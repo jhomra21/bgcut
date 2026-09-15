@@ -58,9 +58,7 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
     return new Uint8Array(bytes);
   });
 
-const createSession = (
-  runtime: GpuRuntime,
-): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
+const createSession = (): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const model = yield* fetchModel();
 
@@ -87,7 +85,7 @@ const getSession = (
     }
 
     cachedSession = undefined;
-    const session = yield* createSession(runtime);
+    const session = yield* createSession();
     cachedSession = { device: runtime.device, session };
     return session;
   });
