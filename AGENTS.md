@@ -24,6 +24,7 @@
 - `oxlint` and `@oxlint/plugins` must stay pinned to exactly matching versions.
 - Enable every canonical generic anti-slop rule and, because this repository directly uses Effect, every canonical Effect anti-slop rule.
 - Keep `tools/oxlint/anti-slop/**` out of application lint traversal; the vendored plugin is tooling source, not product source.
+- `bun run test` is scoped to product tests in `src/`. Vendored anti-slop maintainer tests remain intact but are not part of the Bun application test suite because Oxlint `RuleTester` requires its upstream-supported Node/tsx environment.
 - When upstream changes, review and merge the vendored update while preserving project-local customizations and provenance. Do not force-replace the directory blindly.
 - Do not weaken rule severity, disable a rule, add unsafe casts, or launder types merely to make lint pass. Fix owned product code when the rule exposes a real issue.
 - Treat anti-slop findings as design feedback. Prefer clearer evidence, narrow boundaries, explicit Effect services/errors, and simple data flow over suppressions.
