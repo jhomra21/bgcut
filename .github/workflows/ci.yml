@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -13,8 +16,15 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bun-lock
-          path: bun.lock
+      - name: Commit generated lockfile
+        if: github.event_name == 'push' && hashFiles('bun.lock') != ''
+        run: |
+          if git ls-files --error-unmatch bun.lock >/dev/null 2>&1; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          git commit -m "Add Bun lockfile"
+          git push origin HEAD:bootstrap
       - run: bun run check
