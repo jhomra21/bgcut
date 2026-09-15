@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "oxlint .",
     "typecheck": "tsc --noEmit",
-    "test": "bun test src",
+    "test": "bun test",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
