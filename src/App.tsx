@@ -253,7 +253,7 @@ const App = () => {
             }
           }}
           role="button"
-          tabIndex={0}
+          tabindex={0}
           onKeyDown={(event) => {
             if (!processing() && (event.key === "Enter" || event.key === " ")) {
               fileInput?.click();
