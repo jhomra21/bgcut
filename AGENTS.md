@@ -3,7 +3,7 @@
 ## Engineering defaults
 
 - Use Bun for dependency management, scripts, tests, and workspace operations. Do not use npm, pnpm, or yarn.
-- Use Solid for the UI and reactive application state.
+- Use Solid 2 for the UI and reactive application state. Pin the Solid 2 RC packages exactly while 2.0 is pre-release.
 - Use Effect at asynchronous and system boundaries: GPU initialization, device loss, model loading, model caching, image decoding, worker communication, inference jobs, cancellation, retries, timeouts, persistence, and export.
 - Do not introduce Effect abstractions into tight GPU or image-processing loops where plain TypeScript, TypeGPU, or raw WebGPU is clearer.
 - Prefer explicit tagged domain errors over generic thrown errors.
