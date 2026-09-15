@@ -14,8 +14,19 @@
 - Prefer the smallest implementation that satisfies the current requirement. Do not add an abstraction until there is a concrete second use case.
 - Run `bun run lint`, `bun run typecheck`, `bun run test`, and `bun run build` before considering a change complete.
 - oxlint is mandatory.
-- Anti-slop is mandatory. Enable both the strict generic profile and the Effect-specific anti-slop rule. Do not weaken or disable anti-slop rules just to make generated or awkward code pass.
 - Tests should be change detectors for observable behavior and contracts, not implementation details.
+
+## Anti-slop
+
+- Anti-slop is mandatory and is vendored project source at `tools/oxlint/anti-slop/` from `dmmulroy/anti-slop`.
+- Do not replace the vendored rules with an unofficial npm package. Upstream explicitly treats anti-slop as vendored source owned by the consuming repository.
+- The exact upstream revision and any intentional local deviations must be recorded in `tools/oxlint/anti-slop/UPSTREAM.md`.
+- `oxlint` and `@oxlint/plugins` must stay pinned to exactly matching versions.
+- Enable every canonical generic anti-slop rule and, because this repository directly uses Effect, every canonical Effect anti-slop rule.
+- Keep `tools/oxlint/anti-slop/**` out of application lint traversal; the vendored plugin is tooling source, not product source.
+- When upstream changes, review and merge the vendored update while preserving project-local customizations and provenance. Do not force-replace the directory blindly.
+- Do not weaken rule severity, disable a rule, add unsafe casts, or launder types merely to make lint pass. Fix owned product code when the rule exposes a real issue.
+- Treat anti-slop findings as design feedback. Prefer clearer evidence, narrow boundaries, explicit Effect services/errors, and simple data flow over suppressions.
 
 ## Product constraints
 
