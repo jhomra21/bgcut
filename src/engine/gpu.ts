@@ -22,6 +22,7 @@ const configureOrt = (device: GPUDevice): Effect.Effect<boolean, RuntimeInitiali
   Effect.tryPromise({
     try: async () => {
       ort.env.webgpu.device = device;
+
       return (await ort.env.webgpu.device) === device;
     },
     catch: () =>

@@ -15,6 +15,7 @@ import { logitToAlphaByte } from "./matte";
 import { getGpuRuntime } from "./runtime";
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
+
 const MODEL_URL = `https://huggingface.co/studioludens/birefnet-lite-512/resolve/${MODEL_REVISION}/onnx/model.onnx`;
 
 export type BackgroundRemovalResult = {
@@ -87,6 +88,7 @@ const getSession = (
     cachedSession = undefined;
     const session = yield* createSession();
     cachedSession = { device: runtime.device, session };
+
     return session;
   });
 
@@ -115,6 +117,7 @@ const runModel = (
     }).pipe(Effect.ensuring(Effect.sync(() => input.dispose())));
 
     const output = outputs[outputName];
+
     if (output === undefined) {
       return yield* new InferenceFailed({
         message: "BiRefNet completed without returning its foreground matte.",
@@ -159,11 +162,13 @@ const createMatteCanvas = (logits: Float32Array): Effect.Effect<HTMLCanvasElemen
       canvas.height = MODEL_INPUT_SIZE;
 
       const context = canvas.getContext("2d");
+
       if (context === null) {
         throw new Error("2D canvas is unavailable.");
       }
 
       const matte = context.createImageData(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+
       for (let pixelIndex = 0; pixelIndex < logits.length; pixelIndex += 1) {
         const alpha = logitToAlphaByte(logits[pixelIndex]);
         const rgbaIndex = pixelIndex * 4;
@@ -174,6 +179,7 @@ const createMatteCanvas = (logits: Float32Array): Effect.Effect<HTMLCanvasElemen
       }
 
       context.putImageData(matte, 0, 0);
+
       return canvas;
     },
     catch: () =>
@@ -189,8 +195,10 @@ const canvasToPng = (canvas: HTMLCanvasElement): Effect.Effect<Blob, ExportFaile
         canvas.toBlob((blob) => {
           if (blob === null) {
             reject(new Error("PNG encoding returned no blob."));
+
             return;
           }
+
           resolve(blob);
         }, "image/png");
       }),
@@ -212,6 +220,7 @@ const compositeAtSourceResolution = (
         output.height = bitmap.height;
 
         const context = output.getContext("2d");
+
         if (context === null) {
           throw new Error("2D canvas is unavailable.");
         }
@@ -222,6 +231,7 @@ const compositeAtSourceResolution = (
         context.imageSmoothingQuality = "high";
         context.drawImage(matte, 0, 0, bitmap.width, bitmap.height);
         context.globalCompositeOperation = "source-over";
+
         return output;
       },
       catch: () =>

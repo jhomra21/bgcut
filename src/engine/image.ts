@@ -6,6 +6,7 @@ import { normalizeRgbaToNchw } from "./preprocess";
 export const MODEL_INPUT_SIZE = 512;
 
 const supportedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 export const isSupportedImageType = (mimeType: string): boolean => supportedImageTypes.has(mimeType);
 
 export type DecodedImage = {
@@ -40,6 +41,7 @@ export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Arr
       canvas.height = MODEL_INPUT_SIZE;
 
       const context = canvas.getContext("2d", { willReadFrequently: true });
+
       if (context === null) {
         throw new Error("2D canvas is unavailable.");
       }
@@ -48,6 +50,7 @@ export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Arr
       context.imageSmoothingQuality = "high";
       context.drawImage(bitmap, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
       const image = context.getImageData(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+
       return normalizeRgbaToNchw(image.data, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
     },
     catch: () =>

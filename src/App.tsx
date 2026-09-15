@@ -48,6 +48,7 @@ type RuntimeCheckProps = {
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
   const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
+
   return `${baseName || "image"}-transparent.png`;
 };
 
@@ -63,31 +64,37 @@ const App = () => {
 
   const readyGpu = (): GpuCapability | undefined => {
     const state = gpuState();
+
     return state.status === "ready" ? state.capability : undefined;
   };
 
   const gpuError = (): string | undefined => {
     const state = gpuState();
+
     return state.status === "error" ? state.message : undefined;
   };
 
   const readyImage = (): ReadyImage | undefined => {
     const state = imageState();
+
     return state.status === "ready" ? state : undefined;
   };
 
   const imageError = (): string | undefined => {
     const state = imageState();
+
     return state.status === "error" ? state.message : undefined;
   };
 
   const readyResult = (): ReadyResult | undefined => {
     const state = resultState();
+
     return state.status === "ready" ? state : undefined;
   };
 
   const resultError = (): string | undefined => {
     const state = resultState();
+
     return state.status === "error" ? state.message : undefined;
   };
 
@@ -98,6 +105,7 @@ const App = () => {
       URL.revokeObjectURL(activeResultUrl);
       activeResultUrl = undefined;
     }
+
     setResultState({ status: "idle" });
   };
 
@@ -161,6 +169,7 @@ const App = () => {
 
   const runRemoval = () => {
     const file = selectedFile();
+
     if (file === undefined || processing()) {
       return;
     }
@@ -200,6 +209,7 @@ const App = () => {
   const handleDrop = (event: DragEvent) => {
     event.preventDefault();
     const file = event.dataTransfer?.files.item(0);
+
     if (file !== null && file !== undefined) {
       selectImage(file);
     }
@@ -207,11 +217,13 @@ const App = () => {
 
   const handleFileInput = (event: Event) => {
     const input = event.currentTarget;
+
     if (!(input instanceof HTMLInputElement)) {
       return;
     }
 
     const file = input.files?.item(0);
+
     if (file !== null && file !== undefined) {
       selectImage(file);
       input.value = "";
@@ -223,9 +235,11 @@ const App = () => {
 
     return () => {
       selectionVersion += 1;
+
       if (activeSourceUrl !== undefined) {
         URL.revokeObjectURL(activeSourceUrl);
       }
+
       if (activeResultUrl !== undefined) {
         URL.revokeObjectURL(activeResultUrl);
       }
