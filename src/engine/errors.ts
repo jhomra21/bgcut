@@ -1,4 +1,4 @@
-import { Data } from "effect";
+import { Data, Match } from "effect";
 
 export class WebGpuUnavailable extends Data.TaggedError("WebGpuUnavailable")<{
   readonly message: string;
@@ -62,24 +62,34 @@ export type BackgroundRemovalError =
 
 export const formatGpuRuntimeError = (error: GpuRuntimeError): string => error.message;
 
-export const formatImageError = (error: ImageError): string => {
-  switch (error._tag) {
-    case "UnsupportedImage":
-      return `Unsupported image type: ${error.mimeType || "unknown"}`;
-    case "ImageDecodeFailed":
-      return `Could not decode ${error.fileName}.`;
-    case "ImageProcessingFailed":
-      return error.message;
-  }
-};
+export const formatImageError = (error: ImageError): string =>
+  Match.value(error).pipe(
+    Match.tag("UnsupportedImage", (unsupported) =>
+      `Unsupported image type: ${unsupported.mimeType || "unknown"}`
+    ),
+    Match.tag("ImageDecodeFailed", (decodeFailure) => `Could not decode ${decodeFailure.fileName}.`),
+    Match.tag("ImageProcessingFailed", (processingFailure) => processingFailure.message),
+    Match.exhaustive,
+  );
 
-export const formatBackgroundRemovalError = (error: BackgroundRemovalError): string => {
-  switch (error._tag) {
-    case "UnsupportedImage":
-    case "ImageDecodeFailed":
-    case "ImageProcessingFailed":
-      return formatImageError(error);
-    default:
-      return error.message;
-  }
-};
+export const formatBackgroundRemovalError = (error: BackgroundRemovalError): string =>
+  Match.value(error).pipe(
+    Match.tag(
+      "UnsupportedImage",
+      "ImageDecodeFailed",
+      "ImageProcessingFailed",
+      (imageError) => formatImageError(imageError),
+    ),
+    Match.tag(
+      "WebGpuUnavailable",
+      "AdapterUnavailable",
+      "DeviceRequestFailed",
+      "RuntimeInitializationFailed",
+      "ModelDownloadFailed",
+      "ModelLoadFailed",
+      "InferenceFailed",
+      "ExportFailed",
+      (failure) => failure.message,
+    ),
+    Match.exhaustive,
+  );
