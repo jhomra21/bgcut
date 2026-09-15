@@ -1,0 +1,32 @@
+{
+  "name": "removebg-webgpu",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "oxlint .",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run build"
+  },
+  "dependencies": {
+    "effect": "3.22.2",
+    "onnxruntime-web": "1.29.0",
+    "solid-js": "1.9.15",
+    "typegpu": "0.12.5"
+  },
+  "devDependencies": {
+    "@victor-software-house/anti-slop": "0.0.1",
+    "@oxlint/plugins": "1.83.0",
+    "@webgpu/types": "0.1.72",
+    "oxlint": "1.83.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "vite-plugin-solid": "2.11.14",
+    "@types/bun": "1.4.2"
+  }
+}
