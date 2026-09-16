@@ -6,57 +6,29 @@ import { MODEL_INPUT_SIZE } from "./image";
 import type { RemovalTimingRecorder } from "./timing";
 
 export type GpuModelInput = {
-  readonly buffer: GPUBuffer;
   readonly tensor: ort.Tensor;
 };
 
-const alignTo16Bytes = (byteLength: number): number => Math.ceil(byteLength / 16) * 16;
-
 export const createGpuModelInput = (
-  device: GPUDevice,
+  _device: GPUDevice,
   modelInput: Float32Array,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<GpuModelInput, InferenceFailed> =>
   Effect.try({
     try: () => {
-      // ORT 1.29.0's own WebGPU IO-binding test stages input by mapping the buffer at creation,
-      // copying bytes into the mapped range, then unmapping before Tensor.fromGpuBuffer().
-      // Keep this timer name stable for the current benchmark contract; it measures staging work,
-      // not a separately proven host-to-device transfer completion boundary.
-      const stopUpload = timings.begin("inputUploadMs");
+      const stopStaging = timings.begin("inputUploadMs");
 
-      const buffer = device.createBuffer({
-        mappedAtCreation: true,
-        size: alignTo16Bytes(modelInput.byteLength),
-        usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-      });
+      const tensor = new ort.Tensor("float32", modelInput, [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
+      stopStaging();
 
-      try {
-        const mappedRange = buffer.getMappedRange();
-        const sourceBytes = new Uint8Array(modelInput.buffer, modelInput.byteOffset, modelInput.byteLength);
-        new Uint8Array(mappedRange).set(sourceBytes);
-        buffer.unmap();
-        stopUpload();
-
-        const tensor = ort.Tensor.fromGpuBuffer(buffer, {
-          dataType: "float32",
-          dims: [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE],
-        });
-
-        return { buffer, tensor };
-      } catch (error) {
-        buffer.destroy();
-
-        throw error;
-      }
+      return { tensor };
     },
     catch: (cause) =>
       new InferenceFailed({
-        message: `The preprocessed image could not be staged in the shared WebGPU buffer. ${String(cause)}`,
+        message: `The preprocessed image could not be wrapped in the CPU-backed ONNX input tensor. ${String(cause)}`,
       }),
   });
 
 export const releaseGpuModelInput = (input: GpuModelInput): void => {
   input.tensor.dispose();
-  input.buffer.destroy();
 };
