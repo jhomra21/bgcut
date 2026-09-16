@@ -137,6 +137,31 @@ SVG rejection remained correct, startup diagnostics remained green, no uncaught 
 
 This error matches ONNX Runtime issue #32257 for user-provided `GPUDevice` synchronization. The fix landed in ONNX Runtime PR #32259 and is included in ONNX Runtime 1.30.0. The experiment therefore upgrades to 1.30.0 rather than adding a local workaround around the 1.29.0 synchronization bug.
 
+## Failed explicit-input candidate: ORT 1.30 with default device limits
+
+Exact SHA:
+
+`39298f0f4ebea3bd653269ef24120ebeb64c049e`
+
+Runtime:
+
+- ONNX Runtime Web 1.30.0
+
+This candidate successfully created the ORT custom-device session and reached `OrtRun()`. The previous cross-device validation error and `Failed to wait for the operation:3` synchronization error were both gone.
+
+Inference then failed reproducibly for the cat and dog while creating ORT's `Conv2dMM` WebGPU compute pipeline:
+
+```text
+Failed to create a WebGPU compute pipeline:
+[Invalid ShaderModule "Conv2dMM"]
+```
+
+A second warm cat attempt made the browser tab unresponsive, so no timing, matte, export dimensions, or session-reuse result from this candidate is valid.
+
+The application had created its external device with plain `adapter.requestDevice()`. ONNX Runtime 1.30's own WebGPU initialization instead requests the adapter's compute/storage limits and available WebGPU features before compiling its shader programs. Upstream also documents that ORT cannot add features or raise limits on an external device after it has been created; the application is responsible for requesting the required capabilities.
+
+The next candidate therefore mirrors ONNX Runtime 1.30's device descriptor rather than treating a default WebGPU device as ORT-compatible.
+
 ## GPU-input staging experiment
 
 Branch:
@@ -150,7 +175,8 @@ Current runtime:
 Current direction:
 
 - keep accepted CPU/Canvas preprocessing unchanged
-- create one application-owned WebGPU device
+- request the application-owned WebGPU device with the same compute/storage limits ONNX Runtime 1.30 requests by default
+- request the same available ORT WebGPU features: Chromium timestamp-query-inside-passes or standard timestamp-query fallback, `shader-f16`, and `subgroups`
 - initialize TypeGPU from that device
 - pass the same device to ONNX Runtime per session via `executionProviders: [{ name: "webgpu", device }]`
 - create the model input GPU buffer on that same device
@@ -159,7 +185,7 @@ Current direction:
 - explicitly dispose the wrapper tensor and destroy the app-owned GPU input buffer
 - preserve the underlying ONNX Runtime error text if session creation or `session.run()` rejects
 
-The current timing field is still named `inputUploadMs` for instrumentation compatibility, but on this staging path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
+The current timing field is still named `inputUploadMs` for instrumentation compatibility, but the UI labels it `Input staging`. On this path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
 
 Because this experiment now uses ONNX Runtime Web 1.30.0 while the accepted PR #3 comparison point used 1.29.0, latency differences between them cannot be attributed solely to explicit GPU input. Correctness and device interoperability can be accepted directly; a performance attribution requires a 1.30.0 control using the prior CPU-input/GPU-output path.
 
