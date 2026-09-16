@@ -16,7 +16,7 @@
   "dependencies": {
     "@solidjs/web": "2.0.0-rc.8",
     "effect": "3.22.2",
-    "onnxruntime-web": "1.29.0",
+    "onnxruntime-web": "1.30.0",
     "solid-js": "2.0.0-rc.8",
     "typegpu": "0.12.5"
   },
