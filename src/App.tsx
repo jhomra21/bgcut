@@ -437,8 +437,9 @@ const App = () => {
                     <TimingRow label="Model fetch" value={result.timings.modelDownloadMs} />
                     <TimingRow label="Session init" value={result.timings.sessionInitMs} />
                     <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
+                    <TimingRow label="Input upload" value={result.timings.inputUploadMs} />
                     <TimingRow label="Inference" value={result.timings.inferenceMs} />
-                    <TimingRow label="Output access" value={result.timings.outputReadbackMs} />
+                    <TimingRow label="GPU readback" value={result.timings.outputReadbackMs} />
                     <TimingRow label="Matte" value={result.timings.matteMs} />
                     <TimingRow label="Composite" value={result.timings.compositeMs} />
                     <TimingRow label="PNG export" value={result.timings.exportMs} />
@@ -449,7 +450,7 @@ const App = () => {
           </Show>
 
           <div class="milestone-note">
-            The first cut keeps preprocessing and compositing on Canvas 2D for reliability. TypeGPU already shares the inference device; mask refinement and GPU-native image stages move there next.
+            Preprocessing and compositing still use Canvas 2D. ONNX input and output now cross explicit shared WebGPU buffer boundaries so transfer costs can be measured before TypeGPU moves more of the image pipeline onto the device.
           </div>
         </aside>
       </section>
