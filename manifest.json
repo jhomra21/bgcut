@@ -1,0 +1,27 @@
+{
+  "model": "birefnet-lite-512-ort-basic.onnx",
+  "model_size_bytes": 195860566,
+  "model_sha256": "972e25d2a688370b83ea30e9e40a6ecdee3cada6490bec51dbbf540509c5cdb0",
+  "chunks": [
+    {
+      "name": "birefnet-lite-512-ort-basic.part-00",
+      "size_bytes": 65000000,
+      "sha256": "710e9bef5b4dfbd7a6a10d8f6c7689dce0d33e6d23fe925206f26d4c2bfea58f"
+    },
+    {
+      "name": "birefnet-lite-512-ort-basic.part-01",
+      "size_bytes": 65000000,
+      "sha256": "3f511ecafca88ed1292644ec7c596a14ff6b4a63f9570c52bf6e782709115c55"
+    },
+    {
+      "name": "birefnet-lite-512-ort-basic.part-02",
+      "size_bytes": 65000000,
+      "sha256": "3000dbd029e5fa7dd8d5125a15f66e4cb35b17c8187a99c49e619787f254f113"
+    },
+    {
+      "name": "birefnet-lite-512-ort-basic.part-03",
+      "size_bytes": 860566,
+      "sha256": "4fafacddc92bb332a2d75a38995bd5fc8813dbf9eb23333c5738f59a7a70fcce"
+    }
+  ]
+}
