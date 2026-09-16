@@ -29,9 +29,11 @@ export const float16ViewToFloat32Array = (view: ArrayBufferView): Float32Array |
     return fp16BitsToFloat32Array(view);
   }
 
-  if (view.constructor.name !== "Float16Array") {
+  if (view.constructor.name !== "Float16Array" || view.byteLength % 2 !== 0) {
     return undefined;
   }
 
-  return Float32Array.from(view as unknown as ArrayLike<number>);
+  const bits = new Uint16Array(view.buffer, view.byteOffset, view.byteLength / 2);
+
+  return fp16BitsToFloat32Array(bits);
 };
