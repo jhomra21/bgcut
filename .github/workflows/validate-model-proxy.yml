@@ -1,0 +1,42 @@
+name: validate-model-proxy
+
+on:
+  push:
+    branches:
+      - ci/validate-benchmark-model-proxy
+
+jobs:
+  proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Start Vite benchmark server
+        run: |
+          bun run dev -- --host 127.0.0.1 --port 4173 > /tmp/removebg-vite.log 2>&1 &
+          echo $! > /tmp/removebg-vite.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/removebg-vite.log
+          exit 1
+      - name: Stream and verify optimized model through Vite proxy
+        run: |
+          curl --fail --location --show-error \
+            http://127.0.0.1:4173/__benchmark-model/birefnet-lite-512-ort-basic.onnx \
+            --output /tmp/birefnet-lite-512-ort-basic.onnx
+          test "$(wc -c < /tmp/birefnet-lite-512-ort-basic.onnx)" = "195860566"
+          echo "972e25d2a688370b83ea30e9e40a6ecdee3cada6490bec51dbbf540509c5cdb0  /tmp/birefnet-lite-512-ort-basic.onnx" | sha256sum --check
+      - name: Stop Vite benchmark server
+        if: always()
+        run: |
+          if test -f /tmp/removebg-vite.pid; then
+            kill "$(cat /tmp/removebg-vite.pid)" || true
+          fi
