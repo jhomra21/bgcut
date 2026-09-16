@@ -11,7 +11,7 @@ import {
 } from "./errors";
 import type { GpuRuntime } from "./gpu";
 import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
-import { MODEL_INPUT_SIZE, loadImageBitmap, prepareModelInput } from "./image";
+import { MODEL_INPUT_SIZE, loadImageBitmap, prepareModelPixels } from "./image";
 import { logitToAlphaByte } from "./matte";
 import { getGpuRuntime } from "./runtime";
 import {
@@ -116,7 +116,7 @@ const getSession = (
 const runModel = (
   session: ort.InferenceSession,
   runtime: GpuRuntime,
-  modelInput: Float32Array,
+  modelPixels: Uint8ClampedArray,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
@@ -130,7 +130,7 @@ const runModel = (
     }
 
     return yield* Effect.acquireUseRelease(
-      createGpuModelInput(runtime.device, modelInput, timings),
+      createGpuModelInput(runtime, modelPixels, timings),
       (input) =>
         Effect.gen(function* () {
           const stopInference = timings.begin("inferenceMs");
@@ -304,10 +304,10 @@ export const removeBackground = (
           const session = yield* getSession(runtime, timings);
 
           const stopPreprocess = timings.begin("preprocessMs");
-          const modelInput = yield* prepareModelInput(bitmap);
+          const modelPixels = yield* prepareModelPixels(bitmap);
           stopPreprocess();
 
-          const logits = yield* runModel(session, runtime, modelInput, timings);
+          const logits = yield* runModel(session, runtime, modelPixels, timings);
 
           const stopMatte = timings.begin("matteMs");
           const matte = yield* createMatteCanvas(logits);
