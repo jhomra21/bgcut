@@ -17,21 +17,30 @@ jobs:
         run: |
           set -euxo pipefail
 
-          echo '=== browser release URL ==='
+          echo '=== browser release URL HEAD ==='
           curl --silent --show-error --location --head \
             --header "Origin: ${ORIGIN}" \
             "${RELEASE_URL}" \
             --write-out '\nFINAL %{url_effective} %{http_code}\n'
 
-          echo '=== REST asset endpoint + octet-stream ==='
-          curl --silent --show-error --location --head \
+          echo '=== REST asset endpoint ranged GET + octet-stream ==='
+          curl --silent --show-error --location \
+            --range 0-0 \
+            --dump-header - \
+            --output /dev/null \
             --header "Origin: ${ORIGIN}" \
             --header 'Accept: application/octet-stream' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
             "${API_ASSET_URL}" \
             --write-out '\nFINAL %{url_effective} %{http_code}\n'
 
-          echo '=== REST endpoint response without following redirect ==='
-          curl --silent --show-error --head \
+          echo '=== REST asset endpoint ranged GET without redirect ==='
+          curl --silent --show-error \
+            --range 0-0 \
+            --dump-header - \
+            --output /dev/null \
             --header "Origin: ${ORIGIN}" \
             --header 'Accept: application/octet-stream' \
-            "${API_ASSET_URL}"
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "${API_ASSET_URL}" \
+            --write-out '\nFINAL %{url_effective} %{http_code}\n'
