@@ -136,9 +136,9 @@ const runModel = (
 
           const outputs = yield* Effect.tryPromise({
             try: () => session.run({ [inputName]: input.tensor }),
-            catch: () =>
+            catch: (cause) =>
               new InferenceFailed({
-                message: "BiRefNet inference failed on the WebGPU device.",
+                message: `BiRefNet inference failed on the WebGPU device. ${String(cause)}`,
               }),
           });
 
