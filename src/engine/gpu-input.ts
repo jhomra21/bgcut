@@ -17,18 +17,21 @@ export const createGpuModelInput = (
   modelInput: Float32Array,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<GpuModelInput, InferenceFailed> =>
-  Effect.tryPromise({
-    try: async () => {
+  Effect.try({
+    try: () => {
       const stopUpload = timings.begin("inputUploadMs");
 
       const buffer = device.createBuffer({
+        mappedAtCreation: true,
         size: alignTo16Bytes(modelInput.byteLength),
         usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
       });
 
       try {
-        device.queue.writeBuffer(buffer, 0, modelInput);
-        await device.queue.onSubmittedWorkDone();
+        const mappedRange = buffer.getMappedRange();
+        const sourceBytes = new Uint8Array(modelInput.buffer, modelInput.byteOffset, modelInput.byteLength);
+        new Uint8Array(mappedRange).set(sourceBytes);
+        buffer.unmap();
         stopUpload();
 
         const tensor = ort.Tensor.fromGpuBuffer(buffer, {
@@ -43,9 +46,9 @@ export const createGpuModelInput = (
         throw error;
       }
     },
-    catch: () =>
+    catch: (cause) =>
       new InferenceFailed({
-        message: "The preprocessed image could not be uploaded to the shared WebGPU device.",
+        message: `The preprocessed image could not be staged in the shared WebGPU buffer. ${String(cause)}`,
       }),
   });
 
