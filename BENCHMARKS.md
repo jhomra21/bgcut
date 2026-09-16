@@ -47,15 +47,7 @@ Accepted exact SHA:
 
 `4a2e07de544433ad2b321cb4e29be28a74f397d6`
 
-Change from the CPU-output baseline:
-
-- request `preferredOutputLocation: "gpu-buffer"`
-- require the returned ORT tensor to report `location === "gpu-buffer"`
-- keep CPU preprocessing, model, matte conversion, compositing, and export behavior unchanged
-- call `tensor.getData()` only after `session.run()`
-- dispose the ORT-owned GPU tensor after readback
-
-All four timing runs below used the same 1600×1598 cat image without reloading.
+The same 1600×1598 cat image was used for one cold run plus three warm reruns without reloading.
 
 | Metric | Cold | Warm 1 | Warm 2 | Warm 3 | Warm median |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -73,29 +65,37 @@ Cold setup:
 - session init: 1,643 ms
 - reported `cold session`
 
-All warm runs reported a reused session with model fetch and session init at `0.0 ms`.
+The accepted browser runtime proved that `preferredOutputLocation: "gpu-buffer"` worked for BiRefNet and made output readback an explicit `tensor.getData()` stage. These measurements do not prove a speedup versus the earlier CPU-output baseline because the earlier baseline used a different image.
 
-The accepted browser pass also confirmed unchanged cat fur/ear/whisker behavior, a sensible dog matte, RGBA source-resolution PNG export, SVG rejection, and no WebGPU/Solid/device-crash errors. Only the two known ONNX shape-node CPU-placement warnings appeared.
+## Failed explicit-input candidate
 
-This experiment proves that explicit GPU output residency works in the accepted runtime and exposes a stable output-readback cost of roughly 102–112 ms for this image. It does **not** prove a speedup versus the CPU-output implementation because the accepted CPU-output warm sample used a different image.
+Exact SHA:
 
-## GPU-input boundary experiment
+`670b49fd360015c4cbcd29155d64999562bfb3a9`
+
+This candidate created an app-owned WebGPU input buffer, populated it with `GPUQueue.writeBuffer()`, waited for `queue.onSubmittedWorkDone()`, and passed the result through `Tensor.fromGpuBuffer()`.
+
+Exact-head browser acceptance failed reproducibly for both the accepted cat and dog images at `session.run()`. All five startup checks remained green, SVG rejection remained correct, there were no device-loss or uncaught errors, and only the two known ONNX shape-node CPU-placement warnings appeared. No valid timing result was produced.
+
+Because ONNX Runtime 1.29.0's own WebGPU IO-binding test stages GPU input differently—using a buffer mapped at creation, a CPU byte copy into the mapped range, then `unmap()` before `Tensor.fromGpuBuffer()`—the next candidate mirrors that upstream-tested path. Upstream also notes that this staging path does not provide a separately awaitable copy-completion boundary, so its timing must not be described as completed host-to-device upload time.
+
+## GPU-input staging experiment
 
 Branch:
 
 `perf/gpu-input-buffer`
 
-Purpose:
+Current direction:
 
-- keep the accepted CPU/Canvas preprocessing math unchanged
-- allocate the model input as an app-owned WebGPU buffer on the same device already shared by TypeGPU and ONNX Runtime
-- write the existing Float32 NCHW data into that buffer
-- wait for the shared queue to finish the upload before starting `session.run()`
-- wrap the buffer with `ort.Tensor.fromGpuBuffer()`
-- keep the accepted GPU-output path and explicit output readback unchanged
-- destroy the app-owned input buffer after the run
+- keep accepted CPU/Canvas preprocessing unchanged
+- create the model input GPU buffer with `mappedAtCreation: true`
+- copy the existing Float32 NCHW bytes into the mapped range
+- unmap before `Tensor.fromGpuBuffer()`
+- preserve the accepted GPU-output / explicit readback path
+- explicitly dispose the wrapper tensor and destroy the app-owned GPU input buffer
+- preserve the underlying ONNX Runtime error text if `session.run()` rejects
 
-The explicit queue synchronization is deliberate. It may add latency, but it moves input upload out of the `Inference` span so the experiment can measure transfer cost honestly before TypeGPU writes model-ready data directly on the GPU.
+The current timing field is still named `inputUploadMs` for compatibility with the existing instrumentation contract, but on this staging path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
 
 ## Controlled comparison protocol
 
@@ -103,11 +103,9 @@ For before/after performance claims, use the same exact source image and the sam
 
 1. Start from a fresh page/runtime for the cold run.
 2. Record every timing stage.
-3. Run the same image again without reloading for warm runs.
-4. Confirm warm runs report a reused session and zero model/session setup time.
+3. Run the same image again without reloading for the warm run.
+4. Confirm the second run reports a reused session and zero model/session setup time.
 5. Repeat enough times to distinguish stable behavior from one-run noise.
 6. Compare medians rather than choosing the fastest run.
 7. Confirm output dimensions and visual matte behavior remain unchanged.
 8. Record console warnings/errors and any device loss.
-
-For the GPU-input experiment, capture at least three warm runs of the same image and record `Preprocess`, `Input upload`, `Inference`, `GPU readback`, and `Total` separately. The main question is how much work moves out of `session.run()` once both input upload and output readback are explicit boundaries.
