@@ -5,9 +5,7 @@ import { initializeGpuRuntime, type GpuRuntime } from "./gpu";
 
 export type GpuCapability = {
   readonly webGpu: true;
-  readonly ortWebGpu: true;
   readonly typeGpu: true;
-  readonly ortUsesSharedDevice: true;
   readonly typeGpuUsesSharedDevice: true;
 };
 
@@ -33,9 +31,7 @@ export const getGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = Effect.
 export const checkGpuCapability: Effect.Effect<GpuCapability, GpuRuntimeError> = getGpuRuntime.pipe(
   Effect.map((runtime) => ({
     webGpu: true,
-    ortWebGpu: true,
     typeGpu: true,
-    ortUsesSharedDevice: true,
     typeGpuUsesSharedDevice: runtime.typeGpuUsesSharedDevice,
   })),
 );
