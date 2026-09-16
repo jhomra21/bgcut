@@ -90,6 +90,7 @@ const createSession = (
           executionProviders: [{ name: "webgpu", device: runtime.device }],
           enableGraphCapture: true,
           graphOptimizationLevel: "all",
+          logSeverityLevel: 1,
           preferredOutputLocation: "gpu-buffer",
         }),
       catch: (cause) =>
