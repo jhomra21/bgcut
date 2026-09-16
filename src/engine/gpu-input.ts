@@ -20,6 +20,7 @@ export const createGpuModelInput = (
   Effect.tryPromise({
     try: async () => {
       const stopUpload = timings.begin("inputUploadMs");
+
       const buffer = device.createBuffer({
         size: alignTo16Bytes(modelInput.byteLength),
         usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
