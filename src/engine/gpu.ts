@@ -1,5 +1,4 @@
 import { Effect } from "effect";
-import * as ort from "onnxruntime-web/webgpu";
 import { tgpu } from "typegpu";
 
 import {
@@ -14,22 +13,8 @@ export type GpuRuntime = {
   readonly adapter: GPUAdapter;
   readonly device: GPUDevice;
   readonly root: ReturnType<typeof tgpu.initFromDevice>;
-  readonly ortUsesSharedDevice: boolean;
   readonly typeGpuUsesSharedDevice: boolean;
 };
-
-const configureOrt = (device: GPUDevice): Effect.Effect<boolean, RuntimeInitializationFailed> =>
-  Effect.tryPromise({
-    try: async () => {
-      ort.env.webgpu.device = device;
-
-      return (await ort.env.webgpu.device) === device;
-    },
-    catch: () =>
-      new RuntimeInitializationFailed({
-        message: "ONNX Runtime could not attach to the application WebGPU device.",
-      }),
-  });
 
 export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = Effect.gen(function* () {
   const gpu = navigator.gpu;
@@ -62,14 +47,6 @@ export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = 
       }),
   });
 
-  const ortUsesSharedDevice = yield* configureOrt(device);
-
-  if (!ortUsesSharedDevice) {
-    return yield* new RuntimeInitializationFailed({
-      message: "ONNX Runtime did not retain the application-owned WebGPU device.",
-    });
-  }
-
   const root = yield* Effect.try({
     try: () => tgpu.initFromDevice({ device }),
     catch: () =>
@@ -90,7 +67,6 @@ export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = 
     adapter,
     device,
     root,
-    ortUsesSharedDevice,
     typeGpuUsesSharedDevice,
   };
 });
