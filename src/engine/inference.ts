@@ -10,6 +10,7 @@ import {
   type BackgroundRemovalError,
 } from "./errors";
 import type { GpuRuntime } from "./gpu";
+import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
 import { MODEL_INPUT_SIZE, loadImageBitmap, prepareModelInput } from "./image";
 import { logitToAlphaByte } from "./matte";
 import { getGpuRuntime } from "./runtime";
@@ -66,6 +67,7 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
   });
 
 const createSession = (
+  runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
@@ -78,13 +80,13 @@ const createSession = (
     const session = yield* Effect.tryPromise({
       try: () =>
         ort.InferenceSession.create(model, {
-          executionProviders: ["webgpu"],
+          executionProviders: [{ name: "webgpu", device: runtime.device }],
           graphOptimizationLevel: "all",
           preferredOutputLocation: "gpu-buffer",
         }),
-      catch: () =>
+      catch: (cause) =>
         new ModelLoadFailed({
-          message: "BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session.",
+          message: `BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session. ${String(cause)}`,
         }),
     });
 
@@ -105,7 +107,7 @@ const getSession = (
     }
 
     cachedSession = undefined;
-    const session = yield* createSession(timings);
+    const session = yield* createSession(runtime, timings);
     cachedSession = { device: runtime.device, session };
 
     return session;
@@ -113,6 +115,7 @@ const getSession = (
 
 const runModel = (
   session: ort.InferenceSession,
+  runtime: GpuRuntime,
   modelInput: Float32Array,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
@@ -126,64 +129,70 @@ const runModel = (
       });
     }
 
-    const input = new ort.Tensor("float32", modelInput, [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
-    const stopInference = timings.begin("inferenceMs");
-
-    const outputs = yield* Effect.tryPromise({
-      try: () => session.run({ [inputName]: input }),
-      catch: () =>
-        new InferenceFailed({
-          message: "BiRefNet inference failed on the WebGPU device.",
-        }),
-    }).pipe(Effect.ensuring(Effect.sync(() => input.dispose())));
-
-    stopInference();
-
-    const output = outputs[outputName];
-
-    if (output === undefined) {
-      return yield* new InferenceFailed({
-        message: "BiRefNet completed without returning its foreground matte.",
-      });
-    }
-
     return yield* Effect.acquireUseRelease(
-      Effect.succeed(output),
-      (tensor) =>
+      createGpuModelInput(runtime.device, modelInput, timings),
+      (input) =>
         Effect.gen(function* () {
-          if (tensor.location !== "gpu-buffer") {
-            return yield* new InferenceFailed({
-              message: `BiRefNet returned its matte at ${tensor.location} instead of the requested WebGPU buffer.`,
-            });
-          }
+          const stopInference = timings.begin("inferenceMs");
 
-          const stopReadback = timings.begin("outputReadbackMs");
-
-          const outputData = yield* Effect.tryPromise({
-            try: () => tensor.getData(),
-            catch: () =>
+          const outputs = yield* Effect.tryPromise({
+            try: () => session.run({ [inputName]: input.tensor }),
+            catch: (cause) =>
               new InferenceFailed({
-                message: "BiRefNet returned a GPU matte that could not be read back to the CPU.",
+                message: `BiRefNet inference failed on the WebGPU device. ${String(cause)}`,
               }),
           });
 
-          stopReadback();
+          stopInference();
 
-          if (!(outputData instanceof Float32Array)) {
+          const output = outputs[outputName];
+
+          if (output === undefined) {
             return yield* new InferenceFailed({
-              message: "The fp32 BiRefNet model returned an unexpected output type.",
+              message: "BiRefNet completed without returning its foreground matte.",
             });
           }
 
-          if (outputData.length !== MODEL_INPUT_SIZE * MODEL_INPUT_SIZE) {
-            return yield* new InferenceFailed({
-              message: "BiRefNet returned a matte with unexpected dimensions.",
-            });
-          }
+          return yield* Effect.acquireUseRelease(
+            Effect.succeed(output),
+            (tensor) =>
+              Effect.gen(function* () {
+                if (tensor.location !== "gpu-buffer") {
+                  return yield* new InferenceFailed({
+                    message: `BiRefNet returned its matte at ${tensor.location} instead of the requested WebGPU buffer.`,
+                  });
+                }
 
-          return outputData.slice();
+                const stopReadback = timings.begin("outputReadbackMs");
+
+                const outputData = yield* Effect.tryPromise({
+                  try: () => tensor.getData(),
+                  catch: () =>
+                    new InferenceFailed({
+                      message: "BiRefNet returned a GPU matte that could not be read back to the CPU.",
+                    }),
+                });
+
+                stopReadback();
+
+                if (!(outputData instanceof Float32Array)) {
+                  return yield* new InferenceFailed({
+                    message: "The fp32 BiRefNet model returned an unexpected output type.",
+                  });
+                }
+
+                if (outputData.length !== MODEL_INPUT_SIZE * MODEL_INPUT_SIZE) {
+                  return yield* new InferenceFailed({
+                    message: "BiRefNet returned a matte with unexpected dimensions.",
+                  });
+                }
+
+                return outputData.slice();
+              }),
+            (tensor) => Effect.sync(() => tensor.dispose()),
+          );
         }),
-      (tensor) => Effect.sync(() => tensor.dispose()),
+      (input) => Effect.sync(() => releaseGpuModelInput(input)),
     );
   });
 
@@ -298,7 +307,7 @@ export const removeBackground = (
           const modelInput = yield* prepareModelInput(bitmap);
           stopPreprocess();
 
-          const logits = yield* runModel(session, modelInput, timings);
+          const logits = yield* runModel(session, runtime, modelInput, timings);
 
           const stopMatte = timings.begin("matteMs");
           const matte = yield* createMatteCanvas(logits);

@@ -4,6 +4,7 @@ export type RemovalStageTimings = {
   readonly modelDownloadMs: number;
   readonly sessionInitMs: number;
   readonly preprocessMs: number;
+  readonly inputUploadMs: number;
   readonly inferenceMs: number;
   readonly outputReadbackMs: number;
   readonly matteMs: number;
@@ -22,6 +23,7 @@ type MutableStageTimings = {
   modelDownloadMs: number;
   sessionInitMs: number;
   preprocessMs: number;
+  inputUploadMs: number;
   inferenceMs: number;
   outputReadbackMs: number;
   matteMs: number;
@@ -45,6 +47,7 @@ const createEmptyStageTimings = (): MutableStageTimings => ({
   modelDownloadMs: 0,
   sessionInitMs: 0,
   preprocessMs: 0,
+  inputUploadMs: 0,
   inferenceMs: 0,
   outputReadbackMs: 0,
   matteMs: 0,
@@ -84,6 +87,7 @@ export const createRemovalTimingRecorder = (
       modelDownloadMs: roundMilliseconds(durations.modelDownloadMs),
       sessionInitMs: roundMilliseconds(durations.sessionInitMs),
       preprocessMs: roundMilliseconds(durations.preprocessMs),
+      inputUploadMs: roundMilliseconds(durations.inputUploadMs),
       inferenceMs: roundMilliseconds(durations.inferenceMs),
       outputReadbackMs: roundMilliseconds(durations.outputReadbackMs),
       matteMs: roundMilliseconds(durations.matteMs),
