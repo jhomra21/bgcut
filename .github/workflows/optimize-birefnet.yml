@@ -1,9 +1,7 @@
 name: optimize-birefnet
 
 on:
-  push:
-    branches:
-      - perf/optimized-model-graph-capture
+  workflow_dispatch:
 
 permissions:
   contents: write
