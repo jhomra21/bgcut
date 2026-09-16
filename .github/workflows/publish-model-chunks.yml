@@ -1,0 +1,78 @@
+name: publish-model-chunks
+
+on:
+  push:
+    branches:
+      - perf/optimized-model-graph-capture
+    paths:
+      - .github/workflows/publish-model-chunks.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: model-birefnet-lite-512-ort-basic-v1
+      MODEL_FILE: birefnet-lite-512-ort-basic.onnx
+      MODEL_SHA256: 972e25d2a688370b83ea30e9e40a6ecdee3cada6490bec51dbbf540509c5cdb0
+      ASSET_BRANCH: model-assets-birefnet-lite-512-ort-basic-v1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify validated model
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$RELEASE_TAG" --pattern "$MODEL_FILE"
+          echo "$MODEL_SHA256  $MODEL_FILE" | sha256sum --check --strict
+
+      - name: Split into GitHub-hostable chunks
+        run: |
+          mkdir -p /tmp/model-assets
+          split \
+            --bytes=65000000 \
+            --numeric-suffixes=0 \
+            --suffix-length=2 \
+            "$MODEL_FILE" \
+            /tmp/model-assets/birefnet-lite-512-ort-basic.part-
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('/tmp/model-assets')
+          chunks = []
+          for path in sorted(root.glob('birefnet-lite-512-ort-basic.part-*')):
+              data = path.read_bytes()
+              chunks.append({
+                  'name': path.name,
+                  'size_bytes': len(data),
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+
+          manifest = {
+              'model': 'birefnet-lite-512-ort-basic.onnx',
+              'model_size_bytes': 195860566,
+              'model_sha256': os.environ['MODEL_SHA256'],
+              'chunks': chunks,
+          }
+          (root / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          print((root / 'manifest.json').read_text())
+          PY
+
+      - name: Publish immutable model asset branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan "$ASSET_BRANCH"
+          git rm -rf .
+          cp -R /tmp/model-assets/. .
+          printf '* -text\n' > .gitattributes
+          git add .
+          git commit -m "Publish validated optimized BiRefNet chunks"
+          git push origin "HEAD:refs/heads/$ASSET_BRANCH" --force
+          echo "ASSET_COMMIT=$(git rev-parse HEAD)"
