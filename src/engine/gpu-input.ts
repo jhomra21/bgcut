@@ -14,9 +14,13 @@ export type GpuModelInput = {
 };
 
 const PIXEL_BUFFER_BYTES = MODEL_PIXEL_COUNT * 4;
+
 const TENSOR_FLOAT_COUNT = MODEL_PIXEL_COUNT * 3;
+
 const TENSOR_BUFFER_BYTES = TENSOR_FLOAT_COUNT * Float32Array.BYTES_PER_ELEMENT;
+
 const NORMALIZE_WORKGROUP_SIZE = 256;
+
 const NORMALIZE_WORKGROUP_COUNT = Math.ceil(MODEL_PIXEL_COUNT / NORMALIZE_WORKGROUP_SIZE);
 
 const normalizeLayout = tgpu.bindGroupLayout({
@@ -62,6 +66,7 @@ const getNormalizePipeline = (runtime: GpuRuntime): NormalizePipeline => {
   }
 
   const pipeline = runtime.root.createComputePipeline({ compute: normalizeCompute });
+
   cachedNormalizePipeline = { device: runtime.device, pipeline };
 
   return pipeline;
@@ -79,11 +84,13 @@ export const createGpuModelInput = (
       }
 
       const stopUpload = timings.begin("inputUploadMs");
+
       const pixelBuffer = runtime.device.createBuffer({
         mappedAtCreation: true,
         size: PIXEL_BUFFER_BYTES,
         usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
       });
+
       const tensorBuffer = runtime.device.createBuffer({
         size: TENSOR_BUFFER_BYTES,
         usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
@@ -97,6 +104,7 @@ export const createGpuModelInput = (
           pixels: pixelBuffer,
           tensor: tensorBuffer,
         });
+
         getNormalizePipeline(runtime).with(bindGroup).dispatchWorkgroups(NORMALIZE_WORKGROUP_COUNT);
         stopUpload();
 
