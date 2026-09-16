@@ -1,4 +1,4 @@
-import { Data, Effect } from "effect";
+import { Cause, Data, Effect, Exit } from "effect";
 import { resolve } from "node:path";
 
 import {
@@ -29,7 +29,9 @@ const verifyBuiltModel = Effect.gen(function* () {
   console.log(`Verified production model at ${builtModelPath}.`);
 });
 
-await Effect.runPromise(verifyBuiltModel).catch((error: unknown) => {
-  console.error(error);
+const exit = await Effect.runPromiseExit(verifyBuiltModel);
+
+if (Exit.isFailure(exit)) {
+  console.error(Cause.pretty(exit.cause));
   process.exitCode = 1;
-});
+}
