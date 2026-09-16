@@ -67,6 +67,7 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
   });
 
 const createSession = (
+  runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
@@ -79,13 +80,13 @@ const createSession = (
     const session = yield* Effect.tryPromise({
       try: () =>
         ort.InferenceSession.create(model, {
-          executionProviders: ["webgpu"],
+          executionProviders: [{ name: "webgpu", device: runtime.device }],
           graphOptimizationLevel: "all",
           preferredOutputLocation: "gpu-buffer",
         }),
-      catch: () =>
+      catch: (cause) =>
         new ModelLoadFailed({
-          message: "BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session.",
+          message: `BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session. ${String(cause)}`,
         }),
     });
 
@@ -106,7 +107,7 @@ const getSession = (
     }
 
     cachedSession = undefined;
-    const session = yield* createSession(timings);
+    const session = yield* createSession(runtime, timings);
     cachedSession = { device: runtime.device, session };
 
     return session;
