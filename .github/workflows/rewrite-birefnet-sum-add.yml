@@ -1,0 +1,212 @@
+name: rewrite-birefnet-sum-add
+
+on:
+  push:
+    branches:
+      - perf/graph-capture-sum-add-model
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned model tooling
+        run: python -m pip install --disable-pip-version-check "onnxruntime==1.30.0" "onnx==1.19.0" "numpy==2.3.3"
+
+      - name: Rewrite unsupported Sum nodes and validate parity
+        env:
+          SOURCE_URL: https://github.com/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-webgpu-v1/birefnet-lite-512-ort-basic-webgpu.onnx
+          SOURCE_SHA256: 61cd6fa6761eda8595a4511ad4586cfdb06d6be3b45f652fbe7e853f9434e2ae
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from collections import Counter
+          from pathlib import Path
+
+          import numpy as np
+          import onnx
+          import onnxruntime as ort
+
+          source_url = os.environ["SOURCE_URL"]
+          expected_sha = os.environ["SOURCE_SHA256"]
+          source_path = Path("birefnet-lite-512-ort-basic-webgpu-v1.onnx")
+          rewritten_path = Path("birefnet-lite-512-ort-basic-webgpu-v2.onnx")
+          manifest_path = Path("birefnet-lite-512-ort-basic-webgpu-v2.json")
+
+          print(f"Downloading validated WebGPU rewrite v1: {source_url}")
+          urllib.request.urlretrieve(source_url, source_path)
+
+          def sha256(path: Path) -> str:
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          source_sha = sha256(source_path)
+          if source_sha != expected_sha:
+              raise RuntimeError(f"source SHA-256 mismatch: {source_sha} != {expected_sha}")
+
+          source_model = onnx.load(source_path, load_external_data=False)
+          source_ops = Counter(node.op_type for node in source_model.graph.node)
+          sum_nodes = [node for node in source_model.graph.node if node.op_type == "Sum"]
+
+          print(f"Sum nodes: {len(sum_nodes)}")
+          for node in sum_nodes:
+              print(f"  {node.name}: inputs={len(node.input)} outputs={len(node.output)} attrs={len(node.attribute)}")
+
+          if len(sum_nodes) != 20:
+              raise RuntimeError(f"expected exactly 20 Sum nodes, found {len(sum_nodes)}")
+
+          invalid = [
+              node.name
+              for node in sum_nodes
+              if len(node.input) != 2 or len(node.output) != 1 or len(node.attribute) != 0
+          ]
+          if invalid:
+              raise RuntimeError(f"Sum nodes are not safe binary Add rewrites: {invalid}")
+
+          rewritten_model = onnx.ModelProto()
+          rewritten_model.CopyFrom(source_model)
+          rewrites = []
+          for node in rewritten_model.graph.node:
+              if node.op_type != "Sum":
+                  continue
+              rewrites.append({
+                  "node": node.name,
+                  "inputs": list(node.input),
+                  "output": node.output[0],
+              })
+              node.op_type = "Add"
+
+          if len(rewrites) != 20:
+              raise RuntimeError(f"expected 20 rewrites, got {len(rewrites)}")
+
+          onnx.checker.check_model(rewritten_model)
+          onnx.save(rewritten_model, rewritten_path)
+
+          source_options = ort.SessionOptions()
+          source_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+          rewritten_options = ort.SessionOptions()
+          rewritten_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+
+          source_session = ort.InferenceSession(
+              str(source_path),
+              sess_options=source_options,
+              providers=["CPUExecutionProvider"],
+          )
+          rewritten_session = ort.InferenceSession(
+              str(rewritten_path),
+              sess_options=rewritten_options,
+              providers=["CPUExecutionProvider"],
+          )
+
+          input_info = source_session.get_inputs()[0]
+          rewritten_input = rewritten_session.get_inputs()[0]
+          source_output = source_session.get_outputs()[0]
+          rewritten_output = rewritten_session.get_outputs()[0]
+
+          if input_info.name != rewritten_input.name or list(input_info.shape) != list(rewritten_input.shape) or input_info.type != rewritten_input.type:
+              raise RuntimeError("rewritten model input contract changed")
+          if source_output.name != rewritten_output.name or list(source_output.shape) != list(rewritten_output.shape) or source_output.type != rewritten_output.type:
+              raise RuntimeError("rewritten model output contract changed")
+
+          rng = np.random.default_rng(20260916)
+          sample = rng.normal(0.0, 1.0, size=[1, 3, 512, 512]).astype(np.float32)
+          original = source_session.run(None, {input_info.name: sample})[0]
+          rewritten = rewritten_session.run(None, {rewritten_input.name: sample})[0]
+
+          max_abs = float(np.max(np.abs(original - rewritten)))
+          mean_abs = float(np.mean(np.abs(original - rewritten)))
+          original_sigmoid = 1.0 / (1.0 + np.exp(-original))
+          rewritten_sigmoid = 1.0 / (1.0 + np.exp(-rewritten))
+          max_sigmoid_abs = float(np.max(np.abs(original_sigmoid - rewritten_sigmoid)))
+
+          if max_abs != 0.0 or mean_abs != 0.0 or max_sigmoid_abs != 0.0:
+              raise RuntimeError(
+                  f"binary Sum->Add rewrite changed output: max_abs={max_abs}, mean_abs={mean_abs}, max_sigmoid_abs={max_sigmoid_abs}"
+              )
+
+          rewritten_ops = Counter(node.op_type for node in rewritten_model.graph.node)
+          manifest = {
+              "source": {
+                  "url": source_url,
+                  "sha256": source_sha,
+                  "size_bytes": source_path.stat().st_size,
+                  "nodes": len(source_model.graph.node),
+              },
+              "rewritten": {
+                  "filename": rewritten_path.name,
+                  "sha256": sha256(rewritten_path),
+                  "size_bytes": rewritten_path.stat().st_size,
+                  "nodes": len(rewritten_model.graph.node),
+                  "sum_to_add_rewrites": len(rewrites),
+              },
+              "tooling": {
+                  "onnxruntime": ort.__version__,
+                  "onnx": onnx.__version__,
+                  "numpy": np.__version__,
+              },
+              "io": {
+                  "input_name": input_info.name,
+                  "input_shape": list(input_info.shape),
+                  "input_type": input_info.type,
+                  "output_name": source_output.name,
+                  "output_shape": list(source_output.shape),
+                  "output_type": source_output.type,
+              },
+              "parity": {
+                  "seed": 20260916,
+                  "max_abs_logit_diff": max_abs,
+                  "mean_abs_logit_diff": mean_abs,
+                  "max_sigmoid_abs_diff": max_sigmoid_abs,
+              },
+              "op_counts": {
+                  "source": dict(sorted(source_ops.items())),
+                  "rewritten": dict(sorted(rewritten_ops.items())),
+              },
+              "rewrites": rewrites,
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+          print(manifest_path.read_text())
+          PY
+
+      - name: Upload validated WebGPU v2 rewrite
+        uses: actions/upload-artifact@v4
+        with:
+          name: birefnet-lite-512-ort-basic-webgpu-v2
+          path: |
+            birefnet-lite-512-ort-basic-webgpu-v2.onnx
+            birefnet-lite-512-ort-basic-webgpu-v2.json
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish validated WebGPU v2 rewrite prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: model-birefnet-lite-512-ort-basic-webgpu-v2
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --target "${GITHUB_SHA}" \
+              --prerelease \
+              --title "BiRefNet Lite 512 ORT BASIC WebGPU rewrite v2" \
+              --notes "Experimental graph-capture asset. Starting from validated WebGPU rewrite v1, replaces the 20 binary ONNX Sum nodes unsupported by ONNX Runtime WebGPU 1.30.0 with equivalent Add nodes. Publication requires exact deterministic fp32 parity."
+          fi
+          gh release upload "$TAG" \
+            birefnet-lite-512-ort-basic-webgpu-v2.onnx \
+            birefnet-lite-512-ort-basic-webgpu-v2.json \
+            --clobber
