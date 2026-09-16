@@ -21,6 +21,7 @@ const ModelInput = d.arrayOf(d.f32, MODEL_INPUT_ELEMENT_COUNT);
 
 const modelInputLayout = tgpu.bindGroupLayout({
   source: { texture: d.texture2d() },
+  sampler: { sampler: "filtering" },
   output: { storage: ModelInput, access: "mutable" },
 });
 
@@ -32,7 +33,8 @@ const normalizeModelInput = tgpu
     let x = in.gid.x;
     let y = in.gid.y;
     let pixelIndex = y * ${MODEL_INPUT_SIZE}u + x;
-    let pixel = textureLoad(layout.$.source, vec2i(i32(x), i32(y)), 0);
+    let uv = (vec2f(f32(x), f32(y)) + vec2f(0.5, 0.5)) / ${MODEL_INPUT_SIZE}.0;
+    let pixel = textureSampleLevel(layout.$.source, layout.$.sampler, uv, 0.0);
 
     layout.$.output[pixelIndex] = (pixel.x - 0.485) / 0.229;
     layout.$.output[${MODEL_PIXEL_COUNT}u + pixelIndex] = (pixel.y - 0.456) / 0.224;
@@ -68,7 +70,7 @@ const getNormalizationPipeline = (runtime: GpuRuntime): NormalizationPipeline =>
 
 export const createGpuModelInput = (
   runtime: GpuRuntime,
-  modelCanvas: HTMLCanvasElement,
+  sourceBitmap: ImageBitmap,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<GpuModelInput, InferenceFailed> =>
   Effect.try({
@@ -77,10 +79,15 @@ export const createGpuModelInput = (
 
       const sourceTexture = runtime.root
         .createTexture({
-          size: [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE],
+          size: [sourceBitmap.width, sourceBitmap.height],
           format: "rgba8unorm",
         })
         .$usage("sampled", "render");
+
+      const sourceSampler = runtime.root.createSampler({
+        magFilter: "linear",
+        minFilter: "linear",
+      });
 
       const buffer = runtime.device.createBuffer({
         size: MODEL_INPUT_BYTE_LENGTH,
@@ -88,7 +95,7 @@ export const createGpuModelInput = (
       });
 
       try {
-        sourceTexture.write(modelCanvas);
+        sourceTexture.write(sourceBitmap);
 
         const sourceView = sourceTexture.createView(d.texture2d());
 
@@ -96,6 +103,7 @@ export const createGpuModelInput = (
 
         const bindGroup = runtime.root.createBindGroup(modelInputLayout, {
           source: sourceView,
+          sampler: sourceSampler,
           output: outputBuffer,
         });
 
@@ -123,7 +131,7 @@ export const createGpuModelInput = (
     },
     catch: (cause) =>
       new InferenceFailed({
-        message: `TypeGPU could not normalize the resized image into the shared ONNX Runtime input buffer. ${String(cause)}`,
+        message: `TypeGPU could not resize and normalize the image into the shared ONNX Runtime input buffer. ${String(cause)}`,
       }),
   });
 
