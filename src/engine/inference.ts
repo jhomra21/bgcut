@@ -74,6 +74,7 @@ const createSession = (
     stopModelDownload();
 
     const stopSessionInit = timings.begin("sessionInitMs");
+
     const session = yield* Effect.tryPromise({
       try: () =>
         ort.InferenceSession.create(model, {
@@ -86,6 +87,7 @@ const createSession = (
           message: "BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session.",
         }),
     });
+
     stopSessionInit();
 
     return session;
@@ -126,6 +128,7 @@ const runModel = (
 
     const input = new ort.Tensor("float32", modelInput, [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
     const stopInference = timings.begin("inferenceMs");
+
     const outputs = yield* Effect.tryPromise({
       try: () => session.run({ [inputName]: input }),
       catch: () =>
@@ -133,6 +136,7 @@ const runModel = (
           message: "BiRefNet inference failed on the WebGPU device.",
         }),
     }).pipe(Effect.ensuring(Effect.sync(() => input.dispose())));
+
     stopInference();
 
     const output = outputs[outputName];
@@ -148,6 +152,7 @@ const runModel = (
       (tensor) =>
         Effect.gen(function* () {
           const stopReadback = timings.begin("outputReadbackMs");
+
           const outputData = yield* Effect.tryPromise({
             try: () => tensor.getData(),
             catch: () =>
@@ -155,6 +160,7 @@ const runModel = (
                 message: "BiRefNet returned a matte that could not be read on the CPU.",
               }),
           });
+
           stopReadback();
 
           if (!(outputData instanceof Float32Array)) {

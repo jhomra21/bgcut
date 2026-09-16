@@ -30,6 +30,7 @@ type MutableStageTimings = {
 };
 
 type RemovalTimingStage = keyof MutableStageTimings;
+
 type Now = () => number;
 
 export type RemovalTimingRecorder = {
