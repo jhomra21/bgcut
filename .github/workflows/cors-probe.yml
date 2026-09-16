@@ -9,38 +9,18 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe release asset CORS paths
+      - name: Probe static hosting CORS behavior
         env:
           ORIGIN: http://localhost:5174
-          RELEASE_URL: https://github.com/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-v1/birefnet-lite-512-ort-basic.onnx
-          API_ASSET_URL: https://api.github.com/repos/jhomra21/removebg-webgpu/releases/assets/568509455
         run: |
           set -euxo pipefail
 
-          echo '=== browser release URL HEAD ==='
-          curl --silent --show-error --location --head \
+          echo '=== GitHub Pages ==='
+          curl --silent --show-error --head \
             --header "Origin: ${ORIGIN}" \
-            "${RELEASE_URL}" \
-            --write-out '\nFINAL %{url_effective} %{http_code}\n'
+            https://pages.github.com/
 
-          echo '=== REST asset endpoint ranged GET + octet-stream ==='
-          curl --silent --show-error --location \
-            --range 0-0 \
-            --dump-header - \
-            --output /dev/null \
+          echo '=== raw.githubusercontent.com ==='
+          curl --silent --show-error --head \
             --header "Origin: ${ORIGIN}" \
-            --header 'Accept: application/octet-stream' \
-            --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "${API_ASSET_URL}" \
-            --write-out '\nFINAL %{url_effective} %{http_code}\n'
-
-          echo '=== REST asset endpoint ranged GET without redirect ==='
-          curl --silent --show-error \
-            --range 0-0 \
-            --dump-header - \
-            --output /dev/null \
-            --header "Origin: ${ORIGIN}" \
-            --header 'Accept: application/octet-stream' \
-            --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "${API_ASSET_URL}" \
-            --write-out '\nFINAL %{url_effective} %{http_code}\n'
+            https://raw.githubusercontent.com/jhomra21/removebg-webgpu/main/AGENTS.md
