@@ -16,6 +16,41 @@ export type GpuRuntime = {
   readonly typeGpuUsesSharedDevice: true;
 };
 
+const createOrtCompatibleDeviceDescriptor = (adapter: GPUAdapter): GPUDeviceDescriptor => {
+  const requiredFeatures: GPUFeatureName[] = [];
+  const requireFeatureIfAvailable = (feature: GPUFeatureName): boolean => {
+    if (!adapter.features.has(feature)) {
+      return false;
+    }
+
+    requiredFeatures.push(feature);
+    return true;
+  };
+
+  const chromiumTimestampQuery = "chromium-experimental-timestamp-query-inside-passes" as GPUFeatureName;
+
+  if (!requireFeatureIfAvailable(chromiumTimestampQuery)) {
+    requireFeatureIfAvailable("timestamp-query");
+  }
+
+  requireFeatureIfAvailable("shader-f16");
+  requireFeatureIfAvailable("subgroups");
+
+  return {
+    requiredLimits: {
+      maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+      maxComputeWorkgroupsPerDimension: adapter.limits.maxComputeWorkgroupsPerDimension,
+      maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+      maxBufferSize: adapter.limits.maxBufferSize,
+      maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
+      maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+      maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
+      maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
+    },
+    requiredFeatures,
+  };
+};
+
 export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = Effect.gen(function* () {
   const gpu = navigator.gpu;
 
@@ -40,10 +75,10 @@ export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = 
   }
 
   const device = yield* Effect.tryPromise({
-    try: () => adapter.requestDevice(),
+    try: () => adapter.requestDevice(createOrtCompatibleDeviceDescriptor(adapter)),
     catch: () =>
       new DeviceRequestFailed({
-        message: "The browser found WebGPU, but creating a GPU device failed.",
+        message: "The browser found WebGPU, but creating an ONNX Runtime-compatible GPU device failed.",
       }),
   });
 
