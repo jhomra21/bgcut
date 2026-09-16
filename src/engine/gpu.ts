@@ -18,8 +18,8 @@ export type GpuRuntime = {
 
 const createOrtCompatibleDeviceDescriptor = (adapter: GPUAdapter): GPUDeviceDescriptor => {
   const requiredFeatures: GPUFeatureName[] = [];
-  const requireFeatureIfAvailable = (feature: GPUFeatureName): boolean => {
 
+  const requireFeatureIfAvailable = (feature: GPUFeatureName): boolean => {
     if (!adapter.features.has(feature)) {
       return false;
     }
