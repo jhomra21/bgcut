@@ -1,0 +1,195 @@
+name: optimize-birefnet
+
+on:
+  push:
+    branches:
+      - perf/optimized-model-graph-capture
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned model tooling
+        run: python -m pip install --disable-pip-version-check "onnxruntime==1.30.0" "onnx==1.19.0" "numpy==2.3.3"
+
+      - name: Optimize and validate pinned model
+        env:
+          SOURCE_URL: https://huggingface.co/studioludens/birefnet-lite-512/resolve/4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7/onnx/model.onnx
+          SOURCE_SHA256: 1cb0fb360dadd15af77c639085d77a9df67db0c64315560c3de005f676345ac2
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from collections import Counter
+          from pathlib import Path
+
+          import numpy as np
+          import onnx
+          import onnxruntime as ort
+
+          source_url = os.environ["SOURCE_URL"]
+          expected_sha = os.environ["SOURCE_SHA256"]
+          source_path = Path("birefnet-lite-512-source.onnx")
+          optimized_path = Path("birefnet-lite-512-ort-basic.onnx")
+          manifest_path = Path("birefnet-lite-512-ort-basic.json")
+
+          print(f"Downloading pinned source: {source_url}")
+          urllib.request.urlretrieve(source_url, source_path)
+
+          def sha256(path: Path) -> str:
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          source_sha = sha256(source_path)
+          if source_sha != expected_sha:
+              raise RuntimeError(f"source SHA-256 mismatch: {source_sha} != {expected_sha}")
+
+          source_graph = onnx.load(source_path, load_external_data=False)
+          source_ops = Counter(node.op_type for node in source_graph.graph.node)
+
+          options = ort.SessionOptions()
+          options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
+          options.optimized_model_filepath = str(optimized_path)
+
+          print("Creating ORT 1.30 CPU session to write BASIC-optimized graph")
+          source_session = ort.InferenceSession(
+              str(source_path),
+              sess_options=options,
+              providers=["CPUExecutionProvider"],
+          )
+
+          if not optimized_path.exists():
+              raise RuntimeError("ORT did not write the optimized model")
+
+          optimized_graph = onnx.load(optimized_path, load_external_data=False)
+          optimized_ops = Counter(node.op_type for node in optimized_graph.graph.node)
+
+          input_meta = source_session.get_inputs()
+          output_meta = source_session.get_outputs()
+          if len(input_meta) != 1 or len(output_meta) != 1:
+              raise RuntimeError("unexpected BiRefNet I/O arity")
+
+          input_info = input_meta[0]
+          output_info = output_meta[0]
+          expected_input_shape = [1, 3, 512, 512]
+          expected_output_shape = [1, 1, 512, 512]
+          if list(input_info.shape) != expected_input_shape or input_info.type != "tensor(float)":
+              raise RuntimeError(f"unexpected input contract: {input_info.name} {input_info.shape} {input_info.type}")
+          if list(output_info.shape) != expected_output_shape or output_info.type != "tensor(float)":
+              raise RuntimeError(f"unexpected output contract: {output_info.name} {output_info.shape} {output_info.type}")
+
+          optimized_options = ort.SessionOptions()
+          optimized_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+          optimized_session = ort.InferenceSession(
+              str(optimized_path),
+              sess_options=optimized_options,
+              providers=["CPUExecutionProvider"],
+          )
+
+          rng = np.random.default_rng(20260916)
+          sample = rng.normal(0.0, 1.0, size=expected_input_shape).astype(np.float32)
+          original = source_session.run(None, {input_info.name: sample})[0]
+          optimized = optimized_session.run(None, {optimized_session.get_inputs()[0].name: sample})[0]
+
+          max_abs = float(np.max(np.abs(original - optimized)))
+          mean_abs = float(np.mean(np.abs(original - optimized)))
+          original_sigmoid = 1.0 / (1.0 + np.exp(-original))
+          optimized_sigmoid = 1.0 / (1.0 + np.exp(-optimized))
+          max_sigmoid_abs = float(np.max(np.abs(original_sigmoid - optimized_sigmoid)))
+
+          print(f"source nodes: {len(source_graph.graph.node)}")
+          print(f"optimized nodes: {len(optimized_graph.graph.node)}")
+          print(f"source Shape nodes: {source_ops.get('Shape', 0)}")
+          print(f"optimized Shape nodes: {optimized_ops.get('Shape', 0)}")
+          print(f"max abs logit diff: {max_abs}")
+          print(f"mean abs logit diff: {mean_abs}")
+          print(f"max sigmoid diff: {max_sigmoid_abs}")
+
+          if max_abs > 1e-4 or max_sigmoid_abs > 1e-5:
+              raise RuntimeError("optimized model exceeded fp32 parity tolerance")
+
+          manifest = {
+              "source": {
+                  "url": source_url,
+                  "revision": "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7",
+                  "sha256": source_sha,
+                  "size_bytes": source_path.stat().st_size,
+                  "nodes": len(source_graph.graph.node),
+                  "shape_nodes": source_ops.get("Shape", 0),
+              },
+              "optimized": {
+                  "filename": optimized_path.name,
+                  "sha256": sha256(optimized_path),
+                  "size_bytes": optimized_path.stat().st_size,
+                  "nodes": len(optimized_graph.graph.node),
+                  "shape_nodes": optimized_ops.get("Shape", 0),
+              },
+              "tooling": {
+                  "onnxruntime": ort.__version__,
+                  "onnx": onnx.__version__,
+                  "graph_optimization_level": "ORT_ENABLE_BASIC",
+              },
+              "io": {
+                  "input_name": input_info.name,
+                  "input_shape": expected_input_shape,
+                  "input_type": input_info.type,
+                  "output_name": output_info.name,
+                  "output_shape": expected_output_shape,
+                  "output_type": output_info.type,
+              },
+              "parity": {
+                  "seed": 20260916,
+                  "max_abs_logit_diff": max_abs,
+                  "mean_abs_logit_diff": mean_abs,
+                  "max_sigmoid_abs_diff": max_sigmoid_abs,
+              },
+              "op_counts": {
+                  "source": dict(sorted(source_ops.items())),
+                  "optimized": dict(sorted(optimized_ops.items())),
+              },
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+          print(manifest_path.read_text())
+          PY
+
+      - name: Upload validated model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: birefnet-lite-512-ort-basic
+          path: |
+            birefnet-lite-512-ort-basic.onnx
+            birefnet-lite-512-ort-basic.json
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish validated model prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: model-birefnet-lite-512-ort-basic-v1
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --target "${GITHUB_SHA}" \
+              --prerelease \
+              --title "BiRefNet Lite 512 ORT BASIC optimized v1" \
+              --notes "Pinned studioludens/birefnet-lite-512 fp32 model, optimized offline with ONNX Runtime 1.30.0 ORT_ENABLE_BASIC and validated against the original graph on deterministic fp32 input. Experimental asset for WebGPU graph-capture testing."
+          fi
+          gh release upload "$TAG" \
+            birefnet-lite-512-ort-basic.onnx \
+            birefnet-lite-512-ort-basic.json \
+            --clobber
