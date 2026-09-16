@@ -11,6 +11,7 @@ import {
 } from "./errors";
 import type { GpuRuntime } from "./gpu";
 import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
+import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { MODEL_INPUT_SIZE, loadImageBitmap } from "./image";
 import { logitToAlphaByte } from "./matte";
 import { getGpuRuntime } from "./runtime";
@@ -22,7 +23,9 @@ import {
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
-const MODEL_URL = `https://huggingface.co/studioludens/birefnet-lite-512/resolve/${MODEL_REVISION}/onnx/model.onnx`;
+const OPTIMIZED_MODEL_TAG = "model-birefnet-lite-512-ort-basic-v1";
+
+const MODEL_URL = `https://github.com/jhomra21/removebg-webgpu/releases/download/${OPTIMIZED_MODEL_TAG}/birefnet-lite-512-ort-basic.onnx`;
 
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
@@ -45,13 +48,13 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
       try: () => fetch(MODEL_URL, { cache: "force-cache" }),
       catch: () =>
         new ModelDownloadFailed({
-          message: "BiRefNet could not be downloaded. Check the network connection and try again.",
+          message: "The optimized BiRefNet graph could not be downloaded. Check the network connection and try again.",
         }),
     });
 
     if (!response.ok) {
       return yield* new ModelDownloadFailed({
-        message: `BiRefNet download failed with HTTP ${response.status}.`,
+        message: `Optimized BiRefNet download failed with HTTP ${response.status}.`,
       });
     }
 
@@ -59,7 +62,7 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
       try: () => response.arrayBuffer(),
       catch: () =>
         new ModelDownloadFailed({
-          message: "The BiRefNet model response could not be read.",
+          message: "The optimized BiRefNet response could not be read.",
         }),
     });
 
@@ -81,12 +84,13 @@ const createSession = (
       try: () =>
         ort.InferenceSession.create(model, {
           executionProviders: [{ name: "webgpu", device: runtime.device }],
+          enableGraphCapture: true,
           graphOptimizationLevel: "all",
           preferredOutputLocation: "gpu-buffer",
         }),
       catch: (cause) =>
         new ModelLoadFailed({
-          message: `BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session. ${String(cause)}`,
+          message: `The optimized BiRefNet graph downloaded, but ONNX Runtime could not create the WebGPU graph-capture session. ${String(cause)}`,
         }),
     });
 
@@ -129,6 +133,8 @@ const runModel = (
       });
     }
 
+    const outputTarget = getGpuModelOutput(runtime);
+
     return yield* Effect.acquireUseRelease(
       createGpuModelInput(runtime, sourceBitmap, timings),
       (input) =>
@@ -136,10 +142,14 @@ const runModel = (
           const stopInference = timings.begin("inferenceMs");
 
           const outputs = yield* Effect.tryPromise({
-            try: () => session.run({ [inputName]: input.tensor }),
+            try: () =>
+              session.run(
+                { [inputName]: input.tensor },
+                { [outputName]: outputTarget.tensor },
+              ),
             catch: (cause) =>
               new InferenceFailed({
-                message: `BiRefNet inference failed on the WebGPU device. ${String(cause)}`,
+                message: `Optimized BiRefNet graph-capture inference failed on the WebGPU device. ${String(cause)}`,
               }),
           });
 
@@ -153,44 +163,13 @@ const runModel = (
             });
           }
 
-          return yield* Effect.acquireUseRelease(
-            Effect.succeed(output),
-            (tensor) =>
-              Effect.gen(function* () {
-                if (tensor.location !== "gpu-buffer") {
-                  return yield* new InferenceFailed({
-                    message: `BiRefNet returned its matte at ${tensor.location} instead of the requested WebGPU buffer.`,
-                  });
-                }
+          if (output.location !== "gpu-buffer") {
+            return yield* new InferenceFailed({
+              message: `BiRefNet returned its matte at ${output.location} instead of the persistent WebGPU output buffer.`,
+            });
+          }
 
-                const stopReadback = timings.begin("outputReadbackMs");
-
-                const outputData = yield* Effect.tryPromise({
-                  try: () => tensor.getData(),
-                  catch: () =>
-                    new InferenceFailed({
-                      message: "BiRefNet returned a GPU matte that could not be read back to the CPU.",
-                    }),
-                });
-
-                stopReadback();
-
-                if (!(outputData instanceof Float32Array)) {
-                  return yield* new InferenceFailed({
-                    message: "The fp32 BiRefNet model returned an unexpected output type.",
-                  });
-                }
-
-                if (outputData.length !== MODEL_INPUT_SIZE * MODEL_INPUT_SIZE) {
-                  return yield* new InferenceFailed({
-                    message: "BiRefNet returned a matte with unexpected dimensions.",
-                  });
-                }
-
-                return outputData.slice();
-              }),
-            (tensor) => Effect.sync(() => tensor.dispose()),
-          );
+          return yield* readGpuModelOutput(runtime, outputTarget, timings);
         }),
       (input) => Effect.sync(() => releaseGpuModelInput(input)),
     );
