@@ -233,7 +233,7 @@ Warm model fetch and session init were `0.0 ms` for all three reruns. Correctnes
 Against the accepted GPU-input candidate, the CPU-input control warm median was:
 
 - `56 ms` slower in total: `1,919 ms` vs `1,863 ms`
-- about `26.6 ms` slower across input staging + inference: `1,700.0 ms` vs `1,673.5 ms`
+- about `26.5 ms` slower across input staging + inference: `1,700.0 ms` vs `1,673.5 ms`
 
 With only three warm runs and noticeable run-to-run variance, this is not evidence of a meaningful speedup from explicit GPU input. Treat the standalone external GPU-input boundary as **performance-neutral at this sample size**. Its value is architectural: it gives TypeGPU a supported path to write model-ready data into the same GPU buffer that ONNX Runtime consumes, which is a prerequisite for removing the CPU preprocessing/staging boundary in later experiments.
 
