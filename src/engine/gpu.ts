@@ -13,7 +13,7 @@ export type GpuRuntime = {
   readonly adapter: GPUAdapter;
   readonly device: GPUDevice;
   readonly root: ReturnType<typeof tgpu.initFromDevice>;
-  readonly typeGpuUsesSharedDevice: boolean;
+  readonly typeGpuUsesSharedDevice: true;
 };
 
 export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = Effect.gen(function* () {
@@ -55,9 +55,7 @@ export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = 
       }),
   });
 
-  const typeGpuUsesSharedDevice = root.device === device;
-
-  if (!typeGpuUsesSharedDevice) {
+  if (root.device !== device) {
     return yield* new RuntimeInitializationFailed({
       message: "TypeGPU did not retain the application-owned WebGPU device.",
     });
@@ -67,6 +65,6 @@ export const initializeGpuRuntime: Effect.Effect<GpuRuntime, GpuRuntimeError> = 
     adapter,
     device,
     root,
-    typeGpuUsesSharedDevice,
+    typeGpuUsesSharedDevice: true,
   };
 });
