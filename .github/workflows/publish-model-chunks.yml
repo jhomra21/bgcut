@@ -63,6 +63,7 @@ jobs:
           (root / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
           print((root / 'manifest.json').read_text())
           PY
+          rm -f "$MODEL_FILE"
 
       - name: Publish immutable model asset branch
         run: |
