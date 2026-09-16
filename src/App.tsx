@@ -398,9 +398,7 @@ const App = () => {
             {(capability) => (
               <div class="checks">
                 <RuntimeCheck label="WebGPU device" passed={capability.webGpu} />
-                <RuntimeCheck label="ONNX Runtime WebGPU" passed={capability.ortWebGpu} />
                 <RuntimeCheck label="TypeGPU root" passed={capability.typeGpu} />
-                <RuntimeCheck label="ORT shares device" passed={capability.ortUsesSharedDevice} />
                 <RuntimeCheck label="TypeGPU shares device" passed={capability.typeGpuUsesSharedDevice} />
               </div>
             )}
@@ -410,6 +408,7 @@ const App = () => {
             <p class="eyebrow">MODEL</p>
             <strong>BiRefNet Lite · 512 · fp32</strong>
             <span>Pinned revision 4a3c40c</span>
+            <span>ONNX Runtime Web 1.30.0 · custom-device session on first run</span>
             <span>Inference at 512² · export at source resolution</span>
           </div>
 
@@ -437,7 +436,7 @@ const App = () => {
                     <TimingRow label="Model fetch" value={result.timings.modelDownloadMs} />
                     <TimingRow label="Session init" value={result.timings.sessionInitMs} />
                     <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
-                    <TimingRow label="Input upload" value={result.timings.inputUploadMs} />
+                    <TimingRow label="Input staging" value={result.timings.inputUploadMs} />
                     <TimingRow label="Inference" value={result.timings.inferenceMs} />
                     <TimingRow label="GPU readback" value={result.timings.outputReadbackMs} />
                     <TimingRow label="Matte" value={result.timings.matteMs} />
@@ -450,7 +449,7 @@ const App = () => {
           </Show>
 
           <div class="milestone-note">
-            Preprocessing and compositing still use Canvas 2D. ONNX input and output now cross explicit shared WebGPU buffer boundaries so transfer costs can be measured before TypeGPU moves more of the image pipeline onto the device.
+            Preprocessing and compositing still use Canvas 2D. The ONNX session is created lazily on the first removal with the application GPUDevice, so a successful removal validates the custom-device path. Input staging covers mapped buffer creation, CPU copy, and unmap; GPU readback remains explicit.
           </div>
         </aside>
       </section>
