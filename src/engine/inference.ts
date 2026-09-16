@@ -9,8 +9,14 @@ import {
   ModelLoadFailed,
   type BackgroundRemovalError,
 } from "./errors";
+import { float16ViewToFloat32Array } from "./float16";
 import type { GpuRuntime } from "./gpu";
-import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
+import {
+  createGpuModelInput,
+  preferredModelPrecision,
+  releaseGpuModelInput,
+  type ModelPrecision,
+} from "./gpu-input";
 import { MODEL_INPUT_SIZE, loadImageBitmap } from "./image";
 import { logitToAlphaByte } from "./matte";
 import { getGpuRuntime } from "./runtime";
@@ -22,36 +28,44 @@ import {
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
-const MODEL_URL = `https://huggingface.co/studioludens/birefnet-lite-512/resolve/${MODEL_REVISION}/onnx/model.onnx`;
+const MODEL_FILES: Readonly<Record<ModelPrecision, string>> = {
+  fp16: "model_fp16.onnx",
+  fp32: "model.onnx",
+};
+
+const modelUrl = (precision: ModelPrecision): string =>
+  `https://huggingface.co/studioludens/birefnet-lite-512/resolve/${MODEL_REVISION}/onnx/${MODEL_FILES[precision]}`;
 
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
   readonly width: number;
   readonly height: number;
   readonly modelRevision: string;
+  readonly modelPrecision: ModelPrecision;
   readonly timings: RemovalTimings;
 };
 
 type SessionCache = {
   readonly device: GPUDevice;
+  readonly precision: ModelPrecision;
   readonly session: ort.InferenceSession;
 };
 
 let cachedSession: SessionCache | undefined;
 
-const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
+const fetchModel = (precision: ModelPrecision): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
   Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
-      try: () => fetch(MODEL_URL, { cache: "force-cache" }),
+      try: () => fetch(modelUrl(precision), { cache: "force-cache" }),
       catch: () =>
         new ModelDownloadFailed({
-          message: "BiRefNet could not be downloaded. Check the network connection and try again.",
+          message: `BiRefNet ${precision} could not be downloaded. Check the network connection and try again.`,
         }),
     });
 
     if (!response.ok) {
       return yield* new ModelDownloadFailed({
-        message: `BiRefNet download failed with HTTP ${response.status}.`,
+        message: `BiRefNet ${precision} download failed with HTTP ${response.status}.`,
       });
     }
 
@@ -59,7 +73,7 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
       try: () => response.arrayBuffer(),
       catch: () =>
         new ModelDownloadFailed({
-          message: "The BiRefNet model response could not be read.",
+          message: `The BiRefNet ${precision} model response could not be read.`,
         }),
     });
 
@@ -68,11 +82,12 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
 
 const createSession = (
   runtime: GpuRuntime,
+  precision: ModelPrecision,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
-    const model = yield* fetchModel();
+    const model = yield* fetchModel(precision);
     stopModelDownload();
 
     const stopSessionInit = timings.begin("sessionInitMs");
@@ -86,7 +101,7 @@ const createSession = (
         }),
       catch: (cause) =>
         new ModelLoadFailed({
-          message: `BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session. ${String(cause)}`,
+          message: `BiRefNet ${precision} downloaded, but ONNX Runtime could not create the WebGPU session. ${String(cause)}`,
         }),
     });
 
@@ -97,26 +112,40 @@ const createSession = (
 
 const getSession = (
   runtime: GpuRuntime,
+  precision: ModelPrecision,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
-    if (cachedSession?.device === runtime.device) {
+    if (cachedSession?.device === runtime.device && cachedSession.precision === precision) {
       timings.markSessionReused();
 
       return cachedSession.session;
     }
 
     cachedSession = undefined;
-    const session = yield* createSession(runtime, timings);
-    cachedSession = { device: runtime.device, session };
+    const session = yield* createSession(runtime, precision, timings);
+    cachedSession = { device: runtime.device, precision, session };
 
     return session;
   });
+
+const outputToFloat32 = (tensor: ort.Tensor, outputData: unknown): Float32Array | undefined => {
+  if (tensor.type === "float32" && outputData instanceof Float32Array) {
+    return outputData.slice();
+  }
+
+  if (tensor.type === "float16" && ArrayBuffer.isView(outputData)) {
+    return float16ViewToFloat32Array(outputData);
+  }
+
+  return undefined;
+};
 
 const runModel = (
   session: ort.InferenceSession,
   runtime: GpuRuntime,
   sourceBitmap: ImageBitmap,
+  precision: ModelPrecision,
   timings: RemovalTimingRecorder,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
@@ -130,7 +159,7 @@ const runModel = (
     }
 
     return yield* Effect.acquireUseRelease(
-      createGpuModelInput(runtime, sourceBitmap, timings),
+      createGpuModelInput(runtime, sourceBitmap, timings, precision),
       (input) =>
         Effect.gen(function* () {
           const stopInference = timings.begin("inferenceMs");
@@ -139,7 +168,7 @@ const runModel = (
             try: () => session.run({ [inputName]: input.tensor }),
             catch: (cause) =>
               new InferenceFailed({
-                message: `BiRefNet inference failed on the WebGPU device. ${String(cause)}`,
+                message: `BiRefNet ${precision} inference failed on the WebGPU device. ${String(cause)}`,
               }),
           });
 
@@ -175,19 +204,21 @@ const runModel = (
 
                 stopReadback();
 
-                if (!(outputData instanceof Float32Array)) {
+                const logits = outputToFloat32(tensor, outputData);
+
+                if (logits === undefined) {
                   return yield* new InferenceFailed({
-                    message: "The fp32 BiRefNet model returned an unexpected output type.",
+                    message: `BiRefNet ${precision} returned unexpected ${tensor.type} output data.`,
                   });
                 }
 
-                if (outputData.length !== MODEL_INPUT_SIZE * MODEL_INPUT_SIZE) {
+                if (logits.length !== MODEL_INPUT_SIZE * MODEL_INPUT_SIZE) {
                   return yield* new InferenceFailed({
                     message: "BiRefNet returned a matte with unexpected dimensions.",
                   });
                 }
 
-                return outputData.slice();
+                return logits;
               }),
             (tensor) => Effect.sync(() => tensor.dispose()),
           );
@@ -301,8 +332,9 @@ export const removeBackground = (
           const runtime = yield* getGpuRuntime;
           stopRuntime();
 
-          const session = yield* getSession(runtime, timings);
-          const logits = yield* runModel(session, runtime, bitmap, timings);
+          const precision = preferredModelPrecision(runtime);
+          const session = yield* getSession(runtime, precision, timings);
+          const logits = yield* runModel(session, runtime, bitmap, precision, timings);
 
           const stopMatte = timings.begin("matteMs");
           const matte = yield* createMatteCanvas(logits);
@@ -321,6 +353,7 @@ export const removeBackground = (
             width: bitmap.width,
             height: bitmap.height,
             modelRevision: MODEL_REVISION,
+            modelPrecision: precision,
             timings: timings.finish(),
           };
         }),
