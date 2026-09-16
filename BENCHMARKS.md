@@ -162,32 +162,80 @@ The application had created its external device with plain `adapter.requestDevic
 
 The next candidate therefore mirrors ONNX Runtime 1.30's device descriptor rather than treating a default WebGPU device as ORT-compatible.
 
-## GPU-input staging experiment
+## Accepted GPU-input boundary
 
-Branch:
+Accepted exact SHA:
 
-`perf/gpu-input-buffer`
+`95b8f98fa870967a5916e8be078b624ec2060579`
 
-Current runtime:
+Merged main SHA:
+
+`b83085a8d0e580c2761ddb291d1bdd9f43547315`
+
+Runtime:
 
 - ONNX Runtime Web 1.30.0
+- app-owned ORT-compatible shared `GPUDevice`
+- CPU/Canvas preprocessing
+- mapped app-owned GPU input buffer passed through `Tensor.fromGpuBuffer()`
+- GPU-buffer output with explicit `tensor.getData()` readback
 
-Current direction:
+The same 1600×1598 cat image was used for one cold run plus three warm reruns without reloading.
 
-- keep accepted CPU/Canvas preprocessing unchanged
-- request the application-owned WebGPU device with the same compute/storage limits ONNX Runtime 1.30 requests by default
-- request the same available ORT WebGPU features: Chromium timestamp-query-inside-passes or standard timestamp-query fallback, `shader-f16`, and `subgroups`
-- initialize TypeGPU from that device
-- pass the same device to ONNX Runtime per session via `executionProviders: [{ name: "webgpu", device }]`
-- create the model input GPU buffer on that same device
-- stage the existing Float32 NCHW bytes with `mappedAtCreation`, mapped CPU copy, and `unmap()`
-- preserve the accepted GPU-output / explicit readback path
-- explicitly dispose the wrapper tensor and destroy the app-owned GPU input buffer
-- preserve the underlying ONNX Runtime error text if session creation or `session.run()` rejects
+| Metric | Cold | Warm 1 | Warm 2 | Warm 3 | Warm median |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Total | 12,862 ms | 1,905 ms | 1,776 ms | 1,863 ms | 1,863 ms |
+| Preprocess | 31 ms | 12 ms | 7.0 ms | 6.3 ms | 7.0 ms |
+| Input staging | 0.2 ms | 0.5 ms | 1.5 ms | 1.6 ms | 1.5 ms |
+| Inference | 2,932 ms | 1,713 ms | 1,613 ms | 1,672 ms | 1,672 ms |
+| GPU readback | 136 ms | 101 ms | 80 ms | 106 ms | 101 ms |
+| Matte | 4.5 ms | 3.7 ms | 2.7 ms | 4.1 ms | 3.7 ms |
+| Composite | 0.8 ms | 0.2 ms | 0.1 ms | 0.3 ms | 0.2 ms |
+| PNG export | 62 ms | 62 ms | 58 ms | 58 ms | 58 ms |
 
-The current timing field is still named `inputUploadMs` for instrumentation compatibility, but the UI labels it `Input staging`. On this path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
+Cold setup:
 
-Because this experiment now uses ONNX Runtime Web 1.30.0 while the accepted PR #3 comparison point used 1.29.0, latency differences between them cannot be attributed solely to explicit GPU input. Correctness and device interoperability can be accepted directly; a performance attribution requires a 1.30.0 control using the prior CPU-input/GPU-output path.
+- model fetch: 7,875 ms
+- session init: 1,805 ms
+
+Acceptance confirmed `Conv2dMM` compiled, cat fur/ears/whiskers were retained, RGBA 1600×1598 cat export, sensible RGBA 1200×800 dog output, unchanged SVG rejection, session reuse, no cross-device/wait errors, and no uncaught exception or device crash.
+
+`Input staging` measures mapped buffer creation + CPU copy + unmap. It does not prove completion of host-to-device transfer.
+
+## ORT 1.30 CPU-input control
+
+Control exact SHA:
+
+`4ae89872dc10c42d4ac12f75b09e19935f209f24`
+
+This benchmark-only control kept the accepted ORT 1.30 runtime, ORT-compatible shared device, BiRefNet revision, CPU/Canvas preprocessing, GPU output, explicit readback, matte, composite, export, and session reuse unchanged. It changed only the model input from the app-owned GPU buffer to a normal CPU-backed `ort.Tensor`.
+
+| Metric | Cold | Warm 1 | Warm 2 | Warm 3 | Warm median |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Total | 11,875 ms | 1,919 ms | 2,004 ms | 1,764 ms | 1,919 ms |
+| Preprocess | 34 ms | 6.7 ms | 8.2 ms | 12 ms | 8.2 ms |
+| Input staging | 0.1 ms | 0.1 ms | 0.0 ms | 0.0 ms | 0.0 ms |
+| Inference | 1,670 ms | 1,700 ms | 1,736 ms | 1,577 ms | 1,700 ms |
+| GPU readback | 80 ms | 131 ms | 173 ms | 94 ms | 131 ms |
+| Matte | 4.6 ms | 4.1 ms | 2.8 ms | 4.6 ms | 4.1 ms |
+| Composite | 0.3 ms | 0.2 ms | 0.2 ms | 0.1 ms | 0.2 ms |
+| PNG export | 58 ms | 63 ms | 65 ms | 61 ms | 63 ms |
+
+Cold setup:
+
+- model fetch: 8,315 ms
+- session init: 1,698 ms
+
+Warm model fetch and session init were `0.0 ms` for all three reruns. Correctness also passed: transparent cat matte with retained fur, RGBA PNG 1600×1598/color type 6, runtime checks green, expected ORT warnings only, and no exception or device crash.
+
+### Same-runtime interpretation
+
+Against the accepted GPU-input candidate, the CPU-input control warm median was:
+
+- `56 ms` slower in total: `1,919 ms` vs `1,863 ms`
+- about `26.6 ms` slower across input staging + inference: `1,700.0 ms` vs `1,673.5 ms`
+
+With only three warm runs and noticeable run-to-run variance, this is not evidence of a meaningful speedup from explicit GPU input. Treat the standalone external GPU-input boundary as **performance-neutral at this sample size**. Its value is architectural: it gives TypeGPU a supported path to write model-ready data into the same GPU buffer that ONNX Runtime consumes, which is a prerequisite for removing the CPU preprocessing/staging boundary in later experiments.
 
 ## Controlled comparison protocol
 
