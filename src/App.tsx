@@ -6,6 +6,7 @@ import { formatBackgroundRemovalError, formatGpuRuntimeError, formatImageError }
 import { removeBackground } from "./engine/inference";
 import { decodeImage } from "./engine/image";
 import { checkGpuCapability, type GpuCapability } from "./engine/runtime";
+import type { RemovalTimings } from "./engine/timing";
 
 type GpuState =
   | { readonly status: "checking" }
@@ -32,6 +33,7 @@ type ReadyResult = {
   readonly width: number;
   readonly height: number;
   readonly modelRevision: string;
+  readonly timings: RemovalTimings;
 };
 
 type ResultState =
@@ -45,11 +47,24 @@ type RuntimeCheckProps = {
   readonly passed: boolean;
 };
 
+type TimingRowProps = {
+  readonly label: string;
+  readonly value: number;
+};
+
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
   const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
 
   return `${baseName || "image"}-transparent.png`;
+};
+
+const formatTiming = (milliseconds: number): string => {
+  if (milliseconds < 10) {
+    return `${milliseconds.toFixed(1)} ms`;
+  }
+
+  return `${Math.round(milliseconds)} ms`;
 };
 
 const App = () => {
@@ -199,6 +214,7 @@ const App = () => {
               width: result.width,
               height: result.height,
               modelRevision: result.modelRevision,
+              timings: result.timings,
             });
           },
         }),
@@ -399,10 +415,36 @@ const App = () => {
 
           <Show keyed when={readyResult()}>
             {(result) => (
-              <div class="success-card">
-                <strong>Transparent PNG ready</strong>
-                <span>{result.width} × {result.height}</span>
-              </div>
+              <>
+                <div class="success-card">
+                  <strong>Transparent PNG ready</strong>
+                  <span>{result.width} × {result.height}</span>
+                  <span>{formatTiming(result.timings.totalMs)} total</span>
+                </div>
+
+                <div class="timing-card">
+                  <div class="timing-heading">
+                    <div>
+                      <p class="eyebrow">BASELINE</p>
+                      <strong>Pipeline timing</strong>
+                    </div>
+                    <span>{result.timings.sessionReused ? "warm session" : "cold session"}</span>
+                  </div>
+
+                  <div class="timing-grid">
+                    <TimingRow label="Decode" value={result.timings.decodeMs} />
+                    <TimingRow label="Runtime" value={result.timings.runtimeMs} />
+                    <TimingRow label="Model fetch" value={result.timings.modelDownloadMs} />
+                    <TimingRow label="Session init" value={result.timings.sessionInitMs} />
+                    <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
+                    <TimingRow label="Inference" value={result.timings.inferenceMs} />
+                    <TimingRow label="Output access" value={result.timings.outputReadbackMs} />
+                    <TimingRow label="Matte" value={result.timings.matteMs} />
+                    <TimingRow label="Composite" value={result.timings.compositeMs} />
+                    <TimingRow label="PNG export" value={result.timings.exportMs} />
+                  </div>
+                </div>
+              </>
             )}
           </Show>
 
@@ -433,6 +475,13 @@ const RuntimeCheck = (props: RuntimeCheckProps) => (
     <span class={props.passed ? "check-dot passed" : "check-dot failed"} />
     <span>{props.label}</span>
     <strong>{props.passed ? "ready" : "failed"}</strong>
+  </div>
+);
+
+const TimingRow = (props: TimingRowProps) => (
+  <div class="timing-row">
+    <span>{props.label}</span>
+    <strong>{formatTiming(props.value)}</strong>
   </div>
 );
 

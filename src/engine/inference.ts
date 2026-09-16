@@ -13,6 +13,11 @@ import type { GpuRuntime } from "./gpu";
 import { MODEL_INPUT_SIZE, loadImageBitmap, prepareModelInput } from "./image";
 import { logitToAlphaByte } from "./matte";
 import { getGpuRuntime } from "./runtime";
+import {
+  createRemovalTimingRecorder,
+  type RemovalTimingRecorder,
+  type RemovalTimings,
+} from "./timing";
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
@@ -23,6 +28,7 @@ export type BackgroundRemovalResult = {
   readonly width: number;
   readonly height: number;
   readonly modelRevision: string;
+  readonly timings: RemovalTimings;
 };
 
 type SessionCache = {
@@ -59,11 +65,17 @@ const fetchModel = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
     return new Uint8Array(bytes);
   });
 
-const createSession = (): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
+const createSession = (
+  timings: RemovalTimingRecorder,
+): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
+    const stopModelDownload = timings.begin("modelDownloadMs");
     const model = yield* fetchModel();
+    stopModelDownload();
 
-    return yield* Effect.tryPromise({
+    const stopSessionInit = timings.begin("sessionInitMs");
+
+    const session = yield* Effect.tryPromise({
       try: () =>
         ort.InferenceSession.create(model, {
           executionProviders: ["webgpu"],
@@ -75,18 +87,25 @@ const createSession = (): Effect.Effect<ort.InferenceSession, ModelDownloadFaile
           message: "BiRefNet downloaded, but ONNX Runtime could not create the WebGPU session.",
         }),
     });
+
+    stopSessionInit();
+
+    return session;
   });
 
 const getSession = (
   runtime: GpuRuntime,
+  timings: RemovalTimingRecorder,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     if (cachedSession?.device === runtime.device) {
+      timings.markSessionReused();
+
       return cachedSession.session;
     }
 
     cachedSession = undefined;
-    const session = yield* createSession();
+    const session = yield* createSession(timings);
     cachedSession = { device: runtime.device, session };
 
     return session;
@@ -95,6 +114,7 @@ const getSession = (
 const runModel = (
   session: ort.InferenceSession,
   modelInput: Float32Array,
+  timings: RemovalTimingRecorder,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
     const inputName = session.inputNames.at(0);
@@ -107,6 +127,7 @@ const runModel = (
     }
 
     const input = new ort.Tensor("float32", modelInput, [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
+    const stopInference = timings.begin("inferenceMs");
 
     const outputs = yield* Effect.tryPromise({
       try: () => session.run({ [inputName]: input }),
@@ -115,6 +136,8 @@ const runModel = (
           message: "BiRefNet inference failed on the WebGPU device.",
         }),
     }).pipe(Effect.ensuring(Effect.sync(() => input.dispose())));
+
+    stopInference();
 
     const output = outputs[outputName];
 
@@ -128,6 +151,8 @@ const runModel = (
       Effect.succeed(output),
       (tensor) =>
         Effect.gen(function* () {
+          const stopReadback = timings.begin("outputReadbackMs");
+
           const outputData = yield* Effect.tryPromise({
             try: () => tensor.getData(),
             catch: () =>
@@ -135,6 +160,8 @@ const runModel = (
                 message: "BiRefNet returned a matte that could not be read on the CPU.",
               }),
           });
+
+          stopReadback();
 
           if (!(outputData instanceof Float32Array)) {
             return yield* new InferenceFailed({
@@ -208,61 +235,85 @@ const canvasToPng = (canvas: HTMLCanvasElement): Effect.Effect<Blob, ExportFaile
       }),
   });
 
-const compositeAtSourceResolution = (
+const createSourceComposite = (
   bitmap: ImageBitmap,
   matte: HTMLCanvasElement,
-): Effect.Effect<Blob, ImageProcessingFailed | ExportFailed> =>
-  Effect.gen(function* () {
-    const canvas = yield* Effect.try({
-      try: () => {
-        const output = document.createElement("canvas");
-        output.width = bitmap.width;
-        output.height = bitmap.height;
+): Effect.Effect<HTMLCanvasElement, ImageProcessingFailed> =>
+  Effect.try({
+    try: () => {
+      const output = document.createElement("canvas");
+      output.width = bitmap.width;
+      output.height = bitmap.height;
 
-        const context = output.getContext("2d");
+      const context = output.getContext("2d");
 
-        if (context === null) {
-          throw new Error("2D canvas is unavailable.");
-        }
+      if (context === null) {
+        throw new Error("2D canvas is unavailable.");
+      }
 
-        context.drawImage(bitmap, 0, 0);
-        context.globalCompositeOperation = "destination-in";
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-        context.drawImage(matte, 0, 0, bitmap.width, bitmap.height);
-        context.globalCompositeOperation = "source-over";
+      context.drawImage(bitmap, 0, 0);
+      context.globalCompositeOperation = "destination-in";
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(matte, 0, 0, bitmap.width, bitmap.height);
+      context.globalCompositeOperation = "source-over";
 
-        return output;
-      },
-      catch: () =>
-        new ImageProcessingFailed({
-          message: "The foreground matte could not be applied at the source image resolution.",
-        }),
-    });
-
-    return yield* canvasToPng(canvas);
+      return output;
+    },
+    catch: () =>
+      new ImageProcessingFailed({
+        message: "The foreground matte could not be applied at the source image resolution.",
+      }),
   });
 
 export const removeBackground = (
   file: File,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
-  Effect.acquireUseRelease(
-    loadImageBitmap(file),
-    (bitmap) =>
-      Effect.gen(function* () {
-        const runtime = yield* getGpuRuntime;
-        const session = yield* getSession(runtime);
-        const modelInput = yield* prepareModelInput(bitmap);
-        const logits = yield* runModel(session, modelInput);
-        const matte = yield* createMatteCanvas(logits);
-        const blob = yield* compositeAtSourceResolution(bitmap, matte);
+  Effect.suspend(() => {
+    const timings = createRemovalTimingRecorder();
 
-        return {
-          blob,
-          width: bitmap.width,
-          height: bitmap.height,
-          modelRevision: MODEL_REVISION,
-        };
+    return Effect.acquireUseRelease(
+      Effect.gen(function* () {
+        const stopDecode = timings.begin("decodeMs");
+        const bitmap = yield* loadImageBitmap(file);
+        stopDecode();
+
+        return bitmap;
       }),
-    (bitmap) => Effect.sync(() => bitmap.close()),
-  );
+      (bitmap) =>
+        Effect.gen(function* () {
+          const stopRuntime = timings.begin("runtimeMs");
+          const runtime = yield* getGpuRuntime;
+          stopRuntime();
+
+          const session = yield* getSession(runtime, timings);
+
+          const stopPreprocess = timings.begin("preprocessMs");
+          const modelInput = yield* prepareModelInput(bitmap);
+          stopPreprocess();
+
+          const logits = yield* runModel(session, modelInput, timings);
+
+          const stopMatte = timings.begin("matteMs");
+          const matte = yield* createMatteCanvas(logits);
+          stopMatte();
+
+          const stopComposite = timings.begin("compositeMs");
+          const output = yield* createSourceComposite(bitmap, matte);
+          stopComposite();
+
+          const stopExport = timings.begin("exportMs");
+          const blob = yield* canvasToPng(output);
+          stopExport();
+
+          return {
+            blob,
+            width: bitmap.width,
+            height: bitmap.height,
+            modelRevision: MODEL_REVISION,
+            timings: timings.finish(),
+          };
+        }),
+      (bitmap) => Effect.sync(() => bitmap.close()),
+    );
+  });
