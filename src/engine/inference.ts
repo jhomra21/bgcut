@@ -23,11 +23,11 @@ import {
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
-const OPTIMIZED_MODEL_TAG = "model-birefnet-lite-512-ort-basic-v1";
+const OPTIMIZED_MODEL_TAG = "model-birefnet-lite-512-ort-basic-webgpu-v1";
 
-const OPTIMIZED_MODEL_URL = `https://github.com/jhomra21/removebg-webgpu/releases/download/${OPTIMIZED_MODEL_TAG}/birefnet-lite-512-ort-basic.onnx`;
+const OPTIMIZED_MODEL_URL = `https://github.com/jhomra21/removebg-webgpu/releases/download/${OPTIMIZED_MODEL_TAG}/birefnet-lite-512-ort-basic-webgpu.onnx`;
 
-const BENCHMARK_MODEL_URL = "/__benchmark-model/birefnet-lite-512-ort-basic.onnx";
+const BENCHMARK_MODEL_URL = "/__benchmark-model/birefnet-lite-512-ort-basic-webgpu.onnx";
 
 const MODEL_URL = import.meta.env.DEV ? BENCHMARK_MODEL_URL : OPTIMIZED_MODEL_URL;
 
