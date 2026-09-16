@@ -1,0 +1,284 @@
+name: rewrite-birefnet-webgpu
+
+on:
+  push:
+    branches:
+      - perf/graph-capture-partition-diagnostics
+    paths:
+      - .github/workflows/rewrite-birefnet-webgpu.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned model tooling
+        run: python -m pip install --disable-pip-version-check "onnxruntime==1.30.0" "onnx==1.19.0" "numpy==2.3.3"
+
+      - name: Rewrite unsupported int64 slices and validate parity
+        env:
+          SOURCE_URL: https://github.com/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-v1/birefnet-lite-512-ort-basic.onnx
+          SOURCE_SHA256: 972e25d2a688370b83ea30e9e40a6ecdee3cada6490bec51dbbf540509c5cdb0
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from collections import Counter
+          from pathlib import Path
+
+          import numpy as np
+          import onnx
+          import onnxruntime as ort
+          from onnx import TensorProto, helper, numpy_helper
+
+          source_url = os.environ["SOURCE_URL"]
+          expected_sha = os.environ["SOURCE_SHA256"]
+          source_path = Path("birefnet-lite-512-ort-basic.onnx")
+          rewritten_path = Path("birefnet-lite-512-ort-basic-webgpu.onnx")
+          manifest_path = Path("birefnet-lite-512-ort-basic-webgpu.json")
+
+          print(f"Downloading validated ORT BASIC model: {source_url}")
+          urllib.request.urlretrieve(source_url, source_path)
+
+          def sha256(path: Path) -> str:
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          source_sha = sha256(source_path)
+          if source_sha != expected_sha:
+              raise RuntimeError(f"source SHA-256 mismatch: {source_sha} != {expected_sha}")
+
+          model = onnx.load(source_path, load_external_data=False)
+          source_ops = Counter(node.op_type for node in model.graph.node)
+          initializers = {tensor.name: tensor for tensor in model.graph.initializer}
+          producers = {
+              output: node
+              for node in model.graph.node
+              for output in node.output
+              if output
+          }
+
+          def int64_initializer(name: str) -> list[int] | None:
+              tensor = initializers.get(name)
+              if tensor is None or tensor.data_type != TensorProto.INT64:
+                  return None
+              return [int(value) for value in numpy_helper.to_array(tensor).reshape(-1)]
+
+          def cast_target(node: onnx.NodeProto) -> int | None:
+              if node.op_type != "Cast":
+                  return None
+              for attribute in node.attribute:
+                  if attribute.name == "to":
+                      return int(attribute.i)
+              return None
+
+          rewritten_nodes = []
+          added_initializers = []
+          rewrites = []
+
+          for node in model.graph.node:
+              if node.op_type != "Slice" or len(node.input) < 4:
+                  rewritten_nodes.append(node)
+                  continue
+
+              producer = producers.get(node.input[0])
+              if producer is None or cast_target(producer) != TensorProto.INT64:
+                  rewritten_nodes.append(node)
+                  continue
+
+              starts = int64_initializer(node.input[1])
+              ends = int64_initializer(node.input[2])
+              axes = int64_initializer(node.input[3])
+              steps = int64_initializer(node.input[4]) if len(node.input) > 4 and node.input[4] else [1]
+
+              if (
+                  axes != [3]
+                  or starts not in ([0], [1])
+                  or ends != [starts[0] + 1]
+                  or steps != [1]
+              ):
+                  raise RuntimeError(
+                      f"unexpected int64 Slice pattern at {node.name}: "
+                      f"starts={starts} ends={ends} axes={axes} steps={steps}"
+                  )
+
+              index_name = f"{node.output[0]}__webgpu_gather_index"
+              index = numpy_helper.from_array(
+                  np.asarray([starts[0]], dtype=np.int64),
+                  name=index_name,
+              )
+              gather = helper.make_node(
+                  "Gather",
+                  inputs=[node.input[0], index_name],
+                  outputs=list(node.output),
+                  name=node.name,
+                  axis=3,
+              )
+              gather.doc_string = node.doc_string
+
+              added_initializers.append(index)
+              rewritten_nodes.append(gather)
+              rewrites.append(
+                  {
+                      "node": node.name,
+                      "start": starts[0],
+                      "axis": 3,
+                      "replacement": "Gather",
+                  }
+              )
+
+          if len(rewrites) != 40:
+              raise RuntimeError(f"expected exactly 40 int64 Slice rewrites, got {len(rewrites)}")
+
+          del model.graph.node[:]
+          model.graph.node.extend(rewritten_nodes)
+          model.graph.initializer.extend(added_initializers)
+          onnx.checker.check_model(model)
+          onnx.save(model, rewritten_path)
+
+          rewritten_graph = onnx.load(rewritten_path, load_external_data=False)
+          rewritten_ops = Counter(node.op_type for node in rewritten_graph.graph.node)
+
+          if rewritten_ops.get("Slice", 0) != source_ops.get("Slice", 0) - 40:
+              raise RuntimeError("rewritten graph did not remove exactly 40 Slice nodes")
+          if rewritten_ops.get("Gather", 0) != source_ops.get("Gather", 0) + 40:
+              raise RuntimeError("rewritten graph did not add exactly 40 Gather nodes")
+
+          options = ort.SessionOptions()
+          options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+          source_session = ort.InferenceSession(
+              str(source_path),
+              sess_options=options,
+              providers=["CPUExecutionProvider"],
+          )
+
+          rewritten_options = ort.SessionOptions()
+          rewritten_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+          rewritten_session = ort.InferenceSession(
+              str(rewritten_path),
+              sess_options=rewritten_options,
+              providers=["CPUExecutionProvider"],
+          )
+
+          input_meta = source_session.get_inputs()
+          output_meta = source_session.get_outputs()
+          if len(input_meta) != 1 or len(output_meta) != 1:
+              raise RuntimeError("unexpected BiRefNet I/O arity")
+
+          input_info = input_meta[0]
+          output_info = output_meta[0]
+          expected_input_shape = [1, 3, 512, 512]
+          expected_output_shape = [1, 1, 512, 512]
+          if list(input_info.shape) != expected_input_shape or input_info.type != "tensor(float)":
+              raise RuntimeError(f"unexpected input contract: {input_info.name} {input_info.shape} {input_info.type}")
+          if list(output_info.shape) != expected_output_shape or output_info.type != "tensor(float)":
+              raise RuntimeError(f"unexpected output contract: {output_info.name} {output_info.shape} {output_info.type}")
+
+          rng = np.random.default_rng(20260916)
+          sample = rng.normal(0.0, 1.0, size=expected_input_shape).astype(np.float32)
+          source_output = source_session.run(None, {input_info.name: sample})[0]
+          rewritten_output = rewritten_session.run(
+              None,
+              {rewritten_session.get_inputs()[0].name: sample},
+          )[0]
+
+          max_abs = float(np.max(np.abs(source_output - rewritten_output)))
+          mean_abs = float(np.mean(np.abs(source_output - rewritten_output)))
+          source_sigmoid = 1.0 / (1.0 + np.exp(-source_output))
+          rewritten_sigmoid = 1.0 / (1.0 + np.exp(-rewritten_output))
+          max_sigmoid_abs = float(np.max(np.abs(source_sigmoid - rewritten_sigmoid)))
+
+          print(f"rewritten nodes: {len(rewritten_graph.graph.node)}")
+          print(f"Slice nodes: {source_ops.get('Slice', 0)} -> {rewritten_ops.get('Slice', 0)}")
+          print(f"Gather nodes: {source_ops.get('Gather', 0)} -> {rewritten_ops.get('Gather', 0)}")
+          print(f"max abs logit diff: {max_abs}")
+          print(f"mean abs logit diff: {mean_abs}")
+          print(f"max sigmoid diff: {max_sigmoid_abs}")
+
+          if max_abs != 0.0 or mean_abs != 0.0 or max_sigmoid_abs != 0.0:
+              raise RuntimeError("Slice-to-Gather rewrite changed deterministic fp32 output")
+
+          manifest = {
+              "source": {
+                  "url": source_url,
+                  "sha256": source_sha,
+                  "size_bytes": source_path.stat().st_size,
+                  "nodes": len(model.graph.node),
+              },
+              "rewritten": {
+                  "filename": rewritten_path.name,
+                  "sha256": sha256(rewritten_path),
+                  "size_bytes": rewritten_path.stat().st_size,
+                  "nodes": len(rewritten_graph.graph.node),
+                  "slice_to_gather_rewrites": len(rewrites),
+              },
+              "tooling": {
+                  "onnxruntime": ort.__version__,
+                  "onnx": onnx.__version__,
+                  "numpy": np.__version__,
+              },
+              "io": {
+                  "input_name": input_info.name,
+                  "input_shape": expected_input_shape,
+                  "input_type": input_info.type,
+                  "output_name": output_info.name,
+                  "output_shape": expected_output_shape,
+                  "output_type": output_info.type,
+              },
+              "parity": {
+                  "seed": 20260916,
+                  "max_abs_logit_diff": max_abs,
+                  "mean_abs_logit_diff": mean_abs,
+                  "max_sigmoid_abs_diff": max_sigmoid_abs,
+              },
+              "op_counts": {
+                  "source": dict(sorted(source_ops.items())),
+                  "rewritten": dict(sorted(rewritten_ops.items())),
+              },
+              "rewrites": rewrites,
+          }
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+          print(manifest_path.read_text())
+          PY
+
+      - name: Upload validated WebGPU rewrite
+        uses: actions/upload-artifact@v4
+        with:
+          name: birefnet-lite-512-ort-basic-webgpu
+          path: |
+            birefnet-lite-512-ort-basic-webgpu.onnx
+            birefnet-lite-512-ort-basic-webgpu.json
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish validated WebGPU rewrite prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: model-birefnet-lite-512-ort-basic-webgpu-v1
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --target "${GITHUB_SHA}" \
+              --prerelease \
+              --title "BiRefNet Lite 512 ORT BASIC WebGPU rewrite v1" \
+              --notes "Experimental graph-capture asset. Replaces the 40 validated INT64 Slice nodes unsupported by ONNX Runtime WebGPU 1.30.0 with equivalent axis-3 Gather nodes and requires exact deterministic fp32 parity before publication."
+          fi
+          gh release upload "$TAG" \
+            birefnet-lite-512-ort-basic-webgpu.onnx \
+            birefnet-lite-512-ort-basic-webgpu.json \
+            --clobber
