@@ -1,10 +1,10 @@
 import solid from "@solidjs/vite-plugin";
 import { defineConfig } from "vite";
 
-const benchmarkModelPath = "/__benchmark-model/birefnet-lite-512-ort-basic.onnx";
+const benchmarkModelPath = "/__benchmark-model/birefnet-lite-512-ort-basic-webgpu.onnx";
 
 const releaseModelPath =
-  "/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-v1/birefnet-lite-512-ort-basic.onnx";
+  "/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-webgpu-v1/birefnet-lite-512-ort-basic-webgpu.onnx";
 
 export default defineConfig({
   plugins: [solid()],
