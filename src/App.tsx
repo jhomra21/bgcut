@@ -436,7 +436,7 @@ const App = () => {
                     <TimingRow label="Model fetch" value={result.timings.modelDownloadMs} />
                     <TimingRow label="Session init" value={result.timings.sessionInitMs} />
                     <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
-                    <TimingRow label="Input staging" value={result.timings.inputUploadMs} />
+                    <TimingRow label="GPU prep enqueue" value={result.timings.inputUploadMs} />
                     <TimingRow label="Inference" value={result.timings.inferenceMs} />
                     <TimingRow label="GPU readback" value={result.timings.outputReadbackMs} />
                     <TimingRow label="Matte" value={result.timings.matteMs} />
@@ -449,7 +449,7 @@ const App = () => {
           </Show>
 
           <div class="milestone-note">
-            Preprocessing and compositing still use Canvas 2D. The ONNX session is created lazily on the first removal with the application GPUDevice, so a successful removal validates the custom-device path. Input staging covers mapped buffer creation, CPU copy, and unmap; GPU readback remains explicit.
+            Resize and compositing still use Canvas 2D. TypeGPU uploads the resized 512² canvas and enqueues ImageNet normalization directly into the shared ONNX Runtime input buffer. GPU prep enqueue measures host-side upload and dispatch submission, not GPU completion; GPU readback remains explicit.
           </div>
         </aside>
       </section>
