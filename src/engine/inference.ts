@@ -14,6 +14,7 @@ import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
 import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { MODEL_INPUT_SIZE, loadImageBitmap } from "./image";
 import { logitToAlphaByte } from "./matte";
+import { MODEL_PUBLIC_PATH } from "./model-config";
 import { getGpuRuntime } from "./runtime";
 import {
   createRemovalTimingRecorder,
@@ -23,13 +24,7 @@ import {
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
-const OPTIMIZED_MODEL_TAG = "model-birefnet-lite-512-ort-basic-webgpu-v2";
-
-const OPTIMIZED_MODEL_URL = `https://github.com/jhomra21/removebg-webgpu/releases/download/${OPTIMIZED_MODEL_TAG}/birefnet-lite-512-ort-basic-webgpu-v2.onnx`;
-
-const BENCHMARK_MODEL_URL = "/__benchmark-model/birefnet-lite-512-ort-basic-webgpu-v2.onnx";
-
-const MODEL_URL = import.meta.env.DEV ? BENCHMARK_MODEL_URL : OPTIMIZED_MODEL_URL;
+const MODEL_URL = MODEL_PUBLIC_PATH;
 
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
