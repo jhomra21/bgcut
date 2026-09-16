@@ -1,0 +1,72 @@
+name: probe-release-cors
+
+on:
+  push:
+    branches:
+      - perf/optimized-model-graph-capture
+    paths:
+      - .github/workflows/probe-release-cors.yml
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe release asset CORS chain
+        env:
+          ORIGIN: http://localhost:5174
+          ASSET_API_URL: https://api.github.com/repos/jhomra21/removebg-webgpu/releases/assets/568509455
+        run: |
+          set -euo pipefail
+
+          api_headers="$(mktemp)"
+          final_headers="$(mktemp)"
+
+          curl --silent --show-error \
+            --dump-header "$api_headers" \
+            --output /dev/null \
+            --header "Origin: $ORIGIN" \
+            --header "Accept: application/octet-stream" \
+            --header "Range: bytes=0-0" \
+            "$ASSET_API_URL"
+
+          echo "=== GitHub API response ==="
+          cat "$api_headers"
+
+          if ! grep -qi '^access-control-allow-origin: \*' "$api_headers"; then
+            echo "GitHub API response itself is not CORS-readable."
+            exit 1
+          fi
+
+          location="$(awk 'BEGIN { IGNORECASE=1 } /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); gsub(/\r/, ""); print; exit }' "$api_headers")"
+
+          if [ -z "$location" ]; then
+            status="$(awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' "$api_headers")"
+            if [ "$status" = "200" ] || [ "$status" = "206" ]; then
+              echo "Browser-safe direct API streaming is available."
+              exit 0
+            fi
+
+            echo "No redirect or direct binary response was returned."
+            exit 1
+          fi
+
+          echo "=== Redirect target ==="
+          printf '%s\n' "$location"
+
+          curl --silent --show-error \
+            --dump-header "$final_headers" \
+            --output /dev/null \
+            --header "Origin: $ORIGIN" \
+            --header "Range: bytes=0-0" \
+            "$location"
+
+          echo "=== Final asset response ==="
+          cat "$final_headers"
+
+          if grep -qi '^access-control-allow-origin: \*' "$final_headers"; then
+            echo "Browser-safe release asset delivery is available through the API redirect chain."
+            exit 0
+          fi
+
+          echo "Final release asset response does not allow cross-origin browser reads."
+          exit 1
