@@ -9,7 +9,9 @@ import { MODEL_INPUT_SIZE } from "./image";
 import type { RemovalTimingRecorder } from "./timing";
 
 const MODEL_PIXEL_COUNT = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
+
 const MODEL_INPUT_ELEMENT_COUNT = MODEL_PIXEL_COUNT * 3;
+
 const MODEL_INPUT_BYTE_LENGTH = MODEL_INPUT_ELEMENT_COUNT * Float32Array.BYTES_PER_ELEMENT;
 
 const ModelInput = d.arrayOf(d.f32, MODEL_INPUT_ELEMENT_COUNT);
@@ -62,12 +64,14 @@ export const createGpuModelInput = (
   Effect.try({
     try: () => {
       const stopGpuPrep = timings.begin("inputUploadMs");
+
       const sourceTexture = runtime.root
         .createTexture({
           size: [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE],
           format: "rgba8unorm",
         })
         .$usage("sampled");
+
       const buffer = runtime.device.createBuffer({
         size: MODEL_INPUT_BYTE_LENGTH,
         usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
@@ -77,7 +81,9 @@ export const createGpuModelInput = (
         sourceTexture.write(modelCanvas);
 
         const sourceView = sourceTexture.createView(d.texture2d());
+
         const outputBuffer = runtime.root.createBuffer(ModelInput, buffer).$usage("storage");
+
         const bindGroup = runtime.root.createBindGroup(modelInputLayout, {
           source: sourceView,
           output: outputBuffer,
