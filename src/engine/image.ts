@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { ImageDecodeFailed, ImageProcessingFailed, UnsupportedImage, type ImageError } from "./errors";
 
 export const MODEL_INPUT_SIZE = 512;
+
 export const MODEL_PIXEL_COUNT = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
 
 const supportedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
