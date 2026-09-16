@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
-import { d, std, tgpu } from "typegpu";
+import { d, tgpu } from "typegpu";
 
 import { InferenceFailed } from "./errors";
 import type { GpuRuntime } from "./gpu";
@@ -13,12 +13,35 @@ const MODEL_INPUT_ELEMENT_COUNT = MODEL_PIXEL_COUNT * 3;
 
 const MODEL_INPUT_BYTE_LENGTH = MODEL_INPUT_ELEMENT_COUNT * Float32Array.BYTES_PER_ELEMENT;
 
+const NORMALIZATION_WORKGROUP_SIZE = 16;
+
+const NORMALIZATION_WORKGROUP_COUNT = MODEL_INPUT_SIZE / NORMALIZATION_WORKGROUP_SIZE;
+
 const ModelInput = d.arrayOf(d.f32, MODEL_INPUT_ELEMENT_COUNT);
 
 const modelInputLayout = tgpu.bindGroupLayout({
   source: { texture: d.texture2d() },
   output: { storage: ModelInput, access: "mutable" },
 });
+
+const normalizeModelInput = tgpu
+  .computeFn({
+    in: { gid: d.builtin.globalInvocationId },
+    workgroupSize: [NORMALIZATION_WORKGROUP_SIZE, NORMALIZATION_WORKGROUP_SIZE],
+  })`{
+    let x = in.gid.x;
+    let y = in.gid.y;
+    let pixelIndex = y * ${MODEL_INPUT_SIZE}u + x;
+    let pixel = textureLoad(source, vec2i(i32(x), i32(y)), 0);
+
+    output[pixelIndex] = (pixel.x - 0.485) / 0.229;
+    output[${MODEL_PIXEL_COUNT}u + pixelIndex] = (pixel.y - 0.456) / 0.224;
+    output[${MODEL_PIXEL_COUNT * 2}u + pixelIndex] = (pixel.z - 0.406) / 0.225;
+  }`
+  .$uses({
+    source: modelInputLayout.$.source,
+    output: modelInputLayout.$.output,
+  });
 
 export type GpuModelInput = {
   readonly buffer: GPUBuffer;
@@ -27,16 +50,7 @@ export type GpuModelInput = {
 };
 
 const createNormalizationPipeline = (runtime: GpuRuntime) =>
-  runtime.root.createGuardedComputePipeline((x, y) => {
-    "use gpu";
-
-    const pixelIndex = y * MODEL_INPUT_SIZE + x;
-    const pixel = std.textureLoad(modelInputLayout.$.source, d.vec2i(d.i32(x), d.i32(y)), d.i32(0));
-
-    modelInputLayout.$.output[pixelIndex] = (pixel.x - 0.485) / 0.229;
-    modelInputLayout.$.output[MODEL_PIXEL_COUNT + pixelIndex] = (pixel.y - 0.456) / 0.224;
-    modelInputLayout.$.output[MODEL_PIXEL_COUNT * 2 + pixelIndex] = (pixel.z - 0.406) / 0.225;
-  });
+  runtime.root.createComputePipeline({ compute: normalizeModelInput });
 
 type NormalizationPipeline = ReturnType<typeof createNormalizationPipeline>;
 
@@ -90,7 +104,7 @@ export const createGpuModelInput = (
 
         getNormalizationPipeline(runtime)
           .with(bindGroup)
-          .dispatchThreads(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+          .dispatchWorkgroups(NORMALIZATION_WORKGROUP_COUNT, NORMALIZATION_WORKGROUP_COUNT);
         stopGpuPrep();
 
         const tensor = ort.Tensor.fromGpuBuffer(buffer, {
