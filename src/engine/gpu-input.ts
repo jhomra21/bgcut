@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
-import { d, tgpu } from "typegpu";
-import { textureLoad } from "typegpu/std";
+import { d, std, tgpu } from "typegpu";
 
 import { InferenceFailed } from "./errors";
 import type { GpuRuntime } from "./gpu";
@@ -32,7 +31,7 @@ const createNormalizationPipeline = (runtime: GpuRuntime) =>
     "use gpu";
 
     const pixelIndex = y * MODEL_INPUT_SIZE + x;
-    const pixel = textureLoad(modelInputLayout.$.source, d.vec2i(d.i32(x), d.i32(y)), d.i32(0));
+    const pixel = std.textureLoad(modelInputLayout.$.source, d.vec2i(d.i32(x), d.i32(y)), d.i32(0));
 
     modelInputLayout.$.output[pixelIndex] = (pixel.x - 0.485) / 0.229;
     modelInputLayout.$.output[MODEL_PIXEL_COUNT + pixelIndex] = (pixel.y - 0.456) / 0.224;
@@ -70,7 +69,7 @@ export const createGpuModelInput = (
           size: [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE],
           format: "rgba8unorm",
         })
-        .$usage("sampled");
+        .$usage("sampled", "render");
 
       const buffer = runtime.device.createBuffer({
         size: MODEL_INPUT_BYTE_LENGTH,
