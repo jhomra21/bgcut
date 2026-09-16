@@ -22,7 +22,11 @@ import {
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
-const MODEL_URL = `https://huggingface.co/studioludens/birefnet-lite-512/resolve/${MODEL_REVISION}/onnx/model.onnx`;
+const SOURCE_MODEL_URL = `https://huggingface.co/studioludens/birefnet-lite-512/resolve/${MODEL_REVISION}/onnx/model.onnx`;
+
+const BENCHMARK_MODEL_URL = "/__benchmark-model/birefnet-lite-512-ort-basic.onnx";
+
+const MODEL_URL = import.meta.env.DEV ? BENCHMARK_MODEL_URL : SOURCE_MODEL_URL;
 
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
