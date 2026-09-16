@@ -129,18 +129,6 @@ const getSession = (
     return session;
   });
 
-const outputToFloat32 = (tensor: ort.Tensor, outputData: unknown): Float32Array | undefined => {
-  if (tensor.type === "float32" && outputData instanceof Float32Array) {
-    return outputData.slice();
-  }
-
-  if (tensor.type === "float16" && ArrayBuffer.isView(outputData)) {
-    return float16ViewToFloat32Array(outputData);
-  }
-
-  return undefined;
-};
-
 const runModel = (
   session: ort.InferenceSession,
   runtime: GpuRuntime,
@@ -204,7 +192,13 @@ const runModel = (
 
                 stopReadback();
 
-                const logits = outputToFloat32(tensor, outputData);
+                let logits: Float32Array | undefined;
+
+                if (tensor.type === "float32" && outputData instanceof Float32Array) {
+                  logits = outputData.slice();
+                } else if (tensor.type === "float16" && ArrayBuffer.isView(outputData)) {
+                  logits = float16ViewToFloat32Array(outputData);
+                }
 
                 if (logits === undefined) {
                   return yield* new InferenceFailed({
