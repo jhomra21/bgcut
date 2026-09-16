@@ -33,14 +33,16 @@ export const decodeImage = (file: File): Effect.Effect<DecodedImage, ImageError>
     (bitmap) => Effect.sync(() => bitmap.close()),
   );
 
-export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Array, ImageProcessingFailed> =>
+export const prepareModelCanvas = (
+  bitmap: ImageBitmap,
+): Effect.Effect<HTMLCanvasElement, ImageProcessingFailed> =>
   Effect.try({
     try: () => {
       const canvas = document.createElement("canvas");
       canvas.width = MODEL_INPUT_SIZE;
       canvas.height = MODEL_INPUT_SIZE;
 
-      const context = canvas.getContext("2d", { willReadFrequently: true });
+      const context = canvas.getContext("2d");
 
       if (context === null) {
         throw new Error("2D canvas is unavailable.");
@@ -49,12 +51,34 @@ export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Arr
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
       context.drawImage(bitmap, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
-      const image = context.getImageData(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
 
-      return normalizeRgbaToNchw(image.data, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+      return canvas;
     },
     catch: () =>
       new ImageProcessingFailed({
-        message: "The image could not be prepared for background-removal inference.",
+        message: "The image could not be resized for background-removal inference.",
       }),
+  });
+
+export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Array, ImageProcessingFailed> =>
+  Effect.gen(function* () {
+    const canvas = yield* prepareModelCanvas(bitmap);
+
+    return yield* Effect.try({
+      try: () => {
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+
+        if (context === null) {
+          throw new Error("2D canvas is unavailable.");
+        }
+
+        const image = context.getImageData(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+
+        return normalizeRgbaToNchw(image.data, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+      },
+      catch: () =>
+        new ImageProcessingFailed({
+          message: "The image could not be prepared for background-removal inference.",
+        }),
+    });
   });
