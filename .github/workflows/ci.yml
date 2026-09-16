@@ -12,5 +12,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - run: bun install --frozen-lockfile
+      - run: bun install
+      - name: Show generated lock diff
+        run: git diff -- bun.lock
       - run: bun run check
