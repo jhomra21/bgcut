@@ -67,7 +67,7 @@ Cold setup:
 
 The accepted browser runtime proved that `preferredOutputLocation: "gpu-buffer"` worked for BiRefNet and made output readback an explicit `tensor.getData()` stage. These measurements do not prove a speedup versus the earlier CPU-output baseline because the earlier baseline used a different image.
 
-## Failed explicit-input candidate
+## Failed explicit-input candidate: queue upload
 
 Exact SHA:
 
@@ -77,7 +77,27 @@ This candidate created an app-owned WebGPU input buffer, populated it with `GPUQ
 
 Exact-head browser acceptance failed reproducibly for both the accepted cat and dog images at `session.run()`. All five startup checks remained green, SVG rejection remained correct, there were no device-loss or uncaught errors, and only the two known ONNX shape-node CPU-placement warnings appeared. No valid timing result was produced.
 
-Because ONNX Runtime 1.29.0's own WebGPU IO-binding test stages GPU input differently—using a buffer mapped at creation, a CPU byte copy into the mapped range, then `unmap()` before `Tensor.fromGpuBuffer()`—the next candidate mirrors that upstream-tested path. Upstream also notes that this staging path does not provide a separately awaitable copy-completion boundary, so its timing must not be described as completed host-to-device upload time.
+Because ONNX Runtime 1.29.0's own WebGPU IO-binding test stages GPU input differently—using a buffer mapped at creation, a CPU byte copy into the mapped range, then `unmap()` before `Tensor.fromGpuBuffer()`—the next candidate mirrored that upstream-tested path. Upstream also notes that this staging path does not provide a separately awaitable copy-completion boundary, so its timing must not be described as completed host-to-device upload time.
+
+## Failed explicit-input candidate: upstream staging on the wrong device
+
+Exact SHA:
+
+`af245644a1cccf66a8114f62f380e49000ae03f2`
+
+This candidate mirrored ONNX Runtime 1.29.0's own input staging sequence with `mappedAtCreation`, CPU byte copy, `unmap()`, and `Tensor.fromGpuBuffer()`.
+
+The cat cold run, all three cat warm retries, and the dog regression all failed identically. The preserved ONNX Runtime error was:
+
+```text
+WebGPU validation failed.
+[Buffer] is associated with [Device], and cannot be used with [Device].
+... BindGroupDescriptor "Transpose"
+```
+
+The five startup checks were still green, which proved the old `ort.env.webgpu.device === appDevice` check did not establish that the WebGPU execution provider would actually use that device. ONNX Runtime 1.29.0 treats `env.webgpu.device` as an output/default-device surface; custom devices belong in the per-session WebGPU execution-provider options.
+
+No timing, matte, export dimensions, or session-reuse result from this candidate is valid.
 
 ## GPU-input staging experiment
 
@@ -88,12 +108,14 @@ Branch:
 Current direction:
 
 - keep accepted CPU/Canvas preprocessing unchanged
-- create the model input GPU buffer with `mappedAtCreation: true`
-- copy the existing Float32 NCHW bytes into the mapped range
-- unmap before `Tensor.fromGpuBuffer()`
+- create one application-owned WebGPU device
+- initialize TypeGPU from that device
+- pass the same device to ONNX Runtime per session via `executionProviders: [{ name: "webgpu", device }]`
+- create the model input GPU buffer on that same device
+- stage the existing Float32 NCHW bytes with `mappedAtCreation`, mapped CPU copy, and `unmap()`
 - preserve the accepted GPU-output / explicit readback path
 - explicitly dispose the wrapper tensor and destroy the app-owned GPU input buffer
-- preserve the underlying ONNX Runtime error text if `session.run()` rejects
+- preserve the underlying ONNX Runtime error text if session creation or `session.run()` rejects
 
 The current timing field is still named `inputUploadMs` for compatibility with the existing instrumentation contract, but on this staging path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
 
