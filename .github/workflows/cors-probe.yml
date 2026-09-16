@@ -1,0 +1,37 @@
+name: cors-probe
+
+on:
+  push:
+    branches:
+      - infra/model-cors-probe
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe release asset CORS paths
+        env:
+          ORIGIN: http://localhost:5174
+          RELEASE_URL: https://github.com/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-v1/birefnet-lite-512-ort-basic.onnx
+          API_ASSET_URL: https://api.github.com/repos/jhomra21/removebg-webgpu/releases/assets/568509455
+        run: |
+          set -euxo pipefail
+
+          echo '=== browser release URL ==='
+          curl --silent --show-error --location --head \
+            --header "Origin: ${ORIGIN}" \
+            "${RELEASE_URL}" \
+            --write-out '\nFINAL %{url_effective} %{http_code}\n'
+
+          echo '=== REST asset endpoint + octet-stream ==='
+          curl --silent --show-error --location --head \
+            --header "Origin: ${ORIGIN}" \
+            --header 'Accept: application/octet-stream' \
+            "${API_ASSET_URL}" \
+            --write-out '\nFINAL %{url_effective} %{http_code}\n'
+
+          echo '=== REST endpoint response without following redirect ==='
+          curl --silent --show-error --head \
+            --header "Origin: ${ORIGIN}" \
+            --header 'Accept: application/octet-stream' \
+            "${API_ASSET_URL}"
