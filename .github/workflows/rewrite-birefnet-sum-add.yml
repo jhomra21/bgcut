@@ -39,11 +39,13 @@ jobs:
           import numpy as np
           import onnx
           import onnxruntime as ort
+          from onnx import helper
 
           source_url = os.environ["SOURCE_URL"]
           expected_sha = os.environ["SOURCE_SHA256"]
           source_path = Path("birefnet-lite-512-ort-basic-webgpu-v1.onnx")
           rewritten_path = Path("birefnet-lite-512-ort-basic-webgpu-v2.onnx")
+          optimized_check_path = Path("birefnet-lite-512-ort-basic-webgpu-v2-ort-all-check.onnx")
           manifest_path = Path("birefnet-lite-512-ort-basic-webgpu-v2.json")
 
           print(f"Downloading validated WebGPU rewrite v1: {source_url}")
@@ -74,27 +76,51 @@ jobs:
           invalid = [
               node.name
               for node in sum_nodes
-              if len(node.input) != 2 or len(node.output) != 1 or len(node.attribute) != 0
+              if len(node.input) != 4 or len(node.output) != 1 or len(node.attribute) != 0
           ]
           if invalid:
-              raise RuntimeError(f"Sum nodes are not safe binary Add rewrites: {invalid}")
+              raise RuntimeError(f"Sum nodes do not match the validated four-input pattern: {invalid}")
+
+          existing_values = {initializer.name for initializer in source_model.graph.initializer}
+          for node in source_model.graph.node:
+              existing_values.update(value for value in node.input if value)
+              existing_values.update(value for value in node.output if value)
 
           rewritten_model = onnx.ModelProto()
           rewritten_model.CopyFrom(source_model)
+          replacement_nodes = []
           rewrites = []
+
           for node in rewritten_model.graph.node:
               if node.op_type != "Sum":
+                  replacement_nodes.append(node)
                   continue
+
+              output = node.output[0]
+              temp0 = f"{output}__webgpu_sum_add_0"
+              temp1 = f"{output}__webgpu_sum_add_1"
+              if temp0 in existing_values or temp1 in existing_values:
+                  raise RuntimeError(f"temporary value collision for {node.name}")
+              existing_values.add(temp0)
+              existing_values.add(temp1)
+
+              replacement_nodes.extend([
+                  helper.make_node("Add", [node.input[0], node.input[1]], [temp0], name=f"{node.name}/webgpu_add_0"),
+                  helper.make_node("Add", [temp0, node.input[2]], [temp1], name=f"{node.name}/webgpu_add_1"),
+                  helper.make_node("Add", [temp1, node.input[3]], [output], name=f"{node.name}/webgpu_add_2"),
+              ])
               rewrites.append({
                   "node": node.name,
                   "inputs": list(node.input),
-                  "output": node.output[0],
+                  "output": output,
+                  "temporary_outputs": [temp0, temp1],
               })
-              node.op_type = "Add"
 
           if len(rewrites) != 20:
               raise RuntimeError(f"expected 20 rewrites, got {len(rewrites)}")
 
+          del rewritten_model.graph.node[:]
+          rewritten_model.graph.node.extend(replacement_nodes)
           onnx.checker.check_model(rewritten_model)
           onnx.save(rewritten_model, rewritten_path)
 
@@ -135,12 +161,32 @@ jobs:
           rewritten_sigmoid = 1.0 / (1.0 + np.exp(-rewritten))
           max_sigmoid_abs = float(np.max(np.abs(original_sigmoid - rewritten_sigmoid)))
 
+          print(f"max abs logit diff: {max_abs}")
+          print(f"mean abs logit diff: {mean_abs}")
+          print(f"max sigmoid diff: {max_sigmoid_abs}")
+
           if max_abs != 0.0 or mean_abs != 0.0 or max_sigmoid_abs != 0.0:
               raise RuntimeError(
-                  f"binary Sum->Add rewrite changed output: max_abs={max_abs}, mean_abs={mean_abs}, max_sigmoid_abs={max_sigmoid_abs}"
+                  f"four-input Sum->Add-chain rewrite changed output: max_abs={max_abs}, mean_abs={mean_abs}, max_sigmoid_abs={max_sigmoid_abs}"
               )
 
+          all_options = ort.SessionOptions()
+          all_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+          all_options.optimized_model_filepath = str(optimized_check_path)
+          ort.InferenceSession(
+              str(rewritten_path),
+              sess_options=all_options,
+              providers=["CPUExecutionProvider"],
+          )
+          optimized_check = onnx.load(optimized_check_path, load_external_data=False)
+          optimized_check_ops = Counter(node.op_type for node in optimized_check.graph.node)
+          if optimized_check_ops.get("Sum", 0) != 0:
+              raise RuntimeError(f"ORT_ENABLE_ALL recreated Sum nodes: {optimized_check_ops.get('Sum', 0)}")
+
           rewritten_ops = Counter(node.op_type for node in rewritten_model.graph.node)
+          if rewritten_ops.get("Sum", 0) != 0:
+              raise RuntimeError("rewritten graph still contains Sum nodes")
+
           manifest = {
               "source": {
                   "url": source_url,
@@ -153,7 +199,7 @@ jobs:
                   "sha256": sha256(rewritten_path),
                   "size_bytes": rewritten_path.stat().st_size,
                   "nodes": len(rewritten_model.graph.node),
-                  "sum_to_add_rewrites": len(rewrites),
+                  "sum_to_add_chain_rewrites": len(rewrites),
               },
               "tooling": {
                   "onnxruntime": ort.__version__,
@@ -177,6 +223,7 @@ jobs:
               "op_counts": {
                   "source": dict(sorted(source_ops.items())),
                   "rewritten": dict(sorted(rewritten_ops.items())),
+                  "ort_enable_all_check": dict(sorted(optimized_check_ops.items())),
               },
               "rewrites": rewrites,
           }
@@ -204,7 +251,7 @@ jobs:
               --target "${GITHUB_SHA}" \
               --prerelease \
               --title "BiRefNet Lite 512 ORT BASIC WebGPU rewrite v2" \
-              --notes "Experimental graph-capture asset. Starting from validated WebGPU rewrite v1, replaces the 20 binary ONNX Sum nodes unsupported by ONNX Runtime WebGPU 1.30.0 with equivalent Add nodes. Publication requires exact deterministic fp32 parity."
+              --notes "Experimental graph-capture asset. Starting from validated WebGPU rewrite v1, replaces 20 unsupported four-input ONNX Sum nodes with left-to-right Add chains. Publication requires exact deterministic fp32 parity and verifies ORT_ENABLE_ALL does not recreate Sum."
           fi
           gh release upload "$TAG" \
             birefnet-lite-512-ort-basic-webgpu-v2.onnx \
