@@ -449,7 +449,7 @@ const App = () => {
           </Show>
 
           <div class="milestone-note">
-            Resize and compositing still use Canvas 2D. TypeGPU uploads the resized 512² canvas and enqueues ImageNet normalization directly into the shared ONNX Runtime input buffer. GPU prep enqueue measures host-side upload and dispatch submission, not GPU completion; GPU readback remains explicit.
+            Model resize and ImageNet normalization now run on the shared WebGPU device through TypeGPU before ONNX Runtime inference. Canvas 2D remains only for source-resolution matte compositing and PNG export. GPU prep enqueue measures source-texture upload and resize/normalize dispatch submission, not GPU completion; GPU readback remains explicit.
           </div>
         </aside>
       </section>
