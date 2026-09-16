@@ -32,16 +32,13 @@ const normalizeModelInput = tgpu
     let x = in.gid.x;
     let y = in.gid.y;
     let pixelIndex = y * ${MODEL_INPUT_SIZE}u + x;
-    let pixel = textureLoad(source, vec2i(i32(x), i32(y)), 0);
+    let pixel = textureLoad(layout.$.source, vec2i(i32(x), i32(y)), 0);
 
-    output[pixelIndex] = (pixel.x - 0.485) / 0.229;
-    output[${MODEL_PIXEL_COUNT}u + pixelIndex] = (pixel.y - 0.456) / 0.224;
-    output[${MODEL_PIXEL_COUNT * 2}u + pixelIndex] = (pixel.z - 0.406) / 0.225;
+    layout.$.output[pixelIndex] = (pixel.x - 0.485) / 0.229;
+    layout.$.output[${MODEL_PIXEL_COUNT}u + pixelIndex] = (pixel.y - 0.456) / 0.224;
+    layout.$.output[${MODEL_PIXEL_COUNT * 2}u + pixelIndex] = (pixel.z - 0.406) / 0.225;
   }`
-  .$uses({
-    source: modelInputLayout.$.source,
-    output: modelInputLayout.$.output,
-  });
+  .$uses({ layout: modelInputLayout });
 
 export type GpuModelInput = {
   readonly buffer: GPUBuffer;
