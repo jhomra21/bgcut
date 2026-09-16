@@ -1,4 +1,4 @@
-import { Data, Effect } from "effect";
+import { Cause, Data, Effect, Exit } from "effect";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
@@ -16,6 +16,7 @@ class ModelPrepareError extends Data.TaggedError("ModelPrepareError")<{
 }> {}
 
 const modelPath = resolve(import.meta.dir, "../public/models", MODEL_FILENAME);
+
 const temporaryPath = `${modelPath}.download`;
 
 const isExpectedModel = (fingerprint: ModelFileFingerprint | undefined): boolean =>
@@ -26,6 +27,7 @@ const prepareModel = Effect.gen(function* () {
 
   if (isExpectedModel(existing)) {
     console.log(`Model already verified at ${modelPath}`);
+
     return;
   }
 
@@ -103,7 +105,9 @@ const prepareModel = Effect.gen(function* () {
   console.log(`Prepared ${MODEL_FILENAME} (${MODEL_SIZE_BYTES} bytes, SHA-256 ${MODEL_SHA256}).`);
 });
 
-await Effect.runPromise(prepareModel).catch((error: unknown) => {
-  console.error(error);
+const exit = await Effect.runPromiseExit(prepareModel);
+
+if (Exit.isFailure(exit)) {
+  console.error(Cause.pretty(exit.cause));
   process.exitCode = 1;
-});
+}
