@@ -80,7 +80,7 @@ const createSession = (
         ort.InferenceSession.create(model, {
           executionProviders: ["webgpu"],
           graphOptimizationLevel: "all",
-          preferredOutputLocation: "cpu",
+          preferredOutputLocation: "gpu-buffer",
         }),
       catch: () =>
         new ModelLoadFailed({
@@ -151,13 +151,19 @@ const runModel = (
       Effect.succeed(output),
       (tensor) =>
         Effect.gen(function* () {
+          if (tensor.location !== "gpu-buffer") {
+            return yield* new InferenceFailed({
+              message: `BiRefNet returned its matte at ${tensor.location} instead of the requested WebGPU buffer.`,
+            });
+          }
+
           const stopReadback = timings.begin("outputReadbackMs");
 
           const outputData = yield* Effect.tryPromise({
             try: () => tensor.getData(),
             catch: () =>
               new InferenceFailed({
-                message: "BiRefNet returned a matte that could not be read on the CPU.",
+                message: "BiRefNet returned a GPU matte that could not be read back to the CPU.",
               }),
           });
 
