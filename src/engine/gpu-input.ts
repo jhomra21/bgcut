@@ -19,6 +19,10 @@ export const createGpuModelInput = (
 ): Effect.Effect<GpuModelInput, InferenceFailed> =>
   Effect.try({
     try: () => {
+      // ORT 1.29.0's own WebGPU IO-binding test stages input by mapping the buffer at creation,
+      // copying bytes into the mapped range, then unmapping before Tensor.fromGpuBuffer().
+      // Keep this timer name stable for the current benchmark contract; it measures staging work,
+      // not a separately proven host-to-device transfer completion boundary.
       const stopUpload = timings.begin("inputUploadMs");
 
       const buffer = device.createBuffer({
