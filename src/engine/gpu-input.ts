@@ -159,6 +159,7 @@ export const createGpuModelInput = (
 
         if (precision === "fp16") {
           const outputBuffer = runtime.root.createBuffer(Fp16ModelInput, buffer).$usage("storage");
+
           const bindGroup = runtime.root.createBindGroup(fp16ModelInputLayout, {
             source: sourceView,
             sampler: sourceSampler,
@@ -170,6 +171,7 @@ export const createGpuModelInput = (
             .dispatchWorkgroups(NORMALIZATION_WORKGROUP_COUNT, NORMALIZATION_WORKGROUP_COUNT);
         } else {
           const outputBuffer = runtime.root.createBuffer(Fp32ModelInput, buffer).$usage("storage");
+
           const bindGroup = runtime.root.createBindGroup(fp32ModelInputLayout, {
             source: sourceView,
             sampler: sourceSampler,
