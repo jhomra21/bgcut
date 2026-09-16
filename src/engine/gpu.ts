@@ -24,9 +24,11 @@ const createOrtCompatibleDeviceDescriptor = (adapter: GPUAdapter): GPUDeviceDesc
     }
 
     requiredFeatures.push(feature);
+
     return true;
   };
 
+  // SAFETY: ORT 1.30 uses this Chromium feature string as a GPUFeatureName and requests it only when advertised.
   const chromiumTimestampQuery = "chromium-experimental-timestamp-query-inside-passes" as GPUFeatureName;
 
   if (!requireFeatureIfAvailable(chromiumTimestampQuery)) {
