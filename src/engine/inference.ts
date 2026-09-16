@@ -147,7 +147,7 @@ const runModel = (
     }
 
     return yield* Effect.acquireUseRelease(
-      createGpuModelInput(runtime, sourceBitmap, timings, precision),
+      createGpuModelInput(runtime, sourceBitmap, timings),
       (input) =>
         Effect.gen(function* () {
           const stopInference = timings.begin("inferenceMs");
