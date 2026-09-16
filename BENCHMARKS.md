@@ -2,7 +2,7 @@
 
 This file records measured performance baselines and controlled comparison rules for `removebg-webgpu`.
 
-Do not use these numbers as general product claims. They are exact-run observations from a particular browser, device, image, model revision, and commit.
+Do not use these numbers as general product claims. They are exact-run observations from a particular browser, device, image, model revision, runtime version, and commit.
 
 ## Accepted CPU-output baseline
 
@@ -47,6 +47,10 @@ Accepted exact SHA:
 
 `4a2e07de544433ad2b321cb4e29be28a74f397d6`
 
+Runtime:
+
+- ONNX Runtime Web 1.29.0
+
 The same 1600×1598 cat image was used for one cold run plus three warm reruns without reloading.
 
 | Metric | Cold | Warm 1 | Warm 2 | Warm 3 | Warm median |
@@ -73,6 +77,10 @@ Exact SHA:
 
 `670b49fd360015c4cbcd29155d64999562bfb3a9`
 
+Runtime:
+
+- ONNX Runtime Web 1.29.0
+
 This candidate created an app-owned WebGPU input buffer, populated it with `GPUQueue.writeBuffer()`, waited for `queue.onSubmittedWorkDone()`, and passed the result through `Tensor.fromGpuBuffer()`.
 
 Exact-head browser acceptance failed reproducibly for both the accepted cat and dog images at `session.run()`. All five startup checks remained green, SVG rejection remained correct, there were no device-loss or uncaught errors, and only the two known ONNX shape-node CPU-placement warnings appeared. No valid timing result was produced.
@@ -84,6 +92,10 @@ Because ONNX Runtime 1.29.0's own WebGPU IO-binding test stages GPU input differ
 Exact SHA:
 
 `af245644a1cccf66a8114f62f380e49000ae03f2`
+
+Runtime:
+
+- ONNX Runtime Web 1.29.0
 
 This candidate mirrored ONNX Runtime 1.29.0's own input staging sequence with `mappedAtCreation`, CPU byte copy, `unmap()`, and `Tensor.fromGpuBuffer()`.
 
@@ -99,11 +111,41 @@ The five startup checks were still green, which proved the old `ort.env.webgpu.d
 
 No timing, matte, export dimensions, or session-reuse result from this candidate is valid.
 
+## Failed explicit-input candidate: custom device on ONNX Runtime 1.29.0
+
+Exact SHA:
+
+`46c100eea85ae3a259e2aa0746424445f78d9287`
+
+Runtime:
+
+- ONNX Runtime Web 1.29.0
+
+This candidate passed the application-owned `GPUDevice` through ONNX Runtime's supported per-session WebGPU execution-provider option:
+
+```ts
+executionProviders: [{ name: "webgpu", device }]
+```
+
+That removed the previous cross-device buffer validation failure, but session creation then failed reproducibly for the cat cold run, all three cat retries, and the dog regression with:
+
+```text
+Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE: Failed to wait for the operation:3
+```
+
+SVG rejection remained correct, startup diagnostics remained green, no uncaught exception or device-loss event appeared, and only the expected ONNX shape-node CPU-placement warnings were present. No timing, matte, export dimensions, or session-reuse result from this candidate is valid.
+
+This error matches ONNX Runtime issue #32257 for user-provided `GPUDevice` synchronization. The fix landed in ONNX Runtime PR #32259 and is included in ONNX Runtime 1.30.0. The experiment therefore upgrades to 1.30.0 rather than adding a local workaround around the 1.29.0 synchronization bug.
+
 ## GPU-input staging experiment
 
 Branch:
 
 `perf/gpu-input-buffer`
+
+Current runtime:
+
+- ONNX Runtime Web 1.30.0
 
 Current direction:
 
@@ -117,11 +159,13 @@ Current direction:
 - explicitly dispose the wrapper tensor and destroy the app-owned GPU input buffer
 - preserve the underlying ONNX Runtime error text if session creation or `session.run()` rejects
 
-The current timing field is still named `inputUploadMs` for compatibility with the existing instrumentation contract, but on this staging path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
+The current timing field is still named `inputUploadMs` for instrumentation compatibility, but on this staging path it measures buffer creation + mapped CPU copy + unmap. It does not prove completion of host-to-device transfer.
+
+Because this experiment now uses ONNX Runtime Web 1.30.0 while the accepted PR #3 comparison point used 1.29.0, latency differences between them cannot be attributed solely to explicit GPU input. Correctness and device interoperability can be accepted directly; a performance attribution requires a 1.30.0 control using the prior CPU-input/GPU-output path.
 
 ## Controlled comparison protocol
 
-For before/after performance claims, use the same exact source image and the same browser/device setup.
+For before/after performance claims, use the same exact source image, browser/device setup, and runtime version.
 
 1. Start from a fresh page/runtime for the cold run.
 2. Record every timing stage.
@@ -131,3 +175,4 @@ For before/after performance claims, use the same exact source image and the sam
 6. Compare medians rather than choosing the fastest run.
 7. Confirm output dimensions and visual matte behavior remain unchanged.
 8. Record console warnings/errors and any device loss.
+9. When a dependency/runtime version changes, establish a control on that same version before attributing a latency delta to a pipeline change.
