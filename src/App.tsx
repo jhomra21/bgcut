@@ -438,7 +438,7 @@ const App = () => {
                     <TimingRow label="Session init" value={result.timings.sessionInitMs} />
                     <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
                     <TimingRow label="Inference" value={result.timings.inferenceMs} />
-                    <TimingRow label="GPU → CPU" value={result.timings.outputReadbackMs} />
+                    <TimingRow label="Output access" value={result.timings.outputReadbackMs} />
                     <TimingRow label="Matte" value={result.timings.matteMs} />
                     <TimingRow label="Composite" value={result.timings.compositeMs} />
                     <TimingRow label="PNG export" value={result.timings.exportMs} />
