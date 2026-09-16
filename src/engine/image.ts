@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
 import { ImageDecodeFailed, ImageProcessingFailed, UnsupportedImage, type ImageError } from "./errors";
-import { normalizeRgbaToNchw } from "./preprocess";
 
 export const MODEL_INPUT_SIZE = 512;
+export const MODEL_PIXEL_COUNT = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
 
 const supportedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -33,7 +33,9 @@ export const decodeImage = (file: File): Effect.Effect<DecodedImage, ImageError>
     (bitmap) => Effect.sync(() => bitmap.close()),
   );
 
-export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Array, ImageProcessingFailed> =>
+export const prepareModelPixels = (
+  bitmap: ImageBitmap,
+): Effect.Effect<Uint8ClampedArray, ImageProcessingFailed> =>
   Effect.try({
     try: () => {
       const canvas = document.createElement("canvas");
@@ -49,12 +51,11 @@ export const prepareModelInput = (bitmap: ImageBitmap): Effect.Effect<Float32Arr
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
       context.drawImage(bitmap, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
-      const image = context.getImageData(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
 
-      return normalizeRgbaToNchw(image.data, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+      return context.getImageData(0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE).data;
     },
     catch: () =>
       new ImageProcessingFailed({
-        message: "The image could not be prepared for background-removal inference.",
+        message: "The image could not be resized for background-removal inference.",
       }),
   });
