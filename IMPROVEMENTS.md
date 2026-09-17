@@ -1,133 +1,41 @@
-# Improvement Roadmap
+# Improvement roadmap
 
-This file records the concrete improvements that should move `bgcut` from a working local background remover into a differentiated GPU-native cutout engine and editor.
+This file tracks work that is not part of the current beta contract.
 
-The goal is not to claim superiority before evidence exists. Competitive and performance claims must be backed by exact-head validation and repeatable benchmarks.
+Do not turn planned work into product claims. Performance and output-quality claims need exact commits, repeatable inputs, and recorded results.
 
-## Accepted baseline
+## Current baseline
 
-Manual browser acceptance passed on 2026-09-15 at exact SHA:
+The current product has two working paths.
 
-`e2a79a631aee338d82bd49a878e142a805227977`
+The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtime WebGPU graph capture, GPU output readback, and source-resolution PNG export. The accepted graph-capture benchmark recorded a 422 ms warm median on the documented 1600x1598 cat fixture. See `GRAPH_CAPTURE.md` for the exact commit, runtime, model, and timings.
 
-Observed on that frozen commit:
+The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
-- `bun install --frozen-lockfile` passed with Bun 1.4.2.
-- `bun run check` passed; 5 tests passed and the build succeeded.
-- All five WebGPU/runtime diagnostics were green.
-- A 1600×1598 cat image produced a sensible fur, ear, and whisker matte and exported an RGBA PNG at the same 1600×1598 resolution.
-- A 1200×800 dog image produced a sensible matte and exported at the same 1200×800 resolution.
-- The model/session was reused for the second image; there was one model resource entry and no second model request.
-- SVG input produced the expected typed unsupported-image error without crashing.
-- The console showed no WebGPU validation errors, Solid errors, uncaught exceptions, or target crashes.
-- ONNX Runtime emitted two shape-node-on-CPU performance warnings; these were non-fatal and should be treated as a performance investigation item rather than a correctness failure.
+## 1. Simplify the browser UI
 
-This acceptance applies only to `e2a79a631aee338d82bd49a878e142a805227977`. `bootstrap` advanced after that SHA, so later heads require their own exact-head acceptance before merge/release claims.
+The browser UI is the next product task and the blocker for a stable release.
 
-## Competitive baseline
+Keep the first version small:
 
-### BG0
+1. Choose or drop an image.
+2. Remove the background.
+3. Show the result clearly.
+4. Download the result.
+5. Keep diagnostics out of the main flow.
 
-BG0 is already a serious local-browser competitor, not just a privacy proof of concept. As inspected on 2026-09-15, current BG0 includes:
+Do not expose internal benchmark or acceptance controls in the normal product UI.
 
-- browser-local inference with no image upload
-- WebGPU with WASM fallback
-- an embeddable `@bg0/browser` package
-- cancellation with `AbortSignal`
-- structured progress
-- stable public errors
-- browser capability reporting
-- persistent model caching using Cache API with IndexedDB fallback
-- initialized-engine reuse
-- FP16 BiRefNet Lite
-- PNG, JPEG, WebP, HEIC, and HEIF support
-- WebGPU output sanity checks and compatibility retry
-- a `fast | quality` API
-- an additional focused inference pass in quality mode when the subject crop can materially improve effective model resolution
+The UI should work well before adding editor controls, batch processing, or advanced settings.
 
-Reference repository: `opencoredev/bg0`.
+## 2. Define a browser engine API
 
-Competitive notes must be rechecked against current upstream before making public claims. The BG0 `main` head inspected while writing this file was `863c2500203e3f89d5489da0484e695dd614a911`.
+The UI should not own ONNX sessions, cancellation, cache state, or GPU cleanup.
 
-### remove.bg
-
-remove.bg remains the product-maturity benchmark. It is stronger in areas such as:
-
-- erase/restore and assisted brush correction
-- bulk workflows
-- desktop workflows
-- API/CLI and automation surface
-- third-party integrations
-- general editing and background replacement workflows
-
-Raw output-quality comparisons must be benchmarked on the same corpus. Do not claim that remove.bg, BG0, or this project has better segmentation quality without evidence.
-
-## Product direction
-
-The intended differentiation is:
-
-> A private, embeddable, GPU-native cutout engine and editor where preprocessing, inference, refinement, compositing, and interactive mask editing can remain on one GPU pipeline.
-
-Privacy alone is not a moat because BG0 already provides local browser inference. The differentiator must come from lower-level GPU ownership, better refinement/editing, measurably better performance where possible, and a strong engine API.
-
-## Priority 0 — exact-head validation and benchmarks
-
-Before optimizing, establish a benchmark harness and a representative image corpus.
-
-### Benchmark corpus
-
-Include at least:
-
-- long hair
-- curly/fine hair
-- fur
-- whiskers
-- eyeglasses
-- bicycle spokes and other thin structures
-- leaves and plants
-- white-on-white products
-- dark-on-dark subjects
-- translucent or semi-transparent edges
-- multiple people
-- tiny subjects in large images
-- full-frame subjects
-- large phone photos
-
-### Metrics
-
-Record separately:
-
-- cold model download time
-- cold model/session initialization time
-- warm inference time
-- preprocessing time
-- inference time
-- GPU-to-CPU and CPU-to-GPU transfer time where measurable
-- refinement time
-- compositing time
-- export time
-- total wall time
-- peak CPU memory where measurable
-- peak GPU memory where measurable
-- output dimensions
-- provider used
-- model revision/dtype
-- failure/fallback behavior
-
-For quality, use the same source corpus for this project, BG0, and remove.bg. Prefer objective alpha-matte metrics when ground-truth mattes are available and otherwise keep visual comparisons labeled as subjective.
-
-## Priority 1 — first-class engine and job lifecycle
-
-The current UI bootstrap should not become the long-term owner of inference state, cancellation, cleanup, caching, and progress.
-
-Introduce a small engine boundary that is independent of Solid.
-
-Target shape:
+Use a small engine interface that can run without Solid:
 
 ```ts
 interface RemovalEngine {
-  readonly capabilities: EngineCapabilities
-
   remove(
     source: ImageSource,
     options?: RemovalOptions,
@@ -141,104 +49,48 @@ type RemovalOptions = {
 }
 ```
 
-Progress should expose real stages rather than one generic processing flag, for example:
+Progress events should report real work such as model loading, preprocessing, inference, compositing, and export.
 
-```ts
-type RemovalProgress =
-  | { stage: "model-loading"; progress: number }
-  | { stage: "preprocessing"; progress: number }
-  | { stage: "inference"; progress: number }
-  | { stage: "refining"; progress: number }
-  | { stage: "compositing"; progress: number }
-  | { stage: "exporting"; progress: number }
-```
+Use Effect for cancellation, cleanup, retries, device loss, and typed failures. Keep image and shader loops in plain TypeScript, TypeGPU, or raw WebGPU when that is simpler.
 
-Use Effect for cancellation, scopes, cleanup, retry, device-loss boundaries, and typed failures. Keep shader/image loops plain TypeScript, TypeGPU, or raw WebGPU where that is clearer.
+## 3. Keep more work on the GPU
 
-Reference patterns:
+The current browser fast path still reads model output back to the CPU before final matte work and export.
 
-- Diffusion Studio: one canonical operation owns progress, cancellation, cleanup, and lifecycle restoration.
-- OpenCode: keep UI state separate from lower-level runtime services and expose narrow contexts/capabilities.
-- Pi: prefer small explicit capability surfaces over leaking runtime internals.
+Potential next steps:
 
-## Priority 2 — GPU-resident image pipeline
+1. Measure every remaining CPU and GPU transfer.
+2. Keep model output on the GPU when the runtime supports it reliably.
+3. Move sigmoid and matte conversion to TypeGPU.
+4. Test GPU compositing against the current source-resolution output.
+5. Keep CPU reference implementations for correctness tests.
 
-The current path still performs important CPU round trips:
+Do not remove a CPU step only because it is a CPU step. Keep the path that measures better and stays correct across supported browsers.
 
-```text
-ImageBitmap
-  -> Canvas2D resize
-  -> CPU RGBA
-  -> CPU Float32 normalization
-  -> ORT WebGPU
-  -> CPU logits
-  -> CPU alpha conversion
-  -> Canvas2D scaling/compositing
-```
+## 4. Improve difficult edges
 
-The target path is:
+Quality work should focus on cases where one 512x512 inference pass loses useful detail.
 
-```text
-ImageBitmap
-  -> GPU texture
-  -> TypeGPU resize/normalize
-  -> GPUBuffer input
-  -> ORT WebGPU
-  -> GPUBuffer output
-  -> TypeGPU sigmoid/refinement
-  -> GPU matte
-  -> GPU source-resolution compositing
-  -> preview/export
-```
+Use a fixed test set that includes:
 
-Concrete work:
+- long and fine hair
+- fur and whiskers
+- glasses
+- bicycle spokes and other thin structures
+- leaves and plants
+- light subjects on light backgrounds
+- dark subjects on dark backgrounds
+- translucent edges
+- small subjects in large images
+- large phone photos
 
-1. Add timing around the current CPU preprocessing and output readback so there is a baseline.
-2. Research and prototype ORT WebGPU GPU-buffer I/O against the exact pinned ONNX Runtime version before changing product code.
-3. Build a TypeGPU preprocessing path that matches the current CPU reference numerically within an explicit tolerance.
-4. Keep model output on GPU when supported.
-5. Implement sigmoid/matte conversion on GPU.
-6. Move compositing to GPU.
-7. Keep the CPU implementation as a test/reference path while the GPU implementation stabilizes.
-8. Measure before claiming the GPU-native path is faster.
+Possible refinement work includes local high-resolution passes, threshold controls, feathering, edge shift, small-hole cleanup, color-spill cleanup, and source-aware edge refinement.
 
-Do not optimize solely to remove every CPU operation. Prefer the architecture that wins measured latency, memory use, correctness, and browser reliability.
+Each stage needs an isolated correctness test and a measured cost.
 
-## Priority 3 — quality beyond BG0's focused crop pass
+## 5. Add non-destructive editing after the basic UI is solid
 
-BG0 already performs a useful subject-crop second pass in quality mode, so simply copying that does not differentiate this project.
-
-Build toward uncertainty- and edge-directed refinement:
-
-```text
-base inference
-  -> confidence / edge analysis
-  -> identify difficult regions
-  -> higher-resolution local tiles or focused passes
-  -> merge into base matte
-  -> edge-aware refinement
-```
-
-Candidate refinement stages:
-
-- threshold adjustment
-- feathering
-- erosion/dilation or edge shift
-- despeckle
-- small-hole cleanup
-- edge decontamination / color spill cleanup
-- guided or source-aware edge refinement
-- uncertain-region local re-inference
-
-Each stage needs a correctness reference and benchmark. Avoid a stack of heuristics that cannot be independently tested or disabled.
-
-Expose user-facing complexity as a small number of modes such as `fast` and `quality` rather than making normal users choose model internals.
-
-## Priority 4 — non-destructive mask editor
-
-The result should evolve from a static before/after preview into an editable cutout document.
-
-Target model:
+A future editor should keep the model result separate from user corrections.
 
 ```ts
 type CutoutDocument = {
@@ -250,99 +102,58 @@ type CutoutDocument = {
 }
 ```
 
-Manual edits must be non-destructive. Restore/erase strokes should be operations layered over the model matte rather than permanently rewriting the base inference result.
+A practical order is:
 
-Add in this order:
-
-1. mask visualization
-2. zoom/pan
+1. mask view
+2. zoom and pan
 3. restore brush
 4. erase brush
-5. undo/redo
-6. before/after toggle
-7. live refinement controls
-8. background color/image preview
-9. assisted edge-aware brush behavior
+5. undo and redo
+6. refinement controls
+7. background preview
 
-Keep high-frequency pointer/brush state out of broad Solid reactive state. GPU updates and transient brush sampling should live in the editor/runtime layer and publish only the state the UI actually needs.
+Pointer sampling and brush updates should stay out of broad Solid state. Publish only the state the UI needs.
 
-Reference patterns:
+## 6. Expand compatibility deliberately
 
-- DAW Browser Convex and Diffusion Studio for performance-sensitive editor/runtime separation.
-- DialKit for compact, declarative live-parameter APIs.
+Useful compatibility work includes:
 
-## Priority 5 — compatibility and input support
+- clearer WebGPU capability checks
+- provider information in diagnostics
+- output sanity checks before accepting a GPU result
+- HEIC and HEIF input support
+- image-size and memory limits with useful errors
+- device-loss-safe session recreation
 
-BG0 currently has a stronger compatibility story.
+Any fallback must document whether it changes the model, output, or performance characteristics.
 
-Add deliberately rather than hiding provider changes:
+## 7. Improve model lifecycle
 
-- explicit WebGPU capability detection
-- explicit compatibility/fallback provider
-- output sanity validation before accepting a WebGPU result
-- provider surfaced in diagnostics and result metadata
-- remembered known-bad runtime/device combinations where justified
-- HEIC/HEIF support
-- robust content/signature validation rather than trusting MIME type alone
-- image-size/memory limits with useful errors
+Keep model and session behavior predictable:
 
-Any fallback must document whether it changes quality, model dtype, or output semantics.
+- versioned model metadata
+- exact integrity checks
+- explicit cache invalidation
+- a clear model-cache command or API
+- session reuse
+- device-loss-safe disposal
+- optional warmup only if measurements justify it
 
-## Priority 6 — model lifecycle and persistence
+Large model and image data should not live in Solid stores.
 
-Improve first-run and repeat-use behavior:
+## 8. Add batch work after single-image behavior is stable
 
-- versioned model manifest
-- persistent cache with exact model revision and integrity metadata
-- predictable cache invalidation
-- explicit `clearModelCache()` capability
-- initialized-session reuse
-- device-loss-safe session disposal/recreation
-- optional model warmup
-- evaluate FP16 only with quality/performance measurements
+Batch processing needs a scheduler rather than a loop around `remove()`.
 
-Keep large model/image data out of Solid stores.
+It should support bounded concurrency, pause, resume, cancel, per-image errors, model reuse, and recovery after one failed job.
 
-Suggested persistence split:
+Benchmark throughput and memory use before choosing the concurrency level.
 
-```text
-localStorage
-  -> lightweight UI preferences
-  -> refinement defaults
+## 9. Expose a headless library only when there is a second consumer
 
-IndexedDB / Cache Storage / OPFS
-  -> model artifacts
-  -> project metadata
-  -> resumable batch state
-  -> large local assets where needed
-```
+Do not split out a package only for repository organization.
 
-Use Solid Primitives as an API/lifecycle reference for small persisted reactive state rather than inventing a custom persistence framework.
-
-## Priority 7 — batch processing
-
-After one-image correctness and lifecycle are solid, add a local scheduler rather than looping `remove()` blindly.
-
-Requirements:
-
-- bounded concurrency based on device/memory constraints
-- queue pause/resume/cancel
-- per-job status and errors
-- session/model reuse
-- recovery from one failed image without dropping the queue
-- optional resumable queue metadata
-- bulk download/export flow
-- source-resolution guarantees per item
-
-Benchmark throughput and memory pressure. Do not optimize for maximum concurrent jobs if serial or low-concurrency GPU submission is faster or more stable.
-
-## Priority 8 — public headless API
-
-Do not extract a package prematurely. Let the application prove the engine boundary first.
-
-Once there is a real second consumer, publish/extract an engine package with a small public API. Application consumers should not need to know about ONNX sessions, tensor shapes, TypeGPU roots, shader modules, or raw GPU buffers.
-
-Potential public capabilities:
+A future library might expose:
 
 ```ts
 removeBackground(input, options)
@@ -353,108 +164,30 @@ refineMask(mask, settings)
 composite(source, mask, options)
 ```
 
-BG0 already has a clean one-call library, so merely publishing a package is not differentiation. The API should expose composable lower-level editing/refinement capabilities without leaking implementation details.
+Application code should not need ONNX tensor shapes, TypeGPU internals, or raw GPU buffers.
 
-## Suggested code organization
+## Reference repositories
 
-Do not create packages solely for organizational appearance. Keep the repository simple until multiple real consumers justify package boundaries.
+The reference repositories in `AGENTS.md` are useful for specific implementation questions:
 
-A useful near-term shape is:
+- Diffusion Studio for editor and media-runtime boundaries
+- DialKit for small live controls
+- OpenCode for Solid application structure and persistence
+- Solid Primitives for browser lifecycle helpers
+- DAW Browser Convex for worker and high-frequency runtime patterns
+- Pi for small explicit interfaces
 
-```text
-src/
-  domain/
-    cutout-document.ts
-    operations.ts
-    refinement.ts
+Use only the part that solves the current problem.
 
-  engine/
-    api.ts
+## Validation
 
-    runtime/
-      gpu.ts
-      capabilities.ts
+Before merging runtime work:
 
-    models/
-      model.ts
-      registry.ts
-      birefnet-lite.ts
-
-    pipeline/
-      preprocess.ts
-      inference.ts
-      refine.ts
-      composite.ts
-      export.ts
-
-    jobs/
-      progress.ts
-      job.ts
-
-    cache/
-      model-cache.ts
-
-  editor/
-    editor-state.ts
-    history.ts
-    brush.ts
-    actions.ts
-
-  app/
-    context/
-    components/
-
-  App.tsx
+```sh
+bun install --frozen-lockfile
+bun run check
 ```
 
-Only introduce a directory/abstraction when it owns a real boundary.
+Runtime changes also need exact-head browser acceptance on the affected path. Record the commit, input, browser, provider, output dimensions, warnings, errors, and measured timings when performance is part of the change.
 
-## API and architecture references
-
-Use the repository references already documented in `AGENTS.md`:
-
-- **Diffusion Studio** — editor/runtime separation, unified long-running job lifecycle, rendering/export boundaries.
-- **DialKit** — live parameter configuration and compact control APIs.
-- **OpenCode v2** — Solid contexts, application/service separation, persistence and command/action organization.
-- **Solid Primitives** — lifecycle-safe browser primitives and persistence APIs.
-- **DAW Browser Convex** — realtime/high-frequency runtime boundaries, worker/protocol organization, fine-grained state updates.
-- **Pi** — narrow capabilities, composable APIs, and avoiding unnecessary abstraction layers.
-
-Reference projects are sources of patterns and tradeoffs, not templates to clone.
-
-## Release and claim gates
-
-Before calling an improvement complete:
-
-- `bun install --frozen-lockfile`
-- `bun run lint`
-- `bun run typecheck`
-- `bun test`
-- `bun run build`
-- exact-head CI green
-- exact-head browser acceptance for runtime-affecting changes
-- no WebGPU validation errors
-- no uncaught browser/runtime errors
-- source-resolution export preserved
-- tests cover observable contracts rather than private implementation details
-
-Before claiming competitive superiority:
-
-- test the same corpus and hardware/browser where applicable
-- record exact project SHA, competitor version/SHA, model revision, browser, GPU, and settings
-- separate cold-start and warm-run results
-- separate measured facts from subjective visual judgments
-- retain benchmark inputs/results so regressions can be reproduced
-
-## Near-term sequence
-
-The next implementation sequence should be:
-
-1. Revalidate the current `bootstrap` exact head because the accepted SHA predates later anti-slop/tooling/source changes.
-2. Add benchmark instrumentation to the existing CPU/Canvas pipeline without changing its output.
-3. Introduce the engine/job boundary with cancellation and structured progress.
-4. Prototype GPU-buffer ORT I/O and TypeGPU preprocessing behind a reference comparison test.
-5. Move matte conversion/refinement and compositing onto GPU only after correctness is proven.
-6. Add quality refinement that goes beyond a whole-subject second crop pass.
-7. Build the non-destructive restore/erase editor.
-8. Add compatibility fallback, richer input formats, persistent model lifecycle, then batch processing.
+Before making a performance claim, compare the same input on the same hardware and browser. Separate cold setup from warm execution and report medians when multiple runs are available.
