@@ -1,30 +1,41 @@
 # Releasing bgcut
 
-bgcut releases are designed to be driven from the repository. After the one-time npm trusted-publisher setup, maintainers and authorized coding agents should not need a long-lived npm token or an interactive `npm publish` command.
+bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing with GitHub OIDC. Maintainers should not use a long-lived npm publish token for normal releases.
 
-## Current release policy
+## Release channels
 
-bgcut is in beta today.
+bgcut is in beta.
 
-- Beta versions use semver such as `0.1.0-beta.2`.
-- Beta versions publish to the npm `beta` dist-tag.
-- Beta versions create GitHub prereleases.
-- Stable versions have no prerelease suffix, publish to npm `latest`, and create normal GitHub releases.
-- Do not declare a stable release until the browser UI and its acceptance criteria are ready for that transition.
+- Versions such as `0.1.0-beta.2` publish to npm `beta` and create GitHub prereleases.
+- Stable versions have no prerelease suffix. They publish to npm `latest` and create normal GitHub releases.
+- Do not publish a stable version until the browser UI and its acceptance criteria are ready.
 
-The repository package version is the release source of truth.
+`package.json` is the source of truth for the release version.
 
-## One-time npm trusted-publisher setup
+## Trusted publisher setup
 
-The package must trust this repository's `.github/workflows/release.yml` workflow before GitHub Actions can publish with OIDC.
+The npm package must trust `.github/workflows/release.yml` in `jhomra21/bgcut`.
 
-Requirements:
+Check the current configuration first:
 
-- `bgcut` already exists on npm and the configuring account has write access.
-- npm account 2FA is enabled.
-- npm CLI is 11.15.0 or newer for the `npm trust` command.
+```sh
+npm trust list bgcut
+```
 
-From an authenticated maintainer shell:
+The expected entry is:
+
+```text
+type: github
+file: release.yml
+repository: jhomra21/bgcut
+permissions: publish
+```
+
+The entry may also include `stage publish`.
+
+If the entry already exists, do not create it again. `npm trust github` returns `E409` when an equivalent trusted publisher is already registered.
+
+If no matching entry exists, create it from an authenticated npm account with package write access and 2FA enabled:
 
 ```sh
 npm install -g 'npm@^11.15.0'
@@ -34,127 +45,107 @@ npm trust github bgcut \
   --allow-publish
 ```
 
-Complete npm's 2FA flow when prompted. No npm token needs to be added to GitHub.
+Complete npm authentication and 2FA when prompted. Do not add an npm publish token to GitHub as a fallback.
 
-Verify the relationship with:
+## Release workflow
 
-```sh
-npm trust list bgcut
-```
-
-The trusted publisher must identify:
-
-- provider: GitHub Actions
-- repository: `jhomra21/bgcut`
-- workflow: `release.yml`
-- direct `npm publish`: allowed
-
-If the trust relationship ever needs to change, revoke the existing relationship with `npm trust revoke` and create the replacement explicitly. Do not add a broad long-lived publish token as a shortcut.
-
-## Automated release contract
-
-`.github/workflows/release.yml` runs on pushes to `main` that modify `package.json`, but it only publishes when the resulting commit message begins with:
+`.github/workflows/release.yml` watches pushes to `main` that change `package.json`. It publishes only when the resulting commit message starts with:
 
 ```text
 chore(release):
 ```
 
-That makes ordinary package metadata changes safe: changing `package.json` in a normal PR does not publish anything unless the merge commit is intentionally named as a release.
+Normal package metadata changes therefore do not publish by themselves.
 
-The workflow:
+For a release, the workflow:
 
 1. checks out the exact `main` commit;
-2. installs Bun 1.4.2 and Node 24;
-3. installs an npm 11 version with trusted-publishing support;
-4. runs `bun install --frozen-lockfile`;
-5. runs the complete `bun run check` gate;
-6. reads the package name and version from `package.json`;
-7. maps `*-beta.*` to npm `beta` + GitHub prerelease, or stable semver to npm `latest` + normal GitHub release;
-8. publishes with npm trusted publishing/OIDC when that exact version is not already present;
-9. waits for registry propagation;
-10. creates the matching `v<version>` GitHub release and tag with generated release notes.
+2. installs Bun 1.4.2, Node 24, and npm with Trusted Publishing support;
+3. runs `bun install --frozen-lockfile`;
+4. runs `bun run check`;
+5. reads the package name and version from `package.json`;
+6. maps beta versions to npm `beta` and stable versions to npm `latest`;
+7. checks whether the exact npm version already exists;
+8. publishes through npm Trusted Publishing when needed;
+9. verifies registry propagation;
+10. creates the matching `v<version>` GitHub prerelease or release.
 
-The workflow is intentionally idempotent enough to repair a missing GitHub release when the npm version already exists. It does not overwrite or republish an existing npm version.
+If npm already has the exact version, the workflow skips publication and can still create the missing GitHub release.
 
-## Preparing a beta release
+## Preparing a beta
 
-Before a release PR:
+Before opening the release PR:
 
-1. Make sure product changes are already merged and `main` CI is green.
-2. Update user-facing documentation when behavior changed.
-3. Update `CHANGELOG.md` with the new version and user-visible changes.
-4. Update the package version in `package.json`, for example:
-
-```json
-"version": "0.1.0-beta.2"
-```
-
-5. Run or verify the full release gate:
+1. Merge and accept the product changes first.
+2. Update user-facing docs and `skills/bgcut/SKILL.md` when behavior changed.
+3. Move the relevant notes in `CHANGELOG.md` from `Unreleased` into the new version section.
+4. Update `package.json` to the new beta version.
+5. Verify the exact release head with:
 
 ```sh
 bun install --frozen-lockfile
 bun run check
 ```
 
-6. Open a dedicated release PR containing the version/changelog release changes.
-7. Merge only after the PR-triggered gate passes on the exact release head.
-8. Use a merge commit title in this exact form:
+6. Open a dedicated release PR.
+7. Merge only after CI passes on that exact head.
+8. Use this merge title form:
 
 ```text
 chore(release): bgcut v0.1.0-beta.2
 ```
 
-The merge to `main` then performs the npm publish and GitHub prerelease automatically.
+The merge to `main` starts npm publication and GitHub prerelease creation.
 
 ## Preparing a stable release
 
-Stable release mechanics are the same, except the version has no prerelease suffix:
+Use the same process with a version that has no prerelease suffix, for example:
 
 ```json
 "version": "1.0.0"
 ```
 
-and the merge commit is, for example:
+Use a merge title such as:
 
 ```text
 chore(release): bgcut v1.0.0
 ```
 
-The workflow publishes the stable version to `latest` and creates a non-prerelease GitHub release.
+The workflow publishes the version to npm `latest` and creates a normal GitHub release.
 
-Do not switch to stable solely because the CLI works. Stable should represent the intended product contract, including the browser UI and documentation.
+Do not switch to stable only because the CLI works. Stable also requires the intended browser UI and its documented behavior.
 
-## npm dist-tags
+## npm tags during beta
 
-During beta, documentation should explicitly install `bgcut@beta`:
+Public beta instructions should use the beta tag explicitly:
 
 ```sh
 bunx bgcut@beta --help
 npm install -g bgcut@beta
 ```
 
-Do not rely on plain `bgcut`/`latest` until a stable release is intentionally published.
+Do not advertise plain `npm install bgcut` until a stable version intentionally owns the `latest` tag.
 
-Publishing a beta through the automated workflow moves only the `beta` dist-tag. Publishing a stable version moves `latest`.
+An older `latest` tag can remain from an early publish. That does not change the documented beta install path. Stable publication will move `latest` to the first stable version.
 
-## Agent skill shipping contract
+## Packaged agent skill
 
-The npm tarball includes `skills/bgcut/SKILL.md`. It is a self-contained Agent Skills-format instruction file for agents that need to invoke bgcut without searching for external instructions.
+The npm tarball includes:
 
-The package smoke test must verify that both the executable and the bundled skill survive `npm pack` and a clean external install.
+```text
+skills/bgcut/SKILL.md
+```
 
-When CLI syntax or supported formats change, update all of these in the same product PR:
+That file is part of the package contract. Agents should be able to use bgcut without fetching instructions from another repository.
 
-- `README.md`
-- `skills/bgcut/SKILL.md`
-- CLI help text when applicable
-- relevant tests
-- `CHANGELOG.md` when the change is release-worthy
+When CLI syntax, input formats, output formats, engine behavior, caching, privacy behavior, or install commands change, update the README, the packaged skill, tests, and changelog in the same product change.
 
-## Release failure handling
+`scripts/package-smoke.ts` must verify the installed `bgcut` command and the bundled skill from the packed tarball.
 
-If the workflow fails before npm publication, fix the cause and prepare a new release attempt from the same unpublished version if appropriate.
+## Failed releases
 
-If npm reports the version as published but GitHub release creation fails, do not increment or republish just to repair GitHub metadata. Rerun or repair the repository release for the same version.
+If a release fails before npm accepts the version, fix the cause before trying again. Reuse the unpublished version only when the candidate has not changed in a way that requires a new version.
 
-Never attempt to overwrite an npm version that already exists. npm versions are immutable release identities.
+If npm has the version but GitHub release creation fails, do not republish or increment the version only to repair GitHub metadata. Rerun the release workflow for the same version.
+
+npm versions are immutable. Never overwrite an existing version.
