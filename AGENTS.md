@@ -37,6 +37,22 @@
 - Prefer one shared `GPUDevice` across ONNX Runtime WebGPU and TypeGPU so GPU resources can be shared and unnecessary CPU/GPU copies can be removed over time.
 - Model-specific behavior belongs behind an inference boundary so a future native TypeGPU implementation can replace ONNX Runtime without changing the Solid UI.
 
+## Release and package policy
+
+- bgcut is currently beta. Use semver beta versions and the npm `beta` dist-tag until the browser UI and product contract are intentionally declared stable.
+- Stable versions have no prerelease suffix and publish to npm `latest`.
+- Do not run ad hoc manual npm publishes as the normal release path. Releases are repository-driven through `.github/workflows/release.yml` and npm trusted publishing/OIDC.
+- Normal package metadata changes must not publish. The release workflow only publishes when a `main` commit that changes `package.json` begins with `chore(release):`.
+- Prepare releases in a dedicated release PR after product changes are already merged and accepted.
+- Update `CHANGELOG.md` and user-facing documentation before bumping the release version.
+- Merge a release PR only after CI passes on the exact release head. Use an exact merge title such as `chore(release): bgcut v0.1.0-beta.2`.
+- Never reuse or overwrite an npm version that already exists.
+- Keep `package.json` repository metadata exactly aligned with `jhomra21/bgcut`; npm trusted publishing validates repository identity.
+- The npm package must ship `skills/bgcut/SKILL.md`. That skill is part of the public package contract, not repository-only documentation.
+- When CLI syntax, input/output formats, engine behavior, privacy guarantees, or install commands change, update `README.md`, `skills/bgcut/SKILL.md`, relevant tests, and the changelog together.
+- `scripts/package-smoke.ts` must verify both the installed executable and the bundled agent skill from the packed tarball.
+- See `RELEASING.md` for the operational release contract.
+
 ## Reference Codebases
 
 Reference these codebases when designing APIs, code, architecture, persistence, UI systems, or other programming solutions. Use them to understand patterns and tradeoffs, not as requirements to copy their abstractions.
