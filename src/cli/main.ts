@@ -31,6 +31,7 @@ const program = Effect.gen(function* () {
 
   if (parsed.kind === "help") {
     console.log(HELP);
+
     return;
   }
 
