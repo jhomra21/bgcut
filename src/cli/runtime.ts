@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { MODEL_INPUT_SIZE } from "../engine/image";
 import { logitToAlphaByte } from "../engine/matte";
 import { resizeRgbaLinearToNchw } from "../engine/preprocess";
+import { compositeAlphaMask } from "./alpha-mask";
 import type { CliEngine, CliFormat, CliOptions } from "./args";
 import { CliModelError, ensureCliModel } from "./model-cache";
 
@@ -232,16 +233,17 @@ const encodeOutput = (
           fastShrinkOnLoad: false,
         })
         .raw()
-        .toBuffer();
+        .toBuffer({ resolveWithObject: true });
+
+      if (resizedAlpha.info.width !== prepared.width || resizedAlpha.info.height !== prepared.height) {
+        throw new Error(
+          `Resized matte is ${resizedAlpha.info.width} × ${resizedAlpha.info.height}; expected ${prepared.width} × ${prepared.height}.`,
+        );
+      }
 
       const rgba = Buffer.from(prepared.source);
-      const pixelCount = prepared.width * prepared.height;
 
-      for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
-        const alphaIndex = pixelIndex * 4 + 3;
-
-        rgba[alphaIndex] = Math.round((rgba[alphaIndex] * resizedAlpha[pixelIndex]) / 255);
-      }
+      compositeAlphaMask(rgba, resizedAlpha.data, resizedAlpha.info.channels);
 
       await mkdir(dirname(outputPath), { recursive: true });
 
