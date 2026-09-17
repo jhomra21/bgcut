@@ -38,6 +38,7 @@ const isExpectedModel = (fingerprint: ModelFileFingerprint | undefined): boolean
 export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
   Effect.gen(function* () {
     const modelPath = cliModelPath();
+
     const temporaryPath = `${modelPath}.download`;
     const existing = yield* inspectModelFile(modelPath).pipe(
       Effect.mapError((cause) =>
