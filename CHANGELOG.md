@@ -11,6 +11,8 @@ bgcut is in beta. Beta releases use the npm `beta` tag and GitHub prereleases. N
 - Added package tests that verify the installed CLI and bundled skill from a packed tarball.
 - Updated the beta install, AVIF, privacy, runtime, and release documentation.
 - Removed internal comparison-tool references from public documentation.
+- Simplified the browser UI to one image picker, one result view, and download controls.
+- Removed runtime diagnostics, timing tables, model details, and internal reference-image controls from the normal product UI.
 
 ## 0.1.0-beta.1 - 2026-09-17
 
