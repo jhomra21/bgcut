@@ -43,6 +43,7 @@ type SessionCache = {
 };
 
 let cachedSession: SessionCache | undefined;
+
 let ortWebGpuRuntimeConfigured = false;
 
 const configureOrtWebGpuRuntime = (): void => {
@@ -53,6 +54,7 @@ const configureOrtWebGpuRuntime = (): void => {
   ort.env.wasm.wasmPaths = {
     wasm: resolveOrtWebGpuWasmUrl(globalThis.location.href),
   };
+
   ortWebGpuRuntimeConfigured = true;
 };
 
