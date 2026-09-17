@@ -2,6 +2,7 @@ import { readdir, rm, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 const CLOUDFLARE_ASSET_LIMIT_BYTES = 25 * 1024 * 1024;
+
 const distDirectory = resolve(import.meta.dir, "../dist");
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {
@@ -33,6 +34,7 @@ for (const path of initialFiles) {
 }
 
 const deployFiles = await walkFiles(distDirectory);
+
 const oversized: string[] = [];
 
 for (const path of deployFiles) {
