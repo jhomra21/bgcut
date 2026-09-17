@@ -3,7 +3,7 @@ export const MODEL_FILENAME = "birefnet-lite-512-ort-basic-webgpu-v2.onnx";
 export const MODEL_PUBLIC_PATH = `/models/${MODEL_FILENAME}`;
 
 export const MODEL_RELEASE_URL =
-  `https://github.com/jhomra21/removebg-webgpu/releases/download/model-birefnet-lite-512-ort-basic-webgpu-v2/${MODEL_FILENAME}`;
+  `https://github.com/jhomra21/bgremove/releases/download/model-birefnet-lite-512-ort-basic-webgpu-v2/${MODEL_FILENAME}`;
 
 export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
 
