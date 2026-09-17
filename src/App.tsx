@@ -408,7 +408,7 @@ const App = () => {
             id="source-file-input"
             class="file-input"
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/webp,image/avif"
             aria-label="Choose source image"
             onClick={(event) => event.stopPropagation()}
             onChange={handleFileInput}
@@ -420,7 +420,7 @@ const App = () => {
             id="reference-file-input"
             class="file-input"
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/webp,image/avif"
             aria-label="Choose BG0 comparison image"
             onClick={(event) => event.stopPropagation()}
             onChange={handleReferenceInput}
@@ -639,7 +639,7 @@ const DropCopy = () => (
   <div class="drop-copy">
     <div class="drop-icon" aria-hidden="true">↗</div>
     <h2>Drop an image</h2>
-    <p>PNG, JPEG, or WebP. Inference and image processing stay in this browser.</p>
+    <p>PNG, JPEG, WebP, or AVIF. Inference and image processing stay in this browser.</p>
     <button class="primary-button" type="button">Choose image</button>
   </div>
 );
