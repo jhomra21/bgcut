@@ -16,40 +16,51 @@ export class CliModelError extends Data.TaggedError("CliModelError")<{
   readonly cause?: unknown;
 }> {}
 
-const cacheRoot = (): string => {
+const cacheRoot = (appName: string): string => {
   if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Caches", "removebg-webgpu");
+    return join(homedir(), "Library", "Caches", appName);
   }
 
   if (process.platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA;
 
-    return join(localAppData ?? join(homedir(), "AppData", "Local"), "removebg-webgpu");
+    return join(localAppData ?? join(homedir(), "AppData", "Local"), appName);
   }
 
-  return join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "removebg-webgpu");
+  return join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), appName);
 };
 
-export const cliModelPath = (): string => join(cacheRoot(), "models", MODEL_FILENAME);
+export const cliModelPath = (): string => join(cacheRoot("bgremove"), "models", MODEL_FILENAME);
+
+const legacyCliModelPath = (): string => join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME);
 
 const isExpectedModel = (fingerprint: ModelFileFingerprint | undefined): boolean =>
   fingerprint?.sizeBytes === MODEL_SIZE_BYTES && fingerprint.sha256 === MODEL_SHA256;
 
+const inspectCachedModel = (path: string): Effect.Effect<ModelFileFingerprint | undefined, CliModelError> =>
+  inspectModelFile(path).pipe(
+    Effect.mapError((cause) =>
+      new CliModelError({ message: `Could not inspect the cached model at ${path}.`, cause }),
+    ),
+  );
+
 export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
   Effect.gen(function* () {
     const modelPath = cliModelPath();
-
-    const temporaryPath = `${modelPath}.download`;
-
-    const existing = yield* inspectModelFile(modelPath).pipe(
-      Effect.mapError((cause) =>
-        new CliModelError({ message: `Could not inspect the cached model at ${modelPath}.`, cause }),
-      ),
-    );
+    const existing = yield* inspectCachedModel(modelPath);
 
     if (isExpectedModel(existing)) {
       return modelPath;
     }
+
+    const legacyModelPath = legacyCliModelPath();
+    const legacyExisting = yield* inspectCachedModel(legacyModelPath);
+
+    if (isExpectedModel(legacyExisting)) {
+      return legacyModelPath;
+    }
+
+    const temporaryPath = `${modelPath}.download`;
 
     yield* Effect.tryPromise({
       try: () => mkdir(dirname(modelPath), { recursive: true }),
