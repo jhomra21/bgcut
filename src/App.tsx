@@ -20,6 +20,7 @@ type ImageState =
 
 type ReadyResult = {
   readonly status: "ready";
+  readonly blob: Blob;
   readonly url: string;
   readonly downloadName: string;
 };
@@ -40,7 +41,9 @@ const transparentName = (fileName: string): string => {
 const App = () => {
   const [imageState, setImageState] = createSignal<ImageState>({ status: "empty" });
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
+  const [copyState, setCopyState] = createSignal<"idle" | "copied" | "error">("idle");
   let fileInput: HTMLInputElement | undefined;
+  let activeSourceFile: File | undefined;
   let activeSourceUrl: string | undefined;
   let activeResultUrl: string | undefined;
   let selectionVersion = 0;
@@ -78,6 +81,7 @@ const App = () => {
     }
 
     setResultState({ status: "idle" });
+    setCopyState("idle");
   };
 
   const reset = () => {
@@ -89,6 +93,7 @@ const App = () => {
       activeSourceUrl = undefined;
     }
 
+    activeSourceFile = undefined;
     setImageState({ status: "empty" });
 
     if (fileInput !== undefined) {
@@ -115,6 +120,7 @@ const App = () => {
             activeResultUrl = URL.createObjectURL(result.blob);
             setResultState({
               status: "ready",
+              blob: result.blob,
               url: activeResultUrl,
               downloadName: transparentName(file.name),
             });
@@ -139,6 +145,8 @@ const App = () => {
       activeSourceUrl = undefined;
     }
 
+    activeSourceFile = undefined;
+
     void Effect.runPromise(
       decodeImage(file).pipe(
         Effect.match({
@@ -153,6 +161,7 @@ const App = () => {
             }
 
             activeSourceUrl = URL.createObjectURL(file);
+            activeSourceFile = file;
             setImageState({
               status: "ready",
               name: file.name,
@@ -163,6 +172,47 @@ const App = () => {
         }),
       ),
     );
+  };
+
+  const copyResult = (result: ReadyResult) => {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      setCopyState("error");
+
+      return;
+    }
+
+    void navigator.clipboard
+      .write([new ClipboardItem({ "image/png": result.blob })])
+      .then(() => setCopyState("copied"))
+      .catch(() => setCopyState("error"));
+  };
+
+  const copyLabel = (): string => {
+    const state = copyState();
+
+    if (state === "copied") {
+      return "Copied";
+    }
+
+    if (state === "error") {
+      return "Copy failed";
+    }
+
+    return "Copy";
+  };
+
+  const redo = () => {
+    if (activeSourceFile === undefined || processing()) {
+      return;
+    }
+
+    clearResult();
+    runRemoval(activeSourceFile, selectionVersion);
+  };
+
+  const chooseNewImage = () => {
+    reset();
+    fileInput?.click();
   };
 
   const handleDrop = (event: DragEvent) => {
@@ -203,13 +253,17 @@ const App = () => {
     if (activeResultUrl !== undefined) {
       URL.revokeObjectURL(activeResultUrl);
     }
+
+    activeSourceFile = undefined;
   });
 
   return (
     <main class="app-shell">
       <header class="app-header">
-        <h1>Background Image Eraser</h1>
-        <p>Private. Runs only on your device.</p>
+        <h1>bgcut</h1>
+        <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
+          GitHub
+        </a>
       </header>
 
       <section
@@ -267,14 +321,22 @@ const App = () => {
               </Show>
 
               <div class="result-actions">
-                <button class="text-button" type="button" onClick={reset}>
-                  Reset
+                <button class="text-button" type="button" onClick={chooseNewImage}>
+                  New Image
                 </button>
                 <Show keyed when={readyResult()}>
                   {(result) => (
-                    <a class="download-button" href={result.url} download={result.downloadName}>
-                      Download
-                    </a>
+                    <div class="result-action-group">
+                      <button class="text-button" type="button" onClick={() => copyResult(result)}>
+                        {copyLabel()}
+                      </button>
+                      <a class="download-button" href={result.url} download={result.downloadName}>
+                        Download
+                      </a>
+                      <button class="text-button" type="button" onClick={redo}>
+                        Redo
+                      </button>
+                    </div>
                   )}
                 </Show>
               </div>

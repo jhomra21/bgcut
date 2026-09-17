@@ -30,11 +30,15 @@ describe("browser product UI", () => {
   });
 
   test("matches the minimal product flow", () => {
-    expect(appSource).toContain("Background Image Eraser");
-    expect(appSource).toContain("Private. Runs only on your device.");
+    expect(appSource).toContain("<h1>bgcut</h1>");
+    expect(appSource).toContain('href="https://github.com/jhomra21/bgcut"');
+    expect(appSource).toContain("GitHub");
     expect(appSource).toContain("Click or drag image here");
-    expect(appSource).toContain("Reset");
+    expect(appSource).toContain("New Image");
+    expect(appSource).toContain("Copy");
     expect(appSource).toContain("Download");
+    expect(appSource).toContain("Redo");
+    expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");
   });
 

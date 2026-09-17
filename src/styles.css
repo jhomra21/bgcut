@@ -58,10 +58,15 @@ figure {
   font-weight: 650;
 }
 
-.app-header p {
+.app-header a {
   color: #777771;
   font-size: 12px;
   white-space: nowrap;
+  text-decoration: none;
+}
+
+.app-header a:hover {
+  color: #171717;
 }
 
 .drop-surface {
@@ -155,6 +160,8 @@ figure {
 
 .comparison-slider {
   --comparison-position: 50%;
+  --comparison-left-opacity: 1;
+  --comparison-right-opacity: 1;
   position: relative;
   min-height: 520px;
   overflow: hidden;
@@ -192,20 +199,28 @@ figure {
   pointer-events: none;
 }
 
-.comparison-divider span {
+.comparison-chevron {
   position: absolute;
-  left: 50%;
   top: 50%;
-  width: 32px;
-  height: 32px;
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  border: 1px solid #171717;
-  border-radius: 999px;
-  background: #ffffff;
+  width: 16px;
+  height: 28px;
+  transform: translateY(-50%);
   color: #171717;
-  font-size: 14px;
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 24px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.comparison-chevron-left {
+  right: 6px;
+  opacity: var(--comparison-left-opacity);
+}
+
+.comparison-chevron-right {
+  left: 6px;
+  opacity: var(--comparison-right-opacity);
 }
 
 .comparison-range {
@@ -231,6 +246,13 @@ figure {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.result-action-group {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
 
@@ -293,7 +315,7 @@ figure {
     font-size: 22px;
   }
 
-  .app-header p {
+  .app-header a {
     white-space: normal;
   }
 
@@ -309,6 +331,10 @@ figure {
   }
 
   .result-actions {
+    gap: 8px;
+  }
+
+  .result-action-group {
     gap: 8px;
   }
 }
