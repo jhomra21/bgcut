@@ -8,8 +8,9 @@ import {
 
 const releaseModelUrl = new URL(MODEL_RELEASE_URL);
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [solid()],
+  publicDir: mode === "cloudflare" ? false : "public",
   server: {
     proxy: {
       [MODEL_PUBLIC_PATH]: {
@@ -20,4 +21,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
