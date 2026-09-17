@@ -7,6 +7,7 @@ import {
   ModelLoadFailed,
   type BackgroundRemovalError,
 } from "./errors";
+import { shouldFallbackToWasm } from "./fallback-policy";
 import type { GpuRuntime } from "./gpu";
 import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
 import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
@@ -194,14 +195,6 @@ export const removeBackgroundWebGpu = (
       (bitmap) => Effect.sync(() => bitmap.close()),
     );
   });
-
-const shouldFallbackToWasm = (error: BackgroundRemovalError): boolean =>
-  error._tag === "WebGpuUnavailable" ||
-  error._tag === "AdapterUnavailable" ||
-  error._tag === "DeviceRequestFailed" ||
-  error._tag === "RuntimeInitializationFailed" ||
-  error._tag === "ModelLoadFailed" ||
-  error._tag === "InferenceFailed";
 
 const removeBackgroundWithWasm = (
   file: File,
