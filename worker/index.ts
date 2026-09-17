@@ -1,19 +1,40 @@
 import { MODEL_FILENAME } from "../src/engine/model-config.ts";
+import { ORT_WEBGPU_WASM_FILENAME } from "../src/engine/ort-webgpu-runtime.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
+const ORT_WEBGPU_WASM_PATH = `/runtime/${ORT_WEBGPU_WASM_FILENAME}`;
+const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
-const MODEL_CACHE_CONTROL = "public, max-age=31536000, immutable";
+type R2Asset = {
+  readonly key: string;
+  readonly contentType: string;
+};
 
-const modelHeaders = (object: R2Object): Headers => {
+const resolveR2Asset = (pathname: string): R2Asset | undefined => {
+  if (pathname === MODEL_PATH) {
+    return {
+      key: MODEL_FILENAME,
+      contentType: "application/octet-stream",
+    };
+  }
+
+  if (pathname === ORT_WEBGPU_WASM_PATH) {
+    return {
+      key: ORT_WEBGPU_WASM_FILENAME,
+      contentType: "application/wasm",
+    };
+  }
+
+  return undefined;
+};
+
+const objectHeaders = (object: R2Object, contentType: string): Headers => {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
-  headers.set("cache-control", MODEL_CACHE_CONTROL);
+  headers.set("cache-control", IMMUTABLE_CACHE_CONTROL);
   headers.set("content-length", String(object.size));
+  headers.set("content-type", contentType);
   headers.set("etag", object.httpEtag);
-
-  if (!headers.has("content-type")) {
-    headers.set("content-type", "application/octet-stream");
-  }
 
   return headers;
 };
@@ -26,19 +47,20 @@ type Env = {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const asset = resolveR2Asset(url.pathname);
 
-    if (url.pathname !== MODEL_PATH) {
+    if (asset === undefined) {
       return env.ASSETS.fetch(request);
     }
 
     if (request.method === "HEAD") {
-      const object = await env.MODELS.head(MODEL_FILENAME);
+      const object = await env.MODELS.head(asset.key);
 
       if (object === null) {
-        return new Response("Model not found.", { status: 404 });
+        return new Response("Asset not found.", { status: 404 });
       }
 
-      return new Response(null, { headers: modelHeaders(object) });
+      return new Response(null, { headers: objectHeaders(object, asset.contentType) });
     }
 
     if (request.method !== "GET") {
@@ -48,12 +70,14 @@ export default {
       });
     }
 
-    const object = await env.MODELS.get(MODEL_FILENAME);
+    const object = await env.MODELS.get(asset.key);
 
     if (object === null) {
-      return new Response("Model not found.", { status: 404 });
+      return new Response("Asset not found.", { status: 404 });
     }
 
-    return new Response(object.body, { headers: modelHeaders(object) });
+    return new Response(object.body, {
+      headers: objectHeaders(object, asset.contentType),
+    });
   },
 };
