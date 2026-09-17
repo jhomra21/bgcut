@@ -11,8 +11,11 @@ bgcut is in beta. Beta releases use the npm `beta` tag and GitHub prereleases. N
 - Added package tests that verify the installed CLI and bundled skill from a packed tarball.
 - Updated the beta install, AVIF, privacy, runtime, and release documentation.
 - Removed internal comparison-tool references from public documentation.
-- Simplified the browser UI to one image picker, one result view, and download controls.
+- Simplified the browser UI to the sketch flow: click or drag an image, run removal automatically, compare the result, then reset or download.
 - Removed runtime diagnostics, timing tables, model details, and internal reference-image controls from the normal product UI.
+- Added Cloudflare Workers deployment for `bgcut.dev` with the large model served from private R2 at the same `/models/...` path.
+- Added a Cloudflare build gate that removes the unused oversized asyncify WASM artifact and rejects any remaining static asset above 25 MiB.
+- Added a Cloudflare dry-run CI workflow and local deployment instructions.
 
 ## 0.1.0-beta.1 - 2026-09-17
 
