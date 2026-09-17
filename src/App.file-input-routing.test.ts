@@ -29,6 +29,15 @@ describe("browser product UI", () => {
     expect(appSource.match(/type="file"/gu)?.length).toBe(1);
   });
 
+  test("matches the minimal product flow", () => {
+    expect(appSource).toContain("Background Image Eraser");
+    expect(appSource).toContain("Private. Runs only on your device.");
+    expect(appSource).toContain("Click or drag image here");
+    expect(appSource).toContain("Reset");
+    expect(appSource).toContain("Download");
+    expect(appSource).not.toContain("Remove background");
+  });
+
   test("keeps developer diagnostics and external comparison controls out of the product UI", () => {
     const internalComparisonName = ["B", "G", "0"].join("");
 
@@ -37,11 +46,5 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("Execution path");
     expect(appSource).not.toContain("reference-file-input");
     expect(appSource).not.toContain(internalComparisonName);
-  });
-
-  test("keeps the basic product actions", () => {
-    expect(appSource).toContain("Choose image");
-    expect(appSource).toContain("Remove background");
-    expect(appSource).toContain("Download PNG");
   });
 });
