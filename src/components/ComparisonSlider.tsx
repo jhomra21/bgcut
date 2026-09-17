@@ -12,6 +12,9 @@ type ComparisonSliderProps = {
 const ComparisonSlider = (props: ComparisonSliderProps) => {
   const [position, setPosition] = createSignal(50);
 
+  const visibleRightLabel = (): string =>
+    props.leftLabel === "Original" ? "Background removed" : props.rightLabel;
+
   const handleInput = (event: InputEvent) => {
     const input = event.currentTarget;
 
@@ -46,14 +49,14 @@ const ComparisonSlider = (props: ComparisonSliderProps) => {
           min="0"
           max="100"
           value={position()}
-          aria-label={`Compare ${props.leftLabel} with ${props.rightLabel}`}
+          aria-label={`Compare ${props.leftLabel} with ${visibleRightLabel()}`}
           onInput={handleInput}
         />
       </div>
 
       <figcaption class="comparison-labels">
         <span>{props.leftLabel}</span>
-        <span>{props.rightLabel}</span>
+        <span>{visibleRightLabel()}</span>
       </figcaption>
     </figure>
   );
