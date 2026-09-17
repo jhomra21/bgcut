@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
+import ComparisonSlider from "./components/ComparisonSlider";
 import { formatBackgroundRemovalError, formatGpuRuntimeError, formatImageError } from "./engine/errors";
 import { removeBackground } from "./engine/inference";
 import { decodeImage } from "./engine/image";
@@ -42,6 +43,11 @@ type ResultState =
   | ReadyResult
   | { readonly status: "error"; readonly message: string };
 
+type ReferenceState =
+  | { readonly status: "empty" }
+  | ReadyImage
+  | { readonly status: "error"; readonly message: string };
+
 type RuntimeCheckProps = {
   readonly label: string;
   readonly passed: boolean;
@@ -71,11 +77,15 @@ const App = () => {
   const [gpuState, setGpuState] = createSignal<GpuState>({ status: "checking" });
   const [imageState, setImageState] = createSignal<ImageState>({ status: "empty" });
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
+  const [referenceState, setReferenceState] = createSignal<ReferenceState>({ status: "empty" });
   const [selectedFile, setSelectedFile] = createSignal<File>();
   let fileInput: HTMLInputElement | undefined;
+  let referenceInput: HTMLInputElement | undefined;
   let activeSourceUrl: string | undefined;
   let activeResultUrl: string | undefined;
+  let activeReferenceUrl: string | undefined;
   let selectionVersion = 0;
+  let referenceVersion = 0;
 
   const readyGpu = (): GpuCapability | undefined => {
     const state = gpuState();
@@ -113,6 +123,18 @@ const App = () => {
     return state.status === "error" ? state.message : undefined;
   };
 
+  const readyReference = (): ReadyImage | undefined => {
+    const state = referenceState();
+
+    return state.status === "ready" ? state : undefined;
+  };
+
+  const referenceError = (): string | undefined => {
+    const state = referenceState();
+
+    return state.status === "error" ? state.message : undefined;
+  };
+
   const processing = (): boolean => resultState().status === "processing";
 
   const clearResult = () => {
@@ -122,6 +144,17 @@ const App = () => {
     }
 
     setResultState({ status: "idle" });
+  };
+
+  const clearReference = () => {
+    referenceVersion += 1;
+
+    if (activeReferenceUrl !== undefined) {
+      URL.revokeObjectURL(activeReferenceUrl);
+      activeReferenceUrl = undefined;
+    }
+
+    setReferenceState({ status: "empty" });
   };
 
   const initializeGpu = () => {
@@ -145,6 +178,7 @@ const App = () => {
     selectionVersion += 1;
     const version = selectionVersion;
     clearResult();
+    clearReference();
     setSelectedFile(undefined);
     setImageState({ status: "empty" });
 
@@ -175,6 +209,59 @@ const App = () => {
               width: decoded.width,
               height: decoded.height,
               url: activeSourceUrl,
+            });
+          },
+        }),
+      ),
+    );
+  };
+
+  const selectReference = (file: File) => {
+    const result = readyResult();
+
+    if (result === undefined) {
+      return;
+    }
+
+    referenceVersion += 1;
+    const version = referenceVersion;
+
+    if (activeReferenceUrl !== undefined) {
+      URL.revokeObjectURL(activeReferenceUrl);
+      activeReferenceUrl = undefined;
+    }
+
+    setReferenceState({ status: "empty" });
+
+    void Effect.runPromise(
+      decodeImage(file).pipe(
+        Effect.match({
+          onFailure: (error) => {
+            if (version === referenceVersion) {
+              setReferenceState({ status: "error", message: formatImageError(error) });
+            }
+          },
+          onSuccess: (decoded) => {
+            if (version !== referenceVersion) {
+              return;
+            }
+
+            if (decoded.width !== result.width || decoded.height !== result.height) {
+              setReferenceState({
+                status: "error",
+                message: `The BG0 reference is ${decoded.width} × ${decoded.height}; use a ${result.width} × ${result.height} result for pixel-aligned comparison.`,
+              });
+
+              return;
+            }
+
+            activeReferenceUrl = URL.createObjectURL(file);
+            setReferenceState({
+              status: "ready",
+              name: file.name,
+              width: decoded.width,
+              height: decoded.height,
+              url: activeReferenceUrl,
             });
           },
         }),
@@ -246,11 +333,27 @@ const App = () => {
     }
   };
 
+  const handleReferenceInput = (event: Event) => {
+    const input = event.currentTarget;
+
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const file = input.files?.item(0);
+
+    if (file !== null && file !== undefined) {
+      selectReference(file);
+      input.value = "";
+    }
+  };
+
   onSettled(() => {
     initializeGpu();
 
     return () => {
       selectionVersion += 1;
+      referenceVersion += 1;
 
       if (activeSourceUrl !== undefined) {
         URL.revokeObjectURL(activeSourceUrl);
@@ -258,6 +361,10 @@ const App = () => {
 
       if (activeResultUrl !== undefined) {
         URL.revokeObjectURL(activeResultUrl);
+      }
+
+      if (activeReferenceUrl !== undefined) {
+        URL.revokeObjectURL(activeReferenceUrl);
       }
     };
   });
@@ -299,6 +406,16 @@ const App = () => {
             accept="image/png,image/jpeg,image/webp"
             onChange={handleFileInput}
           />
+          <input
+            ref={(element) => {
+              referenceInput = element;
+            }}
+            class="file-input"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            aria-label="Choose BG0 comparison image"
+            onChange={handleReferenceInput}
+          />
 
           <Show keyed when={readyImage()} fallback={<DropCopy />}>
             {(image) => (
@@ -315,22 +432,36 @@ const App = () => {
                     </figure>
                   }
                 >
-                  {(result) => (
-                    <div class="comparison-grid">
-                      <figure class="image-card">
-                        <div class="image-stage checkerboard">
-                          <img class="preview" src={image.url} alt={`Original ${image.name}`} />
+                  {(result) => {
+                    const reference = readyReference();
+
+                    return (
+                      <>
+                        <ComparisonSlider
+                          leftSrc={reference?.url ?? image.url}
+                          rightSrc={result.url}
+                          leftAlt={reference === undefined ? `Original ${image.name}` : `BG0 result ${reference.name}`}
+                          rightAlt={`${image.name} with background removed by this build`}
+                          leftLabel={reference === undefined ? "Original" : `BG0 · ${reference.name}`}
+                          rightLabel="This build"
+                        />
+
+                        <div class="reference-actions">
+                          <button class="ghost-button" type="button" onClick={() => referenceInput?.click()}>
+                            {reference === undefined ? "Load BG0 output" : "Replace BG0 output"}
+                          </button>
+                          <Show when={reference !== undefined}>
+                            <button class="ghost-button" type="button" onClick={clearReference}>Clear BG0 output</button>
+                          </Show>
+                          <span class="reference-note">Reference files stay local and must match the source dimensions.</span>
                         </div>
-                        <figcaption>Original</figcaption>
-                      </figure>
-                      <figure class="image-card">
-                        <div class="image-stage checkerboard">
-                          <img class="preview" src={result.url} alt={`${image.name} with background removed`} />
-                        </div>
-                        <figcaption>Transparent</figcaption>
-                      </figure>
-                    </div>
-                  )}
+
+                        <Show keyed when={referenceError()}>
+                          {(message) => <div class="error-card result-error">{message}</div>}
+                        </Show>
+                      </>
+                    );
+                  }}
                 </Show>
 
                 <div class="image-meta">
@@ -364,7 +495,7 @@ const App = () => {
                     <div class="activity-bar" />
                     <div>
                       <strong>Running BiRefNet locally</strong>
-                      <p>The first run downloads the pinned fp32 model (~183 MB). Later runs can use the browser cache.</p>
+                      <p>The first run downloads the pinned fp32 model (~187 MB). Later runs can use the browser cache.</p>
                     </div>
                   </div>
                 </Show>
