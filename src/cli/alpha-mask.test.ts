@@ -9,6 +9,7 @@ describe("compositeAlphaMask", () => {
       40, 50, 60, 128,
       70, 80, 90, 64,
     ]);
+
     const mask = new Uint8Array([
       255, 4, 9,
       128, 5, 10,
@@ -29,6 +30,7 @@ describe("compositeAlphaMask", () => {
       1, 2, 3, 200,
       4, 5, 6, 100,
     ]);
+
     const mask = new Uint8Array([128, 255]);
 
     compositeAlphaMask(rgba, mask, 1);
