@@ -6,7 +6,7 @@ import { parseCliArgs } from "./args";
 import { removeBackgroundCli } from "./runtime";
 
 const HELP = `Usage:
-  bgremove <image> [format] [options]
+  bgcut <image> [format] [options]
 
 Formats:
   --png,  -png             Transparent PNG (default)
@@ -21,11 +21,11 @@ Options:
   -h, --help               Show this help
 
 Examples:
-  bgremove photo.jpg -png
-  bgremove photo.jpg --webp
-  bgremove photo.jpg -o portrait.png
-  bgremove photo.jpg -webp -o portrait.webp
-  bgremove photo.jpg -gpu
+  bgcut photo.jpg -png
+  bgcut photo.jpg --webp
+  bgcut photo.jpg -o portrait.png
+  bgcut photo.jpg -webp -o portrait.webp
+  bgcut photo.jpg -gpu
 `;
 
 const formatDuration = (milliseconds: number): string => {

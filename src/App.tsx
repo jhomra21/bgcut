@@ -378,7 +378,7 @@ const App = () => {
       <header class="topbar">
         <div>
           <p class="eyebrow">LOCAL IMAGE TOOL</p>
-          <h1>bgremove</h1>
+          <h1>bgcut</h1>
         </div>
         <div class="privacy-pill">Runs in your browser</div>
       </header>

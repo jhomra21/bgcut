@@ -30,9 +30,12 @@ const cacheRoot = (appName: string): string => {
   return join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), appName);
 };
 
-export const cliModelPath = (): string => join(cacheRoot("bgremove"), "models", MODEL_FILENAME);
+export const cliModelPath = (): string => join(cacheRoot("bgcut"), "models", MODEL_FILENAME);
 
-const legacyCliModelPath = (): string => join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME);
+const previousCliModelPaths = (): readonly string[] => [
+  join(cacheRoot("bgremove"), "models", MODEL_FILENAME),
+  join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME),
+];
 
 const isExpectedModel = (fingerprint: ModelFileFingerprint | undefined): boolean =>
   fingerprint?.sizeBytes === MODEL_SIZE_BYTES && fingerprint.sha256 === MODEL_SHA256;
@@ -53,11 +56,12 @@ export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
       return modelPath;
     }
 
-    const legacyModelPath = legacyCliModelPath();
-    const legacyExisting = yield* inspectCachedModel(legacyModelPath);
+    for (const previousModelPath of previousCliModelPaths()) {
+      const previousExisting = yield* inspectCachedModel(previousModelPath);
 
-    if (isExpectedModel(legacyExisting)) {
-      return legacyModelPath;
+      if (isExpectedModel(previousExisting)) {
+        return previousModelPath;
+      }
     }
 
     const temporaryPath = `${modelPath}.download`;

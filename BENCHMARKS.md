@@ -1,6 +1,6 @@
 # Benchmarks
 
-This file records measured performance baselines and controlled comparison rules for `bgremove`.
+This file records measured performance baselines and controlled comparison rules for `bgcut`.
 
 Do not use these numbers as general product claims. They are exact-run observations from a particular browser, device, image, model revision, runtime version, and commit.
 

@@ -1,4 +1,4 @@
-# bgremove
+# bgcut
 
 Local background removal with WebGPU as the primary execution path.
 
@@ -36,35 +36,35 @@ The model artifact is verified by exact byte count and SHA-256 during production
 
 ## Native CLI
 
-The first npm release is published on the `beta` tag. The CLI currently runs on Bun, so install Bun before installing or invoking `bgremove`.
+The first npm release is published on the `beta` tag. The CLI currently runs on Bun, so install Bun before installing or invoking `bgcut`.
 
 Install the beta globally with npm:
 
 ```sh
-npm install -g bgremove@beta
+npm install -g bgcut@beta
 ```
 
 Or with Bun:
 
 ```sh
-bun add -g bgremove@beta
+bun add -g bgcut@beta
 ```
 
 For a one-off run without a global install:
 
 ```sh
-bunx bgremove@beta photo.jpg
+bunx bgcut@beta photo.jpg
 ```
 
-The canonical command is `bgremove`:
+The canonical command is `bgcut`:
 
 ```sh
-bgremove photo.jpg
-bgremove photo.jpg --png
-bgremove photo.jpg -png
-bgremove photo.jpg --webp
-bgremove photo.jpg -webp -o portrait.webp
-bgremove photo.jpg -o portrait.png
+bgcut photo.jpg
+bgcut photo.jpg --png
+bgcut photo.jpg -png
+bgcut photo.jpg --webp
+bgcut photo.jpg -webp -o portrait.webp
+bgcut photo.jpg -o portrait.png
 ```
 
 From a source checkout, `bun run cli -- ...` runs the same entrypoint without installing the package binary.
