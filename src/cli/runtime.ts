@@ -12,11 +12,22 @@ import { CliModelError, ensureCliModel } from "./model-cache";
 
 export type CliExecutionEngine = "webgpu" | "cpu";
 
+export type CliTimings = {
+  readonly totalMs: number;
+  readonly modelMs: number;
+  readonly prepareMs: number;
+  readonly sessionMs: number;
+  readonly inferenceMs: number;
+  readonly encodeMs: number;
+};
+
 export type CliRemovalResult = {
   readonly width: number;
   readonly height: number;
   readonly outputPath: string;
   readonly engine: CliExecutionEngine;
+  readonly fallbackReason: string | undefined;
+  readonly timings: CliTimings;
 };
 
 export class CliImageError extends Data.TaggedError("CliImageError")<{
@@ -49,6 +60,7 @@ type PreparedImage = {
 type NativeSession = {
   readonly session: ort.InferenceSession;
   readonly engine: CliExecutionEngine;
+  readonly fallbackReason: string | undefined;
 };
 
 const supportedSharpFormats = new Set(["jpeg", "png", "webp"]);
@@ -116,6 +128,7 @@ const createSessionForProvider = (
         graphOptimizationLevel: "all",
       }),
       engine,
+      fallbackReason: undefined,
     }),
     catch: (cause) =>
       new CliSessionError({
@@ -137,7 +150,14 @@ const createSession = (
   }
 
   return createSessionForProvider(modelPath, "webgpu").pipe(
-    Effect.catchAll(() => createSessionForProvider(modelPath, "cpu")),
+    Effect.catchAll((webGpuError) =>
+      createSessionForProvider(modelPath, "cpu").pipe(
+        Effect.map((nativeSession) => ({
+          ...nativeSession,
+          fallbackReason: webGpuError.message,
+        })),
+      ),
+    ),
   );
 };
 
@@ -276,9 +296,23 @@ export const removeBackgroundCli = (
       });
     }
 
+    const totalStartedAt = performance.now();
+    let stageStartedAt = performance.now();
+
     const modelPath = yield* ensureCliModel();
+    const modelMs = performance.now() - stageStartedAt;
+
+    stageStartedAt = performance.now();
+
     const prepared = yield* prepareImage(options.inputPath);
+    const prepareMs = performance.now() - stageStartedAt;
+
+    stageStartedAt = performance.now();
+
     const nativeSession = yield* createSession(modelPath, options.engine);
+    const sessionMs = performance.now() - stageStartedAt;
+
+    stageStartedAt = performance.now();
 
     const logits = yield* Effect.acquireUseRelease(
       Effect.succeed(nativeSession.session),
@@ -289,13 +323,28 @@ export const removeBackgroundCli = (
           catch: () => undefined,
         }).pipe(Effect.orElseSucceed(() => undefined)),
     );
+    const inferenceMs = performance.now() - stageStartedAt;
+
+    stageStartedAt = performance.now();
 
     yield* encodeOutput(prepared, logits, options.outputPath, options.format);
+
+    const encodeMs = performance.now() - stageStartedAt;
+    const totalMs = performance.now() - totalStartedAt;
 
     return {
       width: prepared.width,
       height: prepared.height,
       outputPath: options.outputPath,
       engine: nativeSession.engine,
+      fallbackReason: nativeSession.fallbackReason,
+      timings: {
+        totalMs,
+        modelMs,
+        prepareMs,
+        sessionMs,
+        inferenceMs,
+        encodeMs,
+      },
     };
   });
