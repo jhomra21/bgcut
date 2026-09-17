@@ -252,9 +252,9 @@ figure {
 }
 
 .result-actions {
-  display: grid;
+  display: flex;
   align-items: center;
-  grid-template-columns: minmax(0, 1fr) auto;
+  justify-content: space-between;
   min-height: 34px;
   padding: 0;
   border-top: 1px dashed #b9b9b2;
@@ -386,7 +386,8 @@ figure {
   }
 
   .result-actions {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .result-action-group {
