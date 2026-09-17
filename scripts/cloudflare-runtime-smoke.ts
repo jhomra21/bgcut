@@ -22,7 +22,7 @@ const runtimeFile = resolve(
   ORT_WEBGPU_WASM_FILENAME,
 );
 
-const run = async (command: readonly string[]): Promise<void> => {
+const run = async (command: string[]): Promise<void> => {
   const process = Bun.spawn(command, {
     cwd: repositoryRoot,
     stdout: "inherit",
