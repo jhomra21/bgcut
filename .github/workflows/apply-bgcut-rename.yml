@@ -1,0 +1,73 @@
+name: apply-bgcut-rename
+
+on:
+  push:
+    branches:
+      - fix/npm-beta-publish
+
+permissions:
+  contents: write
+
+jobs:
+  rename:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/npm-beta-publish
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Apply bgcut rename
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for name in [
+              'README.md',
+              'BENCHMARKS.md',
+              'IMPROVEMENTS.md',
+              'index.html',
+              'src/App.tsx',
+              'src/cli/main.ts',
+              'scripts/package-smoke.ts',
+          ]:
+              path = Path(name)
+              text = path.read_text()
+              path.write_text(text.replace('bgremove', 'bgcut'))
+
+          package = Path('package.json')
+          text = package.read_text()
+          text = text.replace('"name": "bgremove"', '"name": "bgcut"')
+          text = text.replace('"bgremove": "src/cli/main.ts"', '"bgcut": "src/cli/main.ts"')
+          package.write_text(text)
+
+          cache = Path('src/cli/model-cache.ts')
+          text = cache.read_text()
+          text = text.replace(
+              'export const cliModelPath = (): string => join(cacheRoot("bgremove"), "models", MODEL_FILENAME);\n\nconst legacyCliModelPath = (): string => join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME);',
+              'export const cliModelPath = (): string => join(cacheRoot("bgcut"), "models", MODEL_FILENAME);\n\nconst previousCliModelPaths = (): readonly string[] => [\n  join(cacheRoot("bgremove"), "models", MODEL_FILENAME),\n  join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME),\n];'
+          )
+          text = text.replace(
+              '    const legacyModelPath = legacyCliModelPath();\n    const legacyExisting = yield* inspectCachedModel(legacyModelPath);\n\n    if (isExpectedModel(legacyExisting)) {\n      return legacyModelPath;\n    }',
+              '    for (const previousModelPath of previousCliModelPaths()) {\n      const previousExisting = yield* inspectCachedModel(previousModelPath);\n\n      if (isExpectedModel(previousExisting)) {\n        return previousModelPath;\n      }\n    }'
+          )
+          cache.write_text(text)
+          PY
+
+          bun install --lockfile-only
+
+      - name: Commit rename
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md BENCHMARKS.md IMPROVEMENTS.md index.html package.json bun.lock src/App.tsx src/cli/main.ts src/cli/model-cache.ts scripts/package-smoke.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'release: rename package and command to bgcut'
+          git push origin HEAD:fix/npm-beta-publish
