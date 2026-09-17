@@ -162,6 +162,8 @@ figure {
   --comparison-position: 50%;
   --comparison-left-opacity: 1;
   --comparison-right-opacity: 1;
+  --comparison-left-color: #171717;
+  --comparison-right-color: #171717;
   position: relative;
   min-height: 520px;
   overflow: hidden;
@@ -202,24 +204,25 @@ figure {
 .comparison-chevron {
   position: absolute;
   top: 50%;
-  width: 16px;
-  height: 28px;
+  width: 17px;
+  height: 29px;
   transform: translateY(-50%);
-  color: #171717;
-  font-size: 32px;
+  font-size: 33px;
   font-weight: 300;
-  line-height: 24px;
+  line-height: 25px;
   text-align: center;
   pointer-events: none;
 }
 
 .comparison-chevron-left {
   right: 6px;
+  color: var(--comparison-left-color);
   opacity: var(--comparison-left-opacity);
 }
 
 .comparison-chevron-right {
   left: 6px;
+  color: var(--comparison-right-color);
   opacity: var(--comparison-right-opacity);
 }
 

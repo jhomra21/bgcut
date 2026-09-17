@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
-import { chevronOpacity } from "./comparison-slider-state";
+import { chevronColor, chevronOpacity } from "./comparison-slider-state";
 
-export { chevronOpacity } from "./comparison-slider-state";
+export { chevronColor, chevronOpacity } from "./comparison-slider-state";
 
 type ComparisonSliderProps = {
   readonly leftSrc: string;
@@ -28,7 +28,7 @@ const ComparisonSlider = (props: ComparisonSliderProps) => {
   return (
     <div
       class="comparison-slider checkerboard"
-      style={`--comparison-position: ${currentPosition()}%; --comparison-left-opacity: ${chevronOpacity("left", currentPosition())}; --comparison-right-opacity: ${chevronOpacity("right", currentPosition())};`}
+      style={`--comparison-position: ${currentPosition()}%; --comparison-left-opacity: ${chevronOpacity("left", currentPosition())}; --comparison-right-opacity: ${chevronOpacity("right", currentPosition())}; --comparison-left-color: ${chevronColor("left", currentPosition())}; --comparison-right-color: ${chevronColor("right", currentPosition())};`}
     >
       <div class="comparison-layer">
         <img class="comparison-image" src={props.rightSrc} alt={props.rightAlt} />

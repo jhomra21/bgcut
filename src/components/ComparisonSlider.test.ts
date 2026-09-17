@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chevronOpacity } from "./comparison-slider-state";
+import { chevronColor, chevronOpacity } from "./comparison-slider-state";
 
 const sliderSource = await Bun.file(new URL("./ComparisonSlider.tsx", import.meta.url)).text();
 
@@ -11,6 +11,9 @@ describe("comparison slider handle", () => {
     expect(chevronOpacity("right", 75)).toBe(1);
     expect(chevronOpacity("left", 50)).toBe(1);
     expect(chevronOpacity("right", 50)).toBe(1);
+    expect(chevronColor("left", 25)).toBe("#171717");
+    expect(chevronColor("right", 25)).toBe("#a3a39c");
+    expect(chevronColor("left", 50)).toBe("#171717");
   });
 
   test("uses separate chevrons with position-aware opacity", () => {
@@ -18,6 +21,8 @@ describe("comparison slider handle", () => {
     expect(sliderSource).toContain("comparison-chevron-right");
     expect(sliderSource).toContain("--comparison-left-opacity");
     expect(sliderSource).toContain("--comparison-right-opacity");
+    expect(sliderSource).toContain("--comparison-left-color");
+    expect(sliderSource).toContain("--comparison-right-color");
     expect(sliderSource).not.toContain("↔");
   });
 });
