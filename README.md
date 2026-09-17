@@ -17,7 +17,7 @@ Run the full project checks with:
 bun run check
 ```
 
-That runs oxlint, TypeScript, product tests, and the production build. Vendored anti-slop maintainer tests are excluded from Bun's project-level test discovery through `bunfig.toml` because Oxlint `RuleTester` expects its upstream Node/tsx environment.
+That runs oxlint, TypeScript, product tests, the production build, and an npm package dry run. Vendored anti-slop maintainer tests are excluded from Bun's project-level test discovery through `bunfig.toml` because Oxlint `RuleTester` expects its upstream Node/tsx environment.
 
 ## Browser pipeline
 
@@ -35,6 +35,26 @@ image
 The model artifact is verified by exact byte count and SHA-256 during production builds. Source images never go to an inference backend.
 
 ## Native CLI
+
+The first npm release is published on the `beta` tag. The CLI currently runs on Bun, so install Bun before installing or invoking `bgremove`.
+
+Install the beta globally with npm:
+
+```sh
+npm install -g bgremove@beta
+```
+
+Or with Bun:
+
+```sh
+bun add -g bgremove@beta
+```
+
+For a one-off run without a global install:
+
+```sh
+bunx bgremove@beta photo.jpg
+```
 
 The canonical command is `bgremove`:
 
