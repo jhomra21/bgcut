@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "removebg-webgpu",
+      "name": "bgremove",
       "dependencies": {
         "@solidjs/web": "2.0.0-rc.8",
         "effect": "3.22.2",
