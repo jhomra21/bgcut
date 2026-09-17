@@ -16,6 +16,7 @@ import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
 import { MODEL_REVISION } from "./model-config";
+import { resolveOrtWebGpuWasmUrl } from "./ort-webgpu-runtime";
 import { getGpuRuntime } from "./runtime";
 import {
   createRemovalTimingRecorder,
@@ -42,6 +43,18 @@ type SessionCache = {
 };
 
 let cachedSession: SessionCache | undefined;
+let ortWebGpuRuntimeConfigured = false;
+
+const configureOrtWebGpuRuntime = (): void => {
+  if (ortWebGpuRuntimeConfigured) {
+    return;
+  }
+
+  ort.env.wasm.wasmPaths = {
+    wasm: resolveOrtWebGpuWasmUrl(globalThis.location.href),
+  };
+  ortWebGpuRuntimeConfigured = true;
+};
 
 const createSession = (
   runtime: GpuRuntime,
@@ -51,6 +64,8 @@ const createSession = (
     const stopModelDownload = timings.begin("modelDownloadMs");
     const model = yield* fetchModelBytes();
     stopModelDownload();
+
+    configureOrtWebGpuRuntime();
 
     const stopSessionInit = timings.begin("sessionInitMs");
 
