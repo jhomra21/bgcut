@@ -3,7 +3,7 @@ import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
 import { formatBackgroundRemovalError, formatGpuRuntimeError, formatImageError } from "./engine/errors";
-import { removeBackground } from "./engine/inference";
+import { removeBackground, type BrowserInferenceEngine } from "./engine/inference";
 import { decodeImage } from "./engine/image";
 import { checkGpuCapability, type GpuCapability } from "./engine/runtime";
 import type { RemovalTimings } from "./engine/timing";
@@ -33,6 +33,7 @@ type ReadyResult = {
   readonly width: number;
   readonly height: number;
   readonly modelRevision: string;
+  readonly engine: BrowserInferenceEngine;
   readonly timings: RemovalTimings;
 };
 
@@ -114,6 +115,8 @@ const App = () => {
   };
 
   const processing = (): boolean => resultState().status === "processing";
+
+  const runtimeChecking = (): boolean => gpuState().status === "checking";
 
   const clearResult = () => {
     if (activeResultUrl !== undefined) {
@@ -214,6 +217,7 @@ const App = () => {
               width: result.width,
               height: result.height,
               modelRevision: result.modelRevision,
+              engine: result.engine,
               timings: result.timings,
             });
           },
@@ -345,7 +349,7 @@ const App = () => {
                   <button
                     class="primary-button"
                     type="button"
-                    disabled={processing() || readyGpu() === undefined}
+                    disabled={processing() || runtimeChecking()}
                     onClick={runRemoval}
                   >
                     {processing() ? "Removing…" : readyResult() === undefined ? "Remove background" : "Run again"}
@@ -364,7 +368,7 @@ const App = () => {
                     <div class="activity-bar" />
                     <div>
                       <strong>Running BiRefNet locally</strong>
-                      <p>The first run downloads the pinned fp32 model (~183 MB). Later runs can use the browser cache.</p>
+                      <p>The first run downloads the pinned fp32 model (~187 MB). Later runs can use the browser cache.</p>
                     </div>
                   </div>
                 </Show>
@@ -381,7 +385,7 @@ const App = () => {
           <div class="panel-heading">
             <div>
               <p class="eyebrow">RUNTIME</p>
-              <h2>GPU foundation</h2>
+              <h2>Execution path</h2>
             </div>
             <button class="ghost-button" type="button" disabled={processing()} onClick={initializeGpu}>Retry</button>
           </div>
@@ -390,8 +394,15 @@ const App = () => {
             keyed
             when={readyGpu()}
             fallback={
-              <Show keyed when={gpuError()} fallback={<p class="status-copy">Requesting a WebGPU device…</p>}>
-                {(message) => <div class="error-card">{message}</div>}
+              <Show keyed when={gpuError()} fallback={<p class="status-copy">Checking WebGPU support…</p>}>
+                {(message) => (
+                  <div class="model-card compatibility-card">
+                    <p class="eyebrow">COMPATIBILITY</p>
+                    <strong>WebAssembly fallback ready</strong>
+                    <span>{message}</span>
+                    <span>Images still stay in this browser; inference runs locally on the CPU.</span>
+                  </div>
+                )}
               </Show>
             }
           >
@@ -408,7 +419,7 @@ const App = () => {
             <p class="eyebrow">MODEL</p>
             <strong>BiRefNet Lite · 512 · fp32</strong>
             <span>Pinned revision 4a3c40c</span>
-            <span>ONNX Runtime Web 1.30.0 · custom-device session on first run</span>
+            <span>ONNX Runtime Web 1.30.0 · WebGPU preferred · WebAssembly fallback</span>
             <span>Inference at 512² · export at source resolution</span>
           </div>
 
@@ -418,6 +429,7 @@ const App = () => {
                 <div class="success-card">
                   <strong>Transparent PNG ready</strong>
                   <span>{result.width} × {result.height}</span>
+                  <span>{result.engine === "webgpu" ? "WebGPU" : "WebAssembly fallback"}</span>
                   <span>{formatTiming(result.timings.totalMs)} total</span>
                 </div>
 
@@ -436,9 +448,13 @@ const App = () => {
                     <TimingRow label="Model fetch" value={result.timings.modelDownloadMs} />
                     <TimingRow label="Session init" value={result.timings.sessionInitMs} />
                     <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
-                    <TimingRow label="GPU prep enqueue" value={result.timings.inputUploadMs} />
+                    <Show when={result.engine === "webgpu"}>
+                      <TimingRow label="GPU prep enqueue" value={result.timings.inputUploadMs} />
+                    </Show>
                     <TimingRow label="Inference" value={result.timings.inferenceMs} />
-                    <TimingRow label="GPU readback" value={result.timings.outputReadbackMs} />
+                    <Show when={result.engine === "webgpu"}>
+                      <TimingRow label="GPU readback" value={result.timings.outputReadbackMs} />
+                    </Show>
                     <TimingRow label="Matte" value={result.timings.matteMs} />
                     <TimingRow label="Composite" value={result.timings.compositeMs} />
                     <TimingRow label="PNG export" value={result.timings.exportMs} />
@@ -449,7 +465,7 @@ const App = () => {
           </Show>
 
           <div class="milestone-note">
-            Model resize and ImageNet normalization now run on the shared WebGPU device through TypeGPU before ONNX Runtime inference. Canvas 2D remains only for source-resolution matte compositing and PNG export. GPU prep enqueue measures source-texture upload and resize/normalize dispatch submission, not GPU completion; GPU readback remains explicit.
+            WebGPU remains the preferred fast path: TypeGPU shares the ONNX Runtime device and graph capture preserves the accepted GPU pipeline. If WebGPU, its device, session creation, or GPU inference is unavailable, the same pinned model can run through ONNX Runtime WebAssembly instead. Canvas 2D remains the source-resolution matte compositing and PNG export path for both engines.
           </div>
         </aside>
       </section>
