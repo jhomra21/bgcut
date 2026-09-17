@@ -258,8 +258,6 @@ const App = () => {
                     rightSrc={result.url}
                     leftAlt={`Original ${image.name}`}
                     rightAlt={`${image.name} with background removed`}
-                    leftLabel="Original"
-                    rightLabel="Result"
                   />
                 )}
               </Show>
