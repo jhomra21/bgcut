@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 const workerSource = await Bun.file(new URL("../worker/index.ts", import.meta.url)).text();
+
 const wranglerConfig = await Bun.file(new URL("../wrangler.jsonc", import.meta.url)).text();
+
 const packageSource = await Bun.file(new URL("../package.json", import.meta.url)).text();
 
 describe("Cloudflare WebGPU runtime routing", () => {
