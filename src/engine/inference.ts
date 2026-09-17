@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
 
+import { resolveBrowserEnginePreference } from "./engine-preference";
 import {
   InferenceFailed,
   ModelDownloadFailed,
@@ -211,7 +212,7 @@ const removeBackgroundWithWasm = (
     return yield* wasm.removeBackgroundWasm(file);
   });
 
-export const removeBackground = (
+const automaticRemoval = (
   file: File,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   removeBackgroundWebGpu(file).pipe(
@@ -221,3 +222,22 @@ export const removeBackground = (
         : Effect.fail(error)
     ),
   );
+
+export const removeBackground = (
+  file: File,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  Effect.suspend(() => {
+    const preference = resolveBrowserEnginePreference(
+      typeof globalThis.location === "undefined" ? "" : globalThis.location.search,
+    );
+
+    if (preference === "webgpu") {
+      return removeBackgroundWebGpu(file);
+    }
+
+    if (preference === "wasm") {
+      return removeBackgroundWithWasm(file);
+    }
+
+    return automaticRemoval(file);
+  });
