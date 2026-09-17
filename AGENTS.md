@@ -2,119 +2,108 @@
 
 ## Engineering defaults
 
-- Use Bun for dependency management, scripts, tests, and workspace operations. Do not use npm, pnpm, or yarn.
-- Use Solid 2 for the UI and reactive application state. Pin the Solid 2 RC packages exactly while 2.0 is pre-release.
-- Use Effect at asynchronous and system boundaries: GPU initialization, device loss, model loading, model caching, image decoding, worker communication, inference jobs, cancellation, retries, timeouts, persistence, and export.
-- Do not introduce Effect abstractions into tight GPU or image-processing loops where plain TypeScript, TypeGPU, or raw WebGPU is clearer.
-- Prefer explicit tagged domain errors over generic thrown errors.
-- Validate data that crosses worker, persistence, model-manifest, or external boundaries with Effect Schema.
-- Use TypeGPU for GPU compute and image-processing pipelines. Drop down to raw WebGPU when TypeGPU makes an operation harder instead of simpler.
-- Keep Solid components unaware of ONNX Runtime sessions, GPU buffers, shader implementation details, and model internals.
-- Keep the inference/image engine usable independently from the UI.
-- Prefer the smallest implementation that satisfies the current requirement. Do not add an abstraction until there is a concrete second use case.
-- Run `bun run lint`, `bun run typecheck`, `bun run test`, and `bun run build` before considering a change complete.
-- oxlint is mandatory.
-- Tests should be change detectors for observable behavior and contracts, not implementation details.
+- Use Bun for dependency management, scripts, tests, and workspace operations.
+- Use Solid 2 for the UI and reactive application state. Keep the Solid 2 RC packages pinned while 2.0 is prerelease.
+- Use Effect at asynchronous and system boundaries such as GPU setup, device loss, model loading, model caching, image decoding, inference jobs, cancellation, retries, timeouts, persistence, and export.
+- Keep tight GPU and image-processing loops in plain TypeScript, TypeGPU, or raw WebGPU when that is clearer than Effect.
+- Prefer tagged domain errors over generic thrown errors.
+- Validate worker, persistence, model-manifest, and external data with Effect Schema when validation adds a real boundary.
+- Use TypeGPU for GPU compute and image-processing code when it keeps the implementation simpler. Use raw WebGPU when it does not.
+- Keep Solid components separate from ONNX Runtime sessions, GPU buffers, shaders, and model internals.
+- Keep the image engine usable without the browser UI.
+- Add an abstraction only when a concrete second use case needs it.
+- Run `bun run check` before considering a change complete.
+- oxlint is required.
+- Tests should cover observable behavior and contracts rather than private implementation details.
 
 ## Anti-slop
 
-- Anti-slop is mandatory and is vendored project source at `tools/oxlint/anti-slop/` from `dmmulroy/anti-slop`.
-- Do not replace the vendored rules with an unofficial npm package. Upstream explicitly treats anti-slop as vendored source owned by the consuming repository.
-- The exact upstream revision and any intentional local deviations must be recorded in `tools/oxlint/anti-slop/UPSTREAM.md`.
-- `oxlint` and `@oxlint/plugins` must stay pinned to exactly matching versions.
-- Enable every canonical generic anti-slop rule and, because this repository directly uses Effect, every canonical Effect anti-slop rule.
-- Keep `tools/oxlint/anti-slop/**` out of application lint traversal; the vendored plugin is tooling source, not product source.
-- Keep plain `bun test` as the canonical application test command. Project-level `bunfig.toml` excludes `tools/oxlint/anti-slop/**` from Bun test discovery so vendored upstream maintainer tests remain intact without running under Bun's unsupported Oxlint `RuleTester` environment.
-- When upstream changes, review and merge the vendored update while preserving project-local customizations and provenance. Do not force-replace the directory blindly.
-- Do not weaken rule severity, disable a rule, add unsafe casts, or launder types merely to make lint pass. Fix owned product code when the rule exposes a real issue.
-- Treat anti-slop findings as design feedback. Prefer clearer evidence, narrow boundaries, explicit Effect services/errors, and simple data flow over suppressions.
+- The vendored anti-slop plugin lives at `tools/oxlint/anti-slop/` and comes from `dmmulroy/anti-slop`.
+- Do not replace it with an unofficial npm package.
+- Record the exact upstream revision and intentional local changes in `tools/oxlint/anti-slop/UPSTREAM.md`.
+- Keep `oxlint` and `@oxlint/plugins` on the same exact version.
+- Enable the canonical generic rules and the Effect rules used by this repository.
+- Exclude `tools/oxlint/anti-slop/**` from application lint and Bun test discovery. The vendored maintainer tests use Oxlint's Node and tsx test environment.
+- When updating the vendored plugin, review upstream changes and preserve documented local changes.
+- Do not disable a rule, weaken its severity, add unsafe casts, or hide a type problem only to make lint pass.
+- Fix owned code when a rule finds a real design or readability problem.
 
 ## Product constraints
 
-- Image processing and inference must run locally in the browser. Do not add an image-upload backend as a shortcut.
-- The WebGPU path is the primary architecture. Any CPU/WASM fallback must be explicit and must not silently change output quality.
-- Preserve the original source image resolution for final compositing/export even when inference uses a smaller working resolution.
-- Prefer one shared `GPUDevice` across ONNX Runtime WebGPU and TypeGPU so GPU resources can be shared and unnecessary CPU/GPU copies can be removed over time.
-- Model-specific behavior belongs behind an inference boundary so a future native TypeGPU implementation can replace ONNX Runtime without changing the Solid UI.
+- Browser image processing and inference must stay local. Do not add an image-upload backend as a shortcut.
+- WebGPU is the primary browser path. Any fallback must be explicit and must not silently change output behavior.
+- Preserve the source image dimensions for final compositing and export.
+- Prefer one shared `GPUDevice` across ONNX Runtime WebGPU and TypeGPU when the runtime contract supports it.
+- Keep model-specific behavior behind the inference boundary so the UI does not depend on ONNX details.
+- Keep public documentation focused on bgcut. Do not expose internal comparison-tool names or acceptance fixtures unless they become part of the public product contract.
 
 ## Release and package policy
 
-- bgcut is currently beta. Use semver beta versions and the npm `beta` dist-tag until the browser UI and product contract are intentionally declared stable.
+- bgcut is in beta. Use prerelease semver and the npm `beta` tag until the browser UI and product behavior are intentionally declared stable.
 - Stable versions have no prerelease suffix and publish to npm `latest`.
-- Do not run ad hoc manual npm publishes as the normal release path. Releases are repository-driven through `.github/workflows/release.yml` and npm trusted publishing/OIDC.
-- Normal package metadata changes must not publish. The release workflow only publishes when a `main` commit that changes `package.json` begins with `chore(release):`.
-- Prepare releases in a dedicated release PR after product changes are already merged and accepted.
-- Update `CHANGELOG.md` and user-facing documentation before bumping the release version.
-- Merge a release PR only after CI passes on the exact release head. Use an exact merge title such as `chore(release): bgcut v0.1.0-beta.2`.
+- Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
+- A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
+- Prepare each release in a dedicated PR after the product changes are merged and accepted.
+- Update `CHANGELOG.md` and user-facing docs before the release version is finalized.
+- Merge only after CI passes on the exact release head.
 - Never reuse or overwrite an npm version that already exists.
-- Keep `package.json` repository metadata exactly aligned with `jhomra21/bgcut`; npm trusted publishing validates repository identity.
-- The npm package must ship `skills/bgcut/SKILL.md`. That skill is part of the public package contract, not repository-only documentation.
-- When CLI syntax, input/output formats, engine behavior, privacy guarantees, or install commands change, update `README.md`, `skills/bgcut/SKILL.md`, relevant tests, and the changelog together.
-- `scripts/package-smoke.ts` must verify both the installed executable and the bundled agent skill from the packed tarball.
-- See `RELEASING.md` for the operational release contract.
+- Keep `package.json` repository metadata aligned with `jhomra21/bgcut` because npm Trusted Publishing checks repository identity.
+- The npm package must include `skills/bgcut/SKILL.md`.
+- When CLI syntax, formats, provider behavior, caching, privacy behavior, or install commands change, update `README.md`, `skills/bgcut/SKILL.md`, tests, and the changelog together.
+- `scripts/package-smoke.ts` must verify the installed command and bundled skill from the packed tarball.
+- See `RELEASING.md` for the release procedure.
 
-## Reference Codebases
+## Reference codebases
 
-Reference these codebases when designing APIs, code, architecture, persistence, UI systems, or other programming solutions. Use them to understand patterns and tradeoffs, not as requirements to copy their abstractions.
+Use these repositories to study concrete implementations. Do not copy their architecture by default.
 
 ### Diffusion Studio
 
-**Repositories / sources**
-- `diffusionstudio/editor` — https://github.com/diffusionstudio/editor
-- Diffusion Studio `monorepo-new` when available locally or through authorized repository access
+Repositories:
 
-**Role:** Full-stack video editing platform and application architecture.
+- `diffusionstudio/editor`
+- Diffusion Studio `monorepo-new` when it is available through authorized access
 
-Reference for editor architecture, media pipelines, editor state, application boundaries, worker/background processing, larger product organization, and performance-sensitive editing interactions. Prefer the smallest relevant pattern instead of reproducing the whole editor architecture.
+Use it for editor architecture, media pipelines, worker boundaries, rendering, export, and performance-sensitive interactions.
 
 ### DialKit
 
-**Repository:** `joshpuckett/dialkit` — https://github.com/joshpuckett/dialkit
+Repository: `joshpuckett/dialkit`
 
-**Role:** Real-time parameter tweaking and UI reference for React, Solid, Svelte, and Vue.
-
-Reference for fine-grained interactive controls, parameter editing, Solid integrations, reactive UI APIs, and small composable primitives. It is especially relevant to mask controls such as threshold, feathering, erosion, dilation, and edge refinement.
+Use it for compact live controls, Solid integrations, and parameter editing patterns.
 
 ### OpenCode v2
 
-**Repository:** `anomalyco/opencode` — https://github.com/anomalyco/opencode
+Repository: `anomalyco/opencode`
 
-**Role:** Solid application, persistence, preferences, and product architecture reference.
-
-Reference for Solid application architecture, persistence, application preferences, service boundaries, command/action design, and keeping frontend state separate from lower-level runtime services. Do not copy complexity that exists only because OpenCode is a coding-agent platform.
+Use it for Solid application structure, persistence, preferences, commands, and separation between UI state and runtime services.
 
 ### Solid Primitives
 
-**Repository:** `solidjs-community/solid-primitives` — https://github.com/solidjs-community/solid-primitives
+Repository: `solidjs-community/solid-primitives`
 
-**Role:** Solid library and API-design reference.
-
-Reference especially for storage and persistence primitives, lifecycle handling, browser APIs, cleanup semantics, and composable Solid APIs. Before inventing a general-purpose Solid primitive, check whether Solid Primitives already provides the behavior or demonstrates an established pattern.
+Check it before inventing a general Solid helper for browser APIs, persistence, lifecycle, or cleanup.
 
 ### DAW Browser Convex
 
-**Repository:** `jhomra21/daw-browser-convex` — https://github.com/jhomra21/daw-browser-convex
+Repository: `jhomra21/daw-browser-convex`
 
-**Role:** Audio DSP and performance-sensitive browser application reference.
-
-Reference for worker architecture, realtime processing, DSP-style pipelines, browser/runtime boundaries, high-frequency state, editor architecture, and avoiding UI work on performance-sensitive paths. Borrow architectural and performance ideas rather than audio-specific abstractions.
+Use it for worker architecture, realtime processing, high-frequency state, and editor/runtime separation.
 
 ### Pi
 
-**Repository:** `earendil-works/pi` — https://github.com/earendil-works/pi
+Repository: `earendil-works/pi`
 
-**Role:** Small, composable agent/application architecture reference.
+Use it as a reference for small interfaces, explicit capabilities, and code that remains easy to follow.
 
-Reference for simple APIs, composable building blocks, narrow interfaces, explicit capabilities, avoiding unnecessary framework layers, and code that remains understandable to humans and coding agents. Use Pi as a counterweight when another reference suggests a heavier abstraction.
+## Reference policy
 
-## Reference-codebase policy
+When designing a subsystem:
 
-When designing a new subsystem:
-
-1. Look for an analogous pattern in the reference codebases.
-2. Understand why that pattern exists before adopting it.
-3. Prefer the smallest version that satisfies this repository's actual requirements.
-4. Do not add an abstraction solely because a reference project has one.
-5. Do not copy code blindly. Reimplement the underlying idea for this project's constraints.
-6. When references disagree, prefer fewer concepts, clearer ownership, stronger type safety, and easier testing.
-7. For GPU or inference-specific decisions, benchmark instead of assuming an architecture is faster.
+1. Find the closest relevant pattern in the reference repositories.
+2. Understand why that pattern exists.
+3. Implement only what bgcut needs.
+4. Do not add an abstraction because another project has one.
+5. Reimplement ideas for this repository instead of copying code blindly.
+6. When references disagree, prefer fewer concepts, clear ownership, strong types, and straightforward tests.
+7. Benchmark GPU and inference decisions instead of assuming they are faster.
