@@ -164,8 +164,6 @@ figure {
   --comparison-right-opacity: 1;
   --comparison-left-color: #171717;
   --comparison-right-color: #171717;
-  --comparison-left-highlight: transparent;
-  --comparison-right-highlight: transparent;
   position: relative;
   min-height: 520px;
   overflow: hidden;
@@ -216,8 +214,7 @@ figure {
   border-radius: 4px;
   transition:
     color 120ms ease,
-    opacity 120ms ease,
-    background-color 120ms ease;
+    opacity 120ms ease;
   pointer-events: none;
 }
 
@@ -225,14 +222,12 @@ figure {
   right: 6px;
   color: var(--comparison-left-color);
   opacity: var(--comparison-left-opacity);
-  background: var(--comparison-left-highlight);
 }
 
 .comparison-chevron-right {
   left: 6px;
   color: var(--comparison-right-color);
   opacity: var(--comparison-right-opacity);
-  background: var(--comparison-right-highlight);
 }
 
 .comparison-range {

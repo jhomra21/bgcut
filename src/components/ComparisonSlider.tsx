@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
-import { chevronColor, chevronHighlight, chevronOpacity, type ChevronSide } from "./comparison-slider-state";
+import { chevronColor, chevronOpacity, type ChevronSide } from "./comparison-slider-state";
 
-export { chevronColor, chevronHighlight, chevronOpacity } from "./comparison-slider-state";
+export { chevronColor, chevronOpacity } from "./comparison-slider-state";
 
 type ComparisonSliderProps = {
   readonly leftSrc: string;
@@ -25,7 +25,7 @@ const ComparisonSlider = (props: ComparisonSliderProps) => {
 
     const bounds = input.getBoundingClientRect();
     const dividerX = bounds.left + (position() / 100) * bounds.width;
-    const handleDeadZone = 24;
+    const handleDeadZone = 12;
 
     if (Math.abs(event.clientX - dividerX) <= handleDeadZone) {
       setHoverSide(undefined);
@@ -60,7 +60,7 @@ const ComparisonSlider = (props: ComparisonSliderProps) => {
     const current = currentPosition();
     const highlighted = highlightedSide();
 
-    return `--comparison-position: ${current}%; --comparison-left-opacity: ${chevronOpacity("left", highlighted)}; --comparison-right-opacity: ${chevronOpacity("right", highlighted)}; --comparison-left-color: ${chevronColor("left", highlighted)}; --comparison-right-color: ${chevronColor("right", highlighted)}; --comparison-left-highlight: ${chevronHighlight("left", highlighted)}; --comparison-right-highlight: ${chevronHighlight("right", highlighted)};`;
+    return `--comparison-position: ${current}%; --comparison-left-opacity: ${chevronOpacity("left", highlighted)}; --comparison-right-opacity: ${chevronOpacity("right", highlighted)}; --comparison-left-color: ${chevronColor("left", highlighted)}; --comparison-right-color: ${chevronColor("right", highlighted)};`;
   };
 
   return (
