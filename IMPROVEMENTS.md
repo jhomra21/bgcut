@@ -12,21 +12,17 @@ The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtim
 
 The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
-## 1. Simplify the browser UI
+## 1. Finish the browser UI
 
-The browser UI is the next product task and the blocker for a stable release.
+The normal browser flow is now limited to choosing or dropping an image, removing the background, comparing the original with the result, and downloading the PNG. Developer diagnostics, timing tables, model details, and internal acceptance controls are not part of the product view.
 
-Keep the first version small:
+Before stable:
 
-1. Choose or drop an image.
-2. Remove the background.
-3. Show the result clearly.
-4. Download the result.
-5. Keep diagnostics out of the main flow.
+1. Match the intended sketch layout and spacing.
+2. Check drag and drop, keyboard use, mobile layout, processing, errors, and download behavior in a real browser.
+3. Keep the product view small while fixing any visual or interaction problems found in acceptance.
 
-Do not expose internal benchmark or acceptance controls in the normal product UI.
-
-The UI should work well before adding editor controls, batch processing, or advanced settings.
+Do not add editor controls, batch processing, or advanced settings until this basic flow is accepted.
 
 ## 2. Define a browser engine API
 
