@@ -29,7 +29,7 @@ for (const path of initialFiles) {
 
   if (name.includes("asyncify") && name.endsWith(".wasm")) {
     await rm(path);
-    console.log(`Removed unused Cloudflare-incompatible asset ${name}.`);
+    console.log(`Removed R2-backed oversized asset ${name} from Cloudflare Static Assets.`);
   }
 }
 
