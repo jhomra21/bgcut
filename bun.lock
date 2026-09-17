@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "bgremove",
+      "name": "bgcut",
       "dependencies": {
         "effect": "3.22.2",
         "onnxruntime-node": "1.30.0",
