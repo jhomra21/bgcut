@@ -2,7 +2,9 @@ const imageNetMean = [0.485, 0.456, 0.406] as const;
 
 const imageNetStd = [0.229, 0.224, 0.225] as const;
 
-const normalizeChannel = (value: number, channel: 0 | 1 | 2): number =>
+type RgbChannel = 0 | 1 | 2;
+
+const normalizeChannel = (value: number, channel: RgbChannel): number =>
   (value - imageNetMean[channel]) / imageNetStd[channel];
 
 export const normalizeRgbaToNchw = (
@@ -15,6 +17,7 @@ export const normalizeRgbaToNchw = (
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
     const rgbaIndex = pixelIndex * 4;
+
     tensor[pixelIndex] = normalizeChannel(pixels[rgbaIndex] / 255, 0);
     tensor[pixelCount + pixelIndex] = normalizeChannel(pixels[rgbaIndex + 1] / 255, 1);
     tensor[pixelCount * 2 + pixelIndex] = normalizeChannel(pixels[rgbaIndex + 2] / 255, 2);
@@ -25,6 +28,28 @@ export const normalizeRgbaToNchw = (
 
 const clampIndex = (value: number, maximum: number): number =>
   Math.min(Math.max(value, 0), maximum);
+
+const writeSampledChannel = (
+  tensor: Float32Array,
+  pixels: Uint8Array | Uint8ClampedArray,
+  channel: RgbChannel,
+  targetPixelCount: number,
+  targetIndex: number,
+  topLeftIndex: number,
+  topRightIndex: number,
+  bottomLeftIndex: number,
+  bottomRightIndex: number,
+  xMix: number,
+  yMix: number,
+): void => {
+  const top = pixels[topLeftIndex + channel] * (1 - xMix)
+    + pixels[topRightIndex + channel] * xMix;
+  const bottom = pixels[bottomLeftIndex + channel] * (1 - xMix)
+    + pixels[bottomRightIndex + channel] * xMix;
+  const sampled = (top * (1 - yMix) + bottom * yMix) / 255;
+
+  tensor[channel * targetPixelCount + targetIndex] = normalizeChannel(sampled, channel);
+};
 
 export const resizeRgbaLinearToNchw = (
   pixels: Uint8Array | Uint8ClampedArray,
@@ -57,15 +82,45 @@ export const resizeRgbaLinearToNchw = (
       const bottomRightIndex = (y1 * sourceWidth + x1) * 4;
       const targetIndex = targetY * targetWidth + targetX;
 
-      for (let channel = 0 as 0 | 1 | 2; channel < 3; channel += 1) {
-        const top = pixels[topLeftIndex + channel] * (1 - xMix)
-          + pixels[topRightIndex + channel] * xMix;
-        const bottom = pixels[bottomLeftIndex + channel] * (1 - xMix)
-          + pixels[bottomRightIndex + channel] * xMix;
-        const sampled = (top * (1 - yMix) + bottom * yMix) / 255;
-
-        tensor[channel * targetPixelCount + targetIndex] = normalizeChannel(sampled, channel);
-      }
+      writeSampledChannel(
+        tensor,
+        pixels,
+        0,
+        targetPixelCount,
+        targetIndex,
+        topLeftIndex,
+        topRightIndex,
+        bottomLeftIndex,
+        bottomRightIndex,
+        xMix,
+        yMix,
+      );
+      writeSampledChannel(
+        tensor,
+        pixels,
+        1,
+        targetPixelCount,
+        targetIndex,
+        topLeftIndex,
+        topRightIndex,
+        bottomLeftIndex,
+        bottomRightIndex,
+        xMix,
+        yMix,
+      );
+      writeSampledChannel(
+        tensor,
+        pixels,
+        2,
+        targetPixelCount,
+        targetIndex,
+        topLeftIndex,
+        topRightIndex,
+        bottomLeftIndex,
+        bottomRightIndex,
+        xMix,
+        yMix,
+      );
     }
   }
 
