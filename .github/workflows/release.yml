@@ -1,0 +1,163 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: bgcut-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: startsWith(github.event.head_commit.message, 'chore(release):')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Use an npm version with trusted publishing support
+        run: npm install --global 'npm@^11.15.0'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run release gate
+        run: bun run check
+
+      - name: Resolve release metadata
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PACKAGE_NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+
+          if [[ "$PACKAGE_NAME" != "bgcut" ]]; then
+            echo "Expected package name bgcut, got $PACKAGE_NAME" >&2
+            exit 1
+          fi
+
+          if [[ "$VERSION" == *-beta.* ]]; then
+            DIST_TAG="beta"
+            PRERELEASE="true"
+          elif [[ "$VERSION" == *-* ]]; then
+            echo "Unsupported prerelease channel in $VERSION. bgcut currently supports beta prereleases only." >&2
+            exit 1
+          else
+            DIST_TAG="latest"
+            PRERELEASE="false"
+          fi
+
+          GIT_TAG="v$VERSION"
+
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "git_tag=$GIT_TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Check registry state
+        id: registry
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ steps.release.outputs.package_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if npm view "$PACKAGE_NAME@$VERSION" version --registry=https://registry.npmjs.org/ --prefer-online >/dev/null 2>&1; then
+            echo "needs_publish=false" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$VERSION already exists on npm; publish will be skipped and the GitHub release will be repaired if needed."
+          else
+            echo "needs_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm with trusted publishing
+        if: steps.registry.outputs.needs_publish == 'true'
+        env:
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+        run: npm publish --access public --tag "$DIST_TAG"
+
+      - name: Verify npm publication
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ steps.release.outputs.package_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          for attempt in {1..18}; do
+            PUBLISHED_VERSION="$(npm view "$PACKAGE_NAME@$VERSION" version --registry=https://registry.npmjs.org/ --prefer-online 2>/dev/null || true)"
+
+            if [[ "$PUBLISHED_VERSION" == "$VERSION" ]]; then
+              echo "Verified $PACKAGE_NAME@$VERSION on npm."
+              exit 0
+            fi
+
+            echo "Waiting for npm registry propagation ($attempt/18)..."
+            sleep 10
+          done
+
+          echo "npm did not expose $PACKAGE_NAME@$VERSION within the verification window." >&2
+          exit 1
+
+      - name: Create GitHub prerelease
+        if: steps.release.outputs.prerelease == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_TAG: ${{ steps.release.outputs.git_tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$GIT_TAG" >/dev/null 2>&1; then
+            echo "$GIT_TAG already has a GitHub release."
+            exit 0
+          fi
+
+          gh release create "$GIT_TAG" \
+            --target "$GITHUB_SHA" \
+            --title "bgcut v$VERSION" \
+            --generate-notes \
+            --prerelease
+
+      - name: Create GitHub release
+        if: steps.release.outputs.prerelease == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_TAG: ${{ steps.release.outputs.git_tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$GIT_TAG" >/dev/null 2>&1; then
+            echo "$GIT_TAG already has a GitHub release."
+            exit 0
+          fi
+
+          gh release create "$GIT_TAG" \
+            --target "$GITHUB_SHA" \
+            --title "bgcut v$VERSION" \
+            --generate-notes
