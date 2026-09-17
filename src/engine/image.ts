@@ -5,7 +5,7 @@ import { normalizeRgbaToNchw } from "./preprocess";
 
 export const MODEL_INPUT_SIZE = 512;
 
-const supportedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const supportedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 
 export const isSupportedImageType = (mimeType: string): boolean => supportedImageTypes.has(mimeType);
 
