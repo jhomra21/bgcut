@@ -8,6 +8,7 @@ type ComparisonSliderProps = {
   readonly rightSrc: string;
   readonly leftAlt: string;
   readonly rightAlt: string;
+  readonly aspectRatio: string;
 };
 
 const ComparisonSlider = (props: ComparisonSliderProps) => {
@@ -66,7 +67,7 @@ const ComparisonSlider = (props: ComparisonSliderProps) => {
   return (
     <div
       class="comparison-slider checkerboard"
-      style={comparisonStyle()}
+      style={`${comparisonStyle()} --comparison-aspect-ratio: ${props.aspectRatio};`}
     >
       <div class="comparison-layer">
         <img class="comparison-image" src={props.rightSrc} alt={props.rightAlt} />

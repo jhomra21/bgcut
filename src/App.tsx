@@ -9,6 +9,8 @@ import { decodeImage } from "./engine/image";
 
 type ReadyImage = {
   readonly status: "ready";
+  readonly width: number;
+  readonly height: number;
   readonly name: string;
   readonly url: string;
 };
@@ -155,7 +157,7 @@ const App = () => {
               setImageState({ status: "error", message: formatImageError(error) });
             }
           },
-          onSuccess: () => {
+          onSuccess: (dimensions) => {
             if (version !== selectionVersion) {
               return;
             }
@@ -164,6 +166,8 @@ const App = () => {
             activeSourceFile = file;
             setImageState({
               status: "ready",
+              width: dimensions.width,
+              height: dimensions.height,
               name: file.name,
               url: activeSourceUrl,
             });
@@ -267,7 +271,7 @@ const App = () => {
       </header>
 
       <section
-        class="drop-surface"
+        class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
       >
@@ -298,7 +302,10 @@ const App = () => {
                 keyed
                 when={readyResult()}
                 fallback={
-                  <div class="image-stage checkerboard">
+                  <div
+                    class="image-stage"
+                    style={`--image-aspect-ratio: ${image.width} / ${image.height};`}
+                  >
                     <img class="preview-image" src={image.url} alt={image.name} />
                     <Show when={processing()}>
                       <div class="processing-label" role="status">Removing background...</div>
@@ -312,6 +319,7 @@ const App = () => {
                     rightSrc={result.url}
                     leftAlt={`Original ${image.name}`}
                     rightAlt={`${image.name} with background removed`}
+                    aspectRatio={`${image.width} / ${image.height}`}
                   />
                 )}
               </Show>

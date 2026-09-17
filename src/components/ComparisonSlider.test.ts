@@ -24,6 +24,7 @@ describe("comparison slider handle", () => {
     expect(sliderSource).toContain("--comparison-right-color");
     expect(sliderSource).toContain("onPointerMove");
     expect(sliderSource).toContain("onPointerUp");
+    expect(sliderSource).toContain("aspectRatio");
     expect(sliderSource).toContain("const handleDeadZone = 12");
     expect(sliderSource).not.toContain("chevronHighlight");
     expect(sliderSource).not.toContain("↔");
