@@ -329,7 +329,12 @@ const App = () => {
               </Show>
 
               <div class="result-actions">
-                <button class="text-button" type="button" onClick={chooseNewImage}>
+                <button
+                  class="text-button"
+                  type="button"
+                  disabled={processing()}
+                  onClick={chooseNewImage}
+                >
                   New Image
                 </button>
                 <Show keyed when={readyResult()}>

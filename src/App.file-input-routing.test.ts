@@ -38,6 +38,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("Copy");
     expect(appSource).toContain("Download");
     expect(appSource).toContain("Redo");
+    expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");
   });

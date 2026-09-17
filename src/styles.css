@@ -165,8 +165,8 @@ figure {
   --comparison-position: 50%;
   --comparison-left-opacity: 1;
   --comparison-right-opacity: 1;
-  --comparison-left-color: #171717;
-  --comparison-right-color: #171717;
+  --comparison-left-color: #efefe8;
+  --comparison-right-color: #efefe8;
   position: relative;
   min-height: 0;
   aspect-ratio: var(--comparison-aspect-ratio);
@@ -199,7 +199,7 @@ figure {
   left: var(--comparison-position);
   width: 1px;
   transform: translateX(-0.5px);
-  background: #171717;
+  background: #efefe8;
   pointer-events: none;
 }
 
@@ -255,7 +255,7 @@ figure {
   display: grid;
   align-items: center;
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 68px;
+  min-height: 34px;
   padding: 0;
   border-top: 1px dashed #b9b9b2;
 }
@@ -274,16 +274,41 @@ figure {
 .result-actions > .text-button,
 .result-action-group > .text-button,
 .result-action-group > .download-button {
-  min-height: 68px;
+  min-height: 34px;
   border: 0;
   border-left: 1px solid #d8d8d2;
   border-radius: 0;
   padding: 0 22px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .result-actions > .text-button {
   justify-content: flex-start;
   border-left: 0;
+}
+
+.result-actions > .text-button:hover:not(:disabled),
+.result-action-group > .text-button:hover,
+.result-action-group > .download-button:hover {
+  background: #f1f1ed;
+  color: #171717;
+}
+
+.result-actions > .text-button:active:not(:disabled),
+.result-action-group > .text-button:active,
+.result-action-group > .download-button:active {
+  background: #e4e4de;
+}
+
+.result-action-group > .download-button:hover {
+  background: #333330;
+  color: #ffffff;
+}
+
+.result-action-group > .download-button:active {
+  background: #4b4b47;
 }
 
 .text-button,
