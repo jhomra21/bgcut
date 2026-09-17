@@ -1,7 +1,7 @@
 {
   "name": "bgcut",
   "version": "0.1.0-beta.2",
-  "description": "Local background removal CLI with native WebGPU and CPU fallback.",
+  "description": "Local background removal in the browser and CLI with WebGPU acceleration.",
   "type": "module",
   "packageManager": "bun@1.4.2",
   "bin": {
@@ -26,7 +26,7 @@
     "type": "git",
     "url": "git+https://github.com/jhomra21/bgcut.git"
   },
-  "homepage": "https://github.com/jhomra21/bgcut#readme",
+  "homepage": "https://bgcut.dev",
   "bugs": {
     "url": "https://github.com/jhomra21/bgcut/issues"
   },
@@ -48,6 +48,10 @@
     "model:prepare": "bun run scripts/prepare-model.ts",
     "model:verify-dist": "bun run scripts/verify-model.ts",
     "build": "bun run model:prepare && vite build && bun run model:verify-dist",
+    "build:cloudflare": "vite build --mode cloudflare",
+    "cloudflare:model:local": "bun run model:prepare && bunx wrangler@4.133.0 r2 object put bgcut-models/birefnet-lite-512-ort-basic-webgpu-v2.onnx --file public/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx --content-type application/octet-stream --cache-control 'public, max-age=31536000, immutable' --local --persist-to .wrangler/state",
+    "cloudflare:dev": "bun run build:cloudflare && bunx wrangler@4.133.0 dev --persist-to .wrangler/state",
+    "cloudflare:dry-run": "bun run build:cloudflare && bunx wrangler@4.133.0 deploy --dry-run --outdir .wrangler/dry-run",
     "preview": "vite preview",
     "lint": "oxlint .",
     "typecheck": "tsc --noEmit",
