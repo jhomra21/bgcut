@@ -1,0 +1,34 @@
+name: rename-helper
+
+"on":
+  push:
+    branches:
+      - chore/rename-bgremove
+
+permissions:
+  contents: write
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore/rename-bgremove
+          fetch-depth: 0
+
+      - name: Apply remaining canonical name replacements
+        run: |
+          sed -i 's/removebg-webgpu/bgremove/g' BENCHMARKS.md IMPROVEMENTS.md bun.lock
+          git diff --check
+
+      - name: Commit remaining rename
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add BENCHMARKS.md IMPROVEMENTS.md bun.lock
+          git commit -m 'chore: finish bgremove rename'
+          git push origin HEAD:chore/rename-bgremove
