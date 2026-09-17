@@ -26,6 +26,18 @@ Examples:
   bun run cli -- photo.jpg -gpu
 `;
 
+const formatDuration = (milliseconds: number): string => {
+  if (milliseconds < 10) {
+    return `${milliseconds.toFixed(1)} ms`;
+  }
+
+  if (milliseconds < 1000) {
+    return `${Math.round(milliseconds)} ms`;
+  }
+
+  return `${(milliseconds / 1000).toFixed(2)} s`;
+};
+
 const program = Effect.gen(function* () {
   const parsed = yield* parseCliArgs(process.argv.slice(2));
 
@@ -36,7 +48,17 @@ const program = Effect.gen(function* () {
   }
 
   const result = yield* removeBackgroundCli(parsed.options);
+  const timings = result.timings;
+
   console.log(`✓ ${result.engine} · ${result.width}×${result.height} · saved ${result.outputPath}`);
+
+  if (result.fallbackReason !== undefined) {
+    console.log(`↳ WebGPU unavailable; automatic mode used CPU. ${result.fallbackReason}`);
+  }
+
+  console.log(
+    `  model ${formatDuration(timings.modelMs)} · prepare ${formatDuration(timings.prepareMs)} · session ${formatDuration(timings.sessionMs)} · inference ${formatDuration(timings.inferenceMs)} · encode ${formatDuration(timings.encodeMs)} · total ${formatDuration(timings.totalMs)}`,
+  );
 });
 
 const exit = await Effect.runPromiseExit(program);
