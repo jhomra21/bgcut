@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 const repositoryDocs = [
   "README.md",
   "RELEASING.md",
+  "DEPLOYING.md",
   "CHANGELOG.md",
   "AGENTS.md",
   "BENCHMARKS.md",
