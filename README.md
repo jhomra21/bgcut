@@ -99,6 +99,8 @@ The model download sends model data to the machine. It does not send source imag
 
 The browser path uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
 
+The product UI is intentionally small. Choose or drop an image, remove the background, compare the original with the result, then download the transparent PNG. Runtime checks, model details, timing tables, and internal acceptance controls stay out of the normal UI.
+
 The current WebGPU pipeline is:
 
 ```text
@@ -113,7 +115,7 @@ image
 
 Production builds verify the model by exact byte count and SHA-256.
 
-The browser UI is still beta work. The next product milestone is a much smaller upload, result, and export flow before the first stable release.
+The browser UI remains beta until its visual and interaction acceptance checks are complete.
 
 ## Agent skill
 
