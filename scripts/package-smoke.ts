@@ -25,6 +25,7 @@ const temporaryRoot = await mkdtemp(join(tmpdir(), "bgremove-package-smoke-"));
 try {
   const packageDirectory = join(temporaryRoot, "package");
   const consumerDirectory = join(temporaryRoot, "consumer");
+
   await mkdir(packageDirectory);
   await mkdir(consumerDirectory);
 
@@ -37,6 +38,7 @@ try {
   }
 
   const tarballPath = join(packageDirectory, packedName);
+
   await writeFile(join(consumerDirectory, "package.json"), '{"private":true}\n');
   run("npm", ["install", tarballPath], consumerDirectory);
 
