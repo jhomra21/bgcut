@@ -219,6 +219,14 @@ const App = () => {
     fileInput?.click();
   };
 
+  const handleSurfaceClick = (event: MouseEvent) => {
+    if (readyImage() !== undefined || event.target !== event.currentTarget) {
+      return;
+    }
+
+    fileInput?.click();
+  };
+
   const handleDrop = (event: DragEvent) => {
     event.preventDefault();
 
@@ -272,6 +280,7 @@ const App = () => {
 
       <section
         class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
+        onClick={handleSurfaceClick}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
       >

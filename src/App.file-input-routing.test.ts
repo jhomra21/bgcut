@@ -34,6 +34,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain('href="https://github.com/jhomra21/bgcut"');
     expect(appSource).toContain("GitHub");
     expect(appSource).toContain("Click or drag image here");
+    expect(appSource).toContain("onClick={handleSurfaceClick}");
+    expect(appSource).toContain("event.target !== event.currentTarget");
     expect(appSource).toContain("New Image");
     expect(appSource).toContain("Copy");
     expect(appSource).toContain("Download");
