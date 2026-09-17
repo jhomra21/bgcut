@@ -6,6 +6,7 @@
   "packageManager": "bun@1.4.2",
   "scripts": {
     "dev": "vite",
+    "cli": "bun run src/cli/main.ts",
     "model:prepare": "bun run scripts/prepare-model.ts",
     "model:verify-dist": "bun run scripts/verify-model.ts",
     "build": "bun run model:prepare && vite build && bun run model:verify-dist",
@@ -18,7 +19,9 @@
   "dependencies": {
     "@solidjs/web": "2.0.0-rc.8",
     "effect": "3.22.2",
+    "onnxruntime-node": "1.30.0",
     "onnxruntime-web": "1.30.0",
+    "sharp": "0.35.4",
     "solid-js": "2.0.0-rc.8",
     "typegpu": "0.12.5"
   },

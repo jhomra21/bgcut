@@ -33,13 +33,23 @@ h2 { font-size: 20px; letter-spacing: -0.025em; }
 .drop-copy .primary-button { margin-top: 24px; }
 .download-button { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .preview-wrap { width: 100%; min-height: 548px; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
-.comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-height: 430px; }
 .image-card { min-width: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; }
 .image-card figcaption { color: #73736c; font-size: 11px; font-weight: 600; }
 .image-stage { min-height: 420px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; }
-.comparison-grid .image-stage { min-height: 420px; }
 .checkerboard { background-color: #fff; background-image: linear-gradient(45deg, #ecece8 25%, transparent 25%), linear-gradient(-45deg, #ecece8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ecece8 75%), linear-gradient(-45deg, transparent 75%, #ecece8 75%); background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0; }
 .preview { max-width: 100%; max-height: 480px; width: auto; height: auto; object-fit: contain; }
+.comparison-card { display: grid; gap: 8px; min-width: 0; }
+.comparison-slider { --comparison-position: 50%; position: relative; min-height: 430px; border-radius: 14px; overflow: hidden; isolation: isolate; }
+.comparison-layer { position: absolute; inset: 0; display: grid; place-items: center; }
+.comparison-reveal { clip-path: inset(0 calc(100% - var(--comparison-position)) 0 0); }
+.comparison-image { width: 100%; height: 100%; max-height: 480px; object-fit: contain; }
+.comparison-divider { position: absolute; z-index: 3; top: 0; bottom: 0; left: var(--comparison-position); width: 2px; transform: translateX(-1px); background: #fff; box-shadow: 0 0 0 1px rgba(24, 24, 22, 0.22); pointer-events: none; }
+.comparison-divider span { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 999px; border: 1px solid rgba(24, 24, 22, 0.18); background: #fff; color: #31312d; font-size: 16px; box-shadow: 0 2px 10px rgba(24, 24, 22, 0.12); }
+.comparison-range { position: absolute; z-index: 4; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+.comparison-range:focus-visible { opacity: 1; height: 24px; top: auto; bottom: 10px; padding: 0 14px; }
+.comparison-labels { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #73736c; font-size: 11px; font-weight: 600; }
+.reference-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.reference-note { color: #73736c; font-size: 11px; line-height: 1.45; }
 .image-meta { display: flex; justify-content: space-between; gap: 20px; color: #6c6c65; font-size: 12px; }
 .image-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .diagnostics { min-height: 590px; border: 1px solid #d5d5cd; border-radius: 24px; background: #fbfbf8; padding: 22px; display: flex; flex-direction: column; }
@@ -75,11 +85,6 @@ h2 { font-size: 20px; letter-spacing: -0.025em; }
 .timing-row strong { color: #30302c; font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .milestone-note { margin-top: auto; padding-top: 22px; border-top: 1px solid #e5e5de; color: #6c6c65; font-size: 12px; line-height: 1.55; }
 
-@media (max-width: 980px) {
-  .comparison-grid { grid-template-columns: 1fr; }
-  .comparison-grid .image-stage { min-height: 320px; }
-}
-
 @media (max-width: 850px) {
   .workspace { grid-template-columns: 1fr; }
   .drop-zone, .diagnostics { min-height: auto; }
@@ -93,8 +98,8 @@ h2 { font-size: 20px; letter-spacing: -0.025em; }
   .privacy-pill { display: none; }
   .drop-zone { min-height: 430px; border-radius: 18px; padding: 12px; }
   .diagnostics { border-radius: 18px; }
-  .image-stage { min-height: 330px; }
+  .image-stage, .comparison-slider { min-height: 330px; }
   .image-meta { flex-direction: column; gap: 4px; }
-  .image-actions { align-items: stretch; }
-  .image-actions > * { flex: 1 1 100%; }
+  .image-actions, .reference-actions { align-items: stretch; }
+  .image-actions > *, .reference-actions > * { flex: 1 1 100%; }
 }
