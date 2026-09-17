@@ -7,6 +7,7 @@ describe("isSupportedImageType", () => {
     expect(isSupportedImageType("image/png")).toBe(true);
     expect(isSupportedImageType("image/jpeg")).toBe(true);
     expect(isSupportedImageType("image/webp")).toBe(true);
+    expect(isSupportedImageType("image/avif")).toBe(true);
   });
 
   test("rejects unsupported and missing mime types", () => {

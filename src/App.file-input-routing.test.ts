@@ -27,4 +27,12 @@ describe("file picker routing", () => {
     expect(sourceInput).toContain(propagationBoundary);
     expect(referenceInput).toContain(propagationBoundary);
   });
+
+  test("source and reference pickers expose AVIF", () => {
+    const sourceInput = fileInputBlock("source-file-input");
+    const referenceInput = fileInputBlock("reference-file-input");
+
+    expect(sourceInput).toContain("image/avif");
+    expect(referenceInput).toContain("image/avif");
+  });
 });
