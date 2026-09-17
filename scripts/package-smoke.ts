@@ -20,6 +20,7 @@ const run = (command: string, args: readonly string[], cwd: string): string => {
 };
 
 const root = process.cwd();
+
 const temporaryRoot = await mkdtemp(join(tmpdir(), "bgremove-package-smoke-"));
 
 try {
