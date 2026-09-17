@@ -10,8 +10,6 @@ import { decodeImage } from "./engine/image";
 type ReadyImage = {
   readonly status: "ready";
   readonly name: string;
-  readonly width: number;
-  readonly height: number;
   readonly url: string;
 };
 
@@ -42,7 +40,6 @@ const transparentName = (fileName: string): string => {
 const App = () => {
   const [imageState, setImageState] = createSignal<ImageState>({ status: "empty" });
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
-  const [selectedFile, setSelectedFile] = createSignal<File>();
   let fileInput: HTMLInputElement | undefined;
   let activeSourceUrl: string | undefined;
   let activeResultUrl: string | undefined;
@@ -83,60 +80,23 @@ const App = () => {
     setResultState({ status: "idle" });
   };
 
-  const selectImage = (file: File) => {
-    if (processing()) {
-      return;
-    }
-
+  const reset = () => {
     selectionVersion += 1;
-    const version = selectionVersion;
     clearResult();
-    setSelectedFile(undefined);
-    setImageState({ status: "empty" });
 
     if (activeSourceUrl !== undefined) {
       URL.revokeObjectURL(activeSourceUrl);
       activeSourceUrl = undefined;
     }
 
-    void Effect.runPromise(
-      decodeImage(file).pipe(
-        Effect.match({
-          onFailure: (error) => {
-            if (version === selectionVersion) {
-              setSelectedFile(undefined);
-              setImageState({ status: "error", message: formatImageError(error) });
-            }
-          },
-          onSuccess: (decoded) => {
-            if (version !== selectionVersion) {
-              return;
-            }
+    setImageState({ status: "empty" });
 
-            activeSourceUrl = URL.createObjectURL(file);
-            setSelectedFile(file);
-            setImageState({
-              status: "ready",
-              name: file.name,
-              width: decoded.width,
-              height: decoded.height,
-              url: activeSourceUrl,
-            });
-          },
-        }),
-      ),
-    );
+    if (fileInput !== undefined) {
+      fileInput.value = "";
+    }
   };
 
-  const runRemoval = () => {
-    const file = selectedFile();
-
-    if (file === undefined || processing()) {
-      return;
-    }
-
-    const version = selectionVersion;
-    clearResult();
+  const runRemoval = (file: File, version: number) => {
     setResultState({ status: "processing" });
 
     void Effect.runPromise(
@@ -158,6 +118,47 @@ const App = () => {
               url: activeResultUrl,
               downloadName: transparentName(file.name),
             });
+          },
+        }),
+      ),
+    );
+  };
+
+  const selectImage = (file: File) => {
+    if (processing()) {
+      return;
+    }
+
+    selectionVersion += 1;
+    const version = selectionVersion;
+    clearResult();
+    setImageState({ status: "empty" });
+
+    if (activeSourceUrl !== undefined) {
+      URL.revokeObjectURL(activeSourceUrl);
+      activeSourceUrl = undefined;
+    }
+
+    void Effect.runPromise(
+      decodeImage(file).pipe(
+        Effect.match({
+          onFailure: (error) => {
+            if (version === selectionVersion) {
+              setImageState({ status: "error", message: formatImageError(error) });
+            }
+          },
+          onSuccess: () => {
+            if (version !== selectionVersion) {
+              return;
+            }
+
+            activeSourceUrl = URL.createObjectURL(file);
+            setImageState({
+              status: "ready",
+              name: file.name,
+              url: activeSourceUrl,
+            });
+            runRemoval(file, version);
           },
         }),
       ),
@@ -189,7 +190,6 @@ const App = () => {
 
     if (file !== null && file !== undefined) {
       selectImage(file);
-      input.value = "";
     }
   };
 
@@ -208,12 +208,12 @@ const App = () => {
   return (
     <main class="app-shell">
       <header class="app-header">
-        <h1>bgcut</h1>
-        <span>Local background removal</span>
+        <h1>Background Image Eraser</h1>
+        <p>Private. Runs only on your device.</p>
       </header>
 
       <section
-        class="tool-card"
+        class="drop-surface"
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
       >
@@ -233,23 +233,22 @@ const App = () => {
           keyed
           when={readyImage()}
           fallback={
-            <div class="empty-state">
-              <h2>Drop an image</h2>
-              <p>JPEG, PNG, WebP, or AVIF</p>
-              <button class="primary-button" type="button" onClick={() => fileInput?.click()}>
-                Choose image
-              </button>
-            </div>
+            <button class="drop-trigger" type="button" onClick={() => fileInput?.click()}>
+              Click or drag image here
+            </button>
           }
         >
           {(image) => (
-            <div class="image-flow">
+            <div class="result-flow">
               <Show
                 keyed
                 when={readyResult()}
                 fallback={
                   <div class="image-stage checkerboard">
                     <img class="preview-image" src={image.url} alt={image.name} />
+                    <Show when={processing()}>
+                      <div class="processing-label" role="status">Removing background...</div>
+                    </Show>
                   </div>
                 }
               >
@@ -265,36 +264,18 @@ const App = () => {
                 )}
               </Show>
 
-              <div class="image-meta">
-                <span class="image-name">{image.name}</span>
-                <span>{image.width} x {image.height}</span>
-              </div>
-
-              <Show when={processing()}>
-                <div class="progress-row" role="status">Removing background...</div>
-              </Show>
-
               <Show keyed when={resultError()}>
                 {(message) => <div class="error-card">{message}</div>}
               </Show>
 
-              <div class="image-actions">
-                <button class="secondary-button" type="button" disabled={processing()} onClick={() => fileInput?.click()}>
-                  Change image
+              <div class="result-actions">
+                <button class="text-button" type="button" onClick={reset}>
+                  Reset
                 </button>
-
-                <Show
-                  keyed
-                  when={readyResult()}
-                  fallback={
-                    <button class="primary-button" type="button" disabled={processing()} onClick={runRemoval}>
-                      {processing() ? "Removing..." : "Remove background"}
-                    </button>
-                  }
-                >
+                <Show keyed when={readyResult()}>
                   {(result) => (
-                    <a class="primary-button download-button" href={result.url} download={result.downloadName}>
-                      Download PNG
+                    <a class="download-button" href={result.url} download={result.downloadName}>
+                      Download
                     </a>
                   )}
                 </Show>
@@ -304,11 +285,16 @@ const App = () => {
         </Show>
 
         <Show keyed when={imageError()}>
-          {(message) => <div class="error-card empty-error">{message}</div>}
+          {(message) => (
+            <div class="empty-error">
+              <div class="error-card">{message}</div>
+              <button class="text-button" type="button" onClick={() => fileInput?.click()}>
+                Choose another image
+              </button>
+            </div>
+          )}
         </Show>
       </section>
-
-      <p class="privacy-note">Images stay on this device.</p>
     </main>
   );
 };
