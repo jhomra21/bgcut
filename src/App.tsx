@@ -410,6 +410,7 @@ const App = () => {
             type="file"
             accept="image/png,image/jpeg,image/webp"
             aria-label="Choose source image"
+            onClick={(event) => event.stopPropagation()}
             onChange={handleFileInput}
           />
           <input
@@ -421,6 +422,7 @@ const App = () => {
             type="file"
             accept="image/png,image/jpeg,image/webp"
             aria-label="Choose BG0 comparison image"
+            onClick={(event) => event.stopPropagation()}
             onChange={handleReferenceInput}
           />
 
