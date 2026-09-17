@@ -1,32 +1,32 @@
 ---
 name: bgcut
-description: Remove image backgrounds locally with the bgcut CLI. Use when an agent needs a transparent cutout from a local image, wants a privacy-preserving background-removal command, needs to choose GPU or CPU execution, or must handle JPEG, PNG, WebP, or AVIF inputs without uploading source images.
+description: Remove image backgrounds locally with the bgcut CLI. Use for transparent cutouts from local JPEG, PNG, WebP, or AVIF files, including cases where the filename extension is wrong.
 ---
 
 # bgcut
 
-Use `bgcut` for local background removal. Source image pixels stay on the user's machine. The CLI downloads the pinned model when needed, then runs inference locally with native WebGPU when available and native CPU as the automatic fallback.
+Use `bgcut` to remove an image background on the user's machine. The CLI runs inference locally. It may download the pinned model on the first run, but it does not upload the source image to an application inference backend.
 
-## Release channel
+## Install
 
-bgcut is currently in beta. Prefer the `beta` npm tag until the project publishes a stable release.
+bgcut is in beta. Use the npm `beta` tag until a stable release exists.
 
-For one-off use:
+Run without a global install:
 
 ```sh
 bunx bgcut@beta input.jpg
 ```
 
-For a global install:
+Or install globally:
 
 ```sh
 npm install -g bgcut@beta
 bgcut input.jpg
 ```
 
-The installed CLI currently requires Bun because the executable entrypoint uses Bun.
+The installed CLI currently requires Bun.
 
-## Basic usage
+## Basic command
 
 The default output is a transparent PNG next to the input:
 
@@ -34,13 +34,13 @@ The default output is a transparent PNG next to the input:
 bgcut photo.jpg
 ```
 
-Choose an output path with `-o` or `--output`:
+Choose the output path:
 
 ```sh
 bgcut photo.jpg -o portrait.png
 ```
 
-Choose a format by using the format itself as a flag:
+Choose the output format with a format flag:
 
 ```sh
 bgcut photo.jpg --png
@@ -48,66 +48,63 @@ bgcut photo.jpg --webp
 bgcut photo.jpg --jpg
 ```
 
-Compact aliases are also valid:
+The `-png`, `-webp`, and `-jpg` aliases also work.
 
-```sh
-bgcut photo.jpg -png
-bgcut photo.jpg -webp
-bgcut photo.jpg -jpg
-```
-
-Do not invent `--format png`; bgcut deliberately does not support that syntax.
+Do not use `--format png`. bgcut does not support that syntax.
 
 ## Input formats
 
-The native CLI delegates decoding to Sharp/libvips and detects supported image content from the bytes rather than trusting the filename extension. JPEG, PNG, WebP, and AVIF are supported by the shipped runtime. A file containing AVIF data can still work even if its filename ends in `.jpg`.
+The supported input contract is JPEG, PNG, WebP, and AVIF.
 
-The browser UI accepts JPEG, PNG, WebP, and AVIF through the browser decoder.
+The CLI uses Sharp and libvips to inspect the image contents. It does not trust the filename extension alone. An AVIF file can therefore work even when its name ends in `.jpg`.
+
+Do not claim support for every format Sharp can decode. Treat only JPEG, PNG, WebP, and AVIF as supported bgcut inputs.
 
 ## Output formats
 
 - PNG is the default and preserves transparency.
 - WebP is lossless and preserves transparency.
-- JPG/JPEG has no alpha channel, so bgcut flattens the result onto white.
+- JPG and JPEG have no alpha channel. bgcut places the cutout on white.
 
-If `-o` includes `.png`, `.webp`, `.jpg`, or `.jpeg`, bgcut can infer the output format from the filename. A conflicting explicit format flag is an error.
+If `-o` ends in `.png`, `.webp`, `.jpg`, or `.jpeg`, bgcut can infer the output format. A conflicting explicit format flag is an error.
 
 ## Engine selection
 
-Automatic mode is the default:
+Automatic mode tries native ONNX Runtime WebGPU first and uses the CPU provider if a WebGPU session cannot start:
 
 ```sh
 bgcut photo.jpg
 ```
 
-It tries native ONNX Runtime WebGPU first and falls back to native CPU if WebGPU session creation is unavailable.
-
-Require one engine while diagnosing behavior:
+Require one provider only when the user asks for it or when diagnosing a machine:
 
 ```sh
 bgcut photo.jpg --gpu
 bgcut photo.jpg --cpu
 ```
 
-The compact aliases `-gpu` and `-cpu` also work. Explicit GPU mode does not silently fall back to CPU.
+The `-gpu` and `-cpu` aliases also work.
 
-## Model and caching
+If the user explicitly chooses `--gpu`, do not silently retry on CPU. Preserve the requested constraint and report the failure.
 
-The first run may download the pinned BiRefNet Lite 512 ONNX model, roughly 187 MiB. The model is cached in the operating system user cache directory and verified before use. Later runs reuse a valid cache.
+## Model cache
 
-Do not treat the model download as an image upload. The model comes to the machine; source images are not sent to an application inference backend.
+The first run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use.
 
-## Agent workflow
+A valid cached model is reused on later runs.
 
-When asked to remove a background:
+## Agent procedure
 
-1. Confirm there is a local input path.
-2. Prefer PNG output unless the user asks for another format.
-3. Use automatic engine selection unless the user explicitly wants GPU or CPU diagnostics.
+When the user asks to remove a background:
+
+1. Use the local input path they provide.
+2. Use PNG unless they request another output format.
+3. Use automatic engine selection unless they ask for GPU or CPU specifically.
 4. Run `bgcut <input> -o <output>`.
-5. Report the output path and the engine bgcut selected.
-6. If decode fails, do not guess from the extension alone; the CLI already performs content-based decoding. Report the actual decoder error.
-7. If WebGPU fails in automatic mode, allow bgcut to use CPU. If the user explicitly requested `--gpu`, preserve that requirement instead of retrying silently on CPU.
+5. Report the output path and the engine selected by bgcut.
+6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
+7. If automatic WebGPU setup fails, allow bgcut to use CPU.
+8. Do not upload the image to a remote background-removal service unless the user explicitly asks to use a remote service.
 
 ## Examples
 
@@ -123,22 +120,21 @@ Lossless transparent WebP:
 bgcut ./product.png --webp -o ./product.webp
 ```
 
-Force GPU for a validation run:
+Require GPU:
 
 ```sh
 bgcut ./portrait.jpg --gpu -o ./portrait.png
 ```
 
-Force CPU for comparison:
+Require CPU:
 
 ```sh
 bgcut ./portrait.jpg --cpu -o ./portrait-cpu.png
 ```
 
-## Boundaries
+## Current limits
 
-- Process one input image per command for now.
-- Do not claim every image format Sharp can theoretically decode is a supported bgcut contract; the documented contract is JPEG, PNG, WebP, and AVIF.
-- Do not promise identical performance across GPU hardware or CPU platforms.
-- Do not describe browser warm-run timings as native CLI one-shot timings; they measure different runtime lifecycles.
-- Do not upload images to a remote background-removal service as a fallback unless the user explicitly asks for a different remote tool.
+- One input image is processed per command.
+- Performance depends on the machine and provider.
+- Browser warm-run timings are not CLI one-shot timings.
+- The browser and CLI share the supported image types, but they use different decoders and runtime paths.
