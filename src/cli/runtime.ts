@@ -64,21 +64,13 @@ type NativeSession = {
   readonly fallbackReason: string | undefined;
 };
 
-const supportedSharpFormats = new Set(["jpeg", "png", "webp"]);
-
-const prepareImage = (inputPath: string): Effect.Effect<PreparedImage, CliImageError> =>
+export const prepareImage = (inputPath: string): Effect.Effect<PreparedImage, CliImageError> =>
   Effect.tryPromise({
     try: async () => {
       const input = Bun.file(inputPath);
 
       if (!(await input.exists())) {
         throw new Error(`Input file does not exist: ${inputPath}`);
-      }
-
-      const metadata = await sharp(inputPath).metadata();
-
-      if (metadata.format === undefined || !supportedSharpFormats.has(metadata.format)) {
-        throw new Error(`Unsupported image type: ${metadata.format ?? "unknown"}`);
       }
 
       const source = await sharp(inputPath)

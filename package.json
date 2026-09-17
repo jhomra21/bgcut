@@ -1,6 +1,6 @@
 {
   "name": "bgcut",
-  "version": "0.1.0-beta.0",
+  "version": "0.1.0-beta.1",
   "description": "Local background removal CLI with native WebGPU and CPU fallback.",
   "type": "module",
   "packageManager": "bun@1.4.2",

@@ -69,6 +69,8 @@ bgcut photo.jpg -o portrait.png
 
 From a source checkout, `bun run cli -- ...` runs the same entrypoint without installing the package binary.
 
+Input decoding is content-based rather than extension-based. JPEG, PNG, WebP, and AVIF are supported through Sharp, so an AVIF payload still works even if its filename incorrectly ends in `.jpg`.
+
 The format itself is the option; there is deliberately no `--format png` syntax. PNG is the default. WebP is encoded losslessly. JPG/JPEG is supported, but because JPEG has no alpha channel it is flattened onto white.
 
 The CLI uses the same validated ONNX model and shared normalization/matte functions. It tries native ONNX Runtime WebGPU in automatic mode and falls back to native CPU execution if WebGPU session creation is unavailable. Use `-gpu`/`--gpu` or `-cpu`/`--cpu` to require one engine while validating the native path. The selected engine is printed after each run.
