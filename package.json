@@ -8,6 +8,8 @@
     "bgcut": "src/cli/main.ts"
   },
   "files": [
+    "CHANGELOG.md",
+    "skills/bgcut/SKILL.md",
     "src/cli/alpha-mask.ts",
     "src/cli/args.ts",
     "src/cli/main.ts",
@@ -37,7 +39,8 @@
     "local-ai"
   ],
   "publishConfig": {
-    "tag": "beta"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "dev": "vite",
