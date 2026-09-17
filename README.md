@@ -1,189 +1,179 @@
 # bgcut
 
-Local background removal with a browser WebGPU path and a native CLI.
+Remove image backgrounds locally in the browser or from the command line.
 
-> **Beta:** bgcut is currently prerelease software. Install the npm `beta` channel explicitly for now. Stable releases will use the normal `latest` channel once the browser UI and product contract are ready.
+> **Beta:** bgcut is prerelease software. Use the npm `beta` channel for now. Stable releases will use `latest` after the browser UI and product behavior are ready.
 
-The browser implementation uses a pinned BiRefNet Lite 512 ONNX model with ONNX Runtime WebGPU, shares one application-owned `GPUDevice` with TypeGPU, captures the inference graph, and exports transparent PNGs at the source image resolution. The native CLI uses ONNX Runtime Node with native WebGPU first and CPU fallback in automatic mode.
-
-Source images are processed locally. They are not uploaded to an application inference backend.
+Source images stay on the user's machine. bgcut does not upload them to an application inference backend.
 
 ## Install the beta
 
-The CLI currently runs on Bun, so install Bun before installing or invoking `bgcut`.
+The CLI currently runs on Bun.
 
-For a one-off run:
+Run it without installing globally:
 
 ```sh
 bunx bgcut@beta photo.jpg
 ```
 
-Install globally with npm:
+Or install the beta globally:
 
 ```sh
 npm install -g bgcut@beta
 bgcut photo.jpg
 ```
 
-Or install globally with Bun:
+Bun can install it globally too:
 
 ```sh
 bun add -g bgcut@beta
 bgcut photo.jpg
 ```
 
-During the beta period, prefer `@beta` in install commands rather than relying on npm `latest`.
+Use `@beta` until bgcut publishes a stable release.
 
 ## CLI
 
-The default output is a transparent PNG next to the input:
+The default command writes a transparent PNG next to the input image:
 
 ```sh
 bgcut photo.jpg
 ```
 
-Choose an output path or format:
+Choose the output path with `-o` or `--output`:
 
 ```sh
 bgcut photo.jpg -o portrait.png
+```
+
+Choose an output format with the format flag itself:
+
+```sh
 bgcut photo.jpg --png
 bgcut photo.jpg --webp
 bgcut photo.jpg --jpg
-bgcut photo.jpg -webp -o portrait.webp
 ```
 
-The format itself is the option; there is deliberately no `--format png` syntax. Compact aliases such as `-png`, `-webp`, and `-jpg` are supported.
+Compact aliases also work:
 
-PNG is the default. WebP is encoded losslessly with transparency. JPG/JPEG has no alpha channel, so bgcut flattens the result onto white.
+```sh
+bgcut photo.jpg -png
+bgcut photo.jpg -webp
+bgcut photo.jpg -jpg
+```
+
+There is no `--format png` form.
+
+PNG is the default and preserves transparency. WebP is lossless and preserves transparency. JPG and JPEG have no alpha channel, so bgcut places the cutout on white.
 
 ### Input formats
 
-The native CLI uses content-based decoding through Sharp/libvips instead of trusting the filename extension. The supported contract is:
+The CLI supports JPEG, PNG, WebP, and AVIF. Sharp and libvips inspect the file contents instead of trusting the filename extension, so an AVIF file can still decode when its name ends in `.jpg`.
 
-- JPEG
-- PNG
-- WebP
-- AVIF
-
-An AVIF payload can still work even when its filename incorrectly ends in `.jpg`.
-
-The browser UI accepts JPEG, PNG, WebP, and AVIF through the browser decoder.
+The browser accepts JPEG, PNG, WebP, and AVIF.
 
 ### Engine selection
 
-Automatic mode is the default. It tries native WebGPU first and falls back to native CPU if WebGPU session creation is unavailable:
+Automatic mode tries native WebGPU first. If a WebGPU session cannot start, it uses the native CPU provider.
 
 ```sh
 bgcut photo.jpg
 ```
 
-Require one engine for diagnostics or acceptance testing:
+Require one provider when testing or diagnosing a machine:
 
 ```sh
 bgcut photo.jpg --gpu
 bgcut photo.jpg --cpu
 ```
 
-The compact aliases `-gpu` and `-cpu` are also supported. Explicit GPU mode does not silently fall back to CPU.
+The `-gpu` and `-cpu` aliases also work. Explicit GPU mode never switches to CPU silently.
 
 ### Model cache
 
-The first CLI run may download the pinned BiRefNet Lite 512 model, roughly 187 MiB. bgcut stores the model in the operating system user cache directory and verifies the exact artifact before use. Later runs reuse a valid cache.
+The first CLI run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use. Later runs reuse a valid cached copy.
 
-The model download brings model data to the machine; it does not upload the input image.
+The model download sends model data to the machine. It does not send source images away from the machine.
 
 ## Browser app
 
-The browser pipeline is:
+The browser path uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
+
+The current WebGPU pipeline is:
 
 ```text
 image
-  -> source decode
-  -> TypeGPU resize + ImageNet normalization on the shared WebGPU device
-  -> BiRefNet Lite ONNX inference with WebGPU graph capture
-  -> GPU output readback
-  -> alpha matte
+  -> browser decode
+  -> TypeGPU resize and ImageNet normalization
+  -> BiRefNet Lite ONNX inference
+  -> matte readback
   -> source-resolution compositing
   -> transparent PNG
 ```
 
-WebGPU is the preferred fast path. If WebGPU or GPU inference is unavailable, the browser can run the same pinned model through ONNX Runtime WebAssembly instead. Image pixels remain local in either path.
+Production builds verify the model by exact byte count and SHA-256.
 
-The model artifact is verified by exact byte count and SHA-256 during production builds.
-
-## BG0 comparison
-
-After the browser removes a background, the result uses a draggable comparison slider. By default it compares the original image with bgcut's result.
-
-Use **Load BG0 output** to select a BG0 result from disk. The reference stays local and must have the same width and height as bgcut's output so the two results remain pixel-aligned while dragging the divider.
-
-This is intended for visual acceptance of hair, fur, whiskers, thin edges, holes, and semi-transparent boundaries. It complements rather than replaces numeric matte regression tests.
+The browser UI is still beta work. The next product milestone is a much smaller upload, result, and export flow before the first stable release.
 
 ## Agent skill
 
-The npm package ships a self-contained Agent Skills-format skill at:
+The npm package includes a self-contained Agent Skills file:
 
 ```text
 skills/bgcut/SKILL.md
 ```
 
-It documents the supported commands, formats, engine behavior, privacy boundary, model caching, and failure-handling rules an agent needs to use bgcut without fetching instructions from a separate skill repository.
+It contains the commands, supported formats, provider behavior, model caching rules, privacy rules, and error-handling guidance needed to use bgcut. Agents do not need a separate skill repository.
 
-Agent-skill tooling that understands the conventional `skills/<name>/SKILL.md` layout can discover or install that file from the package. The skill is also readable directly from an installed `node_modules/bgcut/skills/bgcut/SKILL.md`.
+After installation, the file is available at `node_modules/bgcut/skills/bgcut/SKILL.md`.
 
 ## Development
+
+Install and start the browser app:
 
 ```sh
 bun install --frozen-lockfile
 bun run dev
 ```
 
-Run the native CLI from a source checkout with:
+Run the CLI from the checkout:
 
 ```sh
 bun run cli -- photo.jpg
 ```
 
-Run the complete project gate with:
+Run the complete project check:
 
 ```sh
 bun run check
 ```
 
-That runs oxlint, TypeScript, product tests, the production build, npm package inspection, and a clean external package smoke test. The smoke test verifies the installed `bgcut` executable and the bundled agent skill.
-
-Vendored anti-slop maintainer tests are excluded from Bun's project-level test discovery through `bunfig.toml` because Oxlint `RuleTester` expects its upstream Node/tsx environment.
+`bun run check` runs oxlint, TypeScript, tests, the production build, package inspection, and a clean package install test. The package test verifies both the `bgcut` command and the bundled agent skill.
 
 ## Releases
 
-Releases are repository-driven. npm publication uses GitHub Actions trusted publishing with OIDC, so the release workflow does not need a long-lived npm write token.
+Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
 
-Current policy:
+Beta versions such as `0.1.0-beta.2` publish to the npm `beta` tag and create GitHub prereleases. Stable versions publish to `latest` and create normal GitHub releases.
 
-- prerelease versions such as `0.1.0-beta.1` publish to npm `beta` and become GitHub prereleases;
-- stable versions publish to npm `latest` and become normal GitHub releases;
-- stable is intentionally deferred while the browser UI is still being brought to the intended product state.
+Stable is intentionally blocked on the browser UI and its acceptance criteria.
 
-See [`RELEASING.md`](RELEASING.md) for the release contract and [`CHANGELOG.md`](CHANGELOG.md) for release history.
+See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
 
 ## Model
 
 - Model: `studioludens/birefnet-lite-512`
 - Revision: `4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7`
-- Validated runtime artifact: `birefnet-lite-512-ort-basic-webgpu-v2.onnx`
+- Runtime artifact: `birefnet-lite-512-ort-basic-webgpu-v2.onnx`
 - Artifact size: `195,872,736` bytes
 - SHA-256: `4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c`
-- Inference size: 512×512
+- Inference size: 512x512
 - Export size: original source dimensions
 
-## Direction
+## Project notes
 
-Local execution alone is not the end goal. The target is a GPU-native cutout editor with stronger refinement and editing workflows, not only a one-shot background remover.
-
-Near-term work includes the browser UI, stronger job/cancellation APIs, quality refinement, non-destructive restore/erase editing, persistence, compatibility work, and benchmark coverage. Performance and output-quality claims should continue to be measured rather than assumed.
-
-See [`IMPROVEMENTS.md`](IMPROVEMENTS.md) for the prioritized roadmap and [`BENCHMARKS.md`](BENCHMARKS.md) for benchmark evidence.
+[`BENCHMARKS.md`](BENCHMARKS.md) records measured runtime results. [`GRAPH_CAPTURE.md`](GRAPH_CAPTURE.md) records the graph-capture work behind the current browser fast path. [`IMPROVEMENTS.md`](IMPROVEMENTS.md) tracks planned engine and editor work.
 
 ## Privacy
 
-Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The model is downloaded from the pinned release artifact; source images are not sent there or to an application inference backend.
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The model is downloaded from the pinned release artifact. Source images are not uploaded to that release or to an application inference backend.
