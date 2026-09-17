@@ -44,8 +44,10 @@ const writeSampledChannel = (
 ): void => {
   const top = pixels[topLeftIndex + channel] * (1 - xMix)
     + pixels[topRightIndex + channel] * xMix;
+
   const bottom = pixels[bottomLeftIndex + channel] * (1 - xMix)
     + pixels[bottomRightIndex + channel] * xMix;
+
   const sampled = (top * (1 - yMix) + bottom * yMix) / 255;
 
   tensor[channel * targetPixelCount + targetIndex] = normalizeChannel(sampled, channel);
