@@ -12,15 +12,18 @@ The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtim
 
 The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
+The production web target is `bgcut.dev`. The Vite app is prepared for Cloudflare Workers Static Assets, while the large ONNX model is served through the same Worker from a private R2 bucket.
+
 ## 1. Finish the browser UI
 
-The normal browser flow is now limited to choosing or dropping an image, removing the background, comparing the original with the result, and downloading the PNG. Developer diagnostics, timing tables, model details, and internal acceptance controls are not part of the product view.
+The normal browser flow is now limited to clicking or dropping an image, running removal automatically, comparing the original with the result, then resetting or downloading. Developer diagnostics, timing tables, model details, and internal acceptance controls are not part of the product view.
 
 Before stable:
 
-1. Match the intended sketch layout and spacing.
-2. Check drag and drop, keyboard use, mobile layout, processing, errors, and download behavior in a real browser.
-3. Keep the product view small while fixing any visual or interaction problems found in acceptance.
+1. Check the current layout against the accepted sketch.
+2. Check drag and drop, keyboard use, mobile layout, processing, errors, reset, slider interaction, and download behavior in a real browser.
+3. Check the same flow through the local Cloudflare Worker and R2 path.
+4. Deploy the accepted candidate to `bgcut.dev` and repeat the browser acceptance there.
 
 Do not add editor controls, batch processing, or advanced settings until this basic flow is accepted.
 
@@ -184,6 +187,12 @@ bun install --frozen-lockfile
 bun run check
 ```
 
-Runtime changes also need exact-head browser acceptance on the affected path. Record the commit, input, browser, provider, output dimensions, warnings, errors, and measured timings when performance is part of the change.
+Web deployment changes also need:
+
+```sh
+bun run cloudflare:dry-run
+```
+
+Runtime changes need exact-head browser acceptance on the affected path. Record the commit, input, browser, provider, output dimensions, warnings, errors, and measured timings when performance is part of the change.
 
 Before making a performance claim, compare the same input on the same hardware and browser. Separate cold setup from warm execution and report medians when multiple runs are available.
