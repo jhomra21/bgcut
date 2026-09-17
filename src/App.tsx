@@ -405,15 +405,18 @@ const App = () => {
             ref={(element) => {
               fileInput = element;
             }}
+            id="source-file-input"
             class="file-input"
             type="file"
             accept="image/png,image/jpeg,image/webp"
+            aria-label="Choose source image"
             onChange={handleFileInput}
           />
           <input
             ref={(element) => {
               referenceInput = element;
             }}
+            id="reference-file-input"
             class="file-input"
             type="file"
             accept="image/png,image/jpeg,image/webp"
@@ -436,36 +439,58 @@ const App = () => {
                     </figure>
                   }
                 >
-                  {(result) => {
-                    const reference = readyReference();
+                  {(result) => (
+                    <>
+                      <Show
+                        keyed
+                        when={readyReference()}
+                        fallback={
+                          <>
+                            <ComparisonSlider
+                              leftSrc={image.url}
+                              rightSrc={result.url}
+                              leftAlt={`Original ${image.name}`}
+                              rightAlt={`${image.name} with background removed by this build`}
+                              leftLabel="Original"
+                              rightLabel="Background removed"
+                            />
 
-                    return (
-                      <>
-                        <ComparisonSlider
-                          leftSrc={reference?.url ?? image.url}
-                          rightSrc={result.url}
-                          leftAlt={reference === undefined ? `Original ${image.name}` : `BG0 result ${reference.name}`}
-                          rightAlt={`${image.name} with background removed by this build`}
-                          leftLabel={reference === undefined ? "Original" : `BG0 · ${reference.name}`}
-                          rightLabel={reference === undefined ? "Background removed" : "This build"}
-                        />
+                            <div class="reference-actions">
+                              <button class="ghost-button" type="button" onClick={() => referenceInput?.click()}>
+                                Load BG0 output
+                              </button>
+                              <span class="reference-note">Reference files stay local and must match the source dimensions.</span>
+                            </div>
+                          </>
+                        }
+                      >
+                        {(reference) => (
+                          <>
+                            <ComparisonSlider
+                              leftSrc={reference.url}
+                              rightSrc={result.url}
+                              leftAlt={`BG0 result ${reference.name}`}
+                              rightAlt={`${image.name} with background removed by this build`}
+                              leftLabel={`BG0 · ${reference.name}`}
+                              rightLabel="This build"
+                            />
 
-                        <div class="reference-actions">
-                          <button class="ghost-button" type="button" onClick={() => referenceInput?.click()}>
-                            {reference === undefined ? "Load BG0 output" : "Replace BG0 output"}
-                          </button>
-                          <Show when={reference !== undefined}>
-                            <button class="ghost-button" type="button" onClick={clearReference}>Clear BG0 output</button>
-                          </Show>
-                          <span class="reference-note">Reference files stay local and must match the source dimensions.</span>
-                        </div>
+                            <div class="reference-actions">
+                              <button class="ghost-button" type="button" onClick={() => referenceInput?.click()}>
+                                Replace BG0 output
+                              </button>
+                              <button class="ghost-button" type="button" onClick={clearReference}>Clear BG0 output</button>
+                              <span class="reference-note">Reference files stay local and must match the source dimensions.</span>
+                            </div>
+                          </>
+                        )}
+                      </Show>
 
-                        <Show keyed when={referenceError()}>
-                          {(message) => <div class="error-card result-error">{message}</div>}
-                        </Show>
-                      </>
-                    );
-                  }}
+                      <Show keyed when={referenceError()}>
+                        {(message) => <div class="error-card result-error">{message}</div>}
+                      </Show>
+                    </>
+                  )}
                 </Show>
 
                 <div class="image-meta">
