@@ -1,4 +1,4 @@
-# removebg-webgpu
+# bgremove
 
 Local background removal with WebGPU as the primary execution path.
 
@@ -34,18 +34,20 @@ image
 
 The model artifact is verified by exact byte count and SHA-256 during production builds. Source images never go to an inference backend.
 
-## Experimental native CLI
+## Native CLI
 
-This branch also contains an experimental terminal path. The public binary/package name is intentionally not finalized yet; several obvious background-removal names are already used by existing tools. Run the local entrypoint with Bun while the command name is being chosen:
+The canonical command is `bgremove`:
 
 ```sh
-bun run cli -- photo.jpg
-bun run cli -- photo.jpg --png
-bun run cli -- photo.jpg -png
-bun run cli -- photo.jpg --webp
-bun run cli -- photo.jpg -webp -o portrait.webp
-bun run cli -- photo.jpg -o portrait.png
+bgremove photo.jpg
+bgremove photo.jpg --png
+bgremove photo.jpg -png
+bgremove photo.jpg --webp
+bgremove photo.jpg -webp -o portrait.webp
+bgremove photo.jpg -o portrait.png
 ```
+
+From a source checkout, `bun run cli -- ...` runs the same entrypoint without installing the package binary.
 
 The format itself is the option; there is deliberately no `--format png` syntax. PNG is the default. WebP is encoded losslessly. JPG/JPEG is supported, but because JPEG has no alpha channel it is flattened onto white.
 
