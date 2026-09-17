@@ -1,6 +1,6 @@
 # Improvement Roadmap
 
-This file records the concrete improvements that should move `bgremove` from a working local background remover into a differentiated GPU-native cutout engine and editor.
+This file records the concrete improvements that should move `bgcut` from a working local background remover into a differentiated GPU-native cutout engine and editor.
 
 The goal is not to claim superiority before evidence exists. Competitive and performance claims must be backed by exact-head validation and repeatable benchmarks.
 

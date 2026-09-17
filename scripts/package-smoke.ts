@@ -21,7 +21,7 @@ const run = (command: string, args: readonly string[], cwd: string): string => {
 
 const root = process.cwd();
 
-const temporaryRoot = await mkdtemp(join(tmpdir(), "bgremove-package-smoke-"));
+const temporaryRoot = await mkdtemp(join(tmpdir(), "bgcut-package-smoke-"));
 
 try {
   const packageDirectory = join(temporaryRoot, "package");
@@ -43,12 +43,12 @@ try {
   await writeFile(join(consumerDirectory, "package.json"), '{"private":true}\n');
   run("npm", ["install", tarballPath], consumerDirectory);
 
-  const binName = process.platform === "win32" ? "bgremove.cmd" : "bgremove";
+  const binName = process.platform === "win32" ? "bgcut.cmd" : "bgcut";
   const binPath = join(consumerDirectory, "node_modules", ".bin", binName);
   const help = run(binPath, ["--help"], consumerDirectory);
 
-  if (!help.includes("Usage:") || !help.includes("bgremove <image>")) {
-    throw new Error(`Installed bgremove binary returned unexpected help output:\n${help}`);
+  if (!help.includes("Usage:") || !help.includes("bgcut <image>")) {
+    throw new Error(`Installed bgcut binary returned unexpected help output:\n${help}`);
   }
 
   console.log(`npm tarball consumer smoke passed for ${packedName}.`);
