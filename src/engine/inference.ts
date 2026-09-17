@@ -13,6 +13,7 @@ import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
+import { MODEL_REVISION } from "./model-config";
 import { getGpuRuntime } from "./runtime";
 import {
   createRemovalTimingRecorder,
@@ -20,7 +21,7 @@ import {
   type RemovalTimings,
 } from "./timing";
 
-export const MODEL_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
+export { MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
 
@@ -194,4 +195,36 @@ export const removeBackgroundWebGpu = (
     );
   });
 
-export const removeBackground = removeBackgroundWebGpu;
+const shouldFallbackToWasm = (error: BackgroundRemovalError): boolean =>
+  error._tag === "WebGpuUnavailable" ||
+  error._tag === "AdapterUnavailable" ||
+  error._tag === "DeviceRequestFailed" ||
+  error._tag === "RuntimeInitializationFailed" ||
+  error._tag === "ModelLoadFailed" ||
+  error._tag === "InferenceFailed";
+
+const removeBackgroundWithWasm = (
+  file: File,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  Effect.gen(function* () {
+    const wasm = yield* Effect.tryPromise({
+      try: () => import("./wasm-inference"),
+      catch: (cause) =>
+        new ModelLoadFailed({
+          message: `The WebAssembly compatibility runtime could not be loaded. ${String(cause)}`,
+        }),
+    });
+
+    return yield* wasm.removeBackgroundWasm(file);
+  });
+
+export const removeBackground = (
+  file: File,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  removeBackgroundWebGpu(file).pipe(
+    Effect.catchAll((error) =>
+      shouldFallbackToWasm(error)
+        ? removeBackgroundWithWasm(file)
+        : Effect.fail(error)
+    ),
+  );
