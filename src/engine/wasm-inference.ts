@@ -22,6 +22,7 @@ import {
 } from "./timing";
 
 let wasmConfigured = false;
+
 let cachedSession: ort.InferenceSession | undefined;
 
 const configureWasmRuntime = (): void => {
