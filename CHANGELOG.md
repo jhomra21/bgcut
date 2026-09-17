@@ -6,6 +6,8 @@ bgcut is currently in beta. Beta releases use the npm `beta` dist-tag and GitHub
 
 ## Unreleased
 
+## 0.1.0-beta.2 — 2026-09-17
+
 - Added repository-driven npm trusted publishing and GitHub release automation.
 - Added a self-contained Agent Skills-format `bgcut` skill to the npm package.
 - Added package smoke coverage that verifies the bundled skill after a clean external install.
