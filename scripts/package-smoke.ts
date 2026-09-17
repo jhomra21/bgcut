@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -51,7 +51,14 @@ try {
     throw new Error(`Installed bgcut binary returned unexpected help output:\n${help}`);
   }
 
-  console.log(`npm tarball consumer smoke passed for ${packedName}.`);
+  const skillPath = join(consumerDirectory, "node_modules", "bgcut", "skills", "bgcut", "SKILL.md");
+  const skill = await readFile(skillPath, "utf8");
+
+  if (!skill.includes("name: bgcut") || !skill.includes("bunx bgcut@beta")) {
+    throw new Error(`Installed bgcut agent skill is missing its expected contract: ${skillPath}`);
+  }
+
+  console.log(`npm tarball consumer smoke passed for ${packedName}, including the bundled bgcut agent skill.`);
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }
