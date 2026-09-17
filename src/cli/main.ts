@@ -1,10 +1,12 @@
+#!/usr/bin/env bun
+
 import { Cause, Effect, Exit } from "effect";
 
 import { parseCliArgs } from "./args";
 import { removeBackgroundCli } from "./runtime";
 
 const HELP = `Usage:
-  bun run cli -- <image> [format] [options]
+  bgremove <image> [format] [options]
 
 Formats:
   --png,  -png             Transparent PNG (default)
@@ -19,11 +21,11 @@ Options:
   -h, --help               Show this help
 
 Examples:
-  bun run cli -- photo.jpg -png
-  bun run cli -- photo.jpg --webp
-  bun run cli -- photo.jpg -o portrait.png
-  bun run cli -- photo.jpg -webp -o portrait.webp
-  bun run cli -- photo.jpg -gpu
+  bgremove photo.jpg -png
+  bgremove photo.jpg --webp
+  bgremove photo.jpg -o portrait.png
+  bgremove photo.jpg -webp -o portrait.webp
+  bgremove photo.jpg -gpu
 `;
 
 const formatDuration = (milliseconds: number): string => {
