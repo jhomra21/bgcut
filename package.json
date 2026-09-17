@@ -22,11 +22,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jhomra21/bgremove.git"
+    "url": "git+https://github.com/jhomra21/bgcut.git"
   },
-  "homepage": "https://github.com/jhomra21/bgremove#readme",
+  "homepage": "https://github.com/jhomra21/bgcut#readme",
   "bugs": {
-    "url": "https://github.com/jhomra21/bgremove/issues"
+    "url": "https://github.com/jhomra21/bgcut/issues"
   },
   "keywords": [
     "background-removal",
