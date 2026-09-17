@@ -1,11 +1,43 @@
 {
   "name": "bgremove",
-  "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0-beta.0",
+  "description": "Local background removal CLI with native WebGPU and CPU fallback.",
   "type": "module",
   "packageManager": "bun@1.4.2",
   "bin": {
     "bgremove": "./src/cli/main.ts"
+  },
+  "files": [
+    "src/cli/alpha-mask.ts",
+    "src/cli/args.ts",
+    "src/cli/main.ts",
+    "src/cli/model-cache.ts",
+    "src/cli/runtime.ts",
+    "src/engine/errors.ts",
+    "src/engine/image.ts",
+    "src/engine/matte.ts",
+    "src/engine/model-config.ts",
+    "src/engine/preprocess.ts",
+    "src/shared/model-file.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhomra21/bgremove.git"
+  },
+  "homepage": "https://github.com/jhomra21/bgremove#readme",
+  "bugs": {
+    "url": "https://github.com/jhomra21/bgremove/issues"
+  },
+  "keywords": [
+    "background-removal",
+    "image-processing",
+    "webgpu",
+    "onnx",
+    "cli",
+    "local-ai"
+  ],
+  "publishConfig": {
+    "tag": "beta"
   },
   "scripts": {
     "dev": "vite",
@@ -17,23 +49,25 @@
     "lint": "oxlint .",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run build"
+    "package:dry-run": "npm pack --dry-run",
+    "package:smoke": "bun run scripts/package-smoke.ts",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run build && bun run package:dry-run && bun run package:smoke"
   },
   "dependencies": {
-    "@solidjs/web": "2.0.0-rc.8",
     "effect": "3.22.2",
     "onnxruntime-node": "1.30.0",
-    "onnxruntime-web": "1.30.0",
-    "sharp": "0.35.4",
-    "solid-js": "2.0.0-rc.8",
-    "typegpu": "0.12.5"
+    "sharp": "0.35.4"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.83.0",
     "@solidjs/vite-plugin": "3.0.0-next.43",
+    "@solidjs/web": "2.0.0-rc.8",
     "@types/bun": "1.4.2",
     "@typescript/lib-dom": "npm:@types/web@0.0.356",
+    "onnxruntime-web": "1.30.0",
     "oxlint": "1.83.0",
+    "solid-js": "2.0.0-rc.8",
+    "typegpu": "0.12.5",
     "typescript": "7.0.2",
     "vite": "8.3.0"
   }
