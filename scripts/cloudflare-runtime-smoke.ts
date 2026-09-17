@@ -7,10 +7,15 @@ import {
 } from "../src/engine/ort-webgpu-runtime";
 
 const WRANGLER_VERSION = "4.133.0";
+
 const PORT = 8790;
+
 const ORIGIN = `http://127.0.0.1:${PORT}`;
+
 const repositoryRoot = resolve(import.meta.dir, "..");
+
 const smokeState = resolve(repositoryRoot, ".wrangler/smoke-state");
+
 const runtimeFile = resolve(
   repositoryRoot,
   "node_modules/onnxruntime-web/dist",
@@ -23,6 +28,7 @@ const run = async (command: readonly string[]): Promise<void> => {
     stdout: "inherit",
     stderr: "inherit",
   });
+
   const exitCode = await process.exited;
 
   if (exitCode !== 0) {
@@ -31,7 +37,7 @@ const run = async (command: readonly string[]): Promise<void> => {
 };
 
 const waitForWorker = async (): Promise<void> => {
-  let lastError: unknown;
+  let lastError = new Error("Worker has not responded yet.");
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
@@ -43,7 +49,7 @@ const waitForWorker = async (): Promise<void> => {
 
       lastError = new Error(`Worker returned HTTP ${response.status}.`);
     } catch (error) {
-      lastError = error;
+      lastError = error instanceof Error ? error : new Error(String(error));
     }
 
     await Bun.sleep(250);
