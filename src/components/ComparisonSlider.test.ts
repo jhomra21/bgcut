@@ -11,8 +11,8 @@ describe("comparison slider handle", () => {
     expect(chevronOpacity("right", "right")).toBe(1);
     expect(chevronOpacity("left", undefined)).toBe(1);
     expect(chevronOpacity("right", undefined)).toBe(1);
-    expect(chevronColor("left", "left")).toBe("#171717");
-    expect(chevronColor("right", "left")).toBe("#a3a39c");
+    expect(chevronColor("left", "left")).toBe("#efefe8");
+    expect(chevronColor("right", "left")).toBe("#b8b8b0");
   });
 
   test("uses separate chevrons with position-aware opacity", () => {
