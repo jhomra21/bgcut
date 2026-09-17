@@ -323,6 +323,7 @@ export const removeBackgroundCli = (
           catch: () => undefined,
         }).pipe(Effect.orElseSucceed(() => undefined)),
     );
+
     const inferenceMs = performance.now() - stageStartedAt;
 
     stageStartedAt = performance.now();
