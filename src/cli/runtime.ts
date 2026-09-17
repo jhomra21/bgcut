@@ -8,7 +8,7 @@ import { MODEL_INPUT_SIZE } from "../engine/image";
 import { logitToAlphaByte } from "../engine/matte";
 import { normalizeRgbaToNchw } from "../engine/preprocess";
 import type { CliEngine, CliFormat, CliOptions } from "./args";
-import { ensureCliModel } from "./model-cache";
+import { CliModelError, ensureCliModel } from "./model-cache";
 
 export type CliExecutionEngine = "webgpu" | "cpu";
 
@@ -156,10 +156,12 @@ const runInference = (
     }
 
     const input = new ort.Tensor("float32", modelInput, [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
+
     const outputs = yield* Effect.tryPromise({
       try: () => session.run({ [inputName]: input }),
       catch: (cause) => new CliInferenceError({ message: "BiRefNet inference failed.", cause }),
     });
+
     const output = outputs[outputName];
 
     if (output === undefined) {
@@ -202,6 +204,7 @@ const encodeOutput = (
   Effect.tryPromise({
     try: async () => {
       const alpha = createMask(logits);
+
       const resizedAlpha = await sharp(Buffer.from(alpha), {
         raw: {
           width: MODEL_INPUT_SIZE,
@@ -222,6 +225,7 @@ const encodeOutput = (
 
       for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
         const alphaIndex = pixelIndex * 4 + 3;
+
         rgba[alphaIndex] = Math.round((rgba[alphaIndex] * resizedAlpha[pixelIndex]) / 255);
       }
 
@@ -237,11 +241,13 @@ const encodeOutput = (
 
       if (format === "png") {
         await image.png().toFile(outputPath);
+
         return;
       }
 
       if (format === "webp") {
         await image.webp({ lossless: true }).toFile(outputPath);
+
         return;
       }
 
@@ -261,7 +267,7 @@ export const removeBackgroundCli = (
   options: CliOptions,
 ): Effect.Effect<
   CliRemovalResult,
-  CliImageError | CliSessionError | CliInferenceError | CliOutputError | import("./model-cache").CliModelError
+  CliImageError | CliSessionError | CliInferenceError | CliOutputError | CliModelError
 > =>
   Effect.gen(function* () {
     if (resolve(options.inputPath) === resolve(options.outputPath)) {
