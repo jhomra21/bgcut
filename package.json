@@ -54,6 +54,7 @@
     "cloudflare:r2:local": "bun run cloudflare:model:local && bun run cloudflare:runtime:local",
     "cloudflare:dev": "bun run build:cloudflare && bunx wrangler@4.133.0 dev --persist-to .wrangler/state",
     "cloudflare:dry-run": "bun run build:cloudflare && bunx wrangler@4.133.0 deploy --dry-run --outdir .wrangler/dry-run",
+    "cloudflare:runtime:smoke": "bun run scripts/cloudflare-runtime-smoke.ts",
     "preview": "vite preview",
     "lint": "oxlint .",
     "typecheck": "tsc --noEmit",
