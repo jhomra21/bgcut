@@ -93,6 +93,7 @@ const resolveOutputPath = (
     }
 
     const format = requestedFormat ?? outputFormat ?? "png";
+
     const outputPath = extension.length === 0
       ? `${requestedOutput}${extensionForFormat(format)}`
       : requestedOutput;
