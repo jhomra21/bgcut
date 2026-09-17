@@ -1,6 +1,7 @@
 import { MODEL_FILENAME } from "../src/engine/model-config.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
+
 const MODEL_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
 const modelHeaders = (object: R2Object): Headers => {
