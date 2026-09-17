@@ -101,7 +101,7 @@ The production domain is `bgcut.dev` once the Cloudflare deployment is accepted.
 
 The browser uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
 
-The product UI follows one small flow: click or drop an image, wait for local removal, compare the original with the result, then reset or download the transparent PNG. Runtime checks, model details, timing tables, and internal acceptance controls stay out of the normal UI.
+The product UI follows one small flow: click or drop an image, wait for local removal, compare the original with the result, then copy, download, redo, or choose a new image. Runtime checks, model details, timing tables, and internal acceptance controls stay out of the normal UI.
 
 The current WebGPU pipeline is:
 
@@ -154,13 +154,14 @@ bun run check
 
 ### Cloudflare preview
 
-The production web target uses Cloudflare Workers Static Assets for the Vite app and a private R2 bucket for the large ONNX model. This avoids Cloudflare's 25 MiB static-asset limit while keeping `/models/...` same-origin at `bgcut.dev`.
+The production web target uses Cloudflare Workers Static Assets for the Vite app and private R2 for the large ONNX model and the oversized ONNX Runtime WebGPU binary. The Worker keeps `/models/...` and `/runtime/...` same-origin at `bgcut.dev`.
 
 Run the local Cloudflare path without deploying anything:
 
 ```sh
-bun run cloudflare:model:local
+bun run cloudflare:r2:local
 bun run cloudflare:dry-run
+bun run cloudflare:runtime:smoke
 bun run cloudflare:dev
 ```
 
@@ -192,4 +193,4 @@ See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](
 
 ## Privacy
 
-Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the web app and the pinned model file. It does not receive source images or inference requests.
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the web app, model file, and ONNX Runtime WebGPU binary. It does not receive source images or inference requests.
