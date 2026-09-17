@@ -40,6 +40,7 @@ export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
     const modelPath = cliModelPath();
 
     const temporaryPath = `${modelPath}.download`;
+
     const existing = yield* inspectModelFile(modelPath).pipe(
       Effect.mapError((cause) =>
         new CliModelError({ message: `Could not inspect the cached model at ${modelPath}.`, cause }),
