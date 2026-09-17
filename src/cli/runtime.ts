@@ -6,7 +6,7 @@ import sharp from "sharp";
 
 import { MODEL_INPUT_SIZE } from "../engine/image";
 import { logitToAlphaByte } from "../engine/matte";
-import { normalizeRgbaToNchw } from "../engine/preprocess";
+import { resizeRgbaLinearToNchw } from "../engine/preprocess";
 import type { CliEngine, CliFormat, CliOptions } from "./args";
 import { CliModelError, ensureCliModel } from "./model-cache";
 
@@ -87,19 +87,7 @@ const prepareImage = (inputPath: string): Effect.Effect<PreparedImage, CliImageE
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      const model = await sharp(inputPath)
-        .rotate()
-        .resize(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, {
-          fit: "fill",
-          kernel: sharp.kernel.cubic,
-          fastShrinkOnLoad: false,
-        })
-        .ensureAlpha()
-        .toColourspace("srgb")
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      if (source.info.channels !== 4 || model.info.channels !== 4) {
+      if (source.info.channels !== 4) {
         throw new Error("Decoded image did not produce RGBA pixels.");
       }
 
@@ -107,7 +95,13 @@ const prepareImage = (inputPath: string): Effect.Effect<PreparedImage, CliImageE
         source: source.data,
         width: source.info.width,
         height: source.info.height,
-        modelInput: normalizeRgbaToNchw(model.data, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE),
+        modelInput: resizeRgbaLinearToNchw(
+          source.data,
+          source.info.width,
+          source.info.height,
+          MODEL_INPUT_SIZE,
+          MODEL_INPUT_SIZE,
+        ),
       };
     },
     catch: (cause) =>
