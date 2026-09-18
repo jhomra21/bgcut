@@ -1,44 +1,102 @@
 ---
 name: bgcut
-description: Remove image backgrounds locally with the bgcut CLI. Use for transparent cutouts from local JPEG, PNG, WebP, or AVIF files, including cases where the filename extension is wrong.
+description: Remove image backgrounds locally with the bgcut local app, CLI, or Node API. Use for local JPEG, PNG, WebP, or AVIF cutouts, including files whose extension is wrong.
 ---
 
 # bgcut
 
-Use `bgcut` to remove an image background on the user's machine. The CLI runs inference locally. It may download the pinned model on the first run, but it does not upload the source image to an application inference backend.
+Use `bgcut` for local background removal. Source images stay on the user's machine. The package may download the pinned model on first use, but it does not upload source images to an application inference backend.
 
 ## Install
 
-Run without a global install:
+Run the packaged local app without a global install:
+
+```sh
+npx bgcut
+```
+
+Run one headless removal without a global install:
 
 ```sh
 npx bgcut input.jpg
 ```
 
-Bun users can run the same package with:
-
-```sh
-bunx bgcut input.jpg
-```
+Bun users can run the same package with `bunx bgcut`.
 
 Or install globally:
 
 ```sh
 npm install -g bgcut
-bgcut input.jpg
+bgcut
 ```
 
 The published executable is built for Node. npm and npx users do not need Bun installed.
 
-## Basic command
+For the Node API:
 
-The default output is a transparent PNG next to the input:
+```sh
+npm install bgcut
+```
+
+## Choose the surface
+
+Use the packaged local app when the user wants the browser UI on their own machine:
+
+```sh
+bgcut
+```
+
+Use the CLI when the user wants file-in/file-out automation:
+
+```sh
+bgcut input.jpg -o output.png
+```
+
+Use the Node API when an application needs to keep one ONNX Runtime session alive across multiple removals.
+
+## Local app
+
+Running `bgcut` with no image opens the packaged web UI on a loopback address. The explicit form is:
+
+```sh
+bgcut serve
+```
+
+Useful server options:
+
+```sh
+bgcut serve --port 8787
+bgcut serve --no-open
+bgcut serve --json
+```
+
+`serve --json` does not open a browser. It prints one JSON object containing the resolved URL, host, port, and PID.
+
+The local server binds to `127.0.0.1`. It serves the packaged browser UI, the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
+
+The result UI supports these shortcuts:
+
+- `N`: choose a new image
+- `C`: copy the result
+- `D`: download the result
+- `R`: rerun removal
+- Left and right arrow keys: move the comparison slider when it is focused
+
+## CLI
+
+Passing an image keeps the headless file-in/file-out behavior:
 
 ```sh
 bgcut photo.jpg
 ```
 
-Choose the output path:
+The explicit form also works:
+
+```sh
+bgcut remove photo.jpg
+```
+
+The default output is a transparent PNG next to the input. Choose an output path with `-o` or `--output`:
 
 ```sh
 bgcut photo.jpg -o portrait.png
@@ -52,19 +110,17 @@ bgcut photo.jpg --webp
 bgcut photo.jpg --jpg
 ```
 
-The `-png`, `-webp`, and `-jpg` aliases also work.
+The `-png`, `-webp`, and `-jpg` aliases also work. Do not use `--format png`.
 
-Do not use `--format png`. bgcut does not support that syntax.
-
-## Input formats
+### Input formats
 
 The supported input contract is JPEG, PNG, WebP, and AVIF.
 
-The CLI uses Sharp and libvips to inspect the image contents. It does not trust the filename extension alone. An AVIF file can therefore work even when its name ends in `.jpg`.
+The native path uses Sharp and libvips to inspect image contents instead of trusting the filename extension alone. An AVIF file can therefore work even when its name ends in `.jpg`.
 
 Do not claim support for every format Sharp can decode. Treat only JPEG, PNG, WebP, and AVIF as supported bgcut inputs.
 
-## Output formats
+### Output formats
 
 - PNG is the default and preserves transparency.
 - WebP is lossless and preserves transparency.
@@ -72,7 +128,7 @@ Do not claim support for every format Sharp can decode. Treat only JPEG, PNG, We
 
 If `-o` ends in `.png`, `.webp`, `.jpg`, or `.jpeg`, bgcut can infer the output format. A conflicting explicit format flag is an error.
 
-## Engine selection
+### Engine selection
 
 Automatic mode tries native ONNX Runtime WebGPU first and uses the CPU provider if a WebGPU session cannot start:
 
@@ -87,30 +143,63 @@ bgcut photo.jpg --gpu
 bgcut photo.jpg --cpu
 ```
 
-The `-gpu` and `-cpu` aliases also work.
+The `-gpu` and `-cpu` aliases also work. If the user explicitly chooses `--gpu`, do not silently retry on CPU.
 
-If the user explicitly chooses `--gpu`, do not silently retry on CPU. Preserve the requested constraint and report the failure.
+## Node API
+
+Import `createBgcut` from `bgcut`:
+
+```ts
+import { writeFile } from "node:fs/promises";
+import { createBgcut } from "bgcut";
+
+const bgcut = await createBgcut();
+
+try {
+  const result = await bgcut.remove("photo.jpg", { format: "png" });
+  await writeFile("photo-nobg.png", result.data);
+} finally {
+  await bgcut.close();
+}
+```
+
+One created engine owns one ONNX Runtime session and reuses it across removals until `close()` is called.
+
+Engine options:
+
+- `createBgcut()` or `createBgcut({ engine: "auto" })`: try WebGPU, then CPU if session creation fails
+- `createBgcut({ engine: "gpu" })`: require native WebGPU
+- `createBgcut({ engine: "cpu" })`: require CPU
+
+Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
 
 ## Model cache
 
-The first run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use.
+The first native run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use.
 
-A valid cached model is reused on later runs.
+The CLI, packaged local app, and Node API share the same validated model cache. A valid cached model is reused on later runs.
 
 ## Agent procedure
 
 When the user asks to remove a background:
 
-1. Use the local input path they provide.
-2. Use PNG unless they request another output format.
-3. Use automatic engine selection unless they ask for GPU or CPU specifically.
-4. Run `bgcut <input> -o <output>`.
-5. Report the output path and the engine selected by bgcut.
+1. Choose the local app, CLI, or Node API based on the requested workflow.
+2. For one file, use PNG unless the user requests another output format.
+3. Use automatic engine selection unless the user asks for GPU or CPU specifically.
+4. Preserve explicit provider constraints. Do not turn a requested GPU-only run into CPU silently.
+5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
-7. If automatic WebGPU setup fails, allow bgcut to use CPU.
-8. Do not upload the image to a remote background-removal service unless the user explicitly asks to use a remote service.
+7. Reuse one `createBgcut()` instance when application code will process multiple images.
+8. Close a Node API engine when the caller is finished with it.
+9. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
 
 ## Examples
+
+Open the local UI:
+
+```sh
+bgcut
+```
 
 Transparent PNG:
 
@@ -136,9 +225,16 @@ Require CPU:
 bgcut ./portrait.jpg --cpu -o ./portrait-cpu.png
 ```
 
+Start a machine-readable local server:
+
+```sh
+bgcut serve --json
+```
+
 ## Current limits
 
-- One input image is processed per command.
+- One input image is processed per CLI command.
 - Performance depends on the machine and provider.
 - Browser warm-run timings are not CLI one-shot timings.
-- The browser and CLI share the supported image types, but they use different decoders and runtime paths.
+- Browser and native paths use different decoders and runtime providers.
+- The large model is not bundled inside the npm tarball.
