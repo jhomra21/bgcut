@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "..");
 
 const run = async (args: readonly string[]): Promise<void> => {
-  const process = Bun.spawn(args, {
+  const process = Bun.spawn([...args], {
     cwd: root,
     stdin: "inherit",
     stdout: "inherit",
