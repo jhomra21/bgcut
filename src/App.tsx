@@ -272,7 +272,17 @@ const App = () => {
   return (
     <main class="app-shell">
       <header class="app-header">
-        <h1>bgcut</h1>
+        <h1 class="brand-title">
+          <img
+            class="brand-mark"
+            src="/favicon-48x48.png"
+            alt=""
+            width="24"
+            height="24"
+            aria-hidden="true"
+          />
+          <span>bgcut</span>
+        </h1>
         <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
           GitHub
         </a>
