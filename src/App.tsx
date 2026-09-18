@@ -839,7 +839,7 @@ const AboutPage = () => (
         <div class="eyebrow">About</div>
         <h2>Background removal that runs where your image already is.</h2>
         <p>
-          bgcut is an open source, local-first background-removal tool built around one pinned
+          bgcut is a local-first background-removal tool with public source, built around one pinned
           BiRefNet model and a small set of surfaces that share the same product contract.
         </p>
         <div class="hero-actions">
@@ -901,7 +901,7 @@ const AboutPage = () => (
 
       <section class="doc-section">
         <div class="eyebrow">Project</div>
-        <h3>Open source and inspectable</h3>
+        <h3>Public source and inspectable</h3>
         <p>
           The repository contains the browser app, native CLI, Node API, model validation,
           Cloudflare Worker, package smoke tests, deployment configuration, benchmarks, and release
