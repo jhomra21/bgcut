@@ -54,13 +54,19 @@ figure {
 .brand-title {
   display: inline-flex;
   align-items: center;
-  line-height: 0;
+  gap: 8px;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 750;
 }
 
-.brand-logo {
+.brand-mark {
   display: block;
-  width: auto;
-  height: 30px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
 }
 
 .app-header a {
@@ -371,8 +377,14 @@ figure {
     margin-bottom: 12px;
   }
 
-  .brand-logo {
-    height: 27px;
+  .brand-title {
+    font-size: 25px;
+  }
+
+  .brand-mark {
+    width: 29px;
+    height: 29px;
+    flex-basis: 29px;
   }
 
   .app-header a {
