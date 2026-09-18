@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { access, stat } from "node:fs/promises";
@@ -215,9 +216,7 @@ export const startLocalAppServer = async (
       }
 
       if (url.pathname === `/models/${MODEL_FILENAME}`) {
-        const modelPath = await import("effect").then(({ Effect }) =>
-          Effect.runPromise(ensureCliModel())
-        );
+        const modelPath = await Effect.runPromise(ensureCliModel());
 
         await sendFile(response, modelPath, {
           method,
