@@ -1,8 +1,14 @@
 import { Schema } from "effect";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+
+import {
+  MODEL_FILENAME,
+  MODEL_PUBLIC_PATH,
+  MODEL_SIZE_BYTES,
+} from "../src/engine/model-config";
 
 const run = (command: string, args: readonly string[], cwd: string): string => {
   const result = spawnSync(command, [...args], {
@@ -89,6 +95,9 @@ const temporaryRoot = await mkdtemp(join(tmpdir(), "bgcut-package-smoke-"));
 try {
   const packageDirectory = join(temporaryRoot, "package");
   const consumerDirectory = join(temporaryRoot, "consumer");
+  const smokeHome = join(temporaryRoot, "home");
+  const smokeCache = join(temporaryRoot, "cache");
+  const smokeLocalAppData = join(temporaryRoot, "local-app-data");
 
   await mkdir(packageDirectory);
   await mkdir(consumerDirectory);
@@ -128,8 +137,28 @@ try {
     consumerDirectory,
   );
 
+  const modelCacheRoot = process.platform === "darwin"
+    ? join(smokeHome, "Library", "Caches", "bgcut")
+    : process.platform === "win32"
+      ? join(smokeLocalAppData, "bgcut")
+      : join(smokeCache, "bgcut");
+  const cachedModelPath = join(modelCacheRoot, "models", MODEL_FILENAME);
+
+  await mkdir(dirname(cachedModelPath), { recursive: true });
+  await copyFile(
+    join(root, "public", "models", MODEL_FILENAME),
+    cachedModelPath,
+  );
+
   const localApp = spawn(binPath, ["serve", "--json"], {
     cwd: consumerDirectory,
+    env: {
+      ...process.env,
+      HOME: smokeHome,
+      USERPROFILE: smokeHome,
+      XDG_CACHE_HOME: smokeCache,
+      LOCALAPPDATA: smokeLocalAppData,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -159,6 +188,19 @@ try {
     if (!health.ok || !healthBody.ok) {
       throw new Error(`Packaged bgcut health route failed at ${startup.url}health.`);
     }
+
+    const model = await fetch(new URL(MODEL_PUBLIC_PATH, startup.url), {
+      method: "HEAD",
+    });
+
+    if (
+      !model.ok ||
+      Number(model.headers.get("content-length")) !== MODEL_SIZE_BYTES
+    ) {
+      throw new Error(
+        `Packaged Node server could not inspect and serve the cached model at ${startup.url}.`,
+      );
+    }
   } finally {
     localApp.kill("SIGTERM");
     await new Promise<void>((resolveExit) => {
@@ -178,7 +220,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI, local web app, Node API export, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: Node CLI, local web app, cached model route, Node API export, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
