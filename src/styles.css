@@ -45,17 +45,27 @@ figure {
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 18px;
 }
 
-.app-header h1 {
+.brand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 24px;
   line-height: 1.05;
   letter-spacing: -0.035em;
   font-weight: 650;
+}
+
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
 }
 
 .app-header a {
@@ -366,8 +376,14 @@ figure {
     margin-bottom: 12px;
   }
 
-  .app-header h1 {
+  .brand-title {
     font-size: 22px;
+  }
+
+  .brand-mark {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
   }
 
   .app-header a {
