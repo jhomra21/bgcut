@@ -275,10 +275,10 @@ const App = () => {
         <h1 class="brand-title">
           <img
             class="brand-mark"
-            src="/favicon-48x48.png"
+            src="/favicon-48x48.png?v=2"
             alt=""
-            width="24"
-            height="24"
+            width="32"
+            height="32"
             aria-hidden="true"
           />
           <span>bgcut</span>

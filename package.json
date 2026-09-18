@@ -43,12 +43,12 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "bun run brand:prepare && vite",
     "cli": "bun run src/cli/main.ts",
     "model:prepare": "bun run scripts/prepare-model.ts",
     "model:verify-dist": "bun run scripts/verify-model.ts",
-    "build": "bun run model:prepare && vite build && bun run model:verify-dist",
-    "build:cloudflare": "vite build --mode cloudflare && bun run scripts/prepare-cloudflare-dist.ts",
+    "build": "bun run brand:prepare && bun run model:prepare && vite build && bun run model:verify-dist",
+    "build:cloudflare": "bun run brand:prepare && vite build --mode cloudflare && bun run scripts/prepare-cloudflare-dist.ts",
     "cloudflare:model:local": "bun run model:prepare && bunx wrangler@4.135.0 r2 object put bgcut-models/birefnet-lite-512-ort-basic-webgpu-v2.onnx --file public/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx --content-type application/octet-stream --cache-control 'public, max-age=31536000, immutable' --local --persist-to .wrangler/state",
     "cloudflare:runtime:local": "bunx wrangler@4.135.0 r2 object put bgcut-models/ort-wasm-simd-threaded.asyncify.wasm --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm --content-type application/wasm --cache-control 'public, max-age=31536000, immutable' --local --persist-to .wrangler/state && bunx wrangler@4.135.0 r2 object put bgcut-models/ort-wasm-simd-threaded.wasm --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm --content-type application/wasm --cache-control 'public, max-age=31536000, immutable' --local --persist-to .wrangler/state && bunx wrangler@4.135.0 r2 object put bgcut-models/ort-wasm-simd-threaded.mjs --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs --content-type text/javascript --cache-control 'public, max-age=31536000, immutable' --local --persist-to .wrangler/state",
     "cloudflare:r2:local": "bun run cloudflare:model:local && bun run cloudflare:runtime:local",
@@ -64,7 +64,8 @@
     "check": "bun run lint && bun run typecheck && bun run test && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
-    "cloudflare:runtime:remote": "bun run scripts/upload-cloudflare-runtime.ts"
+    "cloudflare:runtime:remote": "bun run scripts/upload-cloudflare-runtime.ts",
+    "brand:prepare": "bun run scripts/prepare-brand-assets.ts"
   },
   "dependencies": {
     "effect": "3.22.2",
