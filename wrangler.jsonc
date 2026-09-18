@@ -1,10 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "bgcut-web",
+  "name": "bgcut",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-17",
   "workers_dev": true,
   "preview_urls": true,
+  "build": {
+    "command": "bun run build:cloudflare"
+  },
   "routes": [
     {
       "pattern": "bgcut.dev",
