@@ -86,13 +86,16 @@ The accepted head also passed these checks:
 
 The graph-capture experiment first used a development Vite proxy because GitHub Release assets were not suitable as a direct browser model origin.
 
-The production build keeps the model same-origin while keeping inference local:
+The current production path keeps the model same-origin while keeping inference local:
 
 - the app requests `/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx`
-- development proxies that path to the pinned GitHub Release asset
-- production preparation downloads the model into `public/models/`
-- preparation checks the expected byte count and SHA-256 before Vite builds
-- the build checks the copied `dist/models/` artifact again
-- the 196 MB model stays out of Git history
+- `MODEL_RELEASE_URL` points to the pinned v2 GitHub Release asset used by `bun run model:prepare`
+- model preparation verifies the exact byte count and SHA-256 before using the file
+- Cloudflare production does not ship the 196 MB model in Workers Static Assets
+- the validated model is stored in the private `bgcut-models` R2 bucket
+- the Worker serves `/models/*` from that R2 binding under the same `bgcut.dev` origin
+- the model stays out of Git history
 
 This changes model delivery only. Source images still stay on the user's machine and inference still runs locally.
+
+See `DEPLOYING.md` for the current R2 bootstrap and production deployment flow.
