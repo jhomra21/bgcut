@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - package.json
+      - .github/workflows/release.yml
 
 permissions:
   contents: write
@@ -121,7 +122,41 @@ jobs:
           echo "npm did not expose $PACKAGE_NAME@$VERSION within the verification window." >&2
           exit 1
 
-      - name: Create GitHub prerelease
+      - name: Build GitHub release notes
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const version = process.env.VERSION;
+          const lines = readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/u);
+          const heading = `## ${version}`;
+          const start = lines.findIndex(
+            (line) => line === heading || line.startsWith(`${heading} - `),
+          );
+
+          if (start < 0) {
+            throw new Error(`CHANGELOG.md has no section for ${version}.`);
+          }
+
+          const nextHeading = lines.findIndex(
+            (line, index) => index > start && line.startsWith("## "),
+          );
+          const end = nextHeading < 0 ? lines.length : nextHeading;
+          const notes = lines.slice(start + 1, end).join("\n").trim();
+
+          if (notes.length === 0) {
+            throw new Error(`CHANGELOG.md section for ${version} is empty.`);
+          }
+
+          writeFileSync("release-notes.md", `${notes}\n`);
+          NODE
+
+      - name: Create or update GitHub prerelease
         if: steps.release.outputs.prerelease == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -132,17 +167,19 @@ jobs:
           set -euo pipefail
 
           if gh release view "$GIT_TAG" >/dev/null 2>&1; then
-            echo "$GIT_TAG already has a GitHub release."
-            exit 0
+            gh release edit "$GIT_TAG" \
+              --title "bgcut v$VERSION" \
+              --notes-file release-notes.md \
+              --prerelease
+          else
+            gh release create "$GIT_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "bgcut v$VERSION" \
+              --notes-file release-notes.md \
+              --prerelease
           fi
 
-          gh release create "$GIT_TAG" \
-            --target "$GITHUB_SHA" \
-            --title "bgcut v$VERSION" \
-            --generate-notes \
-            --prerelease
-
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         if: steps.release.outputs.prerelease == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -153,11 +190,12 @@ jobs:
           set -euo pipefail
 
           if gh release view "$GIT_TAG" >/dev/null 2>&1; then
-            echo "$GIT_TAG already has a GitHub release."
-            exit 0
+            gh release edit "$GIT_TAG" \
+              --title "bgcut v$VERSION" \
+              --notes-file release-notes.md
+          else
+            gh release create "$GIT_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "bgcut v$VERSION" \
+              --notes-file release-notes.md
           fi
-
-          gh release create "$GIT_TAG" \
-            --target "$GITHUB_SHA" \
-            --title "bgcut v$VERSION" \
-            --generate-notes
