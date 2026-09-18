@@ -154,7 +154,7 @@ bun run check
 
 ### Cloudflare preview
 
-The production web target uses Cloudflare Workers Static Assets for the Vite app and private R2 for the large ONNX model and the oversized ONNX Runtime WebGPU binary. The Worker keeps `/models/...` and `/runtime/...` same-origin at `bgcut.dev`.
+The production web target uses Cloudflare Workers Static Assets for the app shell and private R2 for the large ONNX model plus both ONNX Runtime WASM binaries. The Worker keeps `/models/...` and `/runtime/...` same-origin at `bgcut.dev`. Cloudflare Static Assets do not carry the model or ONNX Runtime WASM binaries.
 
 Run the local Cloudflare path without deploying anything:
 
@@ -193,4 +193,4 @@ See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](
 
 ## Privacy
 
-Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the web app, model file, and ONNX Runtime WebGPU binary. It does not receive source images or inference requests.
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the app shell and proxies the model plus ONNX Runtime WASM binaries from private R2. It does not receive source images or inference requests.
