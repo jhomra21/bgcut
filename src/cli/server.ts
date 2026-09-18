@@ -269,6 +269,7 @@ export const startLocalAppServer = async (
       server.off("listening", onListening);
       rejectListening(cause);
     };
+
     const onListening = () => {
       server.off("error", onError);
       resolveListening();
