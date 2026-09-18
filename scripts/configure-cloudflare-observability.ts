@@ -106,7 +106,7 @@ const readWranglerToken = async (): Promise<string> => {
     return injected;
   }
 
-  const process = Bun.spawn(
+  const child = Bun.spawn(
     ["bunx", `wrangler@${WRANGLER_VERSION}`, "auth", "token", "--json"],
     {
       stdout: "pipe",
@@ -115,9 +115,9 @@ const readWranglerToken = async (): Promise<string> => {
   );
 
   const [exitCode, stdout, stderr] = await Promise.all([
-    process.exited,
-    readProcessText(process.stdout),
-    readProcessText(process.stderr),
+    child.exited,
+    readProcessText(child.stdout),
+    readProcessText(child.stderr),
   ]);
 
   if (exitCode !== 0) {
