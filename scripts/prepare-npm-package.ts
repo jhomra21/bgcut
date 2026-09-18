@@ -29,6 +29,7 @@ await run(["bun", "run", "brand:prepare"]);
 await run(["bunx", "vite", "build", "--mode", "package"]);
 
 await run(["bun", "run", "scripts/prepare-package-web.ts"]);
+
 await run([
   "bun",
   "build",
