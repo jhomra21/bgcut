@@ -1,3 +1,5 @@
+import { Schema } from "effect";
+
 const WRANGLER_VERSION = "4.135.0";
 
 const WORKER_NAME = "bgcut";
@@ -26,40 +28,66 @@ const OBSERVABILITY = {
   },
 } as const;
 
-type CloudflareEnvelope<T> = {
-  readonly success: boolean;
-  readonly result: T;
-  readonly errors?: readonly {
-    readonly code?: number;
-    readonly message?: string;
-  }[];
-};
+const WranglerCredential = Schema.Struct({
+  token: Schema.String,
+});
 
-type Account = {
-  readonly id: string;
-};
+const CloudflareError = Schema.Struct({
+  code: Schema.optional(Schema.Number),
+  message: Schema.optional(Schema.String),
+});
 
-type ScriptSettings = {
-  readonly observability?: {
-    readonly enabled?: boolean;
-    readonly head_sampling_rate?: number;
-    readonly redact_query_string?: boolean;
-    readonly logs?: {
-      readonly enabled?: boolean;
-      readonly invocation_logs?: boolean;
-      readonly head_sampling_rate?: number;
-      readonly persist?: boolean;
-    };
-    readonly traces?: {
-      readonly enabled?: boolean;
-      readonly head_sampling_rate?: number;
-      readonly persist?: boolean;
-    };
-    readonly issues?: {
-      readonly enabled?: boolean;
-    };
-  };
-};
+const CloudflareEnvelope = Schema.Struct({
+  success: Schema.Boolean,
+  result: Schema.Unknown,
+  errors: Schema.optional(Schema.Array(CloudflareError)),
+});
+
+const Account = Schema.Struct({
+  id: Schema.String,
+});
+
+const Accounts = Schema.Array(Account);
+
+const ScriptSettings = Schema.Struct({
+  observability: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.optional(Schema.Boolean),
+      head_sampling_rate: Schema.optional(Schema.Number),
+      redact_query_string: Schema.optional(Schema.Boolean),
+      logs: Schema.optional(
+        Schema.Struct({
+          enabled: Schema.optional(Schema.Boolean),
+          invocation_logs: Schema.optional(Schema.Boolean),
+          head_sampling_rate: Schema.optional(Schema.Number),
+          persist: Schema.optional(Schema.Boolean),
+        }),
+      ),
+      traces: Schema.optional(
+        Schema.Struct({
+          enabled: Schema.optional(Schema.Boolean),
+          head_sampling_rate: Schema.optional(Schema.Number),
+          persist: Schema.optional(Schema.Boolean),
+        }),
+      ),
+      issues: Schema.optional(
+        Schema.Struct({
+          enabled: Schema.optional(Schema.Boolean),
+        }),
+      ),
+    }),
+  ),
+});
+
+type ParsedScriptSettings = typeof ScriptSettings.Type;
+
+const decodeCredential = Schema.decodeUnknownSync(WranglerCredential);
+
+const decodeEnvelope = Schema.decodeUnknownSync(CloudflareEnvelope);
+
+const decodeAccounts = Schema.decodeUnknownSync(Accounts);
+
+const decodeScriptSettings = Schema.decodeUnknownSync(ScriptSettings);
 
 const readProcessText = async (
   stream: ReadableStream<Uint8Array> | null,
@@ -92,22 +120,20 @@ const readWranglerToken = async (): Promise<string> => {
     );
   }
 
-  const credential = JSON.parse(stdout) as {
-    readonly token?: unknown;
-  };
+  const credential = decodeCredential(JSON.parse(stdout));
 
-  if (typeof credential.token !== "string" || credential.token.length === 0) {
+  if (credential.token.length === 0) {
     throw new Error("Wrangler did not return an API or OAuth token.");
   }
 
   return credential.token;
 };
 
-const api = async <T>(
+const api = async (
   token: string,
   path: string,
   init?: RequestInit,
-): Promise<CloudflareEnvelope<T>> => {
+): Promise<typeof CloudflareEnvelope.Type> => {
   const response = await fetch(`${CLOUDFLARE_API}${path}`, {
     ...init,
     headers: {
@@ -117,7 +143,7 @@ const api = async <T>(
     },
   });
 
-  const payload = await response.json() as CloudflareEnvelope<T>;
+  const payload = decodeEnvelope(await response.json());
 
   if (!response.ok || payload.success !== true) {
     const details = payload.errors
@@ -142,18 +168,16 @@ const resolveAccountId = async (token: string): Promise<string> => {
     return configured;
   }
 
-  const accounts = await api<readonly Account[]>(
-    token,
-    "/accounts?per_page=50",
-  );
+  const envelope = await api(token, "/accounts?per_page=50");
+  const accounts = decodeAccounts(envelope.result);
 
-  if (accounts.result.length === 1) {
-    return accounts.result[0].id;
+  if (accounts.length === 1) {
+    return accounts[0].id;
   }
 
   const matches: string[] = [];
 
-  for (const account of accounts.result) {
+  for (const account of accounts) {
     if (!ACCOUNT_ID_PATTERN.test(account.id)) {
       continue;
     }
@@ -181,7 +205,7 @@ const resolveAccountId = async (token: string): Promise<string> => {
   return matches[0];
 };
 
-const assertObservability = (settings: ScriptSettings): void => {
+const assertObservability = (settings: ParsedScriptSettings): void => {
   const observability = settings.observability;
 
   if (
@@ -208,16 +232,17 @@ const accountId = await resolveAccountId(token);
 
 const path = workerSettingsPath(accountId);
 
-await api<ScriptSettings>(token, path, {
+await api(token, path, {
   method: "PATCH",
   body: JSON.stringify({
     observability: OBSERVABILITY,
   }),
 });
 
-const confirmed = await api<ScriptSettings>(token, path);
+const confirmed = await api(token, path);
+const settings = decodeScriptSettings(confirmed.result);
 
-assertObservability(confirmed.result);
+assertObservability(settings);
 
 console.log(
   "Cloudflare observability confirmed: logs, traces, issues, and 100% sampling are enabled.",
