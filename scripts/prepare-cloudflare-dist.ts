@@ -1,9 +1,17 @@
-import { readdir, rm, stat } from "node:fs/promises";
+import { copyFile, readdir, rm, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 const CLOUDFLARE_ASSET_LIMIT_BYTES = 25 * 1024 * 1024;
 
 const distDirectory = resolve(import.meta.dir, "../dist");
+
+const publicDirectory = resolve(import.meta.dir, "../public");
+
+const SITE_ROOT_FILES = [
+  "favicon-48x48.png",
+  "robots.txt",
+  "sitemap.xml",
+] as const;
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -26,6 +34,10 @@ const isOrtRuntimeAsset = (name: string): boolean =>
   name.includes("ort-wasm-") &&
   (name.endsWith(".wasm") || name.endsWith(".mjs"));
 
+for (const name of SITE_ROOT_FILES) {
+  await copyFile(join(publicDirectory, name), join(distDirectory, name));
+}
+
 const initialFiles = await walkFiles(distDirectory);
 
 for (const path of initialFiles) {
@@ -38,6 +50,8 @@ for (const path of initialFiles) {
 }
 
 const deployFiles = await walkFiles(distDirectory);
+
+const deployNames = deployFiles.map((path) => relative(distDirectory, path));
 
 const oversized: string[] = [];
 
@@ -55,17 +69,23 @@ if (oversized.length > 0) {
   );
 }
 
-if (deployFiles.some((path) => relative(distDirectory, path).startsWith("models/"))) {
+if (deployNames.some((name) => name.startsWith("models/"))) {
   throw new Error("Cloudflare builds must serve the model from R2, not Workers Static Assets.");
 }
 
-const leakedOrtRuntime = deployFiles
-  .map((path) => relative(distDirectory, path))
-  .filter(isOrtRuntimeAsset);
+const leakedOrtRuntime = deployNames.filter(isOrtRuntimeAsset);
 
 if (leakedOrtRuntime.length > 0) {
   throw new Error(
     `Cloudflare builds must serve ONNX Runtime assets from R2. Leaked files: ${leakedOrtRuntime.join(", ")}`,
+  );
+}
+
+const missingSiteFiles = SITE_ROOT_FILES.filter((name) => !deployNames.includes(name));
+
+if (missingSiteFiles.length > 0) {
+  throw new Error(
+    `Cloudflare builds must include site metadata assets. Missing files: ${missingSiteFiles.join(", ")}`,
   );
 }
 
