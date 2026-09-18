@@ -137,11 +137,18 @@ try {
     consumerDirectory,
   );
 
-  const modelCacheRoot = process.platform === "darwin"
-    ? join(smokeHome, "Library", "Caches", "bgcut")
-    : process.platform === "win32"
-      ? join(smokeLocalAppData, "bgcut")
-      : join(smokeCache, "bgcut");
+  const modelCacheRoot = (() => {
+    if (process.platform === "darwin") {
+      return join(smokeHome, "Library", "Caches", "bgcut");
+    }
+
+    if (process.platform === "win32") {
+      return join(smokeLocalAppData, "bgcut");
+    }
+
+    return join(smokeCache, "bgcut");
+  })();
+
   const cachedModelPath = join(modelCacheRoot, "models", MODEL_FILENAME);
 
   await mkdir(dirname(cachedModelPath), { recursive: true });
