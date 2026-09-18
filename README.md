@@ -1,5 +1,5 @@
 <h1>
-  <img src="./docs/images/bgcut-icon.png" alt="" width="42" height="42" align="middle" />
+  <img src="https://raw.githubusercontent.com/jhomra21/bgcut/main/docs/images/bgcut-icon.png" alt="" width="42" height="42" align="middle" />
   bgcut
 </h1>
 
@@ -7,7 +7,7 @@ Remove image backgrounds locally in the browser or from the command line.
 
 <a href="https://bgcut.dev">
   <img
-    src="./docs/images/bgcut-ui.webp"
+    src="https://raw.githubusercontent.com/jhomra21/bgcut/main/docs/images/bgcut-ui.webp"
     alt="bgcut browser UI showing local background removal and before-and-after comparison"
     width="100%"
   />
@@ -108,7 +108,7 @@ The model download sends model data to the machine. It does not send source imag
 
 ## Browser app
 
-The production domain is `bgcut.dev` once the Cloudflare deployment is accepted.
+The production domain is [`bgcut.dev`](https://bgcut.dev).
 
 The browser uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
 
@@ -182,7 +182,7 @@ See [`DEPLOYING.md`](DEPLOYING.md) for the exact local checks, one-time R2 setup
 
 Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
 
-Beta versions such as `0.1.0-beta.2` publish to the npm `beta` tag and create GitHub prereleases. Stable versions publish to `latest` and create normal GitHub releases.
+Beta versions such as `0.2.0-beta.0` publish to the npm `beta` tag and create GitHub prereleases. Stable versions publish to `latest` and create normal GitHub releases.
 
 Stable is intentionally blocked on the browser UI and its acceptance criteria.
 
