@@ -175,6 +175,7 @@ try {
     XDG_CACHE_HOME: smokeCache,
     LOCALAPPDATA: smokeLocalAppData,
   };
+
   const inputPath = join(temporaryRoot, "input.png");
 
   await sharp({
@@ -245,6 +246,7 @@ try {
   }
 
   const cliOutputPath = join(temporaryRoot, "cli-output.png");
+
   const cliOutput = run(
     binPath,
     [inputPath, "--cpu", "-o", cliOutputPath],
