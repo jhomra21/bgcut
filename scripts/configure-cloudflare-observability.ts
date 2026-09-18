@@ -240,6 +240,7 @@ await api(token, path, {
 });
 
 const confirmed = await api(token, path);
+
 const settings = decodeScriptSettings(confirmed.result);
 
 assertObservability(settings);
