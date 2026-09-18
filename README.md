@@ -133,7 +133,7 @@ The `-gpu` and `-cpu` aliases also work. Explicit GPU mode never switches to CPU
 
 ### Model cache
 
-The first CLI run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use. Later runs reuse a valid cached copy.
+The first native run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use. The CLI, packaged local app, and Node API share that validated cache, so later runs reuse a valid copy.
 
 The model download sends model data to the machine. It does not send source images away from the machine.
 
@@ -162,7 +162,13 @@ image
 
 ## Node API
 
-The package also exposes the same native removal engine for applications and scripts. A created engine downloads/verifies the pinned model if needed, creates one ONNX Runtime session, and reuses that session across removals until it is closed.
+Install bgcut as an application dependency:
+
+```sh
+npm install bgcut
+```
+
+The package exposes the same native removal engine for applications and scripts. A created engine downloads and verifies the pinned model if needed, creates one ONNX Runtime session, and reuses that session across removals until it is closed.
 
 ```ts
 import { writeFile } from "node:fs/promises";

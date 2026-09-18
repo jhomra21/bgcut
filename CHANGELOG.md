@@ -6,6 +6,9 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Expanded the packaged agent skill to cover the local app, CLI, reusable Node API, shared model cache, and current Node install behavior.
+- Updated release documentation and package metadata for the accepted 0.3 beta-to-stable promotion flow.
+
 ## 0.3.0-beta.0 - 2026-09-18
 
 - Added the packaged local web app: `bgcut` or `bgcut serve` starts the accepted browser UI on loopback, with JSON startup discovery, local health checks, the validated model route, and installed ONNX Runtime assets.
