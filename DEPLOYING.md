@@ -11,7 +11,7 @@ GitHub: jhomra21/bgcut
   -> Cloudflare Workers Builds
      -> main: bun run build:cloudflare
               bun run cloudflare:deploy
-        -> bgcut-web
+        -> bgcut
            -> bgcut.dev
            -> Vite SPA from Workers Static Assets
            -> /models/* from private R2 bucket bgcut-models
@@ -26,7 +26,7 @@ Source images never go through the Worker or R2. Browser image decoding, preproc
 
 `wrangler.jsonc` is the deployment source of truth. It configures:
 
-- Worker name `bgcut-web`
+- Worker name `bgcut`
 - `bgcut.dev` as a Worker Custom Domain
 - `dist/` as the SPA asset directory
 - SPA navigation fallback to `index.html`
@@ -36,9 +36,10 @@ Source images never go through the Worker or R2. Browser image decoding, preproc
 
 ## Cloudflare Git integration
 
-Connect the existing `bgcut-web` Worker to `jhomra21/bgcut` from Cloudflare Workers & Pages.
+Connect the existing `bgcut` Worker to `jhomra21/bgcut` from Cloudflare Workers & Pages.
 
-Use these build settings:
+Use these build settings. Do not use Cloudflare's auto-detected `bun run build` command here: the normal build intentionally places the 187 MiB model in `dist/`, which exceeds the Workers Static Assets 25 MiB per-file limit. The Cloudflare build strips R2-backed model/runtime payloads from `dist/`.
+
 
 ```text
 Root directory: /
