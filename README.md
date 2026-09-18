@@ -1,5 +1,5 @@
 <h1>
-  <img src="./docs/images/bgcut-icon.png" alt="" width="42" height="42" />
+  <img src="./docs/images/bgcut-icon.png" alt="" width="42" height="42" align="middle" />
   bgcut
 </h1>
 
