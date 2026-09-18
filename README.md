@@ -1,6 +1,17 @@
-# bgcut
+<h1>
+  <img src="./docs/images/bgcut-icon.png" alt="" width="42" height="42" />
+  bgcut
+</h1>
 
 Remove image backgrounds locally in the browser or from the command line.
+
+<a href="https://bgcut.dev">
+  <img
+    src="./docs/images/bgcut-ui.webp"
+    alt="bgcut browser UI showing local background removal and before-and-after comparison"
+    width="100%"
+  />
+</a>
 
 > **Beta:** bgcut is prerelease software. Use the npm `beta` channel for now. Stable releases will use `latest` after the browser UI and product behavior are ready.
 
