@@ -84,17 +84,17 @@ export type NativeBgcut = {
 };
 
 const toSharpInput = async (input: BgcutInput): Promise<string | Buffer> => {
-  if (typeof input === "string") {
-    await access(input);
-
-    return input;
+  if (input instanceof Uint8Array) {
+    return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
   }
 
   if (input instanceof ArrayBuffer) {
     return Buffer.from(input);
   }
 
-  return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+  await access(input);
+
+  return input;
 };
 
 export const prepareNativeImage = (
@@ -127,13 +127,18 @@ export const prepareNativeImage = (
         ),
       };
     },
-    catch: (cause) =>
-      new BgcutImageError({
-        message: typeof input === "string"
-          ? `Could not decode and prepare ${input}.`
-          : "Could not decode and prepare the supplied image bytes.",
+    catch: (cause) => {
+      let message = "Could not decode and prepare the supplied image bytes.";
+
+      if (!(input instanceof Uint8Array) && !(input instanceof ArrayBuffer)) {
+        message = `Could not decode and prepare ${input}.`;
+      }
+
+      return new BgcutImageError({
+        message,
         cause,
-      }),
+      });
+    },
   });
 
 const createSessionForProvider = (
