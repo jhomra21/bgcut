@@ -42,6 +42,12 @@ describe("browser product UI", () => {
     expect(appSource).toContain("Copy");
     expect(appSource).toContain("Download");
     expect(appSource).toContain("Redo");
+    expect(appSource).toContain('aria-keyshortcuts="N"');
+    expect(appSource).toContain('aria-keyshortcuts="C"');
+    expect(appSource).toContain('aria-keyshortcuts="D"');
+    expect(appSource).toContain('aria-keyshortcuts="R"');
+    expect(appSource).toContain("handleKeyboardShortcut");
+    expect(appSource).toContain('window.addEventListener("keydown", handleKeyboardShortcut)');
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");
