@@ -100,7 +100,13 @@ const readProcessText = async (
 };
 
 const readWranglerToken = async (): Promise<string> => {
-  const process = Bun.spawn(
+  const injected = process.env.CLOUDFLARE_API_TOKEN;
+
+  if (injected !== undefined && injected.length > 0) {
+    return injected;
+  }
+
+  const child = Bun.spawn(
     ["bunx", `wrangler@${WRANGLER_VERSION}`, "auth", "token", "--json"],
     {
       stdout: "pipe",
@@ -109,9 +115,9 @@ const readWranglerToken = async (): Promise<string> => {
   );
 
   const [exitCode, stdout, stderr] = await Promise.all([
-    process.exited,
-    readProcessText(process.stdout),
-    readProcessText(process.stderr),
+    child.exited,
+    readProcessText(child.stdout),
+    readProcessText(child.stderr),
   ]);
 
   if (exitCode !== 0) {
@@ -120,7 +126,16 @@ const readWranglerToken = async (): Promise<string> => {
     );
   }
 
-  const credential = decodeCredential(JSON.parse(stdout));
+  const firstBrace = stdout.indexOf("{");
+  const lastBrace = stdout.lastIndexOf("}");
+
+  if (firstBrace < 0 || lastBrace < firstBrace) {
+    throw new Error("Wrangler auth token output did not contain JSON credentials.");
+  }
+
+  const credential = decodeCredential(
+    JSON.parse(stdout.slice(firstBrace, lastBrace + 1)),
+  );
 
   if (credential.token.length === 0) {
     throw new Error("Wrangler did not return an API or OAuth token.");
