@@ -12,7 +12,7 @@ The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtim
 
 The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
-The production web target is `bgcut.dev`. The Vite app shell is prepared for Cloudflare Workers Static Assets, while the ONNX model and both ONNX Runtime WASM binaries are served through the same Worker from private R2.
+The production web target is `bgcut.dev`. Workers Static Assets carry the app shell, while the ONNX model and discrete ONNX Runtime runtime files are served through the same Worker from private R2.
 
 ## 1. Finish the browser UI
 
