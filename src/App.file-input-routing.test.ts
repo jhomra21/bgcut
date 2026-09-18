@@ -30,7 +30,9 @@ describe("browser product UI", () => {
   });
 
   test("matches the minimal product flow", () => {
-    expect(appSource).toContain("<h1>bgcut</h1>");
+    expect(appSource).toContain('class="brand-title"');
+    expect(appSource).toContain('src="/favicon-48x48.png"');
+    expect(appSource).toContain("<span>bgcut</span>");
     expect(appSource).toContain('href="https://github.com/jhomra21/bgcut"');
     expect(appSource).toContain("GitHub");
     expect(appSource).toContain("Click or drag image here");
