@@ -410,7 +410,11 @@ const HomePage = () => {
           when={readyImage()}
           fallback={
             <button class="drop-trigger" type="button" onClick={() => fileInput?.click()}>
-              Click or drag image here
+              <span class="drop-trigger-mark" aria-hidden="true">+</span>
+              <span class="drop-trigger-copy">
+                <strong>Click or drag image here</strong>
+                <span>JPEG, PNG, WebP, or AVIF. Processed locally.</span>
+              </span>
             </button>
           }
         >
@@ -534,13 +538,17 @@ const DocsPage = () => (
       </aside>
 
       <article class="content-page docs-page">
-        <section id="overview" class="content-hero">
+        <section id="overview" class="content-hero docs-hero">
           <div class="eyebrow">Documentation</div>
           <h2>Use bgcut in the browser, from the command line, or inside Node.</h2>
           <p>
             bgcut is one local background-removal system with four public surfaces: the hosted
             web app, the packaged local web app, the native CLI, and the reusable Node API.
           </p>
+          <div class="hero-note">
+            <span class="hero-note-dot" aria-hidden="true"></span>
+            <span>Images stay on your machine. The model runs in your browser or local Node process.</span>
+          </div>
           <div class="hero-actions">
             <a class="primary-link" href="/">Open web app</a>
             <a class="secondary-link" href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">
@@ -835,7 +843,7 @@ const AboutPage = () => (
     <SiteHeader page="about" />
 
     <article class="content-page about-page">
-      <section class="content-hero">
+      <section class="content-hero about-hero">
         <div class="eyebrow">About</div>
         <h2>Background removal that runs where your image already is.</h2>
         <p>
@@ -847,6 +855,12 @@ const AboutPage = () => (
           <a class="secondary-link" href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
             View source
           </a>
+        </div>
+        <div class="project-facts" aria-label="bgcut project facts">
+          <span>Local inference</span>
+          <span>WebGPU first</span>
+          <span>Node API</span>
+          <span>Public source</span>
         </div>
       </section>
 
