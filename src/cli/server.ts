@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import { createRequire } from "node:module";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,7 @@ import { ensureCliModel } from "./model-cache";
 import type { ServeOptions } from "./args";
 
 const HOST = "127.0.0.1";
+
 const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -147,11 +149,13 @@ const resolveStaticPath = async (pathname: string, webRoot: string): Promise<str
 };
 
 const openBrowser = (url: string): void => {
-  const command = process.platform === "darwin"
-    ? { file: "open", args: [url] }
-    : process.platform === "win32"
-      ? { file: "cmd", args: ["/c", "start", "", url] }
-      : { file: "xdg-open", args: [url] };
+  let command = { file: "xdg-open", args: [url] };
+
+  if (process.platform === "darwin") {
+    command = { file: "open", args: [url] };
+  } else if (process.platform === "win32") {
+    command = { file: "cmd", args: ["/c", "start", "", url] };
+  }
 
   try {
     const child = spawn(command.file, command.args, {
@@ -277,12 +281,15 @@ export const startLocalAppServer = async (
 
   const address = server.address();
 
-  if (address === null || typeof address === "string") {
+  if (address === null) {
     await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+
     throw new Error("bgcut could not determine the local server port.");
   }
 
-  const port = address.port;
+  // SAFETY: this server always binds to the TCP loopback host above, so Node returns AddressInfo here.
+  const tcpAddress = address as AddressInfo;
+  const port = tcpAddress.port;
   const url = `http://${HOST}:${port}/`;
 
   return {
