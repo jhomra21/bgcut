@@ -9,7 +9,6 @@ const publicDirectory = resolve(import.meta.dir, "../public");
 
 const SITE_ROOT_FILES = [
   "apple-touch-icon.png",
-  "bgcut-logo.png",
   "favicon-48x48.png",
   "icon-192x192.png",
   "icon-512x512.png",
