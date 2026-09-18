@@ -25,7 +25,9 @@ await Promise.all([
 ]);
 
 await run(["bun", "run", "brand:prepare"]);
+
 await run(["bunx", "vite", "build", "--mode", "package"]);
+
 await run(["bun", "run", "scripts/prepare-package-web.ts"]);
 await run([
   "bun",
@@ -36,6 +38,7 @@ await run([
   "--packages=external",
   "--outdir=dist/cli",
 ]);
+
 await run([
   "bun",
   "build",
