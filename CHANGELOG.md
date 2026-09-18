@@ -6,6 +6,11 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.2.1 - 2026-09-18
+
+- Replaced the renderer-dependent README icon/title alignment with one pre-aligned bgcut lockup so the brand header renders consistently on GitHub and npm.
+- No runtime, inference, CLI, model, or web-app behavior changed.
+
 ## 0.2.0 - 2026-09-18
 
 - Promoted the accepted `0.2.0-beta.0` build to the stable `latest` channel with no runtime or inference changes.
