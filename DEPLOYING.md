@@ -5,9 +5,10 @@ The web app deploys to Cloudflare Workers with Static Assets. Large runtime asse
 The R2 bucket currently stores:
 
 - the pinned BiRefNet Lite ONNX model, served at `/models/...`
-- ONNX Runtime's WebGPU asyncify WASM binary, served at `/runtime/...`
+- ONNX Runtime's WebGPU asyncify WASM binary, served at `/runtime/ort-wasm-simd-threaded.asyncify.wasm`
+- ONNX Runtime's standard WASM fallback binary, served at `/runtime/ort-wasm-simd-threaded.wasm`
 
-This split is required because Cloudflare limits each Workers Static Asset to 25 MiB. The model is about 187 MiB and the WebGPU asyncify WASM binary is about 26.8 MiB. The Cloudflare build removes the bundled asyncify copy from `dist/` and fails if any remaining static asset is larger than the Cloudflare limit.
+The model is about 187 MiB, the WebGPU asyncify WASM binary is about 26.8 MiB, and the standard WASM fallback binary is about 14.2 MiB. All three are runtime payloads rather than UI assets, so they live in R2. The Cloudflare build strips ONNX Runtime WASM binaries from `dist/` and fails if one leaks back into Workers Static Assets.
 
 ## Architecture
 
@@ -38,13 +39,13 @@ Install the repo dependencies first:
 bun install --frozen-lockfile
 ```
 
-Seed Wrangler's local R2 storage with both large runtime assets:
+Seed Wrangler's local R2 storage with the model and both ONNX Runtime WASM binaries:
 
 ```sh
 bun run cloudflare:r2:local
 ```
 
-This prepares the validated model, copies it into local R2, and copies the exact ONNX Runtime 1.30.0 WebGPU asyncify WASM binary from `node_modules` into local R2. It writes local Wrangler state under `.wrangler/`. It does not create or modify a remote R2 bucket.
+This prepares the validated model, copies it into local R2, and copies the exact ONNX Runtime 1.30.0 WebGPU asyncify and standard fallback WASM binaries from `node_modules` into local R2. It writes local Wrangler state under `.wrangler/`. It does not create or modify a remote R2 bucket.
 
 Build the exact static payload Cloudflare would receive:
 
@@ -72,9 +73,10 @@ Check the page, model route, and WebGPU runtime route from another terminal:
 curl -I http://localhost:8787/
 curl -I http://localhost:8787/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx
 curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.asyncify.wasm
+curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.wasm
 ```
 
-The runtime route must return `content-type: application/wasm`. The model route must return the full model object rather than the SPA HTML.
+Both runtime routes must return `content-type: application/wasm`. The model route must return the full model object rather than the SPA HTML.
 
 Then open the local site in a Chromium browser and run a normal image removal. Acceptance requires:
 
@@ -118,12 +120,19 @@ bunx wrangler@4.133.0 r2 object put \
   --remote
 ```
 
-Upload the WebGPU asyncify WASM runtime from the pinned `onnxruntime-web@1.30.0` install:
+Upload both WASM runtimes from the pinned `onnxruntime-web@1.30.0` install:
 
 ```sh
 bunx wrangler@4.133.0 r2 object put \
   bgcut-models/ort-wasm-simd-threaded.asyncify.wasm \
   --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm \
+  --content-type application/wasm \
+  --cache-control 'public, max-age=31536000, immutable' \
+  --remote
+
+bunx wrangler@4.133.0 r2 object put \
+  bgcut-models/ort-wasm-simd-threaded.wasm \
+  --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm \
   --content-type application/wasm \
   --cache-control 'public, max-age=31536000, immutable' \
   --remote
@@ -179,6 +188,7 @@ After deployment:
 curl -I https://bgcut.dev/
 curl -I https://bgcut.dev/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx
 curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.asyncify.wasm
+curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.wasm
 ```
 
 The runtime response must use `application/wasm`. Run a real WebGPU browser removal on `https://bgcut.dev` before treating the deployment as accepted.
