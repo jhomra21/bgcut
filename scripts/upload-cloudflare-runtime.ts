@@ -10,7 +10,7 @@ const WRANGLER_VERSION = "4.133.0";
 
 const BUCKET = "bgcut-models";
 
-const CACHE_CONTROL = "public, max-age=31536000, immutable";
+const CACHE_CONTROL = "public,max-age=31536000,immutable";
 
 const runtimeDirectory = resolve(
   import.meta.dir,
@@ -55,8 +55,7 @@ for (const asset of assets) {
       source,
       "--content-type",
       asset.contentType,
-      "--cache-control",
-      CACHE_CONTROL,
+      `--cache-control=${CACHE_CONTROL}`,
       "--remote",
     ],
     {
