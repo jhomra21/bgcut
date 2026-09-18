@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 import {
   ORT_WASM_FILENAME,
+  ORT_WASM_MODULE_FILENAME,
+  ORT_WASM_MODULE_PUBLIC_PATH,
   ORT_WASM_PUBLIC_PATH,
   ORT_WEBGPU_WASM_FILENAME,
   ORT_WEBGPU_WASM_PUBLIC_PATH,
@@ -37,7 +39,7 @@ const run = async (command: string[]): Promise<void> => {
   }
 };
 
-const seedRuntime = async (filename: string): Promise<void> =>
+const seedRuntime = async (filename: string, contentType: string): Promise<void> =>
   run([
     "bunx",
     `wrangler@${WRANGLER_VERSION}`,
@@ -48,7 +50,7 @@ const seedRuntime = async (filename: string): Promise<void> =>
     "--file",
     resolve(runtimeDirectory, filename),
     "--content-type",
-    "application/wasm",
+    contentType,
     "--cache-control",
     "public, max-age=31536000, immutable",
     "--local",
@@ -80,10 +82,7 @@ const waitForWorker = async (): Promise<void> => {
   });
 };
 
-const verifyRuntimeResponse = async (
-  label: string,
-  publicPath: string,
-): Promise<void> => {
+const verifyWasmResponse = async (label: string, publicPath: string): Promise<void> => {
   const response = await fetch(`${ORIGIN}${publicPath}`);
 
   if (!response.ok) {
@@ -120,11 +119,34 @@ const verifyRuntimeResponse = async (
   }
 };
 
+const verifyModuleResponse = async (): Promise<void> => {
+  const response = await fetch(`${ORIGIN}${ORT_WASM_MODULE_PUBLIC_PATH}`);
+
+  if (!response.ok) {
+    throw new Error(`ORT module route returned HTTP ${response.status}.`);
+  }
+
+  const contentType = response.headers.get("content-type");
+
+  if (contentType === null || !contentType.startsWith("text/javascript")) {
+    throw new Error(
+      `ORT module route returned ${contentType ?? "no content type"} instead of JavaScript.`,
+    );
+  }
+
+  const source = await response.text();
+
+  if (source.length === 0 || source.trimStart().startsWith("<!")) {
+    throw new Error("ORT module route returned an empty response or SPA HTML.");
+  }
+};
+
 await rm(smokeState, { recursive: true, force: true });
 
 try {
-  await seedRuntime(ORT_WEBGPU_WASM_FILENAME);
-  await seedRuntime(ORT_WASM_FILENAME);
+  await seedRuntime(ORT_WEBGPU_WASM_FILENAME, "application/wasm");
+  await seedRuntime(ORT_WASM_FILENAME, "application/wasm");
+  await seedRuntime(ORT_WASM_MODULE_FILENAME, "text/javascript");
   await run(["bun", "run", "build:cloudflare"]);
 
   const worker = Bun.spawn(
@@ -146,8 +168,9 @@ try {
 
   try {
     await waitForWorker();
-    await verifyRuntimeResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
-    await verifyRuntimeResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
+    await verifyWasmResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
+    await verifyWasmResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
+    await verifyModuleResponse();
     console.log("Cloudflare R2 runtime smoke passed.");
   } finally {
     worker.kill();
