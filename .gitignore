@@ -7,3 +7,9 @@ public/models/*.onnx
 .env
 .env.*
 !.env.example
+public/apple-touch-icon.png
+public/bgcut-logo.png
+public/favicon-48x48.png
+public/icon-192x192.png
+public/icon-512x512.png
+public/og-image.png
