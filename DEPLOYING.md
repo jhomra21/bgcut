@@ -226,3 +226,18 @@ Run a real WebGPU browser removal on `https://bgcut.dev` before treating a produ
 `.github/workflows/cloudflare.yml` builds the Cloudflare payload and runs `wrangler deploy --dry-run` plus the local R2 runtime smoke on pull requests and pushes to `main`. It never deploys production resources.
 
 The production deployment is owned by Cloudflare Workers Builds. The npm release workflow remains separate.
+
+### Observability verification
+
+`cloudflare:deploy` does not stop at `wrangler deploy`. It patches the Worker's script-level observability settings through Cloudflare's `script-settings` API and then reads them back. The production build fails unless Cloudflare confirms:
+
+- Workers Logs enabled
+- invocation logs enabled
+- log persistence enabled
+- trace collection enabled
+- trace persistence enabled
+- real-time Issues enabled
+- 100% log and trace head sampling
+- query-string redaction enabled
+
+This extra verification exists because the dashboard can retain script-level observability toggles independently from the uploaded Worker version. No Cloudflare credential is stored in the repository: the script reuses the credential already provided to Wrangler by Workers Builds.
