@@ -1,6 +1,6 @@
 {
   "name": "bgcut",
-  "version": "0.3.0-beta.0",
+  "version": "0.3.0",
   "description": "Local background removal for the browser, CLI, and Node API with WebGPU acceleration.",
   "type": "module",
   "packageManager": "bun@1.4.2",
