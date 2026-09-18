@@ -103,6 +103,7 @@ export const prepareNativeImage = (
   Effect.tryPromise({
     try: async () => {
       const sharpInput = await toSharpInput(input);
+
       const source = await sharp(sharpInput)
         .rotate()
         .ensureAlpha()
