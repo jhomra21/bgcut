@@ -227,17 +227,21 @@ Run a real WebGPU browser removal on `https://bgcut.dev` before treating a produ
 
 The production deployment is owned by Cloudflare Workers Builds. The npm release workflow remains separate.
 
-### Observability verification
+## Observability
 
-`cloudflare:deploy` does not stop at `wrangler deploy`. It patches the Worker's script-level observability settings through Cloudflare's `script-settings` API and then reads them back. The production build fails unless Cloudflare confirms:
+Keep the desired Worker observability policy in `wrangler.jsonc`:
 
 - Workers Logs enabled
 - invocation logs enabled
 - log persistence enabled
-- trace collection enabled
+- automatic traces enabled
 - trace persistence enabled
 - real-time Issues enabled
-- 100% log and trace head sampling
+- 100% log and trace sampling while traffic is low
 - query-string redaction enabled
 
-This extra verification exists because the dashboard can retain script-level observability toggles independently from the uploaded Worker version. No Cloudflare credential is stored in the repository: the script reuses the credential already provided to Wrangler by Workers Builds.
+Cloudflare Workers Builds manages its deployment token internally. That token is sufficient for Wrangler deployments, but Cloudflare does not expose it as a normal build environment variable for arbitrary post-deploy API calls. Do not add a Cloudflare token to GitHub just to work around that boundary.
+
+If the Cloudflare dashboard shows Logs or Traces disabled, enable them once at **Worker > Settings > Observability** and deploy the settings change. The dashboard may show a Wrangler snippet; keep `wrangler.jsonc` aligned with the enabled state. Script-level observability settings persist independently from Worker code versions.
+
+After enabling them, verify the Observability tab shows Logs and Traces on and exercise `bgcut.dev` so Events, Invocations, and Traces receive data.

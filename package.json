@@ -62,10 +62,9 @@
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package-smoke.ts",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build && bun run package:dry-run && bun run package:smoke",
-    "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy && bun run cloudflare:observability:remote",
+    "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
-    "cloudflare:runtime:remote": "bun run scripts/upload-cloudflare-runtime.ts",
-    "cloudflare:observability:remote": "bun run scripts/configure-cloudflare-observability.ts"
+    "cloudflare:runtime:remote": "bun run scripts/upload-cloudflare-runtime.ts"
   },
   "dependencies": {
     "effect": "3.22.2",

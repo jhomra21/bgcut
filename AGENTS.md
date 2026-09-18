@@ -54,7 +54,7 @@
 - Production deploys run through Cloudflare Workers Builds connected directly to GitHub. `main` is the production branch.
 - Keep the Cloudflare build command blank; `wrangler.jsonc` owns the Cloudflare-specific build via `build.command`.
 - `cloudflare:deploy` must seed the pinned ONNX Runtime files into remote `bgcut-models` before deploying the Worker.
-- After production deploy, explicitly patch and read back the Worker script-level observability settings. Treat logs, traces, Issues, persistence, and sampling as a production deployment contract rather than assuming Wrangler version upload metadata is authoritative.
+- Keep the desired observability policy in `wrangler.jsonc`. If Cloudflare's script-level Logs or Traces toggles are off, enable them once in the Worker dashboard; Workers Builds does not expose its managed deploy token to arbitrary post-deploy API scripts.
 - Do not add Cloudflare account IDs or API tokens to GitHub for this deployment path. Workers Builds owns the deployment credential.
 
 ## Release and package policy
