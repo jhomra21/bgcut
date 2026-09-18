@@ -19,6 +19,49 @@ const parseFailure = async (args: readonly string[]): Promise<string> => {
 };
 
 describe("parseCliArgs", () => {
+  test("opens the local app when no arguments are provided", async () => {
+    expect(await parse([])).toEqual({
+      kind: "serve",
+      options: {
+        port: 0,
+        open: true,
+        json: false,
+      },
+    });
+  });
+
+  test("supports explicit local app options", async () => {
+    expect(await parse(["serve", "--port", "8787", "--no-open"])).toEqual({
+      kind: "serve",
+      options: {
+        port: 8787,
+        open: false,
+        json: false,
+      },
+    });
+
+    expect(await parse(["--json"])).toEqual({
+      kind: "serve",
+      options: {
+        port: 0,
+        open: false,
+        json: true,
+      },
+    });
+  });
+
+  test("supports an explicit remove subcommand", async () => {
+    expect(await parse(["remove", "images/cat.jpg"])).toEqual({
+      kind: "run",
+      options: {
+        inputPath: "images/cat.jpg",
+        outputPath: "images/cat-nobg.png",
+        format: "png",
+        engine: "auto",
+      },
+    });
+  });
+
   test("defaults to a PNG next to the input", async () => {
     expect(await parse(["images/cat.jpg"])).toEqual({
       kind: "run",
@@ -120,5 +163,11 @@ describe("parseCliArgs", () => {
 
   test("returns help without requiring an input", async () => {
     expect(await parse(["--help"])).toEqual({ kind: "help" });
+    expect(await parse(["serve", "--help"])).toEqual({ kind: "help" });
+  });
+
+  test("rejects invalid local app ports", async () => {
+    expect(await parseFailure(["serve", "--port", "99999"]))
+      .toContain("Invalid port");
   });
 });

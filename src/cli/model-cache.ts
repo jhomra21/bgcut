@@ -1,5 +1,5 @@
 import { Data, Effect } from "effect";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -89,7 +89,10 @@ export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
     }
 
     yield* Effect.tryPromise({
-      try: () => Bun.write(temporaryPath, response),
+      try: async () => {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        await writeFile(temporaryPath, bytes);
+      },
       catch: (cause) => new CliModelError({ message: `Could not write ${temporaryPath}.`, cause }),
     });
 

@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+
 import { Data, Effect } from "effect";
 
 export type ModelFileFingerprint = {
@@ -10,28 +14,32 @@ export class ModelFileError extends Data.TaggedError("ModelFileError")<{
   readonly cause: unknown;
 }> {}
 
+const isMissingFile = (cause: unknown): boolean =>
+  cause instanceof Error &&
+  "code" in cause &&
+  cause.code === "ENOENT";
+
 export const inspectModelFile = (
   path: string,
 ): Effect.Effect<ModelFileFingerprint | undefined, ModelFileError> =>
   Effect.tryPromise({
     try: async () => {
-      const file = Bun.file(path);
+      let file;
 
-      if (!(await file.exists())) {
-        return undefined;
-      }
-
-      const reader = file.stream().getReader();
-      const hasher = new Bun.CryptoHasher("sha256");
-
-      for (;;) {
-        const chunk = await reader.read();
-
-        if (chunk.done) {
-          break;
+      try {
+        file = await stat(path);
+      } catch (cause) {
+        if (isMissingFile(cause)) {
+          return undefined;
         }
 
-        hasher.update(chunk.value);
+        throw cause;
+      }
+
+      const hasher = createHash("sha256");
+
+      for await (const chunk of createReadStream(path)) {
+        hasher.update(chunk);
       }
 
       return {

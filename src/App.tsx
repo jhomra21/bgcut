@@ -45,6 +45,7 @@ const App = () => {
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
   const [copyState, setCopyState] = createSignal<"idle" | "copied" | "error">("idle");
   let fileInput: HTMLInputElement | undefined;
+  let downloadLink: HTMLAnchorElement | undefined;
   let activeSourceFile: File | undefined;
   let activeSourceUrl: string | undefined;
   let activeResultUrl: string | undefined;
@@ -255,18 +256,82 @@ const App = () => {
     }
   };
 
-  onSettled(() => () => {
-    selectionVersion += 1;
-
-    if (activeSourceUrl !== undefined) {
-      URL.revokeObjectURL(activeSourceUrl);
+  const handleKeyboardShortcut = (event: KeyboardEvent) => {
+    if (
+      event.defaultPrevented ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey
+    ) {
+      return;
     }
 
-    if (activeResultUrl !== undefined) {
-      URL.revokeObjectURL(activeResultUrl);
+    const target = event.target;
+
+    if (
+      target instanceof HTMLElement &&
+      (
+        target.isContentEditable ||
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      )
+    ) {
+      return;
     }
 
-    activeSourceFile = undefined;
+    const key = event.key.toLowerCase();
+
+    if (key === "n" && !processing()) {
+      event.preventDefault();
+      chooseNewImage();
+
+      return;
+    }
+
+    const result = readyResult();
+
+    if (result === undefined) {
+      return;
+    }
+
+    if (key === "c") {
+      event.preventDefault();
+      copyResult(result);
+
+      return;
+    }
+
+    if (key === "d") {
+      event.preventDefault();
+      downloadLink?.click();
+
+      return;
+    }
+
+    if (key === "r" && !processing()) {
+      event.preventDefault();
+      redo();
+    }
+  };
+
+  onSettled(() => {
+    window.addEventListener("keydown", handleKeyboardShortcut);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyboardShortcut);
+      selectionVersion += 1;
+
+      if (activeSourceUrl !== undefined) {
+        URL.revokeObjectURL(activeSourceUrl);
+      }
+
+      if (activeResultUrl !== undefined) {
+        URL.revokeObjectURL(activeResultUrl);
+      }
+
+      activeSourceFile = undefined;
+    };
   });
 
   return (
@@ -352,21 +417,48 @@ const App = () => {
                   class="text-button"
                   type="button"
                   disabled={processing()}
+                  aria-keyshortcuts="N"
+                  title="New image (N)"
                   onClick={chooseNewImage}
                 >
-                  New Image
+                  <span>New Image</span>
+                  <kbd class="shortcut-key" aria-hidden="true">N</kbd>
                 </button>
                 <Show keyed when={readyResult()}>
                   {(result) => (
                     <div class="result-action-group">
-                      <button class="text-button" type="button" onClick={() => copyResult(result)}>
-                        {copyLabel()}
+                      <button
+                        class="text-button"
+                        type="button"
+                        aria-keyshortcuts="C"
+                        title="Copy result (C)"
+                        onClick={() => copyResult(result)}
+                      >
+                        <span>{copyLabel()}</span>
+                        <kbd class="shortcut-key" aria-hidden="true">C</kbd>
                       </button>
-                      <a class="download-button" href={result.url} download={result.downloadName}>
-                        Download
+                      <a
+                        ref={(element) => {
+                          downloadLink = element;
+                        }}
+                        class="download-button"
+                        href={result.url}
+                        download={result.downloadName}
+                        aria-keyshortcuts="D"
+                        title="Download result (D)"
+                      >
+                        <span>Download</span>
+                        <kbd class="shortcut-key shortcut-key-inverted" aria-hidden="true">D</kbd>
                       </a>
-                      <button class="text-button" type="button" onClick={redo}>
-                        Redo
+                      <button
+                        class="text-button"
+                        type="button"
+                        aria-keyshortcuts="R"
+                        title="Redo removal (R)"
+                        onClick={redo}
+                      >
+                        <span>Redo</span>
+                        <kbd class="shortcut-key" aria-hidden="true">R</kbd>
                       </button>
                     </div>
                   )}

@@ -1,12 +1,21 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
-import { Cause, Effect, Exit } from "effect";
+import { Cause, Data, Effect, Exit } from "effect";
 
 import { parseCliArgs } from "./args";
 import { removeBackgroundCli } from "./runtime";
+import { runLocalApp } from "./server";
 
 const HELP = `Usage:
-  bgcut <image> [format] [options]
+  bgcut                         Open the local bgcut web app
+  bgcut serve [options]         Open the local bgcut web app explicitly
+  bgcut <image> [format]        Remove a background and save the result
+  bgcut remove <image> [format] Explicit headless removal command
+
+Local app options:
+  --port <number>          Use a specific localhost port (default: available port)
+  --no-open                Start the local app without opening a browser
+  --json                   Print machine-readable server info and do not open a browser
 
 Formats:
   --png,  -png             Transparent PNG (default)
@@ -14,19 +23,25 @@ Formats:
   --jpg,  -jpg             JPEG flattened onto white
   --jpeg, -jpeg            Alias for JPG
 
-Options:
+Removal options:
   -o, --output <path>      Output filename or path
   --gpu, -gpu              Require native WebGPU
   --cpu, -cpu              Require CPU inference
   -h, --help               Show this help
 
 Examples:
-  bgcut photo.jpg -png
-  bgcut photo.jpg --webp
+  bgcut
+  bgcut serve --port 8787
+  bgcut photo.jpg
+  bgcut remove photo.jpg --webp
   bgcut photo.jpg -o portrait.png
-  bgcut photo.jpg -webp -o portrait.webp
   bgcut photo.jpg -gpu
 `;
+
+class CliServerError extends Data.TaggedError("CliServerError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 const formatDuration = (milliseconds: number): string => {
   if (milliseconds < 10) {
@@ -45,6 +60,19 @@ const program = Effect.gen(function* () {
 
   if (parsed.kind === "help") {
     console.log(HELP);
+
+    return;
+  }
+
+  if (parsed.kind === "serve") {
+    yield* Effect.tryPromise({
+      try: () => runLocalApp(parsed.options),
+      catch: (cause) =>
+        new CliServerError({
+          message: "Could not start the local bgcut web app.",
+          cause,
+        }),
+    });
 
     return;
   }

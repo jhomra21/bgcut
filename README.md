@@ -4,7 +4,7 @@
   width="292"
 />
 
-Remove image backgrounds locally in the browser or from the command line.
+Remove image backgrounds locally from the hosted web app, the installed local app, the CLI, or the Node API.
 
 <a href="https://bgcut.dev">
   <img
@@ -18,37 +18,71 @@ Source images stay on the user's machine. bgcut does not upload them to an appli
 
 ## Install
 
-The CLI currently runs on Bun.
-
-Run it without installing globally:
+Run the local app without installing globally:
 
 ```sh
-bunx bgcut photo.jpg
+npx bgcut
 ```
 
-Or install the beta globally:
+Or install bgcut globally:
 
 ```sh
 npm install -g bgcut
-bgcut photo.jpg
+bgcut
 ```
 
-Bun can install it globally too:
+Bun users can use the same package:
 
 ```sh
-bun add -g bgcut
-bgcut photo.jpg
+bunx bgcut
 ```
+
+The published executable is built for Node. Bun is used to develop and build the repository, but npm and npx users do not need Bun installed to run bgcut.
+
+## Local app
+
+Running `bgcut` with no image starts the packaged bgcut web UI on `127.0.0.1` using an available port and opens it in your browser:
+
+```sh
+bgcut
+```
+
+The explicit form is:
+
+```sh
+bgcut serve
+```
+
+Use a fixed port or keep the browser closed when integrating with another process:
+
+```sh
+bgcut serve --port 8787
+bgcut serve --no-open
+```
+
+For process discovery, `--json` selects an available port, does not open a browser, and prints the resolved URL, host, port, and PID as one JSON object:
+
+```sh
+bgcut serve --json
+```
+
+The local server only binds to the loopback interface. It serves the same browser UI as `bgcut.dev`, the cached validated model at `/models/...`, the installed ONNX Runtime files at `/runtime/...`, and a small `/health` endpoint. Source images remain in the browser.
 
 ## CLI
 
-The default command writes a transparent PNG next to the input image:
+Passing an image keeps the headless file-in/file-out behavior:
 
 ```sh
 bgcut photo.jpg
 ```
 
-Choose the output path with `-o` or `--output`:
+The explicit command is also available:
+
+```sh
+bgcut remove photo.jpg
+```
+
+The default command writes a transparent PNG next to the input image. Choose the output path with `-o` or `--output`:
 
 ```sh
 bgcut photo.jpg -o portrait.png
@@ -111,6 +145,8 @@ The browser uses the same pinned model and keeps inference local. WebGPU is the 
 
 The product UI follows one small flow: click or drop an image, wait for local removal, compare the original with the result, then copy, download, redo, or choose a new image. Runtime checks, model details, timing tables, and internal acceptance controls stay out of the normal UI.
 
+Keyboard shortcuts mirror the result actions: `N` chooses a new image, `C` copies the result, `D` downloads it, and `R` reruns removal. When the comparison slider is focused, the native left and right arrow keys move it.
+
 The current WebGPU pipeline is:
 
 ```text
@@ -123,6 +159,26 @@ image
   -> transparent PNG
 ```
 
+
+## Node API
+
+The package also exposes the same native removal engine for applications and scripts. A created engine downloads/verifies the pinned model if needed, creates one ONNX Runtime session, and reuses that session across removals until it is closed.
+
+```ts
+import { writeFile } from "node:fs/promises";
+import { createBgcut } from "bgcut";
+
+const bgcut = await createBgcut();
+
+try {
+  const result = await bgcut.remove("photo.jpg", { format: "png" });
+  await writeFile("photo-nobg.png", result.data);
+} finally {
+  await bgcut.close();
+}
+```
+
+`createBgcut({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if the WebGPU session cannot start. Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`.
 
 ## Agent skill
 
@@ -157,7 +213,7 @@ Run the complete project check:
 bun run check
 ```
 
-`bun run check` runs oxlint, TypeScript, tests, the production build, package inspection, and a clean package install test. The package test verifies both the `bgcut` command and the bundled agent skill.
+`bun run check` runs oxlint, TypeScript, tests, the production build, package inspection, and a clean package install test. The package test installs the packed tarball and verifies the Node CLI, packaged local web app and health route, Node API export, and bundled agent skill.
 
 ### Cloudflare preview
 
