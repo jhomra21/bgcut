@@ -1,7 +1,8 @@
-<h1>
-  <img src="https://raw.githubusercontent.com/jhomra21/bgcut/main/docs/images/bgcut-icon.png" alt="" width="42" height="42" align="middle" />
-  bgcut
-</h1>
+<img
+  src="https://raw.githubusercontent.com/jhomra21/bgcut/main/docs/images/bgcut-lockup.svg"
+  alt="bgcut"
+  width="292"
+/>
 
 Remove image backgrounds locally in the browser or from the command line.
 
