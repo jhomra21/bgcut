@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -69,6 +70,18 @@ const readFirstLine = async (
     });
   });
 
+const LocalServerStartup = Schema.Struct({
+  url: Schema.String,
+  host: Schema.Literal("127.0.0.1"),
+  port: Schema.Number,
+  pid: Schema.Number,
+});
+
+const LocalServerHealth = Schema.Struct({
+  ok: Schema.Literal(true),
+  service: Schema.Literal("bgcut-local"),
+});
+
 const root = process.cwd();
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "bgcut-package-smoke-"));
@@ -122,19 +135,13 @@ try {
 
   try {
     const startupLine = await readFirstLine(localApp, 15_000);
-    const startup = JSON.parse(startupLine) as {
-      readonly url?: string;
-      readonly host?: string;
-      readonly port?: number;
-    };
 
-    if (
-      typeof startup.url !== "string" ||
-      startup.host !== "127.0.0.1" ||
-      typeof startup.port !== "number" ||
-      startup.port <= 0
-    ) {
-      throw new Error(`Unexpected bgcut local-server startup payload: ${startupLine}`);
+    const startup = Schema.decodeUnknownSync(LocalServerStartup)(
+      JSON.parse(startupLine),
+    );
+
+    if (startup.port <= 0) {
+      throw new Error(`Unexpected bgcut local-server port: ${startup.port}`);
     }
 
     const page = await fetch(startup.url);
@@ -144,9 +151,12 @@ try {
     }
 
     const health = await fetch(new URL("/health", startup.url));
-    const healthBody = await health.json() as { readonly ok?: boolean; readonly service?: string };
 
-    if (!health.ok || healthBody.ok !== true || healthBody.service !== "bgcut-local") {
+    const healthBody = Schema.decodeUnknownSync(LocalServerHealth)(
+      await health.json(),
+    );
+
+    if (!health.ok || !healthBody.ok) {
       throw new Error(`Packaged bgcut health route failed at ${startup.url}health.`);
     }
   } finally {
