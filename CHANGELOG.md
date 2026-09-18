@@ -6,6 +6,16 @@ bgcut is in beta. Beta releases use the npm `beta` tag and GitHub prereleases. N
 
 ## Unreleased
 
+## 0.2.0-beta.0 - 2026-09-18
+
+- Shipped the production `bgcut.dev` experience on Cloudflare Workers with the BiRefNet model and ONNX Runtime payloads served same-origin from private R2.
+- Hardened Cloudflare deployment so the pinned runtime files are seeded before production deploys and local/CI smoke checks verify the Worker and R2 routes.
+- Added Worker observability configuration for logs, invocation logs, traces, Issues, persistence, 100% sampling during beta traffic, and query-string redaction.
+- Added the approved bgcut brand mark across the in-app header, favicon, Apple touch icon, web app icons, manifest, and social preview.
+- Added canonical, search, Open Graph, Twitter, robots, sitemap, and structured metadata for `bgcut.dev`.
+- Branded the repository README with the bgcut icon and a live product screenshot, with image URLs that also render correctly on npm.
+- Cleaned stale repository infrastructure and documentation, closed obsolete benchmark PRs, removed duplicate feature-branch CI runs, and aligned deployment docs with the current R2 architecture.
+
 ## 0.1.0-beta.2 - 2026-09-17
 
 - Added repository-driven npm Trusted Publishing and GitHub release automation.
