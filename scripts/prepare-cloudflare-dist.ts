@@ -22,17 +22,18 @@ const walkFiles = async (directory: string): Promise<readonly string[]> => {
   return files;
 };
 
-const isOrtWasmBinary = (name: string): boolean =>
-  name.includes("ort-wasm-") && name.endsWith(".wasm");
+const isOrtRuntimeAsset = (name: string): boolean =>
+  name.includes("ort-wasm-") &&
+  (name.endsWith(".wasm") || name.endsWith(".mjs"));
 
 const initialFiles = await walkFiles(distDirectory);
 
 for (const path of initialFiles) {
   const name = relative(distDirectory, path);
 
-  if (isOrtWasmBinary(name)) {
+  if (isOrtRuntimeAsset(name)) {
     await rm(path);
-    console.log(`Removed R2-backed ORT binary ${name} from Cloudflare Static Assets.`);
+    console.log(`Removed R2-backed ORT runtime asset ${name} from Cloudflare Static Assets.`);
   }
 }
 
@@ -58,14 +59,14 @@ if (deployFiles.some((path) => relative(distDirectory, path).startsWith("models/
   throw new Error("Cloudflare builds must serve the model from R2, not Workers Static Assets.");
 }
 
-const leakedOrtWasm = deployFiles
+const leakedOrtRuntime = deployFiles
   .map((path) => relative(distDirectory, path))
-  .filter(isOrtWasmBinary);
+  .filter(isOrtRuntimeAsset);
 
-if (leakedOrtWasm.length > 0) {
+if (leakedOrtRuntime.length > 0) {
   throw new Error(
-    `Cloudflare builds must serve ONNX Runtime WASM binaries from R2. Leaked files: ${leakedOrtWasm.join(", ")}`,
+    `Cloudflare builds must serve ONNX Runtime assets from R2. Leaked files: ${leakedOrtRuntime.join(", ")}`,
   );
 }
 
-console.log(`Cloudflare UI asset check passed for ${deployFiles.length} files.`);
+console.log(`Cloudflare app asset check passed for ${deployFiles.length} files.`);
