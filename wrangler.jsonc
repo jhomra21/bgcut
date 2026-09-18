@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "bgcut",
   "main": "worker/index.ts",
-  "compatibility_date": "2026-09-17",
+  "compatibility_date": "2026-09-18",
   "workers_dev": true,
   "preview_urls": true,
   "build": {
@@ -32,20 +32,20 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
-    "issues": {
-      "enabled": true
-    },
+    "redact_query_string": true,
     "logs": {
       "enabled": true,
       "invocation_logs": true,
       "head_sampling_rate": 1,
       "persist": true
     },
-    "redact_query_string": true,
     "traces": {
       "enabled": true,
       "head_sampling_rate": 1,
       "persist": true
+    },
+    "issues": {
+      "enabled": true
     }
   }
 }

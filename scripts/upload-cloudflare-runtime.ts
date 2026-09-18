@@ -6,7 +6,7 @@ import {
   ORT_WEBGPU_WASM_FILENAME,
 } from "../src/engine/ort-webgpu-runtime";
 
-const WRANGLER_VERSION = "4.133.0";
+const WRANGLER_VERSION = "4.135.0";
 
 const BUCKET = "bgcut-models";
 

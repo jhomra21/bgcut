@@ -141,13 +141,13 @@ The three ONNX Runtime files are uploaded automatically by `bun run cloudflare:d
 Authenticate Wrangler on an operator machine:
 
 ```sh
-bunx wrangler@4.133.0 login
+bunx wrangler@4.135.0 login
 ```
 
 Create the bucket only if it does not already exist:
 
 ```sh
-bunx wrangler@4.133.0 r2 bucket create bgcut-models
+bunx wrangler@4.135.0 r2 bucket create bgcut-models
 ```
 
 Prepare the exact validated model:
@@ -159,7 +159,7 @@ bun run model:prepare
 Upload the model:
 
 ```sh
-bunx wrangler@4.133.0 r2 object put \
+bunx wrangler@4.135.0 r2 object put \
   bgcut-models/birefnet-lite-512-ort-basic-webgpu-v2.onnx \
   --file public/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx \
   --content-type application/octet-stream \
@@ -170,21 +170,21 @@ bunx wrangler@4.133.0 r2 object put \
 Upload the pinned ONNX Runtime files:
 
 ```sh
-bunx wrangler@4.133.0 r2 object put \
+bunx wrangler@4.135.0 r2 object put \
   bgcut-models/ort-wasm-simd-threaded.asyncify.wasm \
   --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm \
   --content-type application/wasm \
   --cache-control 'public, max-age=31536000, immutable' \
   --remote
 
-bunx wrangler@4.133.0 r2 object put \
+bunx wrangler@4.135.0 r2 object put \
   bgcut-models/ort-wasm-simd-threaded.wasm \
   --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm \
   --content-type application/wasm \
   --cache-control 'public, max-age=31536000, immutable' \
   --remote
 
-bunx wrangler@4.133.0 r2 object put \
+bunx wrangler@4.135.0 r2 object put \
   bgcut-models/ort-wasm-simd-threaded.mjs \
   --file node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs \
   --content-type text/javascript \
@@ -195,7 +195,7 @@ bunx wrangler@4.133.0 r2 object put \
 Verify the model:
 
 ```sh
-bunx wrangler@4.133.0 r2 object get \
+bunx wrangler@4.135.0 r2 object get \
   bgcut-models/birefnet-lite-512-ort-basic-webgpu-v2.onnx \
   --remote \
   --pipe | shasum -a 256
