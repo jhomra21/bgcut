@@ -8,17 +8,27 @@ import {
 
 const releaseModelUrl = new URL(MODEL_RELEASE_URL);
 
-export default defineConfig(({ mode }) => ({
-  plugins: [solid()],
-  publicDir: mode === "cloudflare" ? false : "public",
-  server: {
-    proxy: {
-      [MODEL_PUBLIC_PATH]: {
-        target: releaseModelUrl.origin,
-        changeOrigin: true,
-        followRedirects: true,
-        rewrite: () => releaseModelUrl.pathname,
+export default defineConfig(({ mode }) => {
+  const externalAssetHost = mode === "cloudflare" || mode === "package";
+
+  return {
+    plugins: [solid()],
+    publicDir: externalAssetHost ? false : "public",
+    build: mode === "package"
+      ? {
+          outDir: "dist/web",
+          emptyOutDir: true,
+        }
+      : undefined,
+    server: {
+      proxy: {
+        [MODEL_PUBLIC_PATH]: {
+          target: releaseModelUrl.origin,
+          changeOrigin: true,
+          followRedirects: true,
+          rewrite: () => releaseModelUrl.pathname,
+        },
       },
     },
-  },
-}));
+  };
+});
