@@ -306,9 +306,12 @@ try {
   if (
     !skill.includes("name: bgcut") ||
     !skill.includes("npx bgcut input.jpg") ||
+    !skill.includes("bgcut serve --json") ||
+    !skill.includes('import { createBgcut } from "bgcut"') ||
+    !skill.includes("share the same validated model cache") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
-    throw new Error(`Installed bgcut agent skill is missing its current Node install contract: ${skillPath}`);
+    throw new Error(`Installed bgcut agent skill is missing its current package contract: ${skillPath}`);
   }
 
   console.log(
