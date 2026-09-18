@@ -7,8 +7,11 @@ import {
 } from "../src/engine/ort-webgpu-runtime";
 
 const WRANGLER_VERSION = "4.133.0";
+
 const BUCKET = "bgcut-models";
+
 const CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 const runtimeDirectory = resolve(
   import.meta.dir,
   "../node_modules/onnxruntime-web/dist",
