@@ -16,25 +16,29 @@ describe("Cloudflare runtime routing", () => {
     expect(wranglerConfig).toContain('"/runtime/*"');
   });
 
-  test("serves both ONNX Runtime binaries with the WebAssembly MIME type", () => {
+  test("serves both WASM binaries and the module loader from R2", () => {
     expect(workerSource).toContain("ORT_WEBGPU_WASM_FILENAME");
     expect(workerSource).toContain("ORT_WASM_FILENAME");
+    expect(workerSource).toContain("ORT_WASM_MODULE_FILENAME");
     expect(workerSource).toContain('"application/wasm"');
+    expect(workerSource).toContain('"text/javascript; charset=utf-8"');
   });
 
-  test("seeds both pinned ONNX Runtime binaries into local R2", () => {
+  test("seeds all pinned ONNX Runtime files into local R2", () => {
     expect(packageSource).toContain('"cloudflare:runtime:local"');
     expect(packageSource).toContain("ort-wasm-simd-threaded.asyncify.wasm");
     expect(packageSource).toContain("ort-wasm-simd-threaded.wasm");
+    expect(packageSource).toContain("ort-wasm-simd-threaded.mjs");
     expect(packageSource).toContain("--content-type application/wasm");
+    expect(packageSource).toContain("--content-type text/javascript");
     expect(packageSource).toContain('"cloudflare:r2:local"');
     expect(packageSource).toContain("cloudflare:model:local");
   });
 
-  test("keeps ONNX Runtime wasm binaries out of Workers Static Assets", () => {
-    expect(cloudflareBuildSource).toContain("isOrtWasmBinary");
+  test("keeps discrete ONNX Runtime assets out of Workers Static Assets", () => {
+    expect(cloudflareBuildSource).toContain("isOrtRuntimeAsset");
     expect(cloudflareBuildSource).toContain(
-      "Cloudflare builds must serve ONNX Runtime WASM binaries from R2",
+      "Cloudflare builds must serve ONNX Runtime assets from R2",
     );
   });
 });
