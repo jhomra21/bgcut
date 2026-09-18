@@ -18,12 +18,34 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/models/*", "/runtime/*"]
+    "run_worker_first": [
+      "/models/*",
+      "/runtime/*"
+    ]
   },
   "r2_buckets": [
     {
       "binding": "MODELS",
       "bucket_name": "bgcut-models"
     }
-  ]
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "issues": {
+      "enabled": true
+    },
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 1,
+      "persist": true
+    },
+    "redact_query_string": true,
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true
+    }
+  }
 }
