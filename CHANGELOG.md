@@ -2,9 +2,15 @@
 
 User-facing changes to bgcut are listed here.
 
-bgcut is in beta. Beta releases use the npm `beta` tag and GitHub prereleases. No stable release exists yet.
+Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prereleases use explicit prerelease tags such as `beta`.
 
 ## Unreleased
+
+## 0.2.0 - 2026-09-18
+
+- Promoted the accepted `0.2.0-beta.0` build to the stable `latest` channel with no runtime or inference changes.
+- Updated npm-facing documentation and the bundled agent skill to use stable install commands.
+- Kept the production `bgcut.dev` Cloudflare Worker, private R2 model/runtime delivery, observability, branding, metadata, and repository cleanup from `0.2.0-beta.0`.
 
 ## 0.2.0-beta.0 - 2026-09-18
 
