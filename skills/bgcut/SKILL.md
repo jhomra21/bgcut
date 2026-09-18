@@ -12,6 +12,12 @@ Use `bgcut` to remove an image background on the user's machine. The CLI runs in
 Run without a global install:
 
 ```sh
+npx bgcut input.jpg
+```
+
+Bun users can run the same package with:
+
+```sh
 bunx bgcut input.jpg
 ```
 
@@ -22,7 +28,7 @@ npm install -g bgcut
 bgcut input.jpg
 ```
 
-The installed CLI currently requires Bun.
+The published executable is built for Node. npm and npx users do not need Bun installed.
 
 ## Basic command
 
