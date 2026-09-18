@@ -6,7 +6,7 @@ bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing 
 
 bgcut is in beta.
 
-- Versions such as `0.1.0-beta.2` publish to npm `beta` and create GitHub prereleases.
+- Versions such as `0.2.0-beta.0` publish to npm `beta` and create GitHub prereleases.
 - Stable versions have no prerelease suffix. They publish to npm `latest` and create normal GitHub releases.
 - Do not publish a stable version until the browser UI and its acceptance criteria are ready.
 
@@ -95,7 +95,7 @@ bun run check
 8. Use this merge title form:
 
 ```text
-chore(release): bgcut v0.1.0-beta.2
+chore(release): bgcut v0.2.0-beta.0
 ```
 
 The merge to `main` starts npm publication and GitHub prerelease creation.
