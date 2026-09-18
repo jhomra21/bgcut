@@ -3,22 +3,15 @@ import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
 import ComparisonSlider from "./components/ComparisonSlider";
-import { formatBackgroundRemovalError, formatGpuRuntimeError, formatImageError } from "./engine/errors";
-import { removeBackground, type BrowserInferenceEngine } from "./engine/inference";
+import { formatBackgroundRemovalError, formatImageError } from "./engine/errors";
+import { removeBackground } from "./engine/inference";
 import { decodeImage } from "./engine/image";
-import { checkGpuCapability, type GpuCapability } from "./engine/runtime";
-import type { RemovalTimings } from "./engine/timing";
-
-type GpuState =
-  | { readonly status: "checking" }
-  | { readonly status: "ready"; readonly capability: GpuCapability }
-  | { readonly status: "error"; readonly message: string };
 
 type ReadyImage = {
   readonly status: "ready";
-  readonly name: string;
   readonly width: number;
   readonly height: number;
+  readonly name: string;
   readonly url: string;
 };
 
@@ -29,13 +22,9 @@ type ImageState =
 
 type ReadyResult = {
   readonly status: "ready";
+  readonly blob: Blob;
   readonly url: string;
   readonly downloadName: string;
-  readonly width: number;
-  readonly height: number;
-  readonly modelRevision: string;
-  readonly engine: BrowserInferenceEngine;
-  readonly timings: RemovalTimings;
 };
 
 type ResultState =
@@ -44,21 +33,6 @@ type ResultState =
   | ReadyResult
   | { readonly status: "error"; readonly message: string };
 
-type ReferenceState =
-  | { readonly status: "empty" }
-  | ReadyImage
-  | { readonly status: "error"; readonly message: string };
-
-type RuntimeCheckProps = {
-  readonly label: string;
-  readonly passed: boolean;
-};
-
-type TimingRowProps = {
-  readonly label: string;
-  readonly value: number;
-};
-
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
   const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
@@ -66,39 +40,15 @@ const transparentName = (fileName: string): string => {
   return `${baseName || "image"}-transparent.png`;
 };
 
-const formatTiming = (milliseconds: number): string => {
-  if (milliseconds < 10) {
-    return `${milliseconds.toFixed(1)} ms`;
-  }
-
-  return `${Math.round(milliseconds)} ms`;
-};
-
 const App = () => {
-  const [gpuState, setGpuState] = createSignal<GpuState>({ status: "checking" });
   const [imageState, setImageState] = createSignal<ImageState>({ status: "empty" });
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
-  const [referenceState, setReferenceState] = createSignal<ReferenceState>({ status: "empty" });
-  const [selectedFile, setSelectedFile] = createSignal<File>();
+  const [copyState, setCopyState] = createSignal<"idle" | "copied" | "error">("idle");
   let fileInput: HTMLInputElement | undefined;
-  let referenceInput: HTMLInputElement | undefined;
+  let activeSourceFile: File | undefined;
   let activeSourceUrl: string | undefined;
   let activeResultUrl: string | undefined;
-  let activeReferenceUrl: string | undefined;
   let selectionVersion = 0;
-  let referenceVersion = 0;
-
-  const readyGpu = (): GpuCapability | undefined => {
-    const state = gpuState();
-
-    return state.status === "ready" ? state.capability : undefined;
-  };
-
-  const gpuError = (): string | undefined => {
-    const state = gpuState();
-
-    return state.status === "error" ? state.message : undefined;
-  };
 
   const readyImage = (): ReadyImage | undefined => {
     const state = imageState();
@@ -124,21 +74,7 @@ const App = () => {
     return state.status === "error" ? state.message : undefined;
   };
 
-  const readyReference = (): ReadyImage | undefined => {
-    const state = referenceState();
-
-    return state.status === "ready" ? state : undefined;
-  };
-
-  const referenceError = (): string | undefined => {
-    const state = referenceState();
-
-    return state.status === "error" ? state.message : undefined;
-  };
-
   const processing = (): boolean => resultState().status === "processing";
-
-  const runtimeChecking = (): boolean => gpuState().status === "checking";
 
   const clearResult = () => {
     if (activeResultUrl !== undefined) {
@@ -147,140 +83,27 @@ const App = () => {
     }
 
     setResultState({ status: "idle" });
+    setCopyState("idle");
   };
 
-  const clearReference = () => {
-    referenceVersion += 1;
-
-    if (activeReferenceUrl !== undefined) {
-      URL.revokeObjectURL(activeReferenceUrl);
-      activeReferenceUrl = undefined;
-    }
-
-    setReferenceState({ status: "empty" });
-  };
-
-  const initializeGpu = () => {
-    setGpuState({ status: "checking" });
-
-    void Effect.runPromise(
-      checkGpuCapability.pipe(
-        Effect.match({
-          onFailure: (error) => setGpuState({ status: "error", message: formatGpuRuntimeError(error) }),
-          onSuccess: (capability) => setGpuState({ status: "ready", capability }),
-        }),
-      ),
-    );
-  };
-
-  const selectImage = (file: File) => {
-    if (processing()) {
-      return;
-    }
-
+  const reset = () => {
     selectionVersion += 1;
-    const version = selectionVersion;
     clearResult();
-    clearReference();
-    setSelectedFile(undefined);
-    setImageState({ status: "empty" });
 
     if (activeSourceUrl !== undefined) {
       URL.revokeObjectURL(activeSourceUrl);
       activeSourceUrl = undefined;
     }
 
-    void Effect.runPromise(
-      decodeImage(file).pipe(
-        Effect.match({
-          onFailure: (error) => {
-            if (version === selectionVersion) {
-              setSelectedFile(undefined);
-              setImageState({ status: "error", message: formatImageError(error) });
-            }
-          },
-          onSuccess: (decoded) => {
-            if (version !== selectionVersion) {
-              return;
-            }
+    activeSourceFile = undefined;
+    setImageState({ status: "empty" });
 
-            activeSourceUrl = URL.createObjectURL(file);
-            setSelectedFile(file);
-            setImageState({
-              status: "ready",
-              name: file.name,
-              width: decoded.width,
-              height: decoded.height,
-              url: activeSourceUrl,
-            });
-          },
-        }),
-      ),
-    );
+    if (fileInput !== undefined) {
+      fileInput.value = "";
+    }
   };
 
-  const selectReference = (file: File) => {
-    const result = readyResult();
-
-    if (result === undefined) {
-      return;
-    }
-
-    referenceVersion += 1;
-    const version = referenceVersion;
-
-    if (activeReferenceUrl !== undefined) {
-      URL.revokeObjectURL(activeReferenceUrl);
-      activeReferenceUrl = undefined;
-    }
-
-    setReferenceState({ status: "empty" });
-
-    void Effect.runPromise(
-      decodeImage(file).pipe(
-        Effect.match({
-          onFailure: (error) => {
-            if (version === referenceVersion) {
-              setReferenceState({ status: "error", message: formatImageError(error) });
-            }
-          },
-          onSuccess: (decoded) => {
-            if (version !== referenceVersion) {
-              return;
-            }
-
-            if (decoded.width !== result.width || decoded.height !== result.height) {
-              setReferenceState({
-                status: "error",
-                message: `The BG0 reference is ${decoded.width} × ${decoded.height}; use a ${result.width} × ${result.height} result for pixel-aligned comparison.`,
-              });
-
-              return;
-            }
-
-            activeReferenceUrl = URL.createObjectURL(file);
-            setReferenceState({
-              status: "ready",
-              name: file.name,
-              width: decoded.width,
-              height: decoded.height,
-              url: activeReferenceUrl,
-            });
-          },
-        }),
-      ),
-    );
-  };
-
-  const runRemoval = () => {
-    const file = selectedFile();
-
-    if (file === undefined || processing()) {
-      return;
-    }
-
-    const version = selectionVersion;
-    clearResult();
+  const runRemoval = (file: File, version: number) => {
     setResultState({ status: "processing" });
 
     void Effect.runPromise(
@@ -299,13 +122,9 @@ const App = () => {
             activeResultUrl = URL.createObjectURL(result.blob);
             setResultState({
               status: "ready",
+              blob: result.blob,
               url: activeResultUrl,
               downloadName: transparentName(file.name),
-              width: result.width,
-              height: result.height,
-              modelRevision: result.modelRevision,
-              engine: result.engine,
-              timings: result.timings,
             });
           },
         }),
@@ -313,8 +132,108 @@ const App = () => {
     );
   };
 
+  const selectImage = (file: File) => {
+    if (processing()) {
+      return;
+    }
+
+    selectionVersion += 1;
+    const version = selectionVersion;
+    clearResult();
+    setImageState({ status: "empty" });
+
+    if (activeSourceUrl !== undefined) {
+      URL.revokeObjectURL(activeSourceUrl);
+      activeSourceUrl = undefined;
+    }
+
+    activeSourceFile = undefined;
+
+    void Effect.runPromise(
+      decodeImage(file).pipe(
+        Effect.match({
+          onFailure: (error) => {
+            if (version === selectionVersion) {
+              setImageState({ status: "error", message: formatImageError(error) });
+            }
+          },
+          onSuccess: (dimensions) => {
+            if (version !== selectionVersion) {
+              return;
+            }
+
+            activeSourceUrl = URL.createObjectURL(file);
+            activeSourceFile = file;
+            setImageState({
+              status: "ready",
+              width: dimensions.width,
+              height: dimensions.height,
+              name: file.name,
+              url: activeSourceUrl,
+            });
+            runRemoval(file, version);
+          },
+        }),
+      ),
+    );
+  };
+
+  const copyResult = (result: ReadyResult) => {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      setCopyState("error");
+
+      return;
+    }
+
+    void navigator.clipboard
+      .write([new ClipboardItem({ "image/png": result.blob })])
+      .then(() => setCopyState("copied"))
+      .catch(() => setCopyState("error"));
+  };
+
+  const copyLabel = (): string => {
+    const state = copyState();
+
+    if (state === "copied") {
+      return "Copied";
+    }
+
+    if (state === "error") {
+      return "Copy failed";
+    }
+
+    return "Copy";
+  };
+
+  const redo = () => {
+    if (activeSourceFile === undefined || processing()) {
+      return;
+    }
+
+    clearResult();
+    runRemoval(activeSourceFile, selectionVersion);
+  };
+
+  const chooseNewImage = () => {
+    reset();
+    fileInput?.click();
+  };
+
+  const handleSurfaceClick = (event: MouseEvent) => {
+    if (readyImage() !== undefined || event.target !== event.currentTarget) {
+      return;
+    }
+
+    fileInput?.click();
+  };
+
   const handleDrop = (event: DragEvent) => {
     event.preventDefault();
+
+    if (processing()) {
+      return;
+    }
+
     const file = event.dataTransfer?.files.item(0);
 
     if (file !== null && file !== undefined) {
@@ -333,330 +252,133 @@ const App = () => {
 
     if (file !== null && file !== undefined) {
       selectImage(file);
-      input.value = "";
     }
   };
 
-  const handleReferenceInput = (event: Event) => {
-    const input = event.currentTarget;
+  onSettled(() => () => {
+    selectionVersion += 1;
 
-    if (!(input instanceof HTMLInputElement)) {
-      return;
+    if (activeSourceUrl !== undefined) {
+      URL.revokeObjectURL(activeSourceUrl);
     }
 
-    const file = input.files?.item(0);
-
-    if (file !== null && file !== undefined) {
-      selectReference(file);
-      input.value = "";
+    if (activeResultUrl !== undefined) {
+      URL.revokeObjectURL(activeResultUrl);
     }
-  };
 
-  onSettled(() => {
-    initializeGpu();
-
-    return () => {
-      selectionVersion += 1;
-      referenceVersion += 1;
-
-      if (activeSourceUrl !== undefined) {
-        URL.revokeObjectURL(activeSourceUrl);
-      }
-
-      if (activeResultUrl !== undefined) {
-        URL.revokeObjectURL(activeResultUrl);
-      }
-
-      if (activeReferenceUrl !== undefined) {
-        URL.revokeObjectURL(activeReferenceUrl);
-      }
-    };
+    activeSourceFile = undefined;
   });
 
   return (
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">LOCAL IMAGE TOOL</p>
-          <h1>bgcut</h1>
-        </div>
-        <div class="privacy-pill">Runs in your browser</div>
+    <main class="app-shell">
+      <header class="app-header">
+        <h1>bgcut</h1>
+        <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
+          GitHub
+        </a>
       </header>
 
-      <section class="workspace">
-        <div
-          class="drop-zone"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => {
-            if (!processing()) {
-              fileInput?.click();
-            }
+      <section
+        class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
+        onClick={handleSurfaceClick}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
+      >
+        <input
+          ref={(element) => {
+            fileInput = element;
           }}
-          role="button"
-          tabindex={0}
-          onKeyDown={(event) => {
-            if (!processing() && (event.key === "Enter" || event.key === " ")) {
-              fileInput?.click();
-            }
-          }}
+          id="source-file-input"
+          class="file-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/avif"
+          aria-label="Choose image"
+          onChange={handleFileInput}
+        />
+
+        <Show
+          keyed
+          when={readyImage()}
+          fallback={
+            <button class="drop-trigger" type="button" onClick={() => fileInput?.click()}>
+              Click or drag image here
+            </button>
+          }
         >
-          <input
-            ref={(element) => {
-              fileInput = element;
-            }}
-            id="source-file-input"
-            class="file-input"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/avif"
-            aria-label="Choose source image"
-            onClick={(event) => event.stopPropagation()}
-            onChange={handleFileInput}
-          />
-          <input
-            ref={(element) => {
-              referenceInput = element;
-            }}
-            id="reference-file-input"
-            class="file-input"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/avif"
-            aria-label="Choose BG0 comparison image"
-            onClick={(event) => event.stopPropagation()}
-            onChange={handleReferenceInput}
-          />
-
-          <Show keyed when={readyImage()} fallback={<DropCopy />}>
-            {(image) => (
-              <div class="preview-wrap" onClick={(event) => event.stopPropagation()}>
-                <Show
-                  keyed
-                  when={readyResult()}
-                  fallback={
-                    <figure class="image-card">
-                      <div class="image-stage checkerboard">
-                        <img class="preview" src={image.url} alt={image.name} />
-                      </div>
-                      <figcaption>Original</figcaption>
-                    </figure>
-                  }
-                >
-                  {(result) => (
-                    <>
-                      <Show
-                        keyed
-                        when={readyReference()}
-                        fallback={
-                          <>
-                            <ComparisonSlider
-                              leftSrc={image.url}
-                              rightSrc={result.url}
-                              leftAlt={`Original ${image.name}`}
-                              rightAlt={`${image.name} with background removed by this build`}
-                              leftLabel="Original"
-                              rightLabel="Background removed"
-                            />
-
-                            <div class="reference-actions">
-                              <button class="ghost-button" type="button" onClick={() => referenceInput?.click()}>
-                                Load BG0 output
-                              </button>
-                              <span class="reference-note">Reference files stay local and must match the source dimensions.</span>
-                            </div>
-                          </>
-                        }
-                      >
-                        {(reference) => (
-                          <>
-                            <ComparisonSlider
-                              leftSrc={reference.url}
-                              rightSrc={result.url}
-                              leftAlt={`BG0 result ${reference.name}`}
-                              rightAlt={`${image.name} with background removed by this build`}
-                              leftLabel={`BG0 · ${reference.name}`}
-                              rightLabel="This build"
-                            />
-
-                            <div class="reference-actions">
-                              <button class="ghost-button" type="button" onClick={() => referenceInput?.click()}>
-                                Replace BG0 output
-                              </button>
-                              <button class="ghost-button" type="button" onClick={clearReference}>Clear BG0 output</button>
-                              <span class="reference-note">Reference files stay local and must match the source dimensions.</span>
-                            </div>
-                          </>
-                        )}
-                      </Show>
-
-                      <Show keyed when={referenceError()}>
-                        {(message) => <div class="error-card result-error">{message}</div>}
-                      </Show>
-                    </>
-                  )}
-                </Show>
-
-                <div class="image-meta">
-                  <span>{image.name}</span>
-                  <span>{image.width} × {image.height}</span>
-                </div>
-
-                <div class="image-actions">
-                  <button class="ghost-button" type="button" disabled={processing()} onClick={() => fileInput?.click()}>
-                    Change image
-                  </button>
-                  <button
-                    class="primary-button"
-                    type="button"
-                    disabled={processing() || runtimeChecking()}
-                    onClick={runRemoval}
+          {(image) => (
+            <div class="result-flow">
+              <Show
+                keyed
+                when={readyResult()}
+                fallback={
+                  <div
+                    class="image-stage"
+                    style={`--image-aspect-ratio: ${image.width} / ${image.height};`}
                   >
-                    {processing() ? "Removing…" : readyResult() === undefined ? "Remove background" : "Run again"}
-                  </button>
-                  <Show keyed when={readyResult()}>
-                    {(result) => (
-                      <a class="download-button" href={result.url} download={result.downloadName}>
-                        Download PNG
-                      </a>
-                    )}
-                  </Show>
-                </div>
-
-                <Show when={processing()}>
-                  <div class="processing-card">
-                    <div class="activity-bar" />
-                    <div>
-                      <strong>Running BiRefNet locally</strong>
-                      <p>The first run downloads the pinned fp32 model (~187 MB). Later runs can use the browser cache.</p>
-                    </div>
+                    <img class="preview-image" src={image.url} alt={image.name} />
+                    <Show when={processing()}>
+                      <div class="processing-label" role="status">Removing background...</div>
+                    </Show>
                   </div>
-                </Show>
-
-                <Show keyed when={resultError()}>
-                  {(message) => <div class="error-card result-error">{message}</div>}
-                </Show>
-              </div>
-            )}
-          </Show>
-        </div>
-
-        <aside class="diagnostics">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">RUNTIME</p>
-              <h2>Execution path</h2>
-            </div>
-            <button class="ghost-button" type="button" disabled={processing()} onClick={initializeGpu}>Retry</button>
-          </div>
-
-          <Show
-            keyed
-            when={readyGpu()}
-            fallback={
-              <Show keyed when={gpuError()} fallback={<p class="status-copy">Checking WebGPU support…</p>}>
-                {(message) => (
-                  <div class="model-card compatibility-card">
-                    <p class="eyebrow">COMPATIBILITY</p>
-                    <strong>WebAssembly fallback ready</strong>
-                    <span>{message}</span>
-                    <span>Images still stay in this browser; inference runs locally on the CPU.</span>
-                  </div>
+                }
+              >
+                {(result) => (
+                  <ComparisonSlider
+                    leftSrc={image.url}
+                    rightSrc={result.url}
+                    leftAlt={`Original ${image.name}`}
+                    rightAlt={`${image.name} with background removed`}
+                    aspectRatio={`${image.width} / ${image.height}`}
+                  />
                 )}
               </Show>
-            }
-          >
-            {(capability) => (
-              <div class="checks">
-                <RuntimeCheck label="WebGPU device" passed={capability.webGpu} />
-                <RuntimeCheck label="TypeGPU root" passed={capability.typeGpu} />
-                <RuntimeCheck label="TypeGPU shares device" passed={capability.typeGpuUsesSharedDevice} />
-              </div>
-            )}
-          </Show>
 
-          <div class="model-card">
-            <p class="eyebrow">MODEL</p>
-            <strong>BiRefNet Lite · 512 · fp32</strong>
-            <span>Pinned revision 4a3c40c</span>
-            <span>ONNX Runtime Web 1.30.0 · WebGPU preferred · WebAssembly fallback</span>
-            <span>Inference at 512² · export at source resolution</span>
-          </div>
+              <Show keyed when={resultError()}>
+                {(message) => <div class="error-card">{message}</div>}
+              </Show>
 
-          <Show keyed when={readyResult()}>
-            {(result) => (
-              <>
-                <div class="success-card">
-                  <strong>Transparent PNG ready</strong>
-                  <span>{result.width} × {result.height}</span>
-                  <span>{result.engine === "webgpu" ? "WebGPU" : "WebAssembly fallback"}</span>
-                  <span>{formatTiming(result.timings.totalMs)} total</span>
-                </div>
-
-                <div class="timing-card">
-                  <div class="timing-heading">
-                    <div>
-                      <p class="eyebrow">BASELINE</p>
-                      <strong>Pipeline timing</strong>
+              <div class="result-actions">
+                <button
+                  class="text-button"
+                  type="button"
+                  disabled={processing()}
+                  onClick={chooseNewImage}
+                >
+                  New Image
+                </button>
+                <Show keyed when={readyResult()}>
+                  {(result) => (
+                    <div class="result-action-group">
+                      <button class="text-button" type="button" onClick={() => copyResult(result)}>
+                        {copyLabel()}
+                      </button>
+                      <a class="download-button" href={result.url} download={result.downloadName}>
+                        Download
+                      </a>
+                      <button class="text-button" type="button" onClick={redo}>
+                        Redo
+                      </button>
                     </div>
-                    <span>{result.timings.sessionReused ? "warm session" : "cold session"}</span>
-                  </div>
+                  )}
+                </Show>
+              </div>
+            </div>
+          )}
+        </Show>
 
-                  <div class="timing-grid">
-                    <TimingRow label="Decode" value={result.timings.decodeMs} />
-                    <TimingRow label="Runtime" value={result.timings.runtimeMs} />
-                    <TimingRow label="Model fetch" value={result.timings.modelDownloadMs} />
-                    <TimingRow label="Session init" value={result.timings.sessionInitMs} />
-                    <TimingRow label="Preprocess" value={result.timings.preprocessMs} />
-                    <Show when={result.engine === "webgpu"}>
-                      <TimingRow label="GPU prep enqueue" value={result.timings.inputUploadMs} />
-                    </Show>
-                    <TimingRow label="Inference" value={result.timings.inferenceMs} />
-                    <Show when={result.engine === "webgpu"}>
-                      <TimingRow label="GPU readback" value={result.timings.outputReadbackMs} />
-                    </Show>
-                    <TimingRow label="Matte" value={result.timings.matteMs} />
-                    <TimingRow label="Composite" value={result.timings.compositeMs} />
-                    <TimingRow label="PNG export" value={result.timings.exportMs} />
-                  </div>
-                </div>
-              </>
-            )}
-          </Show>
-
-          <div class="milestone-note">
-            WebGPU remains the preferred fast path: TypeGPU shares the ONNX Runtime device and graph capture preserves the accepted GPU pipeline. If WebGPU, its device, session creation, or GPU inference is unavailable, the same pinned model can run through ONNX Runtime WebAssembly instead. Canvas 2D remains the source-resolution matte compositing and PNG export path for both engines.
-          </div>
-        </aside>
+        <Show keyed when={imageError()}>
+          {(message) => (
+            <div class="empty-error">
+              <div class="error-card">{message}</div>
+              <button class="text-button" type="button" onClick={() => fileInput?.click()}>
+                Choose another image
+              </button>
+            </div>
+          )}
+        </Show>
       </section>
-
-      <Show keyed when={imageError()}>
-        {(message) => <div class="global-error">{message}</div>}
-      </Show>
     </main>
   );
 };
-
-const DropCopy = () => (
-  <div class="drop-copy">
-    <div class="drop-icon" aria-hidden="true">↗</div>
-    <h2>Drop an image</h2>
-    <p>PNG, JPEG, WebP, or AVIF. Inference and image processing stay in this browser.</p>
-    <button class="primary-button" type="button">Choose image</button>
-  </div>
-);
-
-const RuntimeCheck = (props: RuntimeCheckProps) => (
-  <div class="runtime-check">
-    <span class={props.passed ? "check-dot passed" : "check-dot failed"} />
-    <span>{props.label}</span>
-    <strong>{props.passed ? "ready" : "failed"}</strong>
-  </div>
-);
-
-const TimingRow = (props: TimingRowProps) => (
-  <div class="timing-row">
-    <span>{props.label}</span>
-    <strong>{formatTiming(props.value)}</strong>
-  </div>
-);
 
 export default App;

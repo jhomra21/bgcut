@@ -1,6 +1,7 @@
 node_modules
 dist
 public/models/*.onnx
+.wrangler
 .DS_Store
 *.local
 .env

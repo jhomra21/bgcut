@@ -12,21 +12,20 @@ The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtim
 
 The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
-## 1. Simplify the browser UI
+The production web target is `bgcut.dev`. Workers Static Assets carry the app shell, while the ONNX model and discrete ONNX Runtime runtime files are served through the same Worker from private R2.
 
-The browser UI is the next product task and the blocker for a stable release.
+## 1. Finish the browser UI
 
-Keep the first version small:
+The normal browser flow is now limited to clicking or dropping an image, running removal automatically, comparing the original with the result, then copying, downloading, redoing, or choosing a new image. Developer diagnostics, timing tables, model details, and internal acceptance controls are not part of the product view.
 
-1. Choose or drop an image.
-2. Remove the background.
-3. Show the result clearly.
-4. Download the result.
-5. Keep diagnostics out of the main flow.
+Before stable:
 
-Do not expose internal benchmark or acceptance controls in the normal product UI.
+1. Check the current layout against the accepted sketch.
+2. Check drag and drop, keyboard use, mobile layout, processing, errors, slider interaction, copy, download, redo, and new-image behavior in a real browser.
+3. Check normal WebGPU, explicit WebGPU, and explicit WebAssembly through the local Cloudflare Worker and R2 path with a clean console.
+4. Deploy the accepted candidate to `bgcut.dev` and repeat the browser acceptance there.
 
-The UI should work well before adding editor controls, batch processing, or advanced settings.
+Do not add editor controls, batch processing, or advanced settings until this basic flow is accepted.
 
 ## 2. Define a browser engine API
 
@@ -188,6 +187,13 @@ bun install --frozen-lockfile
 bun run check
 ```
 
-Runtime changes also need exact-head browser acceptance on the affected path. Record the commit, input, browser, provider, output dimensions, warnings, errors, and measured timings when performance is part of the change.
+Web deployment changes also need:
+
+```sh
+bun run cloudflare:dry-run
+bun run cloudflare:runtime:smoke
+```
+
+Runtime changes need exact-head browser acceptance on the affected path. Record the commit, input, browser, provider, output dimensions, warnings, errors, and measured timings when performance is part of the change.
 
 Before making a performance claim, compare the same input on the same hardware and browser. Separate cold setup from warm execution and report medians when multiple runs are available.

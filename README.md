@@ -97,7 +97,11 @@ The model download sends model data to the machine. It does not send source imag
 
 ## Browser app
 
-The browser path uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
+The production domain is `bgcut.dev` once the Cloudflare deployment is accepted.
+
+The browser uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
+
+The product UI follows one small flow: click or drop an image, wait for local removal, compare the original with the result, then copy, download, redo, or choose a new image. Runtime checks, model details, timing tables, and internal acceptance controls stay out of the normal UI.
 
 The current WebGPU pipeline is:
 
@@ -111,9 +115,7 @@ image
   -> transparent PNG
 ```
 
-Production builds verify the model by exact byte count and SHA-256.
-
-The browser UI is still beta work. The next product milestone is a much smaller upload, result, and export flow before the first stable release.
+The browser UI remains beta until its visual and interaction acceptance checks are complete.
 
 ## Agent skill
 
@@ -150,6 +152,21 @@ bun run check
 
 `bun run check` runs oxlint, TypeScript, tests, the production build, package inspection, and a clean package install test. The package test verifies both the `bgcut` command and the bundled agent skill.
 
+### Cloudflare preview
+
+The production web target uses Cloudflare Workers Static Assets for the app shell and private R2 for the ONNX model plus all discrete ONNX Runtime files: the WebGPU WASM binary, fallback WASM binary, and runtime module loader. The Worker keeps `/models/...` and `/runtime/...` same-origin at `bgcut.dev`. Cloudflare Static Assets do not carry the model or discrete ONNX Runtime payloads.
+
+Run the local Cloudflare path without deploying anything:
+
+```sh
+bun run cloudflare:r2:local
+bun run cloudflare:dry-run
+bun run cloudflare:runtime:smoke
+bun run cloudflare:dev
+```
+
+See [`DEPLOYING.md`](DEPLOYING.md) for the exact local checks, one-time R2 setup, and production command.
+
 ## Releases
 
 Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
@@ -172,8 +189,8 @@ See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](
 
 ## Project notes
 
-[`BENCHMARKS.md`](BENCHMARKS.md) records measured runtime results. [`GRAPH_CAPTURE.md`](GRAPH_CAPTURE.md) records the graph-capture work behind the current browser fast path. [`IMPROVEMENTS.md`](IMPROVEMENTS.md) tracks planned engine and editor work.
+[`BENCHMARKS.md`](BENCHMARKS.md) records measured runtime results. [`GRAPH_CAPTURE.md`](GRAPH_CAPTURE.md) records the graph-capture work behind the current browser fast path. [`IMPROVEMENTS.md`](IMPROVEMENTS.md) tracks planned engine and editor work. [`DEPLOYING.md`](DEPLOYING.md) covers the Cloudflare web deployment.
 
 ## Privacy
 
-Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The model is downloaded from the pinned release artifact. Source images are not uploaded to that release or to an application inference backend.
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the app shell and reads model/runtime payloads from private R2. It does not receive source images or inference requests.

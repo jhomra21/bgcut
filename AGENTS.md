@@ -36,6 +36,21 @@
 - Prefer one shared `GPUDevice` across ONNX Runtime WebGPU and TypeGPU when the runtime contract supports it.
 - Keep model-specific behavior behind the inference boundary so the UI does not depend on ONNX details.
 - Keep public documentation focused on bgcut. Do not expose internal comparison-tool names or acceptance fixtures unless they become part of the public product contract.
+- Keep the normal browser UI limited to the user flow. Developer diagnostics and benchmark controls do not belong in the main product surface.
+
+## Web deployment policy
+
+- The production web target is `bgcut.dev` on Cloudflare Workers.
+- `wrangler.jsonc` is the source of truth for Cloudflare configuration.
+- The Vite app is served through Workers Static Assets.
+- The 187 MiB ONNX model must not be deployed as a static asset. Serve it from the private `bgcut-models` R2 bucket through the Worker at the existing `/models/...` path.
+- Serve all discrete ONNX Runtime runtime files from the same R2 bucket through `/runtime/...`: the WebGPU asyncify WASM binary, the standard WASM fallback binary, and the runtime module loader.
+- The Worker may serve application, model, and runtime bytes. It must not receive source images or perform inference.
+- `build:cloudflare` must omit `public/models`, remove discrete ONNX Runtime runtime files from Static Assets, and fail if one leaks back into the static payload.
+- Keep the standard ONNX Runtime WASM fallback as a separate compatibility path. Both runtime binaries belong in R2 even though they serve different execution paths.
+- Run `bun run cloudflare:dry-run` and `bun run cloudflare:runtime:smoke` for web deployment changes.
+- Run the local R2 and Worker path before the first production deploy. See `DEPLOYING.md`.
+- Do not deploy `bgcut.dev` to production until the exact browser candidate has passed visual and interaction acceptance.
 
 ## Release and package policy
 

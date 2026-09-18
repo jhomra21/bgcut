@@ -2,37 +2,56 @@ import { describe, expect, test } from "bun:test";
 
 const appSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
 
-const fileInputBlock = (id: string): string => {
-  const start = appSource.indexOf(`id="${id}"`);
+const sourceInputBlock = (): string => {
+  const start = appSource.indexOf('id="source-file-input"');
 
   if (start < 0) {
-    throw new Error(`Could not find ${id} in App.tsx.`);
+    throw new Error("Could not find source-file-input in App.tsx.");
   }
 
   const end = appSource.indexOf("/>", start);
 
   if (end < 0) {
-    throw new Error(`Could not find the end of ${id} in App.tsx.`);
+    throw new Error("Could not find the end of source-file-input in App.tsx.");
   }
 
   return appSource.slice(start, end);
 };
 
-describe("file picker routing", () => {
-  test("source and reference input clicks cannot bubble into the drop-zone source picker", () => {
-    const sourceInput = fileInputBlock("source-file-input");
-    const referenceInput = fileInputBlock("reference-file-input");
-    const propagationBoundary = "onClick={(event) => event.stopPropagation()}";
+describe("browser product UI", () => {
+  test("uses one image picker with the supported browser formats", () => {
+    const input = sourceInputBlock();
 
-    expect(sourceInput).toContain(propagationBoundary);
-    expect(referenceInput).toContain(propagationBoundary);
+    expect(input).toContain("image/png");
+    expect(input).toContain("image/jpeg");
+    expect(input).toContain("image/webp");
+    expect(input).toContain("image/avif");
+    expect(appSource.match(/type="file"/gu)?.length).toBe(1);
   });
 
-  test("source and reference pickers expose AVIF", () => {
-    const sourceInput = fileInputBlock("source-file-input");
-    const referenceInput = fileInputBlock("reference-file-input");
+  test("matches the minimal product flow", () => {
+    expect(appSource).toContain("<h1>bgcut</h1>");
+    expect(appSource).toContain('href="https://github.com/jhomra21/bgcut"');
+    expect(appSource).toContain("GitHub");
+    expect(appSource).toContain("Click or drag image here");
+    expect(appSource).toContain("onClick={handleSurfaceClick}");
+    expect(appSource).toContain("event.target !== event.currentTarget");
+    expect(appSource).toContain("New Image");
+    expect(appSource).toContain("Copy");
+    expect(appSource).toContain("Download");
+    expect(appSource).toContain("Redo");
+    expect(appSource).toContain("disabled={processing()}");
+    expect(appSource).not.toContain(">Reset<");
+    expect(appSource).not.toContain("Remove background");
+  });
 
-    expect(sourceInput).toContain("image/avif");
-    expect(referenceInput).toContain("image/avif");
+  test("keeps developer diagnostics and external comparison controls out of the product UI", () => {
+    const internalComparisonName = ["B", "G", "0"].join("");
+
+    expect(appSource).not.toContain("diagnostics");
+    expect(appSource).not.toContain("Pipeline timing");
+    expect(appSource).not.toContain("Execution path");
+    expect(appSource).not.toContain("reference-file-input");
+    expect(appSource).not.toContain(internalComparisonName);
   });
 });

@@ -1,8 +1,5 @@
 import { Effect } from "effect";
 import * as ort from "onnxruntime-web/wasm";
-import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.mjs?url";
-import wasmBinaryUrl from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
-
 import {
   ImageProcessingFailed,
   InferenceFailed,
@@ -15,6 +12,7 @@ import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-o
 import type { BackgroundRemovalResult } from "./inference";
 import { fetchModelBytes } from "./model-loader";
 import { MODEL_REVISION } from "./model-config";
+import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "./ort-webgpu-runtime";
 import { normalizeRgbaToNchw } from "./preprocess";
 import {
   createRemovalTimingRecorder,
@@ -33,8 +31,8 @@ const configureWasmRuntime = (): void => {
   ort.env.wasm.numThreads = globalThis.crossOriginIsolated ? 0 : 1;
   ort.env.wasm.proxy = false;
   ort.env.wasm.wasmPaths = {
-    mjs: new URL(wasmModuleUrl, globalThis.location.href).href,
-    wasm: new URL(wasmBinaryUrl, globalThis.location.href).href,
+    mjs: resolveOrtWasmModuleUrl(globalThis.location.href),
+    wasm: resolveOrtWasmUrl(globalThis.location.href),
   };
   wasmConfigured = true;
 };
