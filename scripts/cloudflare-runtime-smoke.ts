@@ -2,6 +2,8 @@ import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import {
+  ORT_WASM_FILENAME,
+  ORT_WASM_PUBLIC_PATH,
   ORT_WEBGPU_WASM_FILENAME,
   ORT_WEBGPU_WASM_PUBLIC_PATH,
 } from "../src/engine/ort-webgpu-runtime";
@@ -16,10 +18,9 @@ const repositoryRoot = resolve(import.meta.dir, "..");
 
 const smokeState = resolve(repositoryRoot, ".wrangler/smoke-state");
 
-const runtimeFile = resolve(
+const runtimeDirectory = resolve(
   repositoryRoot,
   "node_modules/onnxruntime-web/dist",
-  ORT_WEBGPU_WASM_FILENAME,
 );
 
 const run = async (command: string[]): Promise<void> => {
@@ -35,6 +36,25 @@ const run = async (command: string[]): Promise<void> => {
     throw new Error(`Command failed with exit code ${exitCode}: ${command.join(" ")}`);
   }
 };
+
+const seedRuntime = async (filename: string): Promise<void> =>
+  run([
+    "bunx",
+    `wrangler@${WRANGLER_VERSION}`,
+    "r2",
+    "object",
+    "put",
+    `bgcut-models/${filename}`,
+    "--file",
+    resolve(runtimeDirectory, filename),
+    "--content-type",
+    "application/wasm",
+    "--cache-control",
+    "public, max-age=31536000, immutable",
+    "--local",
+    "--persist-to",
+    smokeState,
+  ]);
 
 const waitForWorker = async (): Promise<void> => {
   let lastError = new Error("Worker has not responded yet.");
@@ -60,23 +80,26 @@ const waitForWorker = async (): Promise<void> => {
   });
 };
 
-const verifyRuntimeResponse = async (): Promise<void> => {
-  const response = await fetch(`${ORIGIN}${ORT_WEBGPU_WASM_PUBLIC_PATH}`);
+const verifyRuntimeResponse = async (
+  label: string,
+  publicPath: string,
+): Promise<void> => {
+  const response = await fetch(`${ORIGIN}${publicPath}`);
 
   if (!response.ok) {
-    throw new Error(`WebGPU runtime route returned HTTP ${response.status}.`);
+    throw new Error(`${label} runtime route returned HTTP ${response.status}.`);
   }
 
   const contentType = response.headers.get("content-type");
 
   if (contentType === null || !contentType.startsWith("application/wasm")) {
     throw new Error(
-      `WebGPU runtime route returned ${contentType ?? "no content type"} instead of application/wasm.`,
+      `${label} runtime route returned ${contentType ?? "no content type"} instead of application/wasm.`,
     );
   }
 
   if (response.body === null) {
-    throw new Error("WebGPU runtime route returned an empty response body.");
+    throw new Error(`${label} runtime route returned an empty response body.`);
   }
 
   const reader = response.body.getReader();
@@ -93,31 +116,15 @@ const verifyRuntimeResponse = async (): Promise<void> => {
     bytes[2] !== 0x73 ||
     bytes[3] !== 0x6d
   ) {
-    throw new Error("WebGPU runtime route did not return a WebAssembly binary.");
+    throw new Error(`${label} runtime route did not return a WebAssembly binary.`);
   }
 };
 
 await rm(smokeState, { recursive: true, force: true });
 
 try {
-  await run([
-    "bunx",
-    `wrangler@${WRANGLER_VERSION}`,
-    "r2",
-    "object",
-    "put",
-    `bgcut-models/${ORT_WEBGPU_WASM_FILENAME}`,
-    "--file",
-    runtimeFile,
-    "--content-type",
-    "application/wasm",
-    "--cache-control",
-    "public, max-age=31536000, immutable",
-    "--local",
-    "--persist-to",
-    smokeState,
-  ]);
-
+  await seedRuntime(ORT_WEBGPU_WASM_FILENAME);
+  await seedRuntime(ORT_WASM_FILENAME);
   await run(["bun", "run", "build:cloudflare"]);
 
   const worker = Bun.spawn(
@@ -139,8 +146,9 @@ try {
 
   try {
     await waitForWorker();
-    await verifyRuntimeResponse();
-    console.log("Cloudflare WebGPU runtime smoke passed.");
+    await verifyRuntimeResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
+    await verifyRuntimeResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
+    console.log("Cloudflare R2 runtime smoke passed.");
   } finally {
     worker.kill();
     await worker.exited;
