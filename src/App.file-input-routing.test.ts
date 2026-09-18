@@ -53,6 +53,31 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("Remove background");
   });
 
+
+  test("exposes linkable docs and about pages", () => {
+    expect(appSource).toContain('pathname === "/docs"');
+    expect(appSource).toContain('pathname === "/about"');
+    expect(appSource).toContain('href="/docs"');
+    expect(appSource).toContain('href="/about"');
+    expect(appSource).toContain("Documentation");
+    expect(appSource).toContain("Packaged local app");
+    expect(appSource).toContain("Node API");
+    expect(appSource).toContain('import { createBgcut } from "bgcut"');
+    expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
+    expect(appSource).toContain("Privacy");
+    expect(appSource).toContain("Background removal that runs where your image already is.");
+  });
+
+  test("documents the shipped public interfaces", () => {
+    expect(appSource).toContain("bgcut serve --json");
+    expect(appSource).toContain("bgcut photo.jpg --gpu");
+    expect(appSource).toContain("bgcut photo.jpg --cpu");
+    expect(appSource).toContain('engine: "webgpu" | "cpu"');
+    expect(appSource).toContain("195,872,736 bytes");
+    expect(appSource).toContain("4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c");
+    expect(appSource).toContain("The CLI, packaged local app, and Node API share that validated cache.");
+  });
+
   test("keeps developer diagnostics and external comparison controls out of the product UI", () => {
     const internalComparisonName = ["B", "G", "0"].join("");
 
