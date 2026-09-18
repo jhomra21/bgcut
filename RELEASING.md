@@ -4,11 +4,9 @@ bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing 
 
 ## Release channels
 
-bgcut is in beta.
-
 - Versions such as `0.2.0-beta.0` publish to npm `beta` and create GitHub prereleases.
 - Stable versions have no prerelease suffix. They publish to npm `latest` and create normal GitHub releases.
-- Do not publish a stable version until the browser UI and its acceptance criteria are ready.
+- `0.2.0` is the first stable release.
 
 `package.json` is the source of truth for the release version. `CHANGELOG.md` is the source of truth for the public GitHub release notes.
 
@@ -105,31 +103,27 @@ The merge to `main` starts npm publication and GitHub prerelease creation.
 Use the same process with a version that has no prerelease suffix, for example:
 
 ```json
-"version": "1.0.0"
+"version": "0.2.0"
 ```
 
 Use a merge title such as:
 
 ```text
-chore(release): bgcut v1.0.0
+chore(release): bgcut v0.2.0
 ```
 
 The workflow publishes the version to npm `latest` and creates a normal GitHub release.
 
-Do not switch to stable only because the CLI works. Stable also requires the intended browser UI and its documented behavior.
+## npm tags
 
-## npm tags during beta
-
-Public beta instructions should use the beta tag explicitly:
+Stable installs use the default `latest` tag:
 
 ```sh
-bunx bgcut@beta --help
-npm install -g bgcut@beta
+bunx bgcut --help
+npm install -g bgcut
 ```
 
-Do not advertise plain `npm install bgcut` until a stable version intentionally owns the `latest` tag.
-
-An older `latest` tag can remain from an early publish. That does not change the documented beta install path. Stable publication will move `latest` to the first stable version.
+Prereleases should use an explicit prerelease tag such as `beta`.
 
 ## Packaged agent skill
 

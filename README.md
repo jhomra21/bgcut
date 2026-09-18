@@ -13,35 +13,31 @@ Remove image backgrounds locally in the browser or from the command line.
   />
 </a>
 
-> **Beta:** bgcut is prerelease software. Use the npm `beta` channel for now. Stable releases will use `latest` after the browser UI and product behavior are ready.
-
 Source images stay on the user's machine. bgcut does not upload them to an application inference backend.
 
-## Install the beta
+## Install
 
 The CLI currently runs on Bun.
 
 Run it without installing globally:
 
 ```sh
-bunx bgcut@beta photo.jpg
+bunx bgcut photo.jpg
 ```
 
 Or install the beta globally:
 
 ```sh
-npm install -g bgcut@beta
+npm install -g bgcut
 bgcut photo.jpg
 ```
 
 Bun can install it globally too:
 
 ```sh
-bun add -g bgcut@beta
+bun add -g bgcut
 bgcut photo.jpg
 ```
-
-Use `@beta` until bgcut publishes a stable release.
 
 ## CLI
 
@@ -126,7 +122,6 @@ image
   -> transparent PNG
 ```
 
-The browser UI remains beta until its visual and interaction acceptance checks are complete.
 
 ## Agent skill
 
@@ -182,9 +177,7 @@ See [`DEPLOYING.md`](DEPLOYING.md) for the exact local checks, one-time R2 setup
 
 Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
 
-Beta versions such as `0.2.0-beta.0` publish to the npm `beta` tag and create GitHub prereleases. Stable versions publish to `latest` and create normal GitHub releases.
-
-Stable is intentionally blocked on the browser UI and its acceptance criteria.
+Stable versions publish to npm `latest` and create normal GitHub releases. Prerelease versions publish to their matching prerelease tag, such as `beta`.
 
 See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
 

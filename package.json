@@ -1,6 +1,6 @@
 {
   "name": "bgcut",
-  "version": "0.2.0-beta.0",
+  "version": "0.2.0",
   "description": "On-device background removal in the browser and CLI with WebGPU acceleration.",
   "type": "module",
   "packageManager": "bun@1.4.2",

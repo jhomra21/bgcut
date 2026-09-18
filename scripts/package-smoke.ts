@@ -54,7 +54,7 @@ try {
   const skillPath = join(consumerDirectory, "node_modules", "bgcut", "skills", "bgcut", "SKILL.md");
   const skill = await readFile(skillPath, "utf8");
 
-  if (!skill.includes("name: bgcut") || !skill.includes("bunx bgcut@beta")) {
+  if (!skill.includes("name: bgcut") || !skill.includes("bunx bgcut input.jpg")) {
     throw new Error(`Installed bgcut agent skill is missing its expected contract: ${skillPath}`);
   }
 

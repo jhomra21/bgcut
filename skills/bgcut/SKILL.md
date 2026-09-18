@@ -9,18 +9,16 @@ Use `bgcut` to remove an image background on the user's machine. The CLI runs in
 
 ## Install
 
-bgcut is in beta. Use the npm `beta` tag until a stable release exists.
-
 Run without a global install:
 
 ```sh
-bunx bgcut@beta input.jpg
+bunx bgcut input.jpg
 ```
 
 Or install globally:
 
 ```sh
-npm install -g bgcut@beta
+npm install -g bgcut
 bgcut input.jpg
 ```
 
