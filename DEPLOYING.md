@@ -132,7 +132,7 @@ curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.mjs
 
 Both WASM routes must return `content-type: application/wasm`. The module loader must return JavaScript rather than SPA HTML. The model route must return the model object rather than SPA HTML.
 
-Then open the local site in a Chromium browser and run normal, explicit WebGPU, and explicit WASM removal. Acceptance requires a clean console and correct output.
+Then open the local site in a Chromium browser and run normal, explicit WebGPU, and explicit WebAssembly through the local Cloudflare Worker and R2 path with a clean console and correct output.
 
 ## Remote R2 bootstrap or payload update
 
@@ -225,6 +225,8 @@ Run a real WebGPU browser removal on `https://bgcut.dev` before treating a produ
 
 `.github/workflows/cloudflare.yml` builds the Cloudflare payload and runs `wrangler deploy --dry-run` plus the local R2 runtime smoke on pull requests and pushes to `main`. It never deploys production resources.
 
+`.github/workflows/ci.yml` runs the full repository check on pull requests and on `main`. Feature-branch pushes do not run a second duplicate CI job when a pull request is already open.
+
 The production deployment is owned by Cloudflare Workers Builds. The npm release workflow remains separate.
 
 ## Observability
@@ -240,8 +242,10 @@ Keep the desired Worker observability policy in `wrangler.jsonc`:
 - 100% log and trace sampling while traffic is low
 - query-string redaction enabled
 
-Cloudflare Workers Builds manages its deployment token internally. That token is sufficient for Wrangler deployments, but Cloudflare does not expose it as a normal build environment variable for arbitrary post-deploy API calls. Do not add a Cloudflare token to GitHub just to work around that boundary.
+`wrangler.jsonc` is the intended source of truth. A normal deployment should leave the Cloudflare dashboard consistent with that configuration. If the dashboard and the deployed config disagree, treat that as configuration drift or a Workers Builds/Wrangler synchronization problem rather than as a required second configuration step.
 
-If the Cloudflare dashboard shows Logs or Traces disabled, enable them once at **Worker > Settings > Observability** and deploy the settings change. The dashboard may show a Wrangler snippet; keep `wrangler.jsonc` aligned with the enabled state. Script-level observability settings persist independently from Worker code versions.
+Dashboard changes show the equivalent Wrangler snippet. If a setting is changed manually while diagnosing drift, keep the committed `wrangler.jsonc` equivalent so the repository still records the intended state.
 
-After enabling them, verify the Observability tab shows Logs and Traces on and exercise `bgcut.dev` so Events, Invocations, and Traces receive data.
+Cloudflare Workers Builds manages its deployment credential internally. Do not add a Cloudflare token to GitHub solely to patch observability settings after deployment.
+
+After changes, verify the dashboard shows Logs and Traces enabled and exercise `bgcut.dev` so Events, Invocations, and Traces receive data.
