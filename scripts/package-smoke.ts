@@ -1,6 +1,7 @@
 import { Schema } from "effect";
+import sharp from "sharp";
 import { spawn, spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -10,10 +11,20 @@ import {
   MODEL_SIZE_BYTES,
 } from "../src/engine/model-config";
 
-const run = (command: string, args: readonly string[], cwd: string): string => {
+type RunOptions = {
+  readonly env?: NodeJS.ProcessEnv;
+};
+
+const run = (
+  command: string,
+  args: readonly string[],
+  cwd: string,
+  options: RunOptions = {},
+): string => {
   const result = spawnSync(command, [...args], {
     cwd,
     encoding: "utf8",
+    env: options.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -157,15 +168,29 @@ try {
     cachedModelPath,
   );
 
+  const smokeEnvironment = {
+    ...process.env,
+    HOME: smokeHome,
+    USERPROFILE: smokeHome,
+    XDG_CACHE_HOME: smokeCache,
+    LOCALAPPDATA: smokeLocalAppData,
+  };
+  const inputPath = join(temporaryRoot, "input.png");
+
+  await sharp({
+    create: {
+      width: 8,
+      height: 8,
+      channels: 3,
+      background: { r: 28, g: 112, b: 196 },
+    },
+  })
+    .png()
+    .toFile(inputPath);
+
   const localApp = spawn(binPath, ["serve", "--json"], {
     cwd: consumerDirectory,
-    env: {
-      ...process.env,
-      HOME: smokeHome,
-      USERPROFILE: smokeHome,
-      XDG_CACHE_HOME: smokeCache,
-      LOCALAPPDATA: smokeLocalAppData,
-    },
+    env: smokeEnvironment,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -219,6 +244,60 @@ try {
     });
   }
 
+  const cliOutputPath = join(temporaryRoot, "cli-output.png");
+  const cliOutput = run(
+    binPath,
+    [inputPath, "--cpu", "-o", cliOutputPath],
+    consumerDirectory,
+    { env: smokeEnvironment },
+  );
+
+  if (!cliOutput.includes("✓ cpu") || (await stat(cliOutputPath)).size <= 0) {
+    throw new Error(`Installed Node CLI did not complete a real CPU inference:\n${cliOutput}`);
+  }
+
+  const apiSmokePath = join(consumerDirectory, "api-smoke.mjs");
+  const apiOutputPath = join(temporaryRoot, "api-output.webp");
+
+  await writeFile(
+    apiSmokePath,
+    `import { writeFile } from "node:fs/promises";
+import { createBgcut } from "bgcut";
+
+const bgcut = await createBgcut({ engine: "cpu" });
+
+try {
+  const first = await bgcut.remove(process.argv[2]);
+  const second = await bgcut.remove(process.argv[2], { format: "webp" });
+
+  if (
+    bgcut.engine !== "cpu" ||
+    first.engine !== "cpu" ||
+    second.engine !== "cpu" ||
+    first.data.length === 0 ||
+    second.data.length === 0
+  ) {
+    process.exit(2);
+  }
+
+  await writeFile(process.argv[3], second.data);
+} finally {
+  await bgcut.close();
+}
+`,
+  );
+
+  run(
+    process.execPath,
+    [apiSmokePath, inputPath, apiOutputPath],
+    consumerDirectory,
+    { env: smokeEnvironment },
+  );
+
+  if ((await stat(apiOutputPath)).size <= 0) {
+    throw new Error("Installed Node API did not complete reusable-session inference.");
+  }
+
   const skillPath = join(consumerDirectory, "node_modules", "bgcut", "skills", "bgcut", "SKILL.md");
   const skill = await readFile(skillPath, "utf8");
 
@@ -227,7 +306,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI, local web app, cached model route, Node API export, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model route, reusable Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
