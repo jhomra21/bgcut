@@ -6,6 +6,16 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.3.0-beta.0 - 2026-09-18
+
+- Added the packaged local web app: `bgcut` or `bgcut serve` starts the accepted browser UI on loopback, with JSON startup discovery, local health checks, the validated model route, and installed ONNX Runtime assets.
+- Added browser keyboard shortcuts for New Image, Copy, Download, and Redo, plus native left/right keyboard control for the comparison slider.
+- Published the CLI as a Node executable so npm and npx users do not need Bun, including Node-compatible model-cache inspection and validation.
+- Added the reusable `createBgcut()` Node API with automatic/GPU/CPU engine selection, shared validated model caching, and ONNX Runtime session reuse across removals.
+- Kept the large BiRefNet model out of the npm tarball while sharing the same validated local cache across the local app, CLI, and Node API.
+- Strengthened the packed-package release gate with real installed Node CLI inference and two removals through one reusable Node API engine.
+- Corrected the bundled agent skill so its install guidance matches the Node-native published package.
+
 ## 0.2.1 - 2026-09-18
 
 - Replaced the renderer-dependent README icon/title alignment with one pre-aligned bgcut lockup so the brand header renders consistently on GitHub and npm.
