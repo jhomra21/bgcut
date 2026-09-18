@@ -14,7 +14,7 @@ bgcut is in beta. Beta releases use the npm `beta` tag and GitHub prereleases. N
 - Simplified the browser UI to the sketch flow: click or drag an image, run removal automatically, compare the result, then use the integrated copy, download, redo, or new-image actions.
 - Removed runtime diagnostics, timing tables, model details, and internal reference-image controls from the normal product UI.
 - Added Cloudflare Workers deployment for `bgcut.dev` with the large model served from private R2 at the same `/models/...` path.
-- Moved both ONNX Runtime WASM binaries to private R2 at `/runtime/...` and configured the WebGPU and fallback paths to load them explicitly.
+- Moved the ONNX Runtime WebGPU WASM binary, fallback WASM binary, and module loader to private R2 at `/runtime/...` and configured both browser execution paths to load them explicitly.
 - Added Cloudflare build guards for the 25 MiB Static Assets limit and correct `application/wasm` runtime routing.
 - Added a Cloudflare dry-run CI workflow and local deployment instructions.
 
