@@ -2,6 +2,7 @@ import { copyFile, readdir, rm, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 const distDirectory = resolve(import.meta.dir, "../dist/web");
+
 const publicDirectory = resolve(import.meta.dir, "../public");
 
 const SITE_ROOT_FILES = [
@@ -52,6 +53,7 @@ for (const path of initialFiles) {
 }
 
 const packagedFiles = await walkFiles(distDirectory);
+
 const packagedNames = packagedFiles.map((path) => relative(distDirectory, path));
 
 if (packagedNames.some((name) => name.startsWith("models/"))) {
