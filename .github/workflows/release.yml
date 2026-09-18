@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - package.json
+      - CHANGELOG.md
+      - .github/workflows/release.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,7 +20,7 @@ concurrency:
 
 jobs:
   publish:
-    if: startsWith(github.event.head_commit.message, 'chore(release):')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -87,7 +90,7 @@ jobs:
 
           if npm view "$PACKAGE_NAME@$VERSION" version --registry=https://registry.npmjs.org/ --prefer-online >/dev/null 2>&1; then
             echo "needs_publish=false" >> "$GITHUB_OUTPUT"
-            echo "$PACKAGE_NAME@$VERSION already exists on npm; publish will be skipped and the GitHub release will be repaired if needed."
+            echo "$PACKAGE_NAME@$VERSION already exists on npm; publish will be skipped."
           else
             echo "needs_publish=true" >> "$GITHUB_OUTPUT"
           fi
@@ -121,43 +124,60 @@ jobs:
           echo "npm did not expose $PACKAGE_NAME@$VERSION within the verification window." >&2
           exit 1
 
-      - name: Create GitHub prerelease
-        if: steps.release.outputs.prerelease == 'true'
+      - name: Sync GitHub release from changelog
         env:
           GH_TOKEN: ${{ github.token }}
           GIT_TAG: ${{ steps.release.outputs.git_tag }}
           VERSION: ${{ steps.release.outputs.version }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
         shell: bash
         run: |
           set -euo pipefail
 
+          NOTES_FILE="$(mktemp)"
+
+          awk -v heading="## $VERSION" '
+            $0 == heading { capture = 1; next }
+            capture && /^## / { exit }
+            capture { print }
+          ' CHANGELOG.md > "$NOTES_FILE"
+
+          if ! grep -q '[^[:space:]]' "$NOTES_FILE"; then
+            echo "CHANGELOG.md has no notes for $VERSION." >&2
+            exit 1
+          fi
+
+          TITLE="bgcut v$VERSION"
+
           if gh release view "$GIT_TAG" >/dev/null 2>&1; then
-            echo "$GIT_TAG already has a GitHub release."
+            if [[ "$PRERELEASE" == "true" ]]; then
+              gh release edit "$GIT_TAG" \
+                --title "$TITLE" \
+                --notes-file "$NOTES_FILE" \
+                --prerelease
+            else
+              gh release edit "$GIT_TAG" \
+                --title "$TITLE" \
+                --notes-file "$NOTES_FILE" \
+                --prerelease=false \
+                --latest
+            fi
+
+            echo "Updated GitHub release $GIT_TAG from CHANGELOG.md."
             exit 0
           fi
 
-          gh release create "$GIT_TAG" \
-            --target "$GITHUB_SHA" \
-            --title "bgcut v$VERSION" \
-            --generate-notes \
-            --prerelease
-
-      - name: Create GitHub release
-        if: steps.release.outputs.prerelease == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GIT_TAG: ${{ steps.release.outputs.git_tag }}
-          VERSION: ${{ steps.release.outputs.version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if gh release view "$GIT_TAG" >/dev/null 2>&1; then
-            echo "$GIT_TAG already has a GitHub release."
-            exit 0
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release create "$GIT_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file "$NOTES_FILE" \
+              --prerelease \
+              --latest=false
+          else
+            gh release create "$GIT_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file "$NOTES_FILE" \
+              --latest
           fi
-
-          gh release create "$GIT_TAG" \
-            --target "$GITHUB_SHA" \
-            --title "bgcut v$VERSION" \
-            --generate-notes
