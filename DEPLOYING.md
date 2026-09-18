@@ -38,17 +38,20 @@ Source images never go through the Worker or R2. Browser image decoding, preproc
 
 Connect the existing `bgcut` Worker to `jhomra21/bgcut` from Cloudflare Workers & Pages.
 
-Use these build settings. Do not use Cloudflare's auto-detected `bun run build` command here: the normal build intentionally places the 187 MiB model in `dist/`, which exceeds the Workers Static Assets 25 MiB per-file limit. The Cloudflare build strips R2-backed model/runtime payloads from `dist/`.
-
+Use these build settings:
 
 ```text
 Root directory: /
 Production branch: main
-Build command: bun run build:cloudflare
+Build command: leave blank
 Deploy command: bun run cloudflare:deploy
 Builds for non-production branches: enabled
 Non-production branch deploy command: bun run cloudflare:preview
 ```
+
+The Cloudflare-specific build is pinned in `wrangler.jsonc` through `build.command = "bun run build:cloudflare"`. Wrangler runs that custom build automatically before `deploy` and `versions upload`, so the deployment behavior stays in source control.
+
+Do not configure Workers Builds to run the normal `bun run build` as its build command. The normal build intentionally places the 187 MiB model in `dist/`, which exceeds the Workers Static Assets 25 MiB per-file limit. The Wrangler custom build strips the R2-backed model and discrete ONNX Runtime payloads from `dist/` before assets are scanned.
 
 Set this build variable:
 
