@@ -2,23 +2,24 @@
 
 The web app deploys to Cloudflare Workers with Static Assets. Runtime payloads live in the private R2 bucket `bgcut-models` and are served by the same Worker.
 
-The R2 bucket stores:
-
-- the pinned BiRefNet Lite ONNX model at `/models/...`
-- ONNX Runtime's WebGPU asyncify WASM binary at `/runtime/ort-wasm-simd-threaded.asyncify.wasm`
-- ONNX Runtime's standard WASM fallback binary at `/runtime/ort-wasm-simd-threaded.wasm`
-- ONNX Runtime's module loader at `/runtime/ort-wasm-simd-threaded.mjs`
-
-The model is about 187 MiB, the WebGPU asyncify WASM binary is about 26.8 MiB, and the standard WASM fallback binary is about 14.2 MiB. The module loader is small but belongs to the same runtime boundary. All four files live in R2. The Cloudflare build removes discrete ONNX Runtime runtime files from `dist/` and fails if one leaks back into Workers Static Assets.
+The production path is Cloudflare Workers Builds connected directly to the GitHub repository. GitHub Actions validates the Cloudflare bundle, but it does not authenticate to Cloudflare or deploy production.
 
 ## Architecture
 
 ```text
-bgcut.dev
-  -> Cloudflare Worker
-     -> Vite SPA from Workers Static Assets
-     -> /models/* from private R2 bucket bgcut-models
-     -> /runtime/* from private R2 bucket bgcut-models
+GitHub: jhomra21/bgcut
+  -> Cloudflare Workers Builds
+     -> main: bun run build:cloudflare
+              bun run cloudflare:deploy
+        -> bgcut-web
+           -> bgcut.dev
+           -> Vite SPA from Workers Static Assets
+           -> /models/* from private R2 bucket bgcut-models
+           -> /runtime/* from private R2 bucket bgcut-models
+     -> non-production branch / PR:
+           bun run build:cloudflare
+           bun run cloudflare:preview
+           -> Worker preview URL
 ```
 
 Source images never go through the Worker or R2. Browser image decoding, preprocessing, inference, compositing, and export stay on the user's device.
@@ -29,8 +30,51 @@ Source images never go through the Worker or R2. Browser image decoding, preproc
 - `bgcut.dev` as a Worker Custom Domain
 - `dist/` as the SPA asset directory
 - SPA navigation fallback to `index.html`
+- preview URLs for uploaded Worker versions
 - the `MODELS` binding to the `bgcut-models` R2 bucket
 - Worker-first routing for `/models/*` and `/runtime/*`
+
+## Cloudflare Git integration
+
+Connect the existing `bgcut-web` Worker to `jhomra21/bgcut` from Cloudflare Workers & Pages.
+
+Use these build settings:
+
+```text
+Root directory: /
+Production branch: main
+Build command: bun run build:cloudflare
+Deploy command: bun run cloudflare:deploy
+Builds for non-production branches: enabled
+Non-production branch deploy command: bun run cloudflare:preview
+```
+
+Set this build variable:
+
+```text
+BUN_VERSION=1.4.2
+```
+
+Cloudflare Workers Builds creates and manages the build API token. Do not add `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` to GitHub for this deployment path.
+
+Every production-branch push builds and deploys the Worker. Non-production branch builds upload a Worker version instead of promoting it, which lets Cloudflare attach preview status and URLs to pull requests.
+
+The default build watch path can remain `*`. Narrow it only if deploys from documentation-only changes become noisy.
+
+## R2 payloads
+
+The R2 bucket stores:
+
+- the pinned BiRefNet Lite ONNX model at `/models/...`
+- ONNX Runtime's WebGPU asyncify WASM binary at `/runtime/ort-wasm-simd-threaded.asyncify.wasm`
+- ONNX Runtime's standard WASM fallback binary at `/runtime/ort-wasm-simd-threaded.wasm`
+- ONNX Runtime's module loader at `/runtime/ort-wasm-simd-threaded.mjs`
+
+The model is about 187 MiB, the WebGPU asyncify WASM binary is about 26.8 MiB, and the standard WASM fallback binary is about 14.2 MiB. These files stay in R2 rather than Workers Static Assets.
+
+The model and runtime objects are immutable, version-pinned deployment inputs. Ordinary site deploys do not re-upload them. Seed or replace them only when the pinned model or ONNX Runtime payload changes.
+
+The Worker reads them through the `MODELS` R2 binding, so the Worker itself does not contain R2 credentials.
 
 ## Local Cloudflare test
 
@@ -46,9 +90,7 @@ Seed Wrangler's local R2 storage with the model and ONNX Runtime files:
 bun run cloudflare:r2:local
 ```
 
-This prepares the validated model and copies the exact ONNX Runtime 1.30.0 WebGPU asyncify binary, fallback WASM binary, and module loader into local R2. It writes local Wrangler state under `.wrangler/`. It does not create or modify a remote R2 bucket.
-
-Build the exact static payload Cloudflare would receive:
+Build the exact static payload Cloudflare receives:
 
 ```sh
 bun run build:cloudflare
@@ -88,70 +130,17 @@ Both WASM routes must return `content-type: application/wasm`. The module loader
 
 Then open the local site in a Chromium browser and run normal, explicit WebGPU, and explicit WASM removal. Acceptance requires a clean console and correct output.
 
-## Cloudflare account setup
+## Remote R2 bootstrap or payload update
 
-Production CI uses Cloudflare's documented GitHub Actions authentication variables:
+This is an operator action, not part of every site deploy.
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
-Store both as GitHub secrets in the `production` environment or as repository secrets. Never commit either value.
-
-Create the API token from Cloudflare's **Edit Cloudflare Workers** template and scope it to the account and the `bgcut.dev` zone. The token needs Workers script deployment, Workers route/custom-domain access, and R2 write access because the production workflow both uploads runtime objects and deploys the Worker.
-
-The `bgcut.dev` zone must be active in the same Cloudflare account. If the domain uses another registrar, point its authoritative nameservers to the Cloudflare nameservers assigned to the zone before the first production deploy.
-
-## Production deployment workflow
-
-`.github/workflows/deploy-web.yml` is the production path.
-
-It does not deploy on ordinary pushes to `main`. A deployment starts only when either:
-
-1. `deploy/production.json` changes on `main`, or
-2. an authorized maintainer explicitly runs the workflow and supplies an exact source SHA.
-
-The normal automated path is the deployment manifest. Start from:
-
-```text
-deploy/production.example.json
-```
-
-Create `deploy/production.json` with the exact accepted 40-character commit SHA:
-
-```json
-{
-  "source_sha": "0123456789abcdef0123456789abcdef01234567"
-}
-```
-
-The workflow verifies that the SHA exists and is an ancestor of the trigger commit, then checks out that exact accepted source. The manifest commit itself is not silently substituted for the accepted application source.
-
-Before touching production, the workflow:
-
-1. installs the exact dependencies with Bun 1.4.2;
-2. runs `bun run check`;
-3. runs the Cloudflare dry-run gate;
-4. creates `bgcut-models` only if it does not already exist;
-5. prepares and validates the pinned model;
-6. uploads the model and all three ONNX Runtime files to remote R2;
-7. reads the R2 objects back and checks their SHA-256 values;
-8. builds the Cloudflare payload;
-9. runs `wrangler deploy`;
-10. waits for `bgcut.dev` and verifies the model and runtime routes.
-
-The deployment workflow records the exact deployed source SHA in the GitHub Actions job summary.
-
-## Manual production commands
-
-The GitHub workflow is the normal production path. These commands are useful only for recovery or direct operator work from an authenticated machine.
-
-Authenticate Wrangler:
+Authenticate Wrangler on an operator machine:
 
 ```sh
 bunx wrangler@4.133.0 login
 ```
 
-Create the bucket if it does not exist:
+Create the bucket only if it does not already exist:
 
 ```sh
 bunx wrangler@4.133.0 r2 bucket create bgcut-models
@@ -214,15 +203,9 @@ Expected SHA-256:
 4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c
 ```
 
-Run the final gate and deploy:
+## Production verification
 
-```sh
-bun run cloudflare:dry-run
-bun run build:cloudflare
-bunx wrangler@4.133.0 deploy
-```
-
-After deployment:
+After a successful Cloudflare production build:
 
 ```sh
 curl -I https://bgcut.dev/
@@ -232,10 +215,10 @@ curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.wasm
 curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.mjs
 ```
 
-Run a real WebGPU browser removal on `https://bgcut.dev` before treating the production deployment as accepted.
+Run a real WebGPU browser removal on `https://bgcut.dev` before treating a production change as accepted.
 
 ## CI gate
 
-`.github/workflows/cloudflare.yml` builds the Cloudflare payload and runs `wrangler deploy --dry-run` plus the local R2 runtime smoke on pull requests and pushes to `main`. It does not deploy production resources.
+`.github/workflows/cloudflare.yml` builds the Cloudflare payload and runs `wrangler deploy --dry-run` plus the local R2 runtime smoke on pull requests and pushes to `main`. It never deploys production resources.
 
-The production deploy remains separate from the npm release workflow.
+The production deployment is owned by Cloudflare Workers Builds. The npm release workflow remains separate.
