@@ -55,7 +55,7 @@ for (const asset of assets) {
       source,
       "--content-type",
       asset.contentType,
-      `${"--cache-control"}=${CACHE_CONTROL}`,
+      `--cache-control=${CACHE_CONTROL}`,
       "--remote",
     ],
     {
