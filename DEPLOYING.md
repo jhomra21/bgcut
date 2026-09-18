@@ -76,9 +76,9 @@ The R2 bucket stores:
 
 The model is about 187 MiB, the WebGPU asyncify WASM binary is about 26.8 MiB, and the standard WASM fallback binary is about 14.2 MiB. These files stay in R2 rather than Workers Static Assets.
 
-The model and runtime objects are immutable, version-pinned deployment inputs. Ordinary site deploys do not re-upload them. Seed or replace them only when the pinned model or ONNX Runtime payload changes.
+The model and runtime objects are immutable, version-pinned deployment inputs. The model is bootstrapped separately and is not re-uploaded on ordinary site deploys. Production deploys do upload the three pinned ONNX Runtime files before deploying the Worker so a fresh or repaired environment cannot publish an app whose `/runtime/*` routes return 404.
 
-The Worker reads them through the `MODELS` R2 binding, so the Worker itself does not contain R2 credentials.
+The Worker reads them through the `MODELS` R2 binding, so the Worker itself does not contain R2 credentials. Cloudflare Workers Builds supplies the deployment credential; its default token includes Workers R2 Storage edit access.
 
 ## Local Cloudflare test
 
@@ -136,7 +136,7 @@ Then open the local site in a Chromium browser and run normal, explicit WebGPU, 
 
 ## Remote R2 bootstrap or payload update
 
-This is an operator action, not part of every site deploy.
+The three ONNX Runtime files are uploaded automatically by `bun run cloudflare:deploy` on every production deployment. The model remains an operator bootstrap/update because it is much larger and changes independently.
 
 Authenticate Wrangler on an operator machine:
 
