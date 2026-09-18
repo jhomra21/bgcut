@@ -1,9 +1,14 @@
 import { MODEL_FILENAME } from "../src/engine/model-config.ts";
-import { ORT_WEBGPU_WASM_FILENAME } from "../src/engine/ort-webgpu-runtime.ts";
+import {
+  ORT_WASM_FILENAME,
+  ORT_WEBGPU_WASM_FILENAME,
+} from "../src/engine/ort-webgpu-runtime.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
 
 const ORT_WEBGPU_WASM_PATH = `/runtime/${ORT_WEBGPU_WASM_FILENAME}`;
+
+const ORT_WASM_PATH = `/runtime/${ORT_WASM_FILENAME}`;
 
 const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
@@ -23,6 +28,13 @@ const resolveR2Asset = (pathname: string): R2Asset | undefined => {
   if (pathname === ORT_WEBGPU_WASM_PATH) {
     return {
       key: ORT_WEBGPU_WASM_FILENAME,
+      contentType: "application/wasm",
+    };
+  }
+
+  if (pathname === ORT_WASM_PATH) {
+    return {
+      key: ORT_WASM_FILENAME,
       contentType: "application/wasm",
     };
   }
