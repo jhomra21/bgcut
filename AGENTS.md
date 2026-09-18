@@ -51,9 +51,10 @@
 - Run `bun run cloudflare:dry-run` and `bun run cloudflare:runtime:smoke` for web deployment changes.
 - Run the local R2 and Worker path before the first production deploy. See `DEPLOYING.md`.
 - Do not deploy `bgcut.dev` to production until the exact browser candidate has passed visual and interaction acceptance.
-- Production deploys run through `.github/workflows/deploy-web.yml`. Do not use an ordinary `main` push as an implicit production deploy.
-- The normal production trigger is `deploy/production.json`, which must contain the exact accepted 40-character source SHA.
-- Keep `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in GitHub secrets for the `production` environment or repository. Never write Cloudflare credentials into repository files, logs, issues, or PR bodies.
+- Production deploys run through Cloudflare Workers Builds connected directly to GitHub. `main` is the production branch.
+- Keep the Cloudflare build command blank; `wrangler.jsonc` owns the Cloudflare-specific build via `build.command`.
+- `cloudflare:deploy` must seed the pinned ONNX Runtime files into remote `bgcut-models` before deploying the Worker.
+- Do not add Cloudflare account IDs or API tokens to GitHub for this deployment path. Workers Builds owns the deployment credential.
 
 ## Release and package policy
 
