@@ -4,9 +4,9 @@ bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing 
 
 ## Release channels
 
-- Versions such as `0.2.0-beta.0` publish to npm `beta` and create GitHub prereleases.
+- Versions such as `0.3.0-beta.0` publish to npm `beta` and create GitHub prereleases.
 - Stable versions have no prerelease suffix. They publish to npm `latest` and create normal GitHub releases.
-- `0.2.0` is the first stable release.
+- Promote a beta to stable only after the published beta itself passes end-to-end consumer acceptance.
 
 `package.json` is the source of truth for the release version. `CHANGELOG.md` is the source of truth for the public GitHub release notes.
 
@@ -93,23 +93,38 @@ bun run check
 8. Use this merge title form:
 
 ```text
-chore(release): bgcut v0.2.0-beta.0
+chore(release): bgcut v0.3.0-beta.0
 ```
 
 The merge to `main` starts npm publication and GitHub prerelease creation.
 
 ## Preparing a stable release
 
-Use the same process with a version that has no prerelease suffix, for example:
+A stable release should promote a published beta that already passed consumer acceptance. Do not use the stable publish as the first end-to-end package test.
+
+Before opening the stable release PR:
+
+1. Install the exact beta from npm in a clean consumer environment.
+2. Verify the packaged local UI launches and completes a real removal.
+3. Verify result actions that changed in the release, including keyboard shortcuts and the comparison slider when applicable.
+4. Verify the headless Node CLI completes a real removal.
+5. Verify `bgcut serve --json` returns valid startup metadata and serves the packaged app.
+6. Verify the browser has no unexpected errors.
+7. Update the README, packaged skill, release instructions, tests, and package metadata so `main` describes the accepted public behavior.
+8. Merge those documentation changes to `main` and let normal CI and Cloudflare checks pass.
+9. Create a dedicated stable release PR that changes release metadata only: the stable version plus the matching changelog section.
+10. Merge only after CI passes on that exact release head.
+
+For the 0.3 line, promote the accepted beta with:
 
 ```json
-"version": "0.2.0"
+"version": "0.3.0"
 ```
 
-Use a merge title such as:
+Use this merge title:
 
 ```text
-chore(release): bgcut v0.2.0
+chore(release): bgcut v0.3.0
 ```
 
 The workflow publishes the version to npm `latest` and creates a normal GitHub release.
@@ -119,11 +134,13 @@ The workflow publishes the version to npm `latest` and creates a normal GitHub r
 Stable installs use the default `latest` tag:
 
 ```sh
-bunx bgcut --help
+npx bgcut
 npm install -g bgcut
 ```
 
-Prereleases should use an explicit prerelease tag such as `beta`.
+Bun users can run the same package with `bunx bgcut`.
+
+Prereleases should use an explicit prerelease tag such as `beta`, or an exact prerelease version while validating a release candidate.
 
 ## Packaged agent skill
 
@@ -135,9 +152,9 @@ skills/bgcut/SKILL.md
 
 That file is part of the package contract. Agents should be able to use bgcut without fetching instructions from another repository.
 
-When CLI syntax, input formats, output formats, engine behavior, caching, privacy behavior, or install commands change, update the README, the packaged skill, tests, and changelog in the same product change.
+When local-app behavior, CLI syntax, Node API behavior, input formats, output formats, engine behavior, caching, privacy behavior, or install commands change, update the README, the packaged skill, tests, and changelog in the same product change.
 
-`scripts/package-smoke.ts` must verify the installed `bgcut` command and the bundled skill from the packed tarball.
+`scripts/package-smoke.ts` must verify the installed Node CLI, packaged local app, reusable Node API, and bundled skill from the packed tarball.
 
 ## Failed releases
 
