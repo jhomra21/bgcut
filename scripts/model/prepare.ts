@@ -8,7 +8,7 @@ import {
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
 } from "../../src/shared/model";
-import { inspectModelFile, type ModelFileFingerprint } from "./model-file";
+import { inspectModelFile, type ModelFileFingerprint } from "../../src/native/model-file";
 
 class ModelPrepareError extends Data.TaggedError("ModelPrepareError")<{
   readonly message: string;
