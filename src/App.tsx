@@ -691,7 +691,7 @@ type DocsSectionId = (typeof DOC_SECTION_IDS)[number];
 const isDocsSectionId = (sectionId: string): sectionId is DocsSectionId =>
   DOC_SECTION_IDS.some((candidate) => candidate === sectionId);
 
-const DOCS_SCROLL_MS = 150;
+const DOCS_SCROLL_MS = 120;
 
 const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
 
@@ -720,21 +720,26 @@ const DocsSidebar = () => {
       document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
     ).filter((section) => isDocsSectionId(section.id));
 
-    const documentBottom = document.documentElement.scrollHeight;
-    const viewportBottom = window.scrollY + window.innerHeight;
+    const viewportHeight = window.innerHeight;
+    const readingPoint = viewportHeight * 0.42;
+    const resources = sections.find((section) => section.id === "resources");
+    const resourcesRect = resources?.getBoundingClientRect();
 
-    if (viewportBottom >= documentBottom - 2) {
+    if (
+      resourcesRect !== undefined &&
+      resourcesRect.top <= viewportHeight * 0.68 &&
+      resourcesRect.bottom > 0
+    ) {
       setActiveSection("resources");
 
       return;
     }
 
-    const readingPoint = window.innerHeight * 0.42;
     let bestSection: DocsSectionId = "quickstart";
     let bestDistance = Number.POSITIVE_INFINITY;
 
     for (const section of sections) {
-      if (!isDocsSectionId(section.id)) {
+      if (!isDocsSectionId(section.id) || section.id === "resources") {
         continue;
       }
 
@@ -747,7 +752,7 @@ const DocsSidebar = () => {
       }
 
       const visibleTop = Math.max(rect.top, 0);
-      const visibleBottom = Math.min(rect.bottom, window.innerHeight);
+      const visibleBottom = Math.min(rect.bottom, viewportHeight);
 
       if (visibleBottom <= visibleTop) {
         continue;
