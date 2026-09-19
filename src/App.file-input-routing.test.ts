@@ -106,43 +106,39 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
-  test("tracks the documentation section actually being read", () => {
-    expect(appSource).toContain("const DOC_SECTION_IDS");
-    expect(appSource).toContain("const viewportHeight = window.innerHeight");
-    expect(appSource).toContain("const readingPoint = viewportHeight * 0.42");
-    expect(appSource).toContain('const resources = sections.find((section) => section.id === "resources")');
-    expect(appSource).toContain("resourcesRect.top <= viewportHeight * 0.68");
-    expect(appSource).toContain('section.id === "resources"');
-    expect(appSource).toContain("rect.top <= readingPoint && rect.bottom >= readingPoint");
-    expect(appSource).toContain("const visibleTop = Math.max(rect.top, 0)");
-    expect(appSource).toContain("const visibleBottom = Math.min(rect.bottom, viewportHeight)");
+  test("tracks docs sections by heading boundaries during manual scroll", () => {
+    expect(appSource).toContain("const readingLine = (): number => Math.min(180, window.innerHeight * 0.3)");
+    expect(appSource).toContain("let nextSection: DocsSectionId = \"quickstart\"");
+    expect(appSource).toContain("section.getBoundingClientRect().top > marker");
+    expect(appSource).toContain("nextSection = section.id");
+    expect(appSource).toContain("const atDocumentBottom");
+    expect(appSource).toContain("resourcesRect.top < window.innerHeight * 0.8");
     expect(appSource).toContain('activeSection() === section ? "location" : undefined');
     expect(appSource).toContain('aria-current={current("quickstart")}');
     expect(appSource).toContain('aria-current={current("architecture")}');
     expect(appSource).toContain('aria-current={current("resources")}');
     expect(appSource).toContain('window.addEventListener("scroll", pickActiveSection, { passive: true })');
-    expect(appSource).not.toContain("viewportBottom >= documentBottom - 2");
-    expect(appSource).toContain('setActiveSection("resources")');
     expect(appSource).not.toContain("new IntersectionObserver");
     expect(appSource).not.toContain('aria-current={current("privacy")}');
     expect(appSource).not.toContain('aria-current={current("overview")}');
   });
 
 
-  test("keeps sidebar clicks pinned and caps scroll animation below 150ms", () => {
+  test("keeps click highlighting only for the 120ms programmatic scroll", () => {
     expect(appSource).toContain("const DOCS_SCROLL_MS = 120");
-    expect(appSource).toContain("let pinnedSection: DocsSectionId | undefined");
+    expect(appSource).toContain("let programmaticTarget: DocsSectionId | undefined");
     expect(appSource).toContain("let scrollAnimationFrame: number | undefined");
-    expect(appSource).toContain("const animateScrollTo = (targetY: number)");
+    expect(appSource).toContain("const animateScrollTo = (targetY: number, section: DocsSectionId)");
+    expect(appSource).toContain("programmaticTarget = section");
+    expect(appSource).toContain("programmaticTarget = undefined");
+    expect(appSource).toContain("pickActiveSection()");
     expect(appSource).toContain("easeOutCubic(progress)");
     expect(appSource).toContain("(now - startedAt) / DOCS_SCROLL_MS");
     expect(appSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
-    expect(appSource).toContain("pinnedSection = section");
-    expect(appSource).toContain("setActiveSection(section)");
-    expect(appSource).toContain('section === "model" || section === "architecture" || section === "resources"');
+    expect(appSource).not.toContain("let pinnedSection");
     expect(appSource).not.toContain('target.scrollIntoView({ behavior: "smooth", block })');
-    expect(appSource).toContain('window.addEventListener("wheel", releasePinnedSection, { passive: true })');
-    expect(appSource).toContain('window.addEventListener("touchstart", releasePinnedSection, { passive: true })');
+    expect(appSource).toContain('window.addEventListener("wheel", releaseProgrammaticScroll, { passive: true })');
+    expect(appSource).toContain('window.addEventListener("touchstart", releaseProgrammaticScroll, { passive: true })');
     expect(appSource).toContain('onClick={(event) => navigateToSection(event, "model")}');
     expect(appSource).toContain('onClick={(event) => navigateToSection(event, "architecture")}');
   });
