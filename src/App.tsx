@@ -1133,18 +1133,12 @@ const App = () => {
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
   let routeTarget = initialPage;
   let transitionTimer: number | undefined;
-  let transitionFrame: number | undefined;
   let transitionVersion = 0;
 
   const clearRouteTransition = () => {
     if (transitionTimer !== undefined) {
       window.clearTimeout(transitionTimer);
       transitionTimer = undefined;
-    }
-
-    if (transitionFrame !== undefined) {
-      window.cancelAnimationFrame(transitionFrame);
-      transitionFrame = undefined;
     }
   };
 
@@ -1185,14 +1179,14 @@ const App = () => {
       window.scrollTo(0, 0);
       setRoutePhase("in");
 
-      transitionFrame = window.requestAnimationFrame(() => {
+      transitionTimer = window.setTimeout(() => {
         if (version !== transitionVersion) {
           return;
         }
 
-        transitionFrame = undefined;
+        transitionTimer = undefined;
         setRoutePhase("idle");
-      });
+      }, ROUTE_FADE_MS);
     }, ROUTE_FADE_MS);
   };
 
