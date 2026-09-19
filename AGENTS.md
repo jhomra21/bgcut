@@ -19,6 +19,7 @@
 ## Repository layout
 
 - `src/app/` owns the Solid UI, hosted-site shell, local-app shell, and UI contracts.
+- `src/core/` owns runtime-neutral model constants, preprocessing, and matte math.
 - `src/engine/` owns browser inference and browser runtime integration.
 - `src/native/` owns Node-only inference, model caching, model-file verification, and native compositing helpers.
 - `src/cli/` is the command-line adapter. Keep reusable native behavior out of this directory.
@@ -29,7 +30,7 @@
 - `docs/operations/` contains deployment and release procedures.
 - `test/` contains repository-wide contract tests that do not belong to one runtime module.
 
-Prefer one-way dependencies. UI code may depend on the browser engine. CLI and the public Node API may depend on the native engine. Reusable native behavior must not depend on the CLI layer.
+Prefer one-way dependencies. UI code may depend on the browser engine. Browser and native engines may depend on `src/core/`. CLI and the public Node API may depend on the native engine. Reusable native behavior must not depend on the CLI layer.
 
 ## Anti-slop
 

@@ -8,7 +8,7 @@ import {
   MODEL_RELEASE_URL,
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
-} from "../engine/model-config";
+} from "../core/model-config";
 import { inspectModelFile, type ModelFileFingerprint } from "./model-file";
 
 export class ModelCacheError extends Data.TaggedError("ModelCacheError")<{

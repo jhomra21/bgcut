@@ -3,9 +3,9 @@ import * as ort from "onnxruntime-node";
 import { access } from "node:fs/promises";
 import sharp from "sharp";
 
-import { MODEL_INPUT_SIZE } from "../engine/image";
-import { logitToAlphaByte } from "../engine/matte";
-import { resizeRgbaLinearToNchw } from "../engine/preprocess";
+import { MODEL_INPUT_SIZE } from "../core/model-config";
+import { logitToAlphaByte } from "../core/matte";
+import { resizeRgbaLinearToNchw } from "../core/preprocess";
 import { compositeAlphaMask } from "./alpha-mask";
 import { ModelCacheError, ensureNativeModel } from "./model-cache";
 

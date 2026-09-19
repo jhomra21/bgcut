@@ -1,4 +1,4 @@
-import { MODEL_FILENAME } from "../src/engine/model-config.ts";
+import { MODEL_FILENAME } from "../src/core/model-config.ts";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,

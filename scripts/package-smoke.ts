@@ -9,7 +9,7 @@ import {
   MODEL_FILENAME,
   MODEL_PUBLIC_PATH,
   MODEL_SIZE_BYTES,
-} from "../src/engine/model-config";
+} from "../src/core/model-config";
 
 type RunOptions = {
   readonly env?: NodeJS.ProcessEnv;

@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 import {
   MODEL_PUBLIC_PATH,
   MODEL_RELEASE_URL,
-} from "./src/engine/model-config.ts";
+} from "./src/core/model-config.ts";
 
 const releaseModelUrl = new URL(MODEL_RELEASE_URL);
 

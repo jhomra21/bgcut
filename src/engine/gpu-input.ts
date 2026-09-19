@@ -4,7 +4,7 @@ import { d, tgpu } from "typegpu";
 
 import { InferenceFailed } from "./errors";
 import type { GpuRuntime } from "./gpu";
-import { MODEL_INPUT_SIZE } from "./image";
+import { MODEL_INPUT_SIZE } from "../core/model-config";
 import type { RemovalTimingRecorder } from "./timing";
 
 const MODEL_PIXEL_COUNT = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;

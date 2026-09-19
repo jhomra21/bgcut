@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MODEL_FILENAME } from "../engine/model-config";
+import { MODEL_FILENAME } from "../core/model-config";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
