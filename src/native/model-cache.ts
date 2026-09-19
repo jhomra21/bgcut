@@ -11,7 +11,7 @@ import {
 } from "../shared/model";
 import { inspectModelFile, type ModelFileFingerprint } from "./model-file";
 
-export class CliModelError extends Data.TaggedError("CliModelError")<{
+export class ModelCacheError extends Data.TaggedError("ModelCacheError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
@@ -30,9 +30,9 @@ const cacheRoot = (appName: string): string => {
   return join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), appName);
 };
 
-export const cliModelPath = (): string => join(cacheRoot("bgcut"), "models", MODEL_FILENAME);
+export const cachedModelPath = (): string => join(cacheRoot("bgcut"), "models", MODEL_FILENAME);
 
-const previousCliModelPaths = (): readonly string[] => [
+const previousModelPaths = (): readonly string[] => [
   join(cacheRoot("bgremove"), "models", MODEL_FILENAME),
   join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME),
 ];
@@ -40,23 +40,23 @@ const previousCliModelPaths = (): readonly string[] => [
 const isExpectedModel = (fingerprint: ModelFileFingerprint | undefined): boolean =>
   fingerprint?.sizeBytes === MODEL_SIZE_BYTES && fingerprint.sha256 === MODEL_SHA256;
 
-const inspectCachedModel = (path: string): Effect.Effect<ModelFileFingerprint | undefined, CliModelError> =>
+const inspectCachedModel = (path: string): Effect.Effect<ModelFileFingerprint | undefined, ModelCacheError> =>
   inspectModelFile(path).pipe(
     Effect.mapError((cause) =>
-      new CliModelError({ message: `Could not inspect the cached model at ${path}.`, cause }),
+      new ModelCacheError({ message: `Could not inspect the cached model at ${path}.`, cause }),
     ),
   );
 
-export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
+export const ensureNativeModel = (): Effect.Effect<string, ModelCacheError> =>
   Effect.gen(function* () {
-    const modelPath = cliModelPath();
+    const modelPath = cachedModelPath();
     const existing = yield* inspectCachedModel(modelPath);
 
     if (isExpectedModel(existing)) {
       return modelPath;
     }
 
-    for (const previousModelPath of previousCliModelPaths()) {
+    for (const previousModelPath of previousModelPaths()) {
       const previousExisting = yield* inspectCachedModel(previousModelPath);
 
       if (isExpectedModel(previousExisting)) {
@@ -68,22 +68,22 @@ export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
 
     yield* Effect.tryPromise({
       try: () => mkdir(dirname(modelPath), { recursive: true }),
-      catch: (cause) => new CliModelError({ message: `Could not create ${dirname(modelPath)}.`, cause }),
+      catch: (cause) => new ModelCacheError({ message: `Could not create ${dirname(modelPath)}.`, cause }),
     });
 
     yield* Effect.tryPromise({
       try: () => rm(temporaryPath, { force: true }),
-      catch: (cause) => new CliModelError({ message: `Could not clear ${temporaryPath}.`, cause }),
+      catch: (cause) => new ModelCacheError({ message: `Could not clear ${temporaryPath}.`, cause }),
     });
 
     const response = yield* Effect.tryPromise({
       try: () => fetch(MODEL_RELEASE_URL),
       catch: (cause) =>
-        new CliModelError({ message: "Could not download the validated BiRefNet model.", cause }),
+        new ModelCacheError({ message: "Could not download the validated BiRefNet model.", cause }),
     });
 
     if (!response.ok) {
-      return yield* new CliModelError({
+      return yield* new ModelCacheError({
         message: `Validated model download failed with HTTP ${response.status}.`,
       });
     }
@@ -93,22 +93,22 @@ export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
         const bytes = Buffer.from(await response.arrayBuffer());
         await writeFile(temporaryPath, bytes);
       },
-      catch: (cause) => new CliModelError({ message: `Could not write ${temporaryPath}.`, cause }),
+      catch: (cause) => new ModelCacheError({ message: `Could not write ${temporaryPath}.`, cause }),
     });
 
     const downloaded = yield* inspectModelFile(temporaryPath).pipe(
       Effect.mapError((cause) =>
-        new CliModelError({ message: `Could not verify ${temporaryPath}.`, cause }),
+        new ModelCacheError({ message: `Could not verify ${temporaryPath}.`, cause }),
       ),
     );
 
     if (!isExpectedModel(downloaded)) {
       yield* Effect.tryPromise({
         try: () => rm(temporaryPath, { force: true }),
-        catch: (cause) => new CliModelError({ message: `Could not remove invalid ${temporaryPath}.`, cause }),
+        catch: (cause) => new ModelCacheError({ message: `Could not remove invalid ${temporaryPath}.`, cause }),
       });
 
-      return yield* new CliModelError({
+      return yield* new ModelCacheError({
         message: `Downloaded model did not match the expected ${MODEL_SIZE_BYTES}-byte artifact with SHA-256 ${MODEL_SHA256}.`,
       });
     }
@@ -118,7 +118,7 @@ export const ensureCliModel = (): Effect.Effect<string, CliModelError> =>
         await rm(modelPath, { force: true });
         await rename(temporaryPath, modelPath);
       },
-      catch: (cause) => new CliModelError({ message: `Could not install the model at ${modelPath}.`, cause }),
+      catch: (cause) => new ModelCacheError({ message: `Could not install the model at ${modelPath}.`, cause }),
     });
 
     return modelPath;
