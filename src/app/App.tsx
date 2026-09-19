@@ -3,9 +3,9 @@ import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
 import ComparisonSlider from "./components/ComparisonSlider";
-import { formatBackgroundRemovalError, formatImageError } from "./engine/errors";
-import { removeBackground } from "./engine/inference";
-import { decodeImage } from "./engine/image";
+import { formatBackgroundRemovalError, formatImageError } from "../engine/errors";
+import { removeBackground } from "../engine/inference";
+import { decodeImage } from "../engine/image";
 
 type ReadyImage = {
   readonly status: "ready";

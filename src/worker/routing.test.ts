@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-const workerSource = await Bun.file(new URL("../worker/index.ts", import.meta.url)).text();
+const workerSource = await Bun.file(new URL("./index.ts", import.meta.url)).text();
 
-const wranglerConfig = await Bun.file(new URL("../wrangler.jsonc", import.meta.url)).text();
+const wranglerConfig = await Bun.file(new URL("../../wrangler.jsonc", import.meta.url)).text();
 
-const packageSource = await Bun.file(new URL("../package.json", import.meta.url)).text();
+const packageSource = await Bun.file(new URL("../../package.json", import.meta.url)).text();
 
 const cloudflareBuildSource = await Bun.file(
-  new URL("../scripts/prepare-cloudflare-dist.ts", import.meta.url),
+  new URL("../../scripts/build/cloudflare-dist.ts", import.meta.url),
 ).text();
 
 describe("Cloudflare runtime routing", () => {
