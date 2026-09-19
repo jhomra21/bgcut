@@ -16,6 +16,20 @@
 - oxlint is required.
 - Tests should cover observable behavior and contracts rather than private implementation details.
 
+## Repository layout
+
+- Keep this repository as one package until a second independently versioned or independently consumed package exists.
+- `src/app/` owns Solid UI, hosted-site pages, local-app shell selection, and UI-specific tests.
+- `src/engine/` owns inference/model/image behavior. It currently includes browser runtime code plus primitives reused by the native path; do not rename it to browser-only until those shared primitives are separated deliberately.
+- `src/cli/` owns the command-line interface and packaged loopback server.
+- `src/node/` owns the public Node API and native ONNX Runtime session.
+- `src/shared/` contains code intentionally shared across runtime boundaries.
+- `src/worker/` owns the Cloudflare Worker only. It must not perform image inference.
+- `scripts/build/`, `scripts/cloudflare/`, `scripts/test/`, and `scripts/shared/` group repository tooling by responsibility.
+- `docs/engineering/` contains measurements and roadmap material. `docs/operations/` contains deployment and release runbooks.
+- Keep tests beside the source they protect when practical.
+- Do not introduce `packages/*` or workspace plumbing only to imitate a reference repository.
+
 ## Anti-slop
 
 - The vendored anti-slop plugin lives at `tools/oxlint/anti-slop/` and comes from `dmmulroy/anti-slop`.
