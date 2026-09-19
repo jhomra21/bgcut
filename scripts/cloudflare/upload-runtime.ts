@@ -4,7 +4,7 @@ import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../../src/shared/runtime-assets";
+} from "../../src/core/runtime-assets";
 
 const WRANGLER_VERSION = "4.135.0";
 
