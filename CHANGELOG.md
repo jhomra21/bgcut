@@ -6,6 +6,15 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.3.1-beta.0 - 2026-09-19
+
+- Separated the packaged local app from the hosted website: `bgcut` and `bgcut serve` now show only the bgcut brand and background-removal workflow, without Docs, GitHub, Privacy, Terms, or the hosted footer.
+- Kept the local app root-only by redirecting non-root app routes such as `/docs`, `/privacy`, and `/terms` back to `/`, while preserving the local health, model, and ONNX Runtime routes.
+- Added an explicit local-runtime marker from the loopback server so the packaged app does not rely on hostname detection, and extended the packed npm consumer smoke to verify that contract.
+- Expanded `bgcut.dev` into the full hosted site with shared navigation, documentation, Privacy and Terms pages, footer links, and section-aware docs navigation.
+- Updated the website copy, README, packaged agent skill, and release documentation to match the current CLI, Node API, model/runtime, local-app, privacy, and licensing behavior.
+- No background-removal model, inference algorithm, CLI command syntax, or Node API contract changed in this beta.
+
 ## 0.3.0 - 2026-09-18
 
 - Promoted the accepted `0.3.0-beta.0` package to stable after end-to-end consumer validation of npm installation, the packaged local UI, result actions, the headless CLI, and `serve --json`.
