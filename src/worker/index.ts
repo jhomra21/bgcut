@@ -1,9 +1,9 @@
-import { MODEL_FILENAME } from "../src/engine/model-config.ts";
+import { MODEL_FILENAME } from "../engine/model-config.ts";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../src/engine/ort-webgpu-runtime.ts";
+} from "../engine/ort-webgpu-runtime.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
 
@@ -52,7 +52,23 @@ const resolveR2Asset = (pathname: string): R2Asset | undefined => {
   return undefined;
 };
 
-const objectHeaders = (object: R2Object, contentType: string): Headers => {
+type R2ObjectLike = {
+  readonly body: ReadableStream<Uint8Array>;
+  readonly httpEtag: string;
+  readonly size: number;
+  readonly writeHttpMetadata: (headers: Headers) => void;
+};
+
+type R2BucketLike = {
+  readonly get: (key: string) => Promise<R2ObjectLike | null>;
+  readonly head: (key: string) => Promise<R2ObjectLike | null>;
+};
+
+type AssetFetcher = {
+  readonly fetch: (request: Request) => Promise<Response>;
+};
+
+const objectHeaders = (object: R2ObjectLike, contentType: string): Headers => {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("cache-control", IMMUTABLE_CACHE_CONTROL);
@@ -64,8 +80,8 @@ const objectHeaders = (object: R2Object, contentType: string): Headers => {
 };
 
 type Env = {
-  readonly ASSETS: Fetcher;
-  readonly MODELS: R2Bucket;
+  readonly ASSETS: AssetFetcher;
+  readonly MODELS: R2BucketLike;
 };
 
 export default {
