@@ -71,12 +71,24 @@ describe("browser product UI", () => {
   test("keeps the packaged local app on the root tool shell only", () => {
     expect(appSource).toContain("LOCAL_RUNTIME_META_SELECTOR");
     expect(appSource).toContain('meta[name="bgcut-runtime"][content="local"]');
-    expect(appSource).toContain("if (isLocalRuntime())");
-    expect(appSource).toContain("<LocalAppHeader />");
-    expect(appSource).toContain('class="site-root local-app-root"');
-    expect(appSource).toContain("<HomePage />");
     expect(appSource).toContain("const LocalAppHeader = () => (");
-    expect(appSource).not.toContain('<LocalAppHeader />\n        <SiteFooter');
+
+    const localStart = appSource.indexOf("if (isLocalRuntime())");
+    const hostedStart = appSource.indexOf("const initialPage = currentPage()", localStart);
+
+    expect(localStart).toBeGreaterThanOrEqual(0);
+    expect(hostedStart).toBeGreaterThan(localStart);
+
+    const localBranch = appSource.slice(localStart, hostedStart);
+
+    expect(localBranch).toContain("<LocalAppHeader />");
+    expect(localBranch).toContain('class="site-root local-app-root"');
+    expect(localBranch).toContain("<HomePage />");
+    expect(localBranch).not.toContain("<SiteHeader");
+    expect(localBranch).not.toContain("<SiteFooter");
+    expect(localBranch).not.toContain("<DocsPage");
+    expect(localBranch).not.toContain("<PrivacyPage");
+    expect(localBranch).not.toContain("<TermsPage");
   });
 
   test("exposes docs plus footer-only legal pages without an about surface", () => {
