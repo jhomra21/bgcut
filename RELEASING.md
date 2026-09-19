@@ -4,11 +4,11 @@ bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing 
 
 ## Release channels
 
-- Versions such as `0.3.0-beta.0` publish to npm `beta` and create GitHub prereleases.
+- Versions such as `X.Y.Z-beta.0` publish to npm `beta` and create GitHub prereleases.
 - Stable versions have no prerelease suffix. They publish to npm `latest` and create normal GitHub releases.
 - Promote a beta to stable only after the published beta itself passes end-to-end consumer acceptance.
 
-`package.json` is the source of truth for the release version. `CHANGELOG.md` is the source of truth for the public GitHub release notes.
+`package.json` is the source of truth for the release version. `CHANGELOG.md` is the source of truth for the public GitHub release notes. A stable promotion removes only the prerelease suffix from an accepted beta version, for example `0.3.1-beta.0` to `0.3.1`.
 
 ## Trusted publisher setup
 
@@ -93,7 +93,7 @@ bun run check
 8. Use this merge title form:
 
 ```text
-chore(release): bgcut v0.3.0-beta.0
+chore(release): bgcut vX.Y.Z-beta.N
 ```
 
 The merge to `main` starts npm publication and GitHub prerelease creation.
@@ -110,21 +110,21 @@ Before opening the stable release PR:
 4. Verify the headless Node CLI completes a real removal.
 5. Verify `bgcut serve --json` returns valid startup metadata and serves the packaged app.
 6. Verify the browser has no unexpected errors.
-7. Update the README, packaged skill, release instructions, tests, and package metadata so `main` describes the accepted public behavior.
+7. Update the README, packaged skill, release instructions, and tests so `main` describes the accepted public behavior. Leave the stable version bump for the dedicated release PR.
 8. Merge those documentation changes to `main` and let normal CI and Cloudflare checks pass.
 9. Create a dedicated stable release PR that changes release metadata only: the stable version plus the matching changelog section.
 10. Merge only after CI passes on that exact release head.
 
-For the 0.3 line, promote the accepted beta with:
+Promote an accepted beta by removing its prerelease suffix. For example, after accepting `0.3.1-beta.0`:
 
 ```json
-"version": "0.3.0"
+"version": "0.3.1"
 ```
 
-Use this merge title:
+Use the matching merge title:
 
 ```text
-chore(release): bgcut v0.3.0
+chore(release): bgcut v0.3.1
 ```
 
 The workflow publishes the version to npm `latest` and creates a normal GitHub release.

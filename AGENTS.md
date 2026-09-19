@@ -59,8 +59,8 @@
 
 ## Release and package policy
 
-- bgcut is in beta. Use prerelease semver and the npm `beta` tag until the browser UI and product behavior are intentionally declared stable.
-- Stable versions have no prerelease suffix and publish to npm `latest`.
+- Use prerelease semver and the npm `beta` tag for release candidates that still need published-package acceptance.
+- Stable versions have no prerelease suffix and publish to npm `latest` only after the corresponding published beta passes end-to-end consumer acceptance.
 - Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
 - Prepare each release in a dedicated PR after the product changes are merged and accepted.

@@ -1,6 +1,6 @@
 # Improvement roadmap
 
-This file tracks work that is not part of the current beta contract.
+This file tracks work that is not part of the current public product contract.
 
 Do not turn planned work into product claims. Performance and output-quality claims need exact commits, repeatable inputs, and recorded results.
 
@@ -14,18 +14,19 @@ The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and fal
 
 The production web target is `bgcut.dev`. Workers Static Assets carry the app shell, while the ONNX model and discrete ONNX Runtime runtime files are served through the same Worker from private R2.
 
-## 1. Finish the browser UI
+## 1. Maintain the browser UI
 
 The normal browser flow is now limited to clicking or dropping an image, running removal automatically, comparing the original with the result, then copying, downloading, redoing, or choosing a new image. Developer diagnostics, timing tables, model details, and internal acceptance controls are not part of the product view.
 
-Before stable:
+For changes to this flow:
 
-1. Check the current layout against the accepted sketch.
+1. Check the current layout against the accepted product UI.
 2. Check drag and drop, keyboard use, mobile layout, processing, errors, slider interaction, copy, download, redo, and new-image behavior in a real browser.
-3. Check normal WebGPU, explicit WebGPU, and explicit WebAssembly through the local Cloudflare Worker and R2 path with a clean console.
-4. Deploy the accepted candidate to `bgcut.dev` and repeat the browser acceptance there.
+3. Check normal WebGPU, explicit WebGPU, and explicit WebAssembly through the local Cloudflare Worker and R2 path with a clean console when runtime behavior changes.
+4. Verify the packaged local app separately from the hosted site when shell or routing behavior changes.
+5. Deploy the accepted candidate to `bgcut.dev` and repeat the affected hosted-browser checks.
 
-Do not add editor controls, batch processing, or advanced settings until this basic flow is accepted.
+Editor controls, batch processing, and advanced settings require their own product scope. Do not fold them into the accepted single-image flow incidentally.
 
 ## 2. Define a browser engine API
 
