@@ -699,6 +699,7 @@ const DocsSidebar = () => {
   const [activeSection, setActiveSection] = createSignal<DocsSectionId>("quickstart");
   let programmaticTarget: DocsSectionId | undefined;
   let scrollAnimationFrame: number | undefined;
+  let suppressBottomResourceUntil = 0;
 
   const docsSections = () =>
     Array.from(
@@ -747,6 +748,29 @@ const DocsSidebar = () => {
       }
     }
 
+    const maxScrollY = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+    const atDocumentBottom = Math.abs(window.scrollY - maxScrollY) <= 2;
+    const resourcesVisible = sections.some((section) => {
+      if (section.id !== "resources") {
+        return false;
+      }
+
+      const rect = section.getBoundingClientRect();
+
+      return rect.bottom > 0 && rect.top < window.innerHeight;
+    });
+
+    if (
+      atDocumentBottom &&
+      resourcesVisible &&
+      performance.now() >= suppressBottomResourceUntil
+    ) {
+      nextSection = "resources";
+    }
+
     setActiveSection(nextSection);
   };
 
@@ -776,6 +800,8 @@ const DocsSidebar = () => {
   const animateScrollTo = (targetY: number, section: DocsSectionId) => {
     cancelScrollAnimation();
     programmaticTarget = section;
+    suppressBottomResourceUntil =
+      section === "resources" ? 0 : performance.now() + DOCS_SCROLL_MS + 120;
     setActiveSection(section);
 
     const startY = window.scrollY;
