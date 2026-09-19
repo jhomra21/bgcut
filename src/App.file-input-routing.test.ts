@@ -82,7 +82,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('class="site-footer-brand brand-link"');
     expect(appSource).toContain("MIT licensed");
     expect(appSource).toContain("Documentation");
-    expect(appSource).toContain("Packaged local app");
+    expect(appSource).toContain(">Local app</a>");
     expect(appSource).toContain("Node API");
     expect(appSource).toContain('import { createBgcut } from "bgcut"');
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
@@ -103,6 +103,17 @@ describe("browser product UI", () => {
     expect(appSource).toContain("route-stage route-stage-");
     expect(appSource).toContain('<SiteHeader page={page()} onNavigate={navigate} />');
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
+  });
+
+  test("tracks the documentation section currently being read", () => {
+    expect(appSource).toContain("const DOC_SECTION_IDS");
+    expect(appSource).toContain("new IntersectionObserver");
+    expect(appSource).toContain('rootMargin: "-10% 0px -78% 0px"');
+    expect(appSource).toContain("Math.min(140, window.innerHeight * 0.2)");
+    expect(appSource).toContain('activeSection() === section ? "location" : undefined');
+    expect(appSource).toContain('aria-current={current("overview")}');
+    expect(appSource).toContain('aria-current={current("node-api")}');
+    expect(appSource).toContain('aria-current={current("resources")}');
   });
 
   test("documents the shipped public interfaces", () => {
