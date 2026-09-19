@@ -33,6 +33,9 @@ describe("browser product UI", () => {
     expect(appSource).toContain('class="brand-title"');
     expect(appSource).toContain('src="/favicon-48x48.png?v=2"');
     expect(appSource).toContain("<span>bgcut</span>");
+    expect(appSource).toContain('<a class="brand-link" href="/" aria-label="bgcut home">');
+    expect(appSource).not.toContain("drop-trigger-mark");
+    expect(appSource).not.toContain(">\n        App\n      </a>");
     expect(appSource).toContain('href="https://github.com/jhomra21/bgcut"');
     expect(appSource).toContain("GitHub");
     expect(appSource).toContain("Click or drag image here");

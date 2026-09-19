@@ -73,9 +73,6 @@ const SiteHeader = (props: { readonly page: SitePage }) => (
     </a>
 
     <nav class="site-nav" aria-label="Main navigation">
-      <a href="/" aria-current={props.page === "home" ? "page" : undefined}>
-        App
-      </a>
       <a href="/docs" aria-current={props.page === "docs" ? "page" : undefined}>
         Docs
       </a>
@@ -410,7 +407,6 @@ const HomePage = () => {
           when={readyImage()}
           fallback={
             <button class="drop-trigger" type="button" onClick={() => fileInput?.click()}>
-              <span class="drop-trigger-mark" aria-hidden="true">+</span>
               <span class="drop-trigger-copy">
                 <strong>Click or drag image here</strong>
                 <span>JPEG, PNG, WebP, or AVIF. Processed locally.</span>

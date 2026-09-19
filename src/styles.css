@@ -163,21 +163,6 @@ figure {
   transition: transform 140ms var(--ease-out);
 }
 
-.drop-trigger-mark {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.05);
-  color: #4f4f49;
-  font-size: 22px;
-  font-weight: 350;
-  line-height: 1;
-}
-
 .drop-trigger-copy {
   display: grid;
   gap: 6px;
