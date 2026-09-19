@@ -281,7 +281,7 @@ See [`docs/operations/releasing.md`](docs/operations/releasing.md) for the relea
 
 ## Project notes
 
-[`docs/engineering/benchmarks.md`](docs/engineering/benchmarks.md) records measured runtime results. [`docs/engineering/graph-capture.md`](docs/engineering/graph-capture.md) records the graph-capture work behind the current browser fast path. [`docs/engineering/roadmap.md`](docs/engineering/roadmap.md) tracks planned engine and editor work. [`DEPLOYING.md`](DEPLOYING.md) covers the Cloudflare web deployment.
+[`docs/engineering/benchmarks.md`](docs/engineering/benchmarks.md) records measured runtime results. [`docs/engineering/graph-capture.md`](docs/engineering/graph-capture.md) records the graph-capture work behind the current browser fast path. [`docs/engineering/roadmap.md`](docs/engineering/roadmap.md) tracks planned engine and editor work. [`docs/operations/deploying.md`](docs/operations/deploying.md) covers the Cloudflare web deployment.
 
 ## Privacy
 
