@@ -8,7 +8,7 @@ import {
   ORT_WASM_PUBLIC_PATH,
   ORT_WEBGPU_WASM_FILENAME,
   ORT_WEBGPU_WASM_PUBLIC_PATH,
-} from "../src/engine/ort-webgpu-runtime";
+} from "../../src/shared/runtime-assets";
 
 const WRANGLER_VERSION = "4.133.0";
 
@@ -16,7 +16,7 @@ const PORT = 8790;
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
-const repositoryRoot = resolve(import.meta.dir, "..");
+const repositoryRoot = resolve(import.meta.dir, "../..");
 
 const smokeState = resolve(repositoryRoot, ".wrangler/smoke-state");
 
