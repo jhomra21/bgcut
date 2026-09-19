@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-const workerSource = await Bun.file(new URL("../worker/index.ts", import.meta.url)).text();
+const workerSource = await Bun.file(new URL("./index.ts", import.meta.url)).text();
 
 const wranglerConfig = await Bun.file(new URL("../wrangler.jsonc", import.meta.url)).text();
 
