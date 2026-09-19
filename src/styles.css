@@ -511,9 +511,19 @@ figure {
   margin-bottom: 18px;
 }
 
-.page-content {
+.route-stage {
   opacity: 1;
-  transition: opacity 150ms var(--ease-out);
+  transition: opacity 75ms var(--ease-out);
+}
+
+.route-stage-out,
+.route-stage-in {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.route-stage-in {
+  transition: none;
 }
 
 .home-shell {
@@ -1008,10 +1018,6 @@ figure {
 
 
 @starting-style {
-  .page-content {
-    opacity: 0;
-  }
-
   .processing-label,
   .error-card {
     opacity: 0;
@@ -1186,7 +1192,6 @@ figure {
 
 
 @media (prefers-reduced-motion: reduce) {
-  .page-content,
   .drop-trigger,
   .primary-link,
   .secondary-link,
@@ -1197,10 +1202,6 @@ figure {
   .error-card {
     transition-duration: 120ms;
     transition-property: opacity, background-color, color, border-color;
-  }
-
-  .page-content {
-    transition-duration: 100ms;
   }
 
   .drop-trigger,
