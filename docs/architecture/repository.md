@@ -8,7 +8,7 @@ bgcut is one published npm package with several runtime boundaries. The reposito
 src/
   app/       Solid UI, hosted site, packaged local-app shell, and UI tests
   engine/    browser image pipeline and ONNX Runtime WebGPU/WebAssembly integration
-  cli/       CLI commands, native orchestration, model cache, and loopback server
+  cli/       CLI commands, file-output orchestration, and loopback server
   node/      reusable Node API and native session/removal orchestration
   native/    Node-only implementation shared by CLI and Node API
   shared/    runtime-neutral model/runtime metadata and pure image math
@@ -17,8 +17,8 @@ src/
 The dependency direction should stay simple:
 
 - `app` may use `engine`.
-- `cli` may use `node`, `native`, `shared`, and model/runtime metadata from `engine` when that metadata is genuinely shared.
-- `node` may use `native` and low-level image/model helpers, but it must not depend on `cli` or the Solid app.
+- `cli` may use `node`, `native`, and `shared`. It must not depend on the browser `engine`.
+- `node` may use `native` and `shared`, but it must not depend on `cli`, `engine`, or the Solid app.
 - `native` may be shared by `cli` and `node`, but it must not depend on either public surface.
 - `shared` must not depend on UI or command surfaces.
 - Browser UI code must not own native Node process behavior.
@@ -45,6 +45,6 @@ If bgcut later gains a second independently versioned package with a concrete co
 
 ## Naming
 
-Use names that describe concrete ownership. Prefer `app`, `engine`, `cli`, `node`, and `shared` over generic buckets such as `core`, `common`, `utils`, or `misc`.
+Use names that describe concrete ownership. Prefer `app`, `engine`, `cli`, `node`, `native`, and `shared` over generic buckets such as `core`, `common`, `utils`, or `misc`.
 
 Add a new top-level source directory only when it represents a durable runtime or product boundary.
