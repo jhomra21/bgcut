@@ -140,7 +140,9 @@ const sendLocalIndex = async (
   const source = await readFile(path, "utf8");
   const html = source.includes(LOCAL_RUNTIME_META)
     ? source
-    : source.replace("</head>", `  ${LOCAL_RUNTIME_META}\n  </head>`);
+    : source.includes("</head>")
+      ? source.replace("</head>", `  ${LOCAL_RUNTIME_META}\n  </head>`)
+      : `${LOCAL_RUNTIME_META}\n${source}`;
   const body = Buffer.from(html, "utf8");
 
   response.statusCode = 200;
@@ -271,6 +273,15 @@ export const startLocalAppServer = async (
       }
 
       const staticPath = await resolveStaticPath(url.pathname, webRoot);
+
+      if (staticPath.endsWith("index.html") && url.pathname !== "/") {
+        response.statusCode = 302;
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("location", "/");
+        response.end();
+
+        return;
+      }
 
       if (staticPath.endsWith("index.html")) {
         await sendLocalIndex(response, staticPath, method);
