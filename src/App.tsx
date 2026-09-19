@@ -741,6 +741,7 @@ const DocsSidebar = () => {
 
     const resources = sections.find((section) => section.id === "resources");
     const resourcesRect = resources?.getBoundingClientRect();
+
     const atDocumentBottom =
       window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
 
@@ -852,6 +853,7 @@ const DocsSidebar = () => {
 
     const sectionTop = window.scrollY + target.getBoundingClientRect().top;
     const desiredY = sectionTop - readingLine();
+
     const maxScrollY = Math.max(
       0,
       document.documentElement.scrollHeight - window.innerHeight,
