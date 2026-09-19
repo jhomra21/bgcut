@@ -57,18 +57,18 @@ describe("browser product UI", () => {
   });
 
 
-  test("exposes linkable docs and about pages", () => {
+  test("exposes the docs page without a separate about surface", () => {
     expect(appSource).toContain('pathname === "/docs"');
-    expect(appSource).toContain('pathname === "/about"');
     expect(appSource).toContain('href="/docs"');
-    expect(appSource).toContain('href="/about"');
+    expect(appSource).not.toContain('pathname === "/about"');
+    expect(appSource).not.toContain('href="/about"');
+    expect(appSource).not.toContain("AboutPage");
     expect(appSource).toContain("Documentation");
     expect(appSource).toContain("Packaged local app");
     expect(appSource).toContain("Node API");
     expect(appSource).toContain('import { createBgcut } from "bgcut"');
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
     expect(appSource).toContain("Privacy");
-    expect(appSource).toContain("Background removal that runs where your image already is.");
   });
 
   test("documents the shipped public interfaces", () => {

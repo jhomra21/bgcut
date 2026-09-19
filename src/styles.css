@@ -515,11 +515,6 @@ figure {
   max-width: 790px;
 }
 
-.about-page {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
 .content-hero {
   padding: 58px 0 64px;
   border-bottom: 1px solid var(--line);
@@ -812,8 +807,7 @@ figure {
   overflow-wrap: anywhere;
 }
 
-.architecture-grid,
-.about-principles {
+.architecture-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
@@ -856,73 +850,6 @@ figure {
 
 .link-list a:hover {
   text-decoration-color: #333330;
-}
-
-.about-principles {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 28px;
-  margin: 0;
-  padding: 46px 0 50px;
-  border-bottom: 1px solid var(--line);
-}
-
-.about-principles > div {
-  min-width: 0;
-  border-top: 1px solid var(--line-strong);
-  padding: 18px 12px 0 0;
-}
-
-.principle-number {
-  display: block;
-  margin-bottom: 28px;
-  color: #a0a09a;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.about-principles h3 {
-  margin: 0 0 9px;
-  color: #292926;
-  font-size: 16px;
-  letter-spacing: -0.02em;
-}
-
-.about-principles p {
-  margin: 0;
-  color: #6b6b65;
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-
-.project-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  margin-top: 38px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.project-facts span {
-  position: relative;
-}
-
-.project-facts span:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -11px;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: #b9b9b2;
 }
 
 @starting-style {
@@ -1037,8 +964,7 @@ figure {
   }
 
   .doc-grid,
-  .architecture-grid,
-  .about-principles {
+  .architecture-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1052,23 +978,6 @@ figure {
 
   .spec-row strong {
     border-bottom: 1px solid #ecece7;
-  }
-
-  .about-principles {
-    gap: 30px;
-  }
-
-  .project-facts {
-    gap: 8px 14px;
-    margin-top: 30px;
-  }
-
-  .project-facts span:not(:last-child)::after {
-    right: -8px;
-  }
-
-  .principle-number {
-    margin-bottom: 10px;
   }
 
   .drop-surface {

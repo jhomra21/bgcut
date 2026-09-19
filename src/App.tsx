@@ -33,7 +33,7 @@ type ResultState =
   | ReadyResult
   | { readonly status: "error"; readonly message: string };
 
-type SitePage = "home" | "docs" | "about";
+type SitePage = "home" | "docs";
 
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
@@ -47,10 +47,6 @@ const currentPage = (): SitePage => {
 
   if (pathname === "/docs") {
     return "docs";
-  }
-
-  if (pathname === "/about") {
-    return "about";
   }
 
   return "home";
@@ -75,9 +71,6 @@ const SiteHeader = (props: { readonly page: SitePage }) => (
     <nav class="site-nav" aria-label="Main navigation">
       <a href="/docs" aria-current={props.page === "docs" ? "page" : undefined}>
         Docs
-      </a>
-      <a href="/about" aria-current={props.page === "about" ? "page" : undefined}>
-        About
       </a>
       <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
         GitHub
@@ -834,109 +827,11 @@ try {
   </main>
 );
 
-const AboutPage = () => (
-  <main class="app-shell content-shell">
-    <SiteHeader page="about" />
-
-    <article class="content-page about-page">
-      <section class="content-hero about-hero">
-        <div class="eyebrow">About</div>
-        <h2>Background removal that runs where your image already is.</h2>
-        <p>
-          bgcut is a local-first background-removal tool with public source, built around one pinned
-          BiRefNet model and a small set of surfaces that share the same product contract.
-        </p>
-        <div class="hero-actions">
-          <a class="primary-link" href="/docs">Read the docs</a>
-          <a class="secondary-link" href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
-            View source
-          </a>
-        </div>
-        <div class="project-facts" aria-label="bgcut project facts">
-          <span>Local inference</span>
-          <span>WebGPU first</span>
-          <span>Node API</span>
-          <span>Public source</span>
-        </div>
-      </section>
-
-      <section class="about-principles" aria-label="Project principles">
-        <div>
-          <span class="principle-number">01</span>
-          <h3>Local by default</h3>
-          <p>
-            The browser and native package process source images on the user's machine rather than
-            sending them to a bgcut inference service.
-          </p>
-        </div>
-        <div>
-          <span class="principle-number">02</span>
-          <h3>One model contract</h3>
-          <p>
-            The project pins the model revision, ONNX artifact, size, and hash so browser and
-            native behavior can be validated against a known input.
-          </p>
-        </div>
-        <div>
-          <span class="principle-number">03</span>
-          <h3>Useful from multiple surfaces</h3>
-          <p>
-            The hosted UI is for direct use, the local app brings that UI to npm, the CLI is for
-            automation, and the Node API is for applications that need reusable sessions.
-          </p>
-        </div>
-      </section>
-
-      <section class="doc-section">
-        <div class="eyebrow">How it works</div>
-        <h3>The same removal pipeline, adapted to each runtime</h3>
-        <p>
-          Images are decoded, resized and normalized for a 512 x 512 BiRefNet inference pass,
-          converted into a foreground matte, resized back to the source dimensions, and composed
-          into the final output. Browser execution prefers WebGPU with a WebAssembly fallback.
-          Native Node execution can use WebGPU or CPU.
-        </p>
-      </section>
-
-      <section class="doc-section">
-        <div class="eyebrow">Why a local app too?</div>
-        <h3>The web UI without depending on the hosted site</h3>
-        <p>
-          Installing bgcut gives you the same UI on a loopback server. The package serves its own
-          static web build and ONNX Runtime browser files while reusing the validated native model
-          cache. That makes the visual workflow available from <code>npx bgcut</code> as well as
-          from bgcut.dev.
-        </p>
-      </section>
-
-      <section class="doc-section">
-        <div class="eyebrow">Project</div>
-        <h3>Public source and inspectable</h3>
-        <p>
-          The repository contains the browser app, native CLI, Node API, model validation,
-          Cloudflare Worker, package smoke tests, deployment configuration, benchmarks, and release
-          automation in one codebase.
-        </p>
-        <div class="link-list">
-          <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">Source on GitHub</a>
-          <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">Package on npm</a>
-          <a href="https://github.com/jhomra21/bgcut/releases" target="_blank" rel="noreferrer">Release history</a>
-          <a href="/docs">Documentation</a>
-        </div>
-      </section>
-    </article>
-  </main>
-);
-
 const App = () => {
   const page = currentPage();
 
   if (page === "docs") {
     return <DocsPage />;
-  }
-
-  if (page === "about") {
-    return <AboutPage />;
   }
 
   return <HomePage />;
