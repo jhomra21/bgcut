@@ -4,6 +4,7 @@ import {
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
 } from "../engine/ort-webgpu-runtime.ts";
+import type { AssetFetcher, R2BucketBinding, R2ObjectMetadata } from "./types.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
 
@@ -52,7 +53,7 @@ const resolveR2Asset = (pathname: string): R2Asset | undefined => {
   return undefined;
 };
 
-const objectHeaders = (object: R2Object, contentType: string): Headers => {
+const objectHeaders = (object: R2ObjectMetadata, contentType: string): Headers => {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("cache-control", IMMUTABLE_CACHE_CONTROL);
@@ -64,8 +65,8 @@ const objectHeaders = (object: R2Object, contentType: string): Headers => {
 };
 
 type Env = {
-  readonly ASSETS: Fetcher;
-  readonly MODELS: R2Bucket;
+  readonly ASSETS: AssetFetcher;
+  readonly MODELS: R2BucketBinding;
 };
 
 export default {
