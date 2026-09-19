@@ -18,10 +18,14 @@ describe("site design contract", () => {
     expect(styles).toContain("@media (prefers-contrast: more)");
   });
 
-  test("keeps shared site chrome stable while page content changes", () => {
+  test("keeps every page inside the same root site bounds", () => {
     expect(styles).toContain(".site-header-shell");
     expect(styles).toContain(".home-shell");
+    expect(styles).toContain(".content-shell");
+    expect(styles).toContain(".legal-shell");
     expect(styles).toContain("width: min(920px, calc(100% - 40px))");
+    expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
+    expect(styles).toContain("gap: 36px");
     expect(styles).toContain(".page-content");
     expect(styles).toContain("transition: opacity 150ms var(--ease-out)");
     expect(styles).toContain(".docs-sidebar");
