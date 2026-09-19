@@ -29,6 +29,7 @@ test("local app server binds an available loopback port and serves the web UI", 
 
     const page = await fetch(server.url);
     expect(page.status).toBe(200);
+
     const pageHtml = await page.text();
     expect(pageHtml).toContain("bgcut local");
     expect(pageHtml).toContain('<meta name="bgcut-runtime" content="local" />');
