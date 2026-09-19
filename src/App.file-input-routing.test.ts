@@ -196,7 +196,7 @@ describe("browser product UI", () => {
 
   test("keeps website documentation aligned with the shipped runtime behavior", () => {
     expect(appSource).toContain("If <code>--port</code> is omitted");
-    expect(appSource).toContain("The server asks the operating system for an available port by default");
+    expect(appSource).toContain("The local UI contains the bgcut brand and removal workflow only");
     expect(appSource).toContain("WebGPU input uses TypeGPU resize and ImageNet normalization");
     expect(appSource).toContain("WebAssembly input uses canvas resize and the same normalization");
     expect(appSource).toContain("Sharp/libvips decode and orientation");
