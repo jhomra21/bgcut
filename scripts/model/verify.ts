@@ -5,14 +5,14 @@ import {
   MODEL_FILENAME,
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
-} from "../src/engine/model-config";
+} from "../../src/shared/model";
 import { inspectModelFile } from "./model-file";
 
 class ModelVerificationError extends Data.TaggedError("ModelVerificationError")<{
   readonly message: string;
 }> {}
 
-const builtModelPath = resolve(import.meta.dir, "../dist/models", MODEL_FILENAME);
+const builtModelPath = resolve(import.meta.dir, "../../dist/models", MODEL_FILENAME);
 
 const verifyBuiltModel = Effect.gen(function* () {
   const fingerprint = yield* inspectModelFile(builtModelPath);
