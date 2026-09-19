@@ -620,13 +620,6 @@ figure {
   min-width: 0;
 }
 
-.docs-intro {
-  padding: 26px 0 30px;
-  border-bottom: 1px solid var(--line);
-  scroll-margin-top: 24px;
-}
-
-.docs-kicker,
 .eyebrow {
   margin-bottom: 9px;
   color: #85857e;
@@ -636,31 +629,6 @@ figure {
   text-transform: uppercase;
 }
 
-.docs-intro h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 32px;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
-  font-weight: 740;
-}
-
-.docs-intro p {
-  max-width: 640px;
-  margin: 10px 0 0;
-  color: var(--ink-muted);
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.docs-intro-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 14px;
-}
-
-.docs-intro-links a,
 .docs-related a {
   color: #454541;
   font-size: 12px;
@@ -670,7 +638,6 @@ figure {
   text-underline-offset: 3px;
 }
 
-.docs-intro-links a:hover,
 .docs-related a:hover {
   color: var(--ink);
   text-decoration-color: var(--ink);
@@ -680,6 +647,10 @@ figure {
   padding: 34px 0 38px;
   border-bottom: 1px solid var(--line);
   scroll-margin-top: 24px;
+}
+
+.docs-quickstart {
+  padding-top: 24px;
 }
 
 .doc-section:last-child {
@@ -725,8 +696,7 @@ figure {
   font-size: 12px !important;
 }
 
-.doc-section code,
-.docs-intro code {
+.doc-section code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.92em;
 }
@@ -1093,21 +1063,13 @@ figure {
     display: none;
   }
 
-  .docs-intro {
-    padding: 28px 0 30px;
-    scroll-margin-top: 58px;
-  }
-
-  .doc-section {
-    scroll-margin-top: 58px;
-  }
-
-  .docs-intro h2 {
-    font-size: 30px;
-  }
-
   .doc-section {
     padding: 32px 0 35px;
+    scroll-margin-top: 58px;
+  }
+
+  .docs-quickstart {
+    padding-top: 24px;
   }
 
   .legal-page {
