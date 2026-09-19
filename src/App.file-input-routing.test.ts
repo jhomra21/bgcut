@@ -122,6 +122,16 @@ describe("browser product UI", () => {
   });
 
 
+
+  test("lets Resources own only the true manual document bottom", () => {
+    expect(appSource).toContain("let suppressBottomResourceUntil = 0");
+    expect(appSource).toContain("const atDocumentBottom = Math.abs(window.scrollY - maxScrollY) <= 2");
+    expect(appSource).toContain("const resourcesVisible = sections.some");
+    expect(appSource).toContain("performance.now() >= suppressBottomResourceUntil");
+    expect(appSource).toContain('nextSection = "resources"');
+    expect(appSource).toContain('section === "resources" ? 0 : performance.now() + DOCS_SCROLL_MS + 120');
+  });
+
   test("keeps click highlighting only for the 120ms programmatic scroll", () => {
     expect(appSource).toContain("const DOCS_SCROLL_MS = 120");
     expect(appSource).toContain("let programmaticTarget: DocsSectionId | undefined");
