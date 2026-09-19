@@ -1095,6 +1095,11 @@ figure {
 
   .docs-intro {
     padding: 28px 0 30px;
+    scroll-margin-top: 58px;
+  }
+
+  .doc-section {
+    scroll-margin-top: 58px;
   }
 
   .docs-intro h2 {
