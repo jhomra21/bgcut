@@ -700,7 +700,7 @@ const DocsSidebar = () => {
     ).filter((section) => sectionIds.has(section.id));
 
     const pickActiveSection = () => {
-      const readingLine = window.innerHeight * 0.28;
+      const readingLine = Math.min(140, window.innerHeight * 0.2);
       let nextSection: DocsSectionId = "overview";
 
       for (const section of sections) {
@@ -715,7 +715,7 @@ const DocsSidebar = () => {
     };
 
     const observer = new IntersectionObserver(pickActiveSection, {
-      rootMargin: "-18% 0px -68% 0px",
+      rootMargin: "-10% 0px -78% 0px",
       threshold: [0, 1],
     });
 
