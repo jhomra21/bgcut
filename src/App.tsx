@@ -690,14 +690,16 @@ const DOC_SECTION_IDS = [
 
 type DocsSectionId = (typeof DOC_SECTION_IDS)[number];
 
+const isDocsSectionId = (sectionId: string): sectionId is DocsSectionId =>
+  DOC_SECTION_IDS.some((candidate) => candidate === sectionId);
+
 const DocsSidebar = () => {
   const [activeSection, setActiveSection] = createSignal<DocsSectionId>("overview");
 
   onSettled(() => {
-    const sectionIds = new Set<string>(DOC_SECTION_IDS);
     const sections = Array.from(
       document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
-    ).filter((section) => sectionIds.has(section.id));
+    ).filter((section) => isDocsSectionId(section.id));
 
     const pickActiveSection = () => {
       const readingLine = Math.min(140, window.innerHeight * 0.2);
@@ -708,7 +710,9 @@ const DocsSidebar = () => {
           break;
         }
 
-        nextSection = section.id as DocsSectionId;
+        if (isDocsSectionId(section.id)) {
+          nextSection = section.id;
+        }
       }
 
       setActiveSection(nextSection);
