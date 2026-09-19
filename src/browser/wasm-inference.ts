@@ -7,13 +7,13 @@ import {
   ModelLoadFailed,
   type BackgroundRemovalError,
 } from "./errors";
-import { MODEL_INPUT_SIZE, loadImageBitmap } from "./image";
+import { loadImageBitmap } from "./image";
+import { MODEL_INPUT_SIZE, MODEL_REVISION } from "../shared/model";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import type { BackgroundRemovalResult } from "./inference";
 import { fetchModelBytes } from "./model-loader";
-import { MODEL_REVISION } from "./model-config";
-import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "./ort-webgpu-runtime";
-import { normalizeRgbaToNchw } from "./preprocess";
+import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "../shared/runtime-assets";
+import { normalizeRgbaToNchw } from "../shared/preprocess";
 import {
   createRemovalTimingRecorder,
   type RemovalTimingRecorder,
