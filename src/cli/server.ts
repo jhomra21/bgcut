@@ -138,11 +138,13 @@ const sendLocalIndex = async (
   method: string,
 ): Promise<void> => {
   const source = await readFile(path, "utf8");
+
   const html = source.includes(LOCAL_RUNTIME_META)
     ? source
     : source.includes("</head>")
       ? source.replace("</head>", `  ${LOCAL_RUNTIME_META}\n  </head>`)
       : `${LOCAL_RUNTIME_META}\n${source}`;
+
   const body = Buffer.from(html, "utf8");
 
   response.statusCode = 200;
