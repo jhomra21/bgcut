@@ -16,6 +16,25 @@
 - oxlint is required.
 - Tests should cover observable behavior and contracts rather than private implementation details.
 
+## Repository layout
+
+- `src/app/`: Solid UI, hosted-site shell, local-app shell, styles, and app-level tests.
+- `src/engine/`: browser inference, WebGPU/WebAssembly runtime code, image processing, and engine tests.
+- `src/cli/`: command parsing, headless CLI behavior, model cache, and the packaged loopback server.
+- `src/node/`: reusable Node API and native ONNX Runtime execution.
+- `src/shared/`: utilities shared by native surfaces without UI or CLI ownership.
+- `src/worker/`: Cloudflare Worker routing and Worker-specific tests.
+- `scripts/brand/`: generated brand assets.
+- `scripts/cloudflare/`: Cloudflare build, runtime upload, and smoke tooling.
+- `scripts/model/`: model preparation and integrity tooling.
+- `scripts/package/`: npm package preparation and installed-consumer smoke tests.
+- `tests/`: repository-level policy tests that do not belong to one runtime surface.
+- `docs/operations/`: deployment and release runbooks.
+- `docs/engineering/`: benchmark and implementation records.
+- `docs/roadmap.md`: planned work that is outside the current public product contract.
+
+Keep the repository as one package until a concrete second package needs an independent dependency or release boundary. OpenCode and Pi use workspaces because they ship many distinct packages; bgcut should copy their ownership clarity, not their monorepo size.
+
 ## Anti-slop
 
 - The vendored anti-slop plugin lives at `tools/oxlint/anti-slop/` and comes from `dmmulroy/anti-slop`.
@@ -49,7 +68,7 @@
 - `build:cloudflare` must omit `public/models`, remove discrete ONNX Runtime runtime files from Static Assets, and fail if one leaks back into the static payload.
 - Keep the standard ONNX Runtime WASM fallback as a separate compatibility path. Both runtime binaries belong in R2 even though they serve different execution paths.
 - Run `bun run cloudflare:dry-run` and `bun run cloudflare:runtime:smoke` for web deployment changes.
-- Run the local R2 and Worker path before the first production deploy. See `DEPLOYING.md`.
+- Run the local R2 and Worker path before the first production deploy. See `docs/operations/deploying.md`.
 - Do not deploy `bgcut.dev` to production until the exact browser candidate has passed visual and interaction acceptance.
 - Production deploys run through Cloudflare Workers Builds connected directly to GitHub. `main` is the production branch.
 - Keep the Cloudflare build command blank; `wrangler.jsonc` owns the Cloudflare-specific build via `build.command`.
@@ -70,8 +89,8 @@
 - Keep `package.json` repository metadata aligned with `jhomra21/bgcut` because npm Trusted Publishing checks repository identity.
 - The npm package must include `skills/bgcut/SKILL.md`.
 - When CLI syntax, formats, provider behavior, caching, privacy behavior, or install commands change, update `README.md`, `skills/bgcut/SKILL.md`, tests, and the changelog together.
-- `scripts/package-smoke.ts` must verify the installed command and bundled skill from the packed tarball.
-- See `RELEASING.md` for the release procedure.
+- `scripts/package/smoke.ts` must verify the installed command and bundled skill from the packed tarball.
+- See `docs/operations/releasing.md` for the release procedure.
 
 ## Reference codebases
 

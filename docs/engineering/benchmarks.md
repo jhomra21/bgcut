@@ -39,7 +39,7 @@ Warm totals were `550`, `418`, `418`, `422`, and `426` ms.
 
 The explicit readback stage includes GPU completion synchronization, so the end-to-end total is more useful than the small `session.run()` span by itself.
 
-See `GRAPH_CAPTURE.md` for the model rewrites and correctness checks behind this result.
+See [`graph-capture.md`](./graph-capture.md) for the model rewrites and correctness checks behind this result.
 
 ## Native CLI acceptance
 
