@@ -18,10 +18,25 @@ describe("site design contract", () => {
     expect(styles).toContain("@media (prefers-contrast: more)");
   });
 
-  test("keeps documentation navigation oriented while reading", () => {
-    expect(styles).toContain(".content-shell .app-header");
-    expect(styles).toContain("position: sticky");
+  test("keeps shared site chrome stable while page content changes", () => {
+    expect(styles).toContain(".site-header-shell");
+    expect(styles).toContain(".home-shell");
+    expect(styles).toContain("width: min(920px, calc(100% - 40px))");
+    expect(styles).toContain(".page-content");
+    expect(styles).toContain("transition: opacity 150ms var(--ease-out)");
     expect(styles).toContain(".docs-sidebar");
-    expect(styles).toContain("top: 76px");
+    expect(styles).toContain("top: 24px");
+  });
+
+  test("animates top navigation state changes at 150ms", () => {
+    expect(styles).toContain("background-color 150ms ease");
+    expect(styles).toContain("color 150ms ease");
+    expect(styles).toContain("box-shadow 150ms ease");
+  });
+
+  test("styles footer and legal pages outside the top navigation", () => {
+    expect(styles).toContain(".site-footer");
+    expect(styles).toContain(".site-footer-links");
+    expect(styles).toContain(".legal-page");
   });
 });
