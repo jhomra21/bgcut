@@ -37,6 +37,7 @@ test("local app server binds an available loopback port and serves the web UI", 
     const fallbackPage = await fetch(new URL("/docs", server.url), {
       redirect: "manual",
     });
+
     expect(fallbackPage.status).toBe(302);
     expect(fallbackPage.headers.get("location")).toBe("/");
   } finally {
