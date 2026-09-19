@@ -208,7 +208,7 @@ src/browser/   browser WebGPU/WASM inference
 src/cli/       command parsing and local server
 src/native/    Node-only inference and model-cache internals
 src/node/      public Node API
-src/shared/    environment-neutral model and image contracts
+src/core/    environment-neutral model and image contracts
 worker/        Cloudflare Worker
 scripts/       build, model, Cloudflare, and package tooling
 test/          repository-wide policy and architecture tests
@@ -251,7 +251,7 @@ bun run cloudflare:runtime:smoke
 bun run cloudflare:dev
 ```
 
-See [`docs/operations/DEPLOYING.md`](docs/operations/DEPLOYING.md) for the exact local checks, one-time R2 setup, and production command.
+See [`docs/operations/deploying.md`](docs/operations/deploying.md) for the exact local checks, one-time R2 setup, and production command.
 
 ## Releases
 
@@ -259,7 +259,7 @@ Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
 
 Stable versions publish to npm `latest` and create normal GitHub releases. Prerelease versions publish to their matching prerelease tag, such as `beta`.
 
-See [`docs/operations/RELEASING.md`](docs/operations/RELEASING.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
+See [`docs/operations/releasing.md`](docs/operations/releasing.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
 
 ## Model
 
@@ -273,7 +273,7 @@ See [`docs/operations/RELEASING.md`](docs/operations/RELEASING.md) for the relea
 
 ## Project notes
 
-[`docs/performance/BENCHMARKS.md`](docs/performance/BENCHMARKS.md) records measured runtime results. [`docs/performance/GRAPH_CAPTURE.md`](docs/performance/GRAPH_CAPTURE.md) records the graph-capture work behind the current browser fast path. [`docs/roadmap/IMPROVEMENTS.md`](docs/roadmap/IMPROVEMENTS.md) tracks planned engine and editor work. [`docs/operations/DEPLOYING.md`](docs/operations/DEPLOYING.md) covers the Cloudflare web deployment.
+[`docs/performance/benchmarks.md`](docs/performance/benchmarks.md) records measured runtime results. [`docs/performance/graph-capture.md`](docs/performance/graph-capture.md) records the graph-capture work behind the current browser fast path. [`docs/roadmap/roadmap.md`](docs/roadmap/roadmap.md) tracks planned engine and editor work. [`docs/operations/deploying.md`](docs/operations/deploying.md) covers the Cloudflare web deployment.
 
 ## Privacy
 
