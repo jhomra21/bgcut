@@ -752,7 +752,9 @@ const DocsSidebar = () => {
       0,
       document.documentElement.scrollHeight - window.innerHeight,
     );
+
     const atDocumentBottom = Math.abs(window.scrollY - maxScrollY) <= 2;
+
     const resourcesVisible = sections.some((section) => {
       if (section.id !== "resources") {
         return false;
