@@ -66,18 +66,32 @@ describe("browser product UI", () => {
   });
 
 
-  test("exposes the docs page without a separate about surface", () => {
+  test("exposes docs plus footer-only legal pages without an about surface", () => {
     expect(appSource).toContain('pathname === "/docs"');
+    expect(appSource).toContain('pathname === "/privacy"');
+    expect(appSource).toContain('pathname === "/terms"');
     expect(appSource).toContain('href="/docs"');
+    expect(appSource).toContain('href="/privacy"');
+    expect(appSource).toContain('href="/terms"');
     expect(appSource).not.toContain('pathname === "/about"');
     expect(appSource).not.toContain('href="/about"');
     expect(appSource).not.toContain("AboutPage");
+    expect(appSource).toContain("SiteFooter");
+    expect(appSource).toContain("MIT licensed");
     expect(appSource).toContain("Documentation");
     expect(appSource).toContain("Packaged local app");
     expect(appSource).toContain("Node API");
     expect(appSource).toContain('import { createBgcut } from "bgcut"');
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
-    expect(appSource).toContain("Privacy");
+  });
+
+  test("uses client-side navigation so shared site chrome stays mounted", () => {
+    expect(appSource).toContain("window.history.pushState");
+    expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
+    expect(appSource).toContain('<SiteHeader page={page()} onNavigate={navigate} />');
+    expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
+    expect(appSource).toContain('class="page-content home-shell"');
+    expect(appSource).toContain('class="page-content content-shell"');
   });
 
   test("documents the shipped public interfaces", () => {
