@@ -33,7 +33,9 @@ type ResultState =
   | ReadyResult
   | { readonly status: "error"; readonly message: string };
 
-type SitePage = "home" | "docs";
+type SitePage = "home" | "docs" | "privacy" | "terms";
+
+type Navigate = (page: SitePage) => void;
 
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
@@ -49,12 +51,55 @@ const currentPage = (): SitePage => {
     return "docs";
   }
 
+  if (pathname === "/privacy") {
+    return "privacy";
+  }
+
+  if (pathname === "/terms") {
+    return "terms";
+  }
+
   return "home";
 };
 
-const SiteHeader = (props: { readonly page: SitePage }) => (
+const pathForPage = (page: SitePage): string => {
+  if (page === "docs") {
+    return "/docs";
+  }
+
+  if (page === "privacy") {
+    return "/privacy";
+  }
+
+  if (page === "terms") {
+    return "/terms";
+  }
+
+  return "/";
+};
+
+const shouldHandleInternalNavigation = (event: MouseEvent): boolean =>
+  event.button === 0 &&
+  !event.metaKey &&
+  !event.ctrlKey &&
+  !event.shiftKey &&
+  !event.altKey;
+
+const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
   <header class="app-header">
-    <a class="brand-link" href="/" aria-label="bgcut home">
+    <a
+      class="brand-link"
+      href="/"
+      aria-label="bgcut home"
+      onClick={(event) => {
+        if (!shouldHandleInternalNavigation(event)) {
+          return;
+        }
+
+        event.preventDefault();
+        props.onNavigate("home");
+      }}
+    >
       <h1 class="brand-title">
         <img
           class="brand-mark"
@@ -69,7 +114,18 @@ const SiteHeader = (props: { readonly page: SitePage }) => (
     </a>
 
     <nav class="site-nav" aria-label="Main navigation">
-      <a href="/docs" aria-current={props.page === "docs" ? "page" : undefined}>
+      <a
+        href="/docs"
+        aria-current={props.page === "docs" ? "page" : undefined}
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("docs");
+        }}
+      >
         Docs
       </a>
       <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
@@ -77,6 +133,43 @@ const SiteHeader = (props: { readonly page: SitePage }) => (
       </a>
     </nav>
   </header>
+);
+
+const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
+  <footer class="site-footer">
+    <div class="site-footer-meta">
+      <span>bgcut</span>
+      <span>MIT licensed</span>
+    </div>
+    <nav class="site-footer-links" aria-label="Footer navigation">
+      <a
+        href="/privacy"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("privacy");
+        }}
+      >
+        Privacy
+      </a>
+      <a
+        href="/terms"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("terms");
+        }}
+      >
+        Terms
+      </a>
+    </nav>
+  </footer>
 );
 
 const HomePage = () => {
@@ -409,9 +502,7 @@ const HomePage = () => {
   });
 
   return (
-    <main class="app-shell">
-      <SiteHeader page="home" />
-
+    <main class="page-content home-shell">
       <section
         class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
         onClick={handleSurfaceClick}
@@ -555,10 +646,8 @@ const HomePage = () => {
   );
 };
 
-const DocsPage = () => (
-  <main class="app-shell content-shell">
-    <SiteHeader page="docs" />
-
+const DocsPage = (props: { readonly onNavigate: Navigate }) => (
+  <main class="page-content content-shell">
     <div class="content-layout">
       <aside class="docs-sidebar" aria-label="Documentation sections">
         <a href="#overview">Overview</a>
@@ -584,7 +673,20 @@ const DocsPage = () => (
             <span>Images stay on your machine. The model runs in your browser or local Node process.</span>
           </div>
           <div class="hero-actions">
-            <a class="primary-link" href="/">Open web app</a>
+            <a
+              class="primary-link"
+              href="/"
+              onClick={(event) => {
+                if (!shouldHandleInternalNavigation(event)) {
+                  return;
+                }
+
+                event.preventDefault();
+                props.onNavigate("home");
+              }}
+            >
+              Open web app
+            </a>
             <a class="secondary-link" href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">
               npm package
             </a>
@@ -872,14 +974,184 @@ try {
   </main>
 );
 
+const PrivacyPage = () => (
+  <main class="page-content legal-shell">
+    <article class="legal-page">
+      <div class="eyebrow">Privacy</div>
+      <h2>Your images stay on your device.</h2>
+      <p class="legal-updated">Last updated September 18, 2026</p>
+
+      <section>
+        <h3>Local image processing</h3>
+        <p>
+          bgcut is designed so source images, decoded pixels, masks, and generated outputs are
+          processed on your device. The hosted web app runs inference in your browser. The packaged
+          local app runs on loopback, and the CLI and Node API run in your local Node process.
+        </p>
+      </section>
+
+      <section>
+        <h3>Network requests</h3>
+        <p>
+          The hosted app requests its application files, ONNX Runtime files, and model artifact
+          through bgcut.dev and Cloudflare infrastructure. Native use may download the pinned model
+          from the bgcut GitHub release when it is not already cached. Those requests may expose
+          ordinary request metadata such as IP address, user agent, timing, and requested URL to
+          the infrastructure providers used to deliver those files.
+        </p>
+      </section>
+
+      <section>
+        <h3>No image upload service</h3>
+        <p>
+          bgcut does not operate a hosted image-inference endpoint for the product. Your source
+          image is not sent to bgcut.dev for background removal.
+        </p>
+      </section>
+
+      <section>
+        <h3>Accounts, analytics, and cookies</h3>
+        <p>
+          The current bgcut application code has no account system, product analytics, telemetry,
+          or application cookies. If that changes, this policy should be updated before the new
+          collection is introduced.
+        </p>
+      </section>
+
+      <section>
+        <h3>Third-party services</h3>
+        <p>
+          Links to GitHub, npm, and other third-party services are governed by those services'
+          privacy policies. Cloudflare and GitHub may process request metadata according to their
+          own policies when they deliver bgcut assets or downloads.
+        </p>
+      </section>
+
+      <section>
+        <h3>Changes and questions</h3>
+        <p>
+          This policy may change as bgcut evolves. Material changes will be reflected on this page.
+          Questions can be raised through the public bgcut GitHub repository.
+        </p>
+      </section>
+    </article>
+  </main>
+);
+
+const TermsPage = () => (
+  <main class="page-content legal-shell">
+    <article class="legal-page">
+      <div class="eyebrow">Terms</div>
+      <h2>Terms of use</h2>
+      <p class="legal-updated">Last updated September 18, 2026</p>
+
+      <section>
+        <h3>Using bgcut</h3>
+        <p>
+          You may use bgcut and bgcut.dev for lawful purposes. You are responsible for the images
+          you process and for having the rights or permission needed to use them.
+        </p>
+      </section>
+
+      <section>
+        <h3>Software license</h3>
+        <p>
+          bgcut's original source code is licensed under the MIT License. Third-party dependencies,
+          vendored code, ONNX Runtime components, and model artifacts remain subject to their own
+          licenses and terms.
+        </p>
+      </section>
+
+      <section>
+        <h3>No warranty</h3>
+        <p>
+          bgcut is provided as-is and without warranties of any kind to the extent permitted by
+          law. Background-removal output can be imperfect, and the hosted service may change,
+          become unavailable, or stop being offered.
+        </p>
+      </section>
+
+      <section>
+        <h3>Limitation of liability</h3>
+        <p>
+          To the extent permitted by law, the bgcut project and its contributors are not liable for
+          indirect, incidental, special, consequential, or other damages arising from use of the
+          software or hosted site.
+        </p>
+      </section>
+
+      <section>
+        <h3>Third-party software and services</h3>
+        <p>
+          bgcut relies on third-party software, hosting, package distribution, and model artifacts.
+          Those components and services may have separate terms, licenses, and availability.
+        </p>
+      </section>
+
+      <section>
+        <h3>Changes</h3>
+        <p>
+          These terms may be updated as bgcut changes. Continued use after an update means you are
+          using bgcut under the then-current terms.
+        </p>
+      </section>
+    </article>
+  </main>
+);
+
 const App = () => {
-  const page = currentPage();
+  const [page, setPage] = createSignal<SitePage>(currentPage());
 
-  if (page === "docs") {
-    return <DocsPage />;
-  }
+  const navigate: Navigate = (nextPage) => {
+    if (nextPage === page()) {
+      return;
+    }
 
-  return <HomePage />;
+    window.history.pushState(null, "", pathForPage(nextPage));
+    setPage(nextPage);
+    window.scrollTo(0, 0);
+  };
+
+  onSettled(() => {
+    const handlePopState = () => {
+      setPage(currentPage());
+      window.scrollTo(0, 0);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => window.removeEventListener("popstate", handlePopState);
+  });
+
+  return (
+    <div class="site-root">
+      <div class="site-header-shell">
+        <SiteHeader page={page()} onNavigate={navigate} />
+      </div>
+
+      <Show
+        when={page() === "docs"}
+        fallback={
+          <Show
+            when={page() === "privacy"}
+            fallback={
+              <Show when={page() === "terms"} fallback={<HomePage />}>
+                <TermsPage />
+              </Show>
+            }
+          >
+            <PrivacyPage />
+          </Show>
+        }
+      >
+        <DocsPage onNavigate={navigate} />
+      </Show>
+
+      <div class="site-footer-shell">
+        <SiteFooter onNavigate={navigate} />
+      </div>
+    </div>
+  );
 };
 
 export default App;
