@@ -122,6 +122,20 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain('aria-current={current("overview")}');
   });
 
+
+  test("keeps sidebar clicks pinned to their requested docs section", () => {
+    expect(appSource).toContain("let pinnedSection: DocsSectionId | undefined");
+    expect(appSource).toContain("const navigateToSection = (event: MouseEvent, section: DocsSectionId)");
+    expect(appSource).toContain("pinnedSection = section");
+    expect(appSource).toContain("setActiveSection(section)");
+    expect(appSource).toContain('section === "model" || section === "architecture" || section === "resources"');
+    expect(appSource).toContain('target.scrollIntoView({ behavior: "smooth", block })');
+    expect(appSource).toContain('window.addEventListener("wheel", releasePinnedSection, { passive: true })');
+    expect(appSource).toContain('window.addEventListener("touchstart", releasePinnedSection, { passive: true })');
+    expect(appSource).toContain('onClick={(event) => navigateToSection(event, "model")}');
+    expect(appSource).toContain('onClick={(event) => navigateToSection(event, "architecture")}');
+  });
+
   test("documents the shipped public interfaces", () => {
     expect(appSource).toContain("bgcut serve --json");
     expect(appSource).toContain("bgcut photo.jpg --gpu");
