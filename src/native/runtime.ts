@@ -3,11 +3,11 @@ import * as ort from "onnxruntime-node";
 import { access } from "node:fs/promises";
 import sharp from "sharp";
 
-import { MODEL_INPUT_SIZE } from "../engine/image";
-import { logitToAlphaByte } from "../engine/matte";
-import { resizeRgbaLinearToNchw } from "../engine/preprocess";
-import { compositeAlphaMask } from "../cli/alpha-mask";
-import { CliModelError, ensureCliModel } from "../cli/model-cache";
+import { MODEL_INPUT_SIZE } from "../shared/model";
+import { logitToAlphaByte } from "../shared/matte";
+import { resizeRgbaLinearToNchw } from "../shared/preprocess";
+import { compositeAlphaMask } from "./alpha-mask";
+import { CliModelError, ensureCliModel } from "./model-cache";
 
 export type BgcutEngine = "auto" | "gpu" | "cpu";
 
