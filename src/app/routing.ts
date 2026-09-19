@@ -3,7 +3,7 @@ export type SitePage = "home" | "docs" | "privacy" | "terms";
 export type Navigate = (page: SitePage) => void;
 
 export const currentPage = (): SitePage => {
-  const pathname = window.location.pathname.replace(/\\/+$/u, "") || "/";
+  const pathname = window.location.pathname.replace(/\/+$/u, "") || "/";
 
   if (pathname === "/docs") {
     return "docs";
