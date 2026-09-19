@@ -6,6 +6,14 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.3.1 - 2026-09-19
+
+- Promoted the accepted `0.3.1-beta.0` package to stable after published-package validation of the packaged local shell, image removal, comparison slider, clipboard and paste actions, keyboard shortcuts, file download, health endpoint, and local route redirects.
+- The packaged local app now shows only the bgcut brand and removal workflow, while Docs, GitHub navigation, Privacy, Terms, and the site footer remain on `bgcut.dev`.
+- Non-root local app routes redirect to `/` while `/health`, `/models/...`, and `/runtime/...` remain available to the packaged app.
+- `bgcut.dev` remains the full hosted site with Docs/GitHub navigation, Privacy and Terms pages, footer links, and section-aware documentation navigation.
+- No background-removal model, inference algorithm, CLI command syntax, or Node API contract changed from the accepted beta.
+
 ## 0.3.1-beta.0 - 2026-09-19
 
 - Separated the packaged local app from the hosted website: `bgcut` and `bgcut serve` now show only the bgcut brand and background-removal workflow, without Docs, GitHub, Privacy, Terms, or the hosted footer.
