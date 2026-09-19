@@ -860,11 +860,14 @@ const DocsSidebar = () => {
 
     const rect = target.getBoundingClientRect();
     const sectionTop = window.scrollY + rect.top;
+
     const centerSection =
       section === "model" || section === "architecture" || section === "resources";
+
     const desiredY = centerSection
       ? sectionTop - (window.innerHeight - rect.height) / 2
       : sectionTop - 24;
+
     const maxScrollY = Math.max(
       0,
       document.documentElement.scrollHeight - window.innerHeight,
