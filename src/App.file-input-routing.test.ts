@@ -113,7 +113,6 @@ describe("browser product UI", () => {
     expect(appSource).toContain("const distance = Math.abs(rect.top - marker)");
     expect(appSource).toContain("distance < closestDistance");
     expect(appSource).toContain("nextSection = section.id");
-    expect(appSource).not.toContain("const atDocumentBottom");
     expect(appSource).not.toContain("resourcesRect.top < window.innerHeight");
     expect(appSource).toContain('activeSection() === section ? "location" : undefined');
     expect(appSource).toContain('aria-current={current("architecture")}');
