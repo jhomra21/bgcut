@@ -693,6 +693,7 @@ const isDocsSectionId = (sectionId: string): sectionId is DocsSectionId =>
 
 const DocsSidebar = () => {
   const [activeSection, setActiveSection] = createSignal<DocsSectionId>("quickstart");
+  let pinnedSection: DocsSectionId | undefined;
 
   onSettled(() => {
     const sections = Array.from(
@@ -700,6 +701,12 @@ const DocsSidebar = () => {
     ).filter((section) => isDocsSectionId(section.id));
 
     const pickActiveSection = () => {
+      if (pinnedSection !== undefined) {
+        setActiveSection(pinnedSection);
+
+        return;
+      }
+
       const documentBottom = document.documentElement.scrollHeight;
       const viewportBottom = window.scrollY + window.innerHeight;
 
@@ -725,6 +732,29 @@ const DocsSidebar = () => {
       setActiveSection(nextSection);
     };
 
+    const releasePinnedSection = () => {
+      if (pinnedSection === undefined) {
+        return;
+      }
+
+      pinnedSection = undefined;
+      pickActiveSection();
+    };
+
+    const handleScrollKey = (event: KeyboardEvent) => {
+      if (
+        event.key === "ArrowDown" ||
+        event.key === "ArrowUp" ||
+        event.key === "PageDown" ||
+        event.key === "PageUp" ||
+        event.key === "Home" ||
+        event.key === "End" ||
+        event.key === " "
+      ) {
+        releasePinnedSection();
+      }
+    };
+
     const observer = new IntersectionObserver(pickActiveSection, {
       rootMargin: "-10% 0px -78% 0px",
       threshold: [0, 1],
@@ -735,12 +765,18 @@ const DocsSidebar = () => {
     }
 
     window.addEventListener("scroll", pickActiveSection, { passive: true });
+    window.addEventListener("wheel", releasePinnedSection, { passive: true });
+    window.addEventListener("touchstart", releasePinnedSection, { passive: true });
+    window.addEventListener("keydown", handleScrollKey);
     window.addEventListener("resize", pickActiveSection);
     pickActiveSection();
 
     return () => {
       observer.disconnect();
       window.removeEventListener("scroll", pickActiveSection);
+      window.removeEventListener("wheel", releasePinnedSection);
+      window.removeEventListener("touchstart", releasePinnedSection);
+      window.removeEventListener("keydown", handleScrollKey);
       window.removeEventListener("resize", pickActiveSection);
     };
   });
@@ -748,26 +784,98 @@ const DocsSidebar = () => {
   const current = (section: DocsSectionId): "location" | undefined =>
     activeSection() === section ? "location" : undefined;
 
+  const navigateToSection = (event: MouseEvent, section: DocsSectionId) => {
+    if (!shouldHandleInternalNavigation(event)) {
+      return;
+    }
+
+    const target = document.getElementById(section);
+
+    if (target === null) {
+      return;
+    }
+
+    event.preventDefault();
+    pinnedSection = section;
+    setActiveSection(section);
+    window.history.replaceState(null, "", `#${section}`);
+
+    const block: ScrollLogicalPosition =
+      section === "model" || section === "architecture" || section === "resources"
+        ? "center"
+        : "start";
+
+    target.scrollIntoView({ behavior: "smooth", block });
+  };
+
   return (
     <aside class="docs-sidebar" aria-label="Documentation sections">
       <div class="docs-sidebar-group">
         <span class="docs-sidebar-label">Start</span>
-        <a href="#quickstart" aria-current={current("quickstart")}>Quickstart</a>
+        <a
+          href="#quickstart"
+          aria-current={current("quickstart")}
+          onClick={(event) => navigateToSection(event, "quickstart")}
+        >
+          Quickstart
+        </a>
       </div>
 
       <div class="docs-sidebar-group">
         <span class="docs-sidebar-label">Use</span>
-        <a href="#web-ui" aria-current={current("web-ui")}>Web UI</a>
-        <a href="#local-app" aria-current={current("local-app")}>Local app</a>
-        <a href="#cli" aria-current={current("cli")}>CLI</a>
-        <a href="#node-api" aria-current={current("node-api")}>Node API</a>
+        <a
+          href="#web-ui"
+          aria-current={current("web-ui")}
+          onClick={(event) => navigateToSection(event, "web-ui")}
+        >
+          Web UI
+        </a>
+        <a
+          href="#local-app"
+          aria-current={current("local-app")}
+          onClick={(event) => navigateToSection(event, "local-app")}
+        >
+          Local app
+        </a>
+        <a
+          href="#cli"
+          aria-current={current("cli")}
+          onClick={(event) => navigateToSection(event, "cli")}
+        >
+          CLI
+        </a>
+        <a
+          href="#node-api"
+          aria-current={current("node-api")}
+          onClick={(event) => navigateToSection(event, "node-api")}
+        >
+          Node API
+        </a>
       </div>
 
       <div class="docs-sidebar-group">
         <span class="docs-sidebar-label">Reference</span>
-        <a href="#model" aria-current={current("model")}>Model & runtime</a>
-        <a href="#architecture" aria-current={current("architecture")}>Architecture</a>
-        <a href="#resources" aria-current={current("resources")}>Resources</a>
+        <a
+          href="#model"
+          aria-current={current("model")}
+          onClick={(event) => navigateToSection(event, "model")}
+        >
+          Model & runtime
+        </a>
+        <a
+          href="#architecture"
+          aria-current={current("architecture")}
+          onClick={(event) => navigateToSection(event, "architecture")}
+        >
+          Architecture
+        </a>
+        <a
+          href="#resources"
+          aria-current={current("resources")}
+          onClick={(event) => navigateToSection(event, "resources")}
+        >
+          Resources
+        </a>
       </div>
     </aside>
   );
