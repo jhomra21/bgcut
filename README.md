@@ -234,7 +234,7 @@ bun run cloudflare:runtime:smoke
 bun run cloudflare:dev
 ```
 
-See [`DEPLOYING.md`](DEPLOYING.md) for the exact local checks, one-time R2 setup, and production command.
+See [`docs/operations/deploying.md`](docs/operations/deploying.md) for the exact local checks, one-time R2 setup, and production command.
 
 ## Releases
 
@@ -242,7 +242,7 @@ Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
 
 Stable versions publish to npm `latest` and create normal GitHub releases. Prerelease versions publish to their matching prerelease tag, such as `beta`.
 
-See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
+See [`docs/operations/releasing.md`](docs/operations/releasing.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
 
 ## Model
 
@@ -256,7 +256,7 @@ See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](
 
 ## Project notes
 
-[`BENCHMARKS.md`](BENCHMARKS.md) records measured runtime results. [`GRAPH_CAPTURE.md`](GRAPH_CAPTURE.md) records the graph-capture work behind the current browser fast path. [`IMPROVEMENTS.md`](IMPROVEMENTS.md) tracks planned engine and editor work. [`DEPLOYING.md`](DEPLOYING.md) covers the Cloudflare web deployment.
+[`docs/engineering/benchmarks.md`](docs/engineering/benchmarks.md) records measured runtime results. [`docs/engineering/graph-capture.md`](docs/engineering/graph-capture.md) records the graph-capture work behind the current browser fast path. [`docs/engineering/roadmap.md`](docs/engineering/roadmap.md) tracks planned engine and editor work. [`DEPLOYING.md`](DEPLOYING.md) covers the Cloudflare web deployment.
 
 ## Privacy
 

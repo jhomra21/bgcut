@@ -98,4 +98,4 @@ The current production path keeps the model same-origin while keeping inference 
 
 This changes model delivery only. Source images still stay on the user's machine and inference still runs locally.
 
-See `DEPLOYING.md` for the current R2 bootstrap and production deployment flow.
+See `../operations/deploying.md` for the current R2 bootstrap and production deployment flow.

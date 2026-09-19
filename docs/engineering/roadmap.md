@@ -8,7 +8,7 @@ Do not turn planned work into product claims. Performance and output-quality cla
 
 The current product has two working paths.
 
-The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtime WebGPU graph capture, GPU output readback, and source-resolution PNG export. The accepted graph-capture benchmark recorded a 422 ms warm median on the documented 1600x1598 cat fixture. See `GRAPH_CAPTURE.md` for the exact commit, runtime, model, and timings.
+The browser path uses a shared WebGPU device, TypeGPU preprocessing, ONNX Runtime WebGPU graph capture, GPU output readback, and source-resolution PNG export. The accepted graph-capture benchmark recorded a 422 ms warm median on the documented 1600x1598 cat fixture. See `graph-capture.md` for the exact commit, runtime, model, and timings.
 
 The CLI uses ONNX Runtime Node. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
@@ -168,7 +168,7 @@ Application code should not need ONNX tensor shapes, TypeGPU internals, or raw G
 
 ## Reference repositories
 
-The reference repositories in `AGENTS.md` are useful for specific implementation questions:
+The reference repositories in `../../AGENTS.md` are useful for specific implementation questions:
 
 - Diffusion Studio for editor and media-runtime boundaries
 - DialKit for small live controls

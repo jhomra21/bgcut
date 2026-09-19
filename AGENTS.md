@@ -49,7 +49,7 @@
 - `build:cloudflare` must omit `public/models`, remove discrete ONNX Runtime runtime files from Static Assets, and fail if one leaks back into the static payload.
 - Keep the standard ONNX Runtime WASM fallback as a separate compatibility path. Both runtime binaries belong in R2 even though they serve different execution paths.
 - Run `bun run cloudflare:dry-run` and `bun run cloudflare:runtime:smoke` for web deployment changes.
-- Run the local R2 and Worker path before the first production deploy. See `DEPLOYING.md`.
+- Run the local R2 and Worker path before the first production deploy. See `docs/operations/deploying.md`.
 - Do not deploy `bgcut.dev` to production until the exact browser candidate has passed visual and interaction acceptance.
 - Production deploys run through Cloudflare Workers Builds connected directly to GitHub. `main` is the production branch.
 - Keep the Cloudflare build command blank; `wrangler.jsonc` owns the Cloudflare-specific build via `build.command`.
@@ -71,7 +71,7 @@
 - The npm package must include `skills/bgcut/SKILL.md`.
 - When CLI syntax, formats, provider behavior, caching, privacy behavior, or install commands change, update `README.md`, `skills/bgcut/SKILL.md`, tests, and the changelog together.
 - `scripts/package-smoke.ts` must verify the installed command and bundled skill from the packed tarball.
-- See `RELEASING.md` for the release procedure.
+- See `docs/operations/releasing.md` for the release procedure.
 
 ## Reference codebases
 
