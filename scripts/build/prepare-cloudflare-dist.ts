@@ -3,9 +3,9 @@ import { join, relative, resolve } from "node:path";
 
 const CLOUDFLARE_ASSET_LIMIT_BYTES = 25 * 1024 * 1024;
 
-const distDirectory = resolve(import.meta.dir, "../dist");
+const distDirectory = resolve(import.meta.dir, "../../dist");
 
-const publicDirectory = resolve(import.meta.dir, "../public");
+const publicDirectory = resolve(import.meta.dir, "../../public");
 
 const SITE_ROOT_FILES = [
   "apple-touch-icon.png",
