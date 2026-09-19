@@ -72,7 +72,7 @@ bgcut serve --json
 
 `serve --json` does not open a browser. It prints one JSON object containing the resolved URL, host, port, and PID. Without `--port`, the operating system chooses an available port.
 
-The local server binds to `127.0.0.1`. It serves the packaged browser UI, the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
+The local server binds to `127.0.0.1`. Its UI is the remover only; hosted Docs, GitHub navigation, Privacy, and Terms are not part of the local app. Non-root app routes redirect to `/`. The server also serves the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
 
 The browser UI supports these shortcuts:
 
