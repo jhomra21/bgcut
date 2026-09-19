@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 
-import { MODEL_INPUT_SIZE } from "../engine/image";
-import { prepareImage } from "./runtime";
+import { MODEL_INPUT_SIZE } from "../shared/model";
+import { prepareNativeImage } from "./runtime";
 
 test("prepareImage decodes AVIF by content even when the filename ends in .jpg", async () => {
   const directory = await mkdtemp(join(tmpdir(), "bgcut-avif-input-"));
@@ -25,7 +25,7 @@ test("prepareImage decodes AVIF by content even when the filename ends in .jpg",
       .avif({ lossless: true })
       .toFile(inputPath);
 
-    const prepared = await Effect.runPromise(prepareImage(inputPath));
+    const prepared = await Effect.runPromise(prepareNativeImage(inputPath));
 
     expect(prepared.width).toBe(3);
     expect(prepared.height).toBe(2);
