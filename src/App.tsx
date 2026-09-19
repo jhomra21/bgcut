@@ -37,6 +37,12 @@ type SitePage = "home" | "docs" | "privacy" | "terms";
 
 type Navigate = (page: SitePage) => void;
 
+type RouteTransitionPhase = "idle" | "out" | "in";
+
+type HistoryMode = "push" | "none";
+
+const ROUTE_FADE_MS = 75;
+
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
   const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
@@ -1122,27 +1128,88 @@ const TermsPage = () => (
 );
 
 const App = () => {
-  const [page, setPage] = createSignal<SitePage>(currentPage());
+  const initialPage = currentPage();
+  const [page, setPage] = createSignal<SitePage>(initialPage);
+  const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
+  let routeTarget = initialPage;
+  let transitionTimer: number | undefined;
+  let transitionFrame: number | undefined;
+  let transitionVersion = 0;
 
-  const navigate: Navigate = (nextPage) => {
-    if (nextPage === page()) {
+  const clearRouteTransition = () => {
+    if (transitionTimer !== undefined) {
+      window.clearTimeout(transitionTimer);
+      transitionTimer = undefined;
+    }
+
+    if (transitionFrame !== undefined) {
+      window.cancelAnimationFrame(transitionFrame);
+      transitionFrame = undefined;
+    }
+  };
+
+  const transitionTo = (nextPage: SitePage, historyMode: HistoryMode) => {
+    if (nextPage === routeTarget && routePhase() !== "idle") {
       return;
     }
 
-    window.history.pushState(null, "", pathForPage(nextPage));
-    setPage(nextPage);
-    window.scrollTo(0, 0);
+    if (nextPage === page() && routePhase() === "idle") {
+      return;
+    }
+
+    routeTarget = nextPage;
+    clearRouteTransition();
+    transitionVersion += 1;
+    const version = transitionVersion;
+
+    if (nextPage === page()) {
+      setRoutePhase("idle");
+
+      return;
+    }
+
+    setRoutePhase("out");
+
+    transitionTimer = window.setTimeout(() => {
+      if (version !== transitionVersion) {
+        return;
+      }
+
+      transitionTimer = undefined;
+
+      if (historyMode === "push") {
+        window.history.pushState(null, "", pathForPage(nextPage));
+      }
+
+      setPage(nextPage);
+      window.scrollTo(0, 0);
+      setRoutePhase("in");
+
+      transitionFrame = window.requestAnimationFrame(() => {
+        if (version !== transitionVersion) {
+          return;
+        }
+
+        transitionFrame = undefined;
+        setRoutePhase("idle");
+      });
+    }, ROUTE_FADE_MS);
   };
+
+  const navigate: Navigate = (nextPage) => transitionTo(nextPage, "push");
 
   onSettled(() => {
     const handlePopState = () => {
-      setPage(currentPage());
-      window.scrollTo(0, 0);
+      transitionTo(currentPage(), "none");
     };
 
     window.addEventListener("popstate", handlePopState);
 
-    return () => window.removeEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      transitionVersion += 1;
+      clearRouteTransition();
+    };
   });
 
   return (
@@ -1151,23 +1218,25 @@ const App = () => {
         <SiteHeader page={page()} onNavigate={navigate} />
       </div>
 
-      <Show
-        when={page() === "docs"}
-        fallback={
-          <Show
-            when={page() === "privacy"}
-            fallback={
-              <Show when={page() === "terms"} fallback={<HomePage />}>
-                <TermsPage />
-              </Show>
-            }
-          >
-            <PrivacyPage />
-          </Show>
-        }
-      >
-        <DocsPage onNavigate={navigate} />
-      </Show>
+      <div class={`route-stage route-stage-${routePhase()}`}>
+        <Show
+          when={page() === "docs"}
+          fallback={
+            <Show
+              when={page() === "privacy"}
+              fallback={
+                <Show when={page() === "terms"} fallback={<HomePage />}>
+                  <TermsPage />
+                </Show>
+              }
+            >
+              <PrivacyPage />
+            </Show>
+          }
+        >
+          <DocsPage onNavigate={navigate} />
+        </Show>
+      </div>
 
       <div class="site-footer-shell">
         <SiteFooter onNavigate={navigate} />
