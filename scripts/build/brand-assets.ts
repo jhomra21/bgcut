@@ -3,9 +3,9 @@ import { resolve } from "node:path";
 
 import sharp from "sharp";
 
-const assetsDirectory = resolve(import.meta.dir, "../assets");
+const assetsDirectory = resolve(import.meta.dir, "../../assets");
 
-const publicDirectory = resolve(import.meta.dir, "../public");
+const publicDirectory = resolve(import.meta.dir, "../../public");
 
 const encoded = await readFile(
   resolve(assetsDirectory, "bgcut-icon.png.b64"),

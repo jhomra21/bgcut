@@ -1,9 +1,9 @@
 import { copyFile, readdir, rm, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
-const distDirectory = resolve(import.meta.dir, "../dist/web");
+const distDirectory = resolve(import.meta.dir, "../../dist/web");
 
-const publicDirectory = resolve(import.meta.dir, "../public");
+const publicDirectory = resolve(import.meta.dir, "../../public");
 
 const SITE_ROOT_FILES = [
   "apple-touch-icon.png",
