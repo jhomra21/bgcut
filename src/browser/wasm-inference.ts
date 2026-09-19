@@ -8,12 +8,12 @@ import {
   type BackgroundRemovalError,
 } from "./errors";
 import { loadImageBitmap } from "./image";
-import { MODEL_INPUT_SIZE, MODEL_REVISION } from "../shared/model";
+import { MODEL_INPUT_SIZE, MODEL_REVISION } from "../core/model";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import type { BackgroundRemovalResult } from "./inference";
 import { fetchModelBytes } from "./model-loader";
-import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "../shared/runtime-assets";
-import { normalizeRgbaToNchw } from "../shared/preprocess";
+import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "../core/runtime-assets";
+import { normalizeRgbaToNchw } from "../core/preprocess";
 import {
   createRemovalTimingRecorder,
   type RemovalTimingRecorder,
