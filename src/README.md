@@ -2,7 +2,7 @@
 
 bgcut is one published package, so the repository uses internal module boundaries instead of workspaces.
 
-- `app/`: Solid UI and site shells.
+- `app/`: Solid UI. `pages/` owns page-level workflows/content, `components/` owns reusable UI/site chrome, and `App.tsx` owns routing orchestration.
 - `core/`: runtime-neutral model/runtime constants, preprocessing, and matte math.
 - `browser/`: browser inference runtime.
 - `native/`: Node-only inference, model cache, model-file integrity, and image-output helpers.

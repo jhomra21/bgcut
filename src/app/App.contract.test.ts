@@ -1,18 +1,31 @@
 import { describe, expect, test } from "bun:test";
 
-const appSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
+const appSource = (
+  await Promise.all(
+    [
+      "./App.tsx",
+      "./routing.ts",
+      "./components/SiteChrome.tsx",
+      "./components/DocsSidebar.tsx",
+      "./pages/HomePage.tsx",
+      "./pages/DocsPage.tsx",
+      "./pages/PrivacyPage.tsx",
+      "./pages/TermsPage.tsx",
+    ].map((path) => Bun.file(new URL(path, import.meta.url)).text()),
+  )
+).join("\n");
 
 const sourceInputBlock = (): string => {
   const start = appSource.indexOf('id="source-file-input"');
 
   if (start < 0) {
-    throw new Error("Could not find source-file-input in App.tsx.");
+    throw new Error("Could not find source-file-input in the app source.");
   }
 
   const end = appSource.indexOf("/>", start);
 
   if (end < 0) {
-    throw new Error("Could not find the end of source-file-input in App.tsx.");
+    throw new Error("Could not find the end of source-file-input in the app source.");
   }
 
   return appSource.slice(start, end);
