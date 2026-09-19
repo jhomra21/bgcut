@@ -33,7 +33,15 @@ type ResultState =
   | ReadyResult
   | { readonly status: "error"; readonly message: string };
 
-type SitePage = "home" | "docs" | "about";
+type SitePage = "home" | "docs" | "privacy" | "terms";
+
+type Navigate = (page: SitePage) => void;
+
+type RouteTransitionPhase = "idle" | "out" | "in";
+
+type HistoryMode = "push" | "none";
+
+const ROUTE_FADE_MS = 75;
 
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
@@ -49,16 +57,55 @@ const currentPage = (): SitePage => {
     return "docs";
   }
 
-  if (pathname === "/about") {
-    return "about";
+  if (pathname === "/privacy") {
+    return "privacy";
+  }
+
+  if (pathname === "/terms") {
+    return "terms";
   }
 
   return "home";
 };
 
-const SiteHeader = (props: { readonly page: SitePage }) => (
+const pathForPage = (page: SitePage): string => {
+  if (page === "docs") {
+    return "/docs";
+  }
+
+  if (page === "privacy") {
+    return "/privacy";
+  }
+
+  if (page === "terms") {
+    return "/terms";
+  }
+
+  return "/";
+};
+
+const shouldHandleInternalNavigation = (event: MouseEvent): boolean =>
+  event.button === 0 &&
+  !event.metaKey &&
+  !event.ctrlKey &&
+  !event.shiftKey &&
+  !event.altKey;
+
+const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
   <header class="app-header">
-    <a class="brand-link" href="/" aria-label="bgcut home">
+    <a
+      class="brand-link"
+      href="/"
+      aria-label="bgcut home"
+      onClick={(event) => {
+        if (!shouldHandleInternalNavigation(event)) {
+          return;
+        }
+
+        event.preventDefault();
+        props.onNavigate("home");
+      }}
+    >
       <h1 class="brand-title">
         <img
           class="brand-mark"
@@ -73,20 +120,84 @@ const SiteHeader = (props: { readonly page: SitePage }) => (
     </a>
 
     <nav class="site-nav" aria-label="Main navigation">
-      <a href="/" aria-current={props.page === "home" ? "page" : undefined}>
-        App
-      </a>
-      <a href="/docs" aria-current={props.page === "docs" ? "page" : undefined}>
+      <a
+        href="/docs"
+        aria-current={props.page === "docs" ? "page" : undefined}
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("docs");
+        }}
+      >
         Docs
-      </a>
-      <a href="/about" aria-current={props.page === "about" ? "page" : undefined}>
-        About
       </a>
       <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
         GitHub
       </a>
     </nav>
   </header>
+);
+
+const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
+  <footer class="site-footer">
+    <div class="site-footer-meta">
+      <a
+        class="site-footer-brand brand-link"
+        href="/"
+        aria-label="bgcut home"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("home");
+        }}
+      >
+        <img
+          class="brand-mark"
+          src="/favicon-48x48.png?v=2"
+          alt=""
+          width="22"
+          height="22"
+          aria-hidden="true"
+        />
+        <span>bgcut</span>
+      </a>
+      <span>MIT licensed</span>
+    </div>
+    <nav class="site-footer-links" aria-label="Footer navigation">
+      <a
+        href="/privacy"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("privacy");
+        }}
+      >
+        Privacy
+      </a>
+      <a
+        href="/terms"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("terms");
+        }}
+      >
+        Terms
+      </a>
+    </nav>
+  </footer>
 );
 
 const HomePage = () => {
@@ -305,13 +416,48 @@ const HomePage = () => {
     }
   };
 
+  const handlePaste = (event: ClipboardEvent) => {
+    if (processing()) {
+      return;
+    }
+
+    const clipboardItems = event.clipboardData?.items;
+
+    if (clipboardItems === undefined) {
+      return;
+    }
+
+    for (const item of Array.from(clipboardItems)) {
+      if (item.kind !== "file" || !item.type.startsWith("image/")) {
+        continue;
+      }
+
+      const file = item.getAsFile();
+
+      if (file !== null) {
+        event.preventDefault();
+        selectImage(file);
+
+        return;
+      }
+    }
+  };
+
   const handleKeyboardShortcut = (event: KeyboardEvent) => {
-    if (
-      event.defaultPrevented ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.altKey
-    ) {
+    if (event.defaultPrevented || event.altKey) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+
+    if ((event.metaKey || event.ctrlKey) && key === "o" && !processing()) {
+      event.preventDefault();
+      chooseNewImage();
+
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey) {
       return;
     }
 
@@ -328,8 +474,6 @@ const HomePage = () => {
     ) {
       return;
     }
-
-    const key = event.key.toLowerCase();
 
     if (key === "n" && !processing()) {
       event.preventDefault();
@@ -366,9 +510,11 @@ const HomePage = () => {
 
   onSettled(() => {
     window.addEventListener("keydown", handleKeyboardShortcut);
+    window.addEventListener("paste", handlePaste);
 
     return () => {
       window.removeEventListener("keydown", handleKeyboardShortcut);
+      window.removeEventListener("paste", handlePaste);
       selectionVersion += 1;
 
       if (activeSourceUrl !== undefined) {
@@ -384,9 +530,7 @@ const HomePage = () => {
   });
 
   return (
-    <main class="app-shell">
-      <SiteHeader page="home" />
-
+    <main class="page-content home-shell">
       <section
         class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
         onClick={handleSurfaceClick}
@@ -410,7 +554,20 @@ const HomePage = () => {
           when={readyImage()}
           fallback={
             <button class="drop-trigger" type="button" onClick={() => fileInput?.click()}>
-              Click or drag image here
+              <span class="drop-trigger-copy">
+                <span class="drop-trigger-shortcuts" aria-label="Image input shortcuts">
+                  <span aria-keyshortcuts="Meta+O Control+O">
+                    <kbd class="shortcut-key input-shortcut-key" aria-label="Choose image shortcut, Command O">⌘O</kbd>
+                  </span>
+                </span>
+                <strong>Click or drag image here</strong>
+                <span class="drop-trigger-shortcuts" aria-label="Image input shortcuts">
+                  <span aria-keyshortcuts="Meta+V Control+V">
+                    or paste <kbd class="shortcut-key input-shortcut-key" aria-label="Paste image shortcut, Command V">⌘V</kbd>
+                  </span>
+                  <span class="drop-trigger-format">JPEG, PNG, WebP, or AVIF</span>
+                </span>
+              </span>
             </button>
           }
         >
@@ -517,73 +674,314 @@ const HomePage = () => {
   );
 };
 
-const DocsPage = () => (
-  <main class="app-shell content-shell">
-    <SiteHeader page="docs" />
+const DOC_SECTION_IDS = [
+  "quickstart",
+  "web-ui",
+  "local-app",
+  "cli",
+  "node-api",
+  "model",
+  "architecture",
+  "resources",
+] as const;
 
+type DocsSectionId = (typeof DOC_SECTION_IDS)[number];
+
+const isDocsSectionId = (sectionId: string): sectionId is DocsSectionId =>
+  DOC_SECTION_IDS.some((candidate) => candidate === sectionId);
+
+const DOCS_SCROLL_MS = 120;
+
+const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
+
+const DocsSidebar = () => {
+  const [activeSection, setActiveSection] = createSignal<DocsSectionId>("quickstart");
+  let programmaticTarget: DocsSectionId | undefined;
+  let scrollAnimationFrame: number | undefined;
+  let suppressBottomResourceUntil = 0;
+
+  const docsSections = () =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
+    ).filter((section) => isDocsSectionId(section.id));
+
+  const readingPosition = (): number => window.innerHeight * 0.42;
+
+  const cancelScrollAnimation = () => {
+    if (scrollAnimationFrame !== undefined) {
+      window.cancelAnimationFrame(scrollAnimationFrame);
+      scrollAnimationFrame = undefined;
+    }
+
+    programmaticTarget = undefined;
+  };
+
+  const pickActiveSection = () => {
+    if (programmaticTarget !== undefined) {
+      setActiveSection(programmaticTarget);
+
+      return;
+    }
+
+    const sections = docsSections();
+    const marker = readingPosition();
+    let nextSection: DocsSectionId = "quickstart";
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    for (const section of sections) {
+      if (!isDocsSectionId(section.id)) {
+        continue;
+      }
+
+      const rect = section.getBoundingClientRect();
+
+      if (rect.bottom <= 0 || rect.top >= window.innerHeight) {
+        continue;
+      }
+
+      const distance = Math.abs(rect.top - marker);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        nextSection = section.id;
+      }
+    }
+
+    const maxScrollY = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+
+    const atDocumentBottom = Math.abs(window.scrollY - maxScrollY) <= 2;
+
+    const resourcesVisible = sections.some((section) => {
+      if (section.id !== "resources") {
+        return false;
+      }
+
+      const rect = section.getBoundingClientRect();
+
+      return rect.bottom > 0 && rect.top < window.innerHeight;
+    });
+
+    if (
+      atDocumentBottom &&
+      resourcesVisible &&
+      performance.now() >= suppressBottomResourceUntil
+    ) {
+      nextSection = "resources";
+    }
+
+    setActiveSection(nextSection);
+  };
+
+  const releaseProgrammaticScroll = () => {
+    if (programmaticTarget === undefined && scrollAnimationFrame === undefined) {
+      return;
+    }
+
+    cancelScrollAnimation();
+    pickActiveSection();
+  };
+
+  const handleScrollKey = (event: KeyboardEvent) => {
+    if (
+      event.key === "ArrowDown" ||
+      event.key === "ArrowUp" ||
+      event.key === "PageDown" ||
+      event.key === "PageUp" ||
+      event.key === "Home" ||
+      event.key === "End" ||
+      event.key === " "
+    ) {
+      releaseProgrammaticScroll();
+    }
+  };
+
+  const animateScrollTo = (targetY: number, section: DocsSectionId) => {
+    cancelScrollAnimation();
+    programmaticTarget = section;
+    suppressBottomResourceUntil =
+      section === "resources" ? 0 : performance.now() + DOCS_SCROLL_MS + 120;
+    setActiveSection(section);
+
+    const startY = window.scrollY;
+    const distance = targetY - startY;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion || Math.abs(distance) < 1) {
+      window.scrollTo(0, targetY);
+      programmaticTarget = undefined;
+      pickActiveSection();
+
+      return;
+    }
+
+    const startedAt = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - startedAt) / DOCS_SCROLL_MS, 1);
+      window.scrollTo(0, startY + distance * easeOutCubic(progress));
+
+      if (progress < 1) {
+        scrollAnimationFrame = window.requestAnimationFrame(tick);
+
+        return;
+      }
+
+      scrollAnimationFrame = undefined;
+      programmaticTarget = undefined;
+      pickActiveSection();
+    };
+
+    scrollAnimationFrame = window.requestAnimationFrame(tick);
+  };
+
+  onSettled(() => {
+    window.addEventListener("scroll", pickActiveSection, { passive: true });
+    window.addEventListener("wheel", releaseProgrammaticScroll, { passive: true });
+    window.addEventListener("touchstart", releaseProgrammaticScroll, { passive: true });
+    window.addEventListener("keydown", handleScrollKey);
+    window.addEventListener("resize", pickActiveSection);
+    pickActiveSection();
+
+    return () => {
+      cancelScrollAnimation();
+      window.removeEventListener("scroll", pickActiveSection);
+      window.removeEventListener("wheel", releaseProgrammaticScroll);
+      window.removeEventListener("touchstart", releaseProgrammaticScroll);
+      window.removeEventListener("keydown", handleScrollKey);
+      window.removeEventListener("resize", pickActiveSection);
+    };
+  });
+
+  const current = (section: DocsSectionId): "location" | undefined =>
+    activeSection() === section ? "location" : undefined;
+
+  const navigateToSection = (event: MouseEvent, section: DocsSectionId) => {
+    if (!shouldHandleInternalNavigation(event)) {
+      return;
+    }
+
+    const target = document.getElementById(section);
+
+    if (target === null) {
+      return;
+    }
+
+    event.preventDefault();
+    window.history.replaceState(null, "", `#${section}`);
+
+    const sectionTop = window.scrollY + target.getBoundingClientRect().top;
+    const desiredY = sectionTop - Math.min(160, window.innerHeight * 0.22);
+
+    const maxScrollY = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+
+    animateScrollTo(Math.min(Math.max(desiredY, 0), maxScrollY), section);
+  };
+
+  return (
+    <aside class="docs-sidebar" aria-label="Documentation sections">
+      <div class="docs-sidebar-group">
+        <span class="docs-sidebar-label">Start</span>
+        <a
+          href="#quickstart"
+          aria-current={current("quickstart")}
+          onClick={(event) => navigateToSection(event, "quickstart")}
+        >
+          Quickstart
+        </a>
+      </div>
+
+      <div class="docs-sidebar-group">
+        <span class="docs-sidebar-label">Use</span>
+        <a
+          href="#web-ui"
+          aria-current={current("web-ui")}
+          onClick={(event) => navigateToSection(event, "web-ui")}
+        >
+          Web UI
+        </a>
+        <a
+          href="#local-app"
+          aria-current={current("local-app")}
+          onClick={(event) => navigateToSection(event, "local-app")}
+        >
+          Local app
+        </a>
+        <a
+          href="#cli"
+          aria-current={current("cli")}
+          onClick={(event) => navigateToSection(event, "cli")}
+        >
+          CLI
+        </a>
+        <a
+          href="#node-api"
+          aria-current={current("node-api")}
+          onClick={(event) => navigateToSection(event, "node-api")}
+        >
+          Node API
+        </a>
+      </div>
+
+      <div class="docs-sidebar-group">
+        <span class="docs-sidebar-label">Reference</span>
+        <a
+          href="#model"
+          aria-current={current("model")}
+          onClick={(event) => navigateToSection(event, "model")}
+        >
+          Model & runtime
+        </a>
+        <a
+          href="#architecture"
+          aria-current={current("architecture")}
+          onClick={(event) => navigateToSection(event, "architecture")}
+        >
+          Architecture
+        </a>
+        <a
+          href="#resources"
+          aria-current={current("resources")}
+          onClick={(event) => navigateToSection(event, "resources")}
+        >
+          Resources
+        </a>
+      </div>
+    </aside>
+  );
+};
+
+const DocsPage = () => (
+  <main class="page-content content-shell">
     <div class="content-layout">
-      <aside class="docs-sidebar" aria-label="Documentation sections">
-        <a href="#overview">Overview</a>
-        <a href="#web-ui">Web UI</a>
-        <a href="#local-app">Local app</a>
-        <a href="#cli">CLI</a>
-        <a href="#node-api">Node API</a>
-        <a href="#model">Model and runtime</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#privacy">Privacy</a>
-      </aside>
+      <DocsSidebar />
 
       <article class="content-page docs-page">
-        <section id="overview" class="content-hero">
-          <div class="eyebrow">Documentation</div>
-          <h2>Use bgcut in the browser, from the command line, or inside Node.</h2>
-          <p>
-            bgcut is one local background-removal system with four public surfaces: the hosted
-            web app, the packaged local web app, the native CLI, and the reusable Node API.
+        <section id="quickstart" class="doc-section docs-quickstart">
+          <h3>Quickstart</h3>
+          <p>Run the local web app from npm without installing bgcut globally:</p>
+          <pre class="code-block"><code>npx bgcut</code></pre>
+          <p class="docs-related">
+            For headless removal, run <a href="#cli"><code>npx bgcut photo.jpg</code></a>.
+            For application code, <a href="#node-api">install bgcut and use the Node API</a>.
           </p>
-          <div class="hero-actions">
-            <a class="primary-link" href="/">Open web app</a>
-            <a class="secondary-link" href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">
-              npm package
-            </a>
-          </div>
-        </section>
-
-        <section class="doc-section">
-          <h3>Quick start</h3>
-          <div class="doc-grid">
-            <div class="doc-card">
-              <div class="doc-card-label">Hosted web</div>
-              <p>Open bgcut.dev, choose an image, and let the browser run inference locally.</p>
-              <pre class="code-block"><code>https://bgcut.dev</code></pre>
-            </div>
-            <div class="doc-card">
-              <div class="doc-card-label">Local web app</div>
-              <p>Run the same UI from the npm package on a loopback server.</p>
-              <pre class="code-block"><code>npx bgcut</code></pre>
-            </div>
-            <div class="doc-card">
-              <div class="doc-card-label">CLI</div>
-              <p>Use the file-in/file-out path for scripts and terminal workflows.</p>
-              <pre class="code-block"><code>npx bgcut photo.jpg</code></pre>
-            </div>
-            <div class="doc-card">
-              <div class="doc-card-label">Node API</div>
-              <p>Keep one native ONNX Runtime session alive across many removals.</p>
-              <pre class="code-block"><code>npm install bgcut</code></pre>
-            </div>
-          </div>
         </section>
 
         <section id="web-ui" class="doc-section">
-          <div class="eyebrow">Web UI</div>
-          <h3>The browser workflow</h3>
+          <h3>Web UI</h3>
           <p>
-            The product UI is intentionally small: choose or drag an image, wait for removal,
-            compare the source and cutout, then copy, download, redo, or choose a new image.
-            JPEG, PNG, WebP, and AVIF are supported.
+            Choose, drag, or paste an image. bgcut removes the background in the browser. Use the
+            comparison slider to inspect the result, then copy or download the PNG, rerun the
+            removal, or choose another image. The browser accepts JPEG, PNG, WebP, and AVIF.
           </p>
           <div class="shortcut-list" aria-label="Keyboard shortcuts">
+            <div><kbd>⌘/Ctrl+O</kbd><span>Choose image</span></div>
+            <div><kbd>⌘/Ctrl+V</kbd><span>Paste image</span></div>
             <div><kbd>N</kbd><span>New image</span></div>
             <div><kbd>C</kbd><span>Copy PNG</span></div>
             <div><kbd>D</kbd><span>Download PNG</span></div>
@@ -591,18 +989,18 @@ const DocsPage = () => (
             <div><kbd>←</kbd><kbd>→</kbd><span>Move focused comparison slider</span></div>
           </div>
           <p>
-            The hosted app prefers ONNX Runtime WebGPU. If WebGPU inference cannot run, the
-            browser can use ONNX Runtime WebAssembly instead. Image decode, preprocessing,
-            inference, matte compositing, and export stay on the user's device.
+            Automatic browser mode tries ONNX Runtime WebGPU first. If WebGPU is unavailable or
+            its setup or inference fails, bgcut retries with ONNX Runtime WebAssembly. Both paths
+            run inference on the user's device.
           </p>
         </section>
 
         <section id="local-app" class="doc-section">
-          <div class="eyebrow">Packaged local app</div>
-          <h3>Run the web UI from npm</h3>
+          <h3>Local app</h3>
           <p>
-            Running bgcut with no image starts the packaged UI on <code>127.0.0.1</code> using
-            an available port and opens the browser.
+            Run bgcut with no image to start the packaged web UI on <code>127.0.0.1</code>.
+            The server asks the operating system for an available port by default and opens that
+            URL in the browser.
           </p>
           <pre class="code-block"><code>{`npm install -g bgcut
 bgcut
@@ -619,20 +1017,21 @@ bgcut serve --no-open
 # machine-readable startup metadata
 bgcut serve --json`}</code></pre>
           <p>
-            <code>serve --json</code> selects an available port, does not open a browser, and
-            prints one JSON object with <code>url</code>, <code>host</code>, <code>port</code>,
-            and <code>pid</code>. The server also exposes <code>/health</code>, the validated
-            model route under <code>/models/...</code>, and the installed ONNX Runtime browser
-            assets under <code>/runtime/...</code>.
+            <code>serve --json</code> does not open a browser. It prints one JSON object with
+            <code>url</code>, <code>host</code>, <code>port</code>, and <code>pid</code>.
+            If <code>--port</code> is omitted, the operating system chooses an available port.
+            The server exposes <code>/health</code>, the validated model under
+            <code>/models/...</code>, and the installed ONNX Runtime browser files under
+            <code>/runtime/...</code>. Image inference still runs in the browser.
           </p>
         </section>
 
         <section id="cli" class="doc-section">
-          <div class="eyebrow">CLI</div>
-          <h3>One image in, one image out</h3>
+          <h3>CLI</h3>
           <p>
-            Passing an image selects the native headless path. The default output is a transparent
-            PNG next to the input image. The explicit <code>remove</code> command is equivalent.
+            Pass one image path to run headless removal. By default, bgcut writes
+            <code>&lt;name&gt;-nobg.png</code> next to the input image. The explicit
+            <code>remove</code> command does the same thing.
           </p>
           <pre class="code-block"><code>{`bgcut photo.jpg
 bgcut remove photo.jpg
@@ -657,26 +1056,26 @@ bgcut photo.jpg --cpu`}</code></pre>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Automatic engine</strong>
-              <span role="cell">Try native WebGPU, then CPU if session creation fails</span>
+              <span role="cell">Create a WebGPU session first, then use CPU if session creation fails</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">GPU-only</strong>
-              <span role="cell"><code>--gpu</code> never silently switches to CPU</span>
+              <span role="cell"><code>--gpu</code> returns an error if the WebGPU session cannot start</span>
             </div>
           </div>
           <p>
-            The native path uses Sharp/libvips to inspect image contents instead of trusting the
-            filename extension alone. Format aliases such as <code>-png</code>, <code>-webp</code>,
-            <code>-jpg</code>, <code>-gpu</code>, and <code>-cpu</code> are also accepted.
+            Sharp/libvips decodes the image from its contents, not from the filename extension.
+            bgcut also accepts <code>-png</code>, <code>-webp</code>, <code>-jpg</code>,
+            <code>-gpu</code>, and <code>-cpu</code>.
           </p>
         </section>
 
         <section id="node-api" class="doc-section">
-          <div class="eyebrow">Node API</div>
-          <h3>Reuse one inference session</h3>
+          <h3>Node API</h3>
           <p>
-            Install bgcut as an application dependency and create an engine. One engine owns one
-            native ONNX Runtime session and reuses it until <code>close()</code> is called.
+            Install bgcut as an application dependency, then call <code>createBgcut()</code>.
+            Each created engine owns one ONNX Runtime session and reuses it until
+            <code>close()</code>.
           </p>
           <pre class="code-block"><code>{`import { writeFile } from "node:fs/promises";
 import { createBgcut } from "bgcut";
@@ -694,15 +1093,15 @@ try {
           <div class="spec-table" role="table" aria-label="Node API engines">
             <div class="spec-row" role="row">
               <strong role="cell"><code>auto</code></strong>
-              <span role="cell">Try WebGPU, then CPU if the WebGPU session cannot start</span>
+              <span role="cell">Create a WebGPU session first, then use CPU if creation fails</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell"><code>gpu</code></strong>
-              <span role="cell">Require native WebGPU</span>
+              <span role="cell">Require a WebGPU session</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell"><code>cpu</code></strong>
-              <span role="cell">Require the CPU provider</span>
+              <span role="cell">Require a CPU session</span>
             </div>
           </div>
 
@@ -727,17 +1126,21 @@ try {
   };
 };`}</code></pre>
           <p>
-            The engine also exposes <code>engine</code>, <code>fallbackReason</code>, and setup
-            timing for model preparation and session creation.
+            The returned engine also reports the selected <code>engine</code>, any
+            <code>fallbackReason</code>, and setup timings for model preparation and session
+            creation.
           </p>
         </section>
 
         <section id="model" class="doc-section">
-          <div class="eyebrow">Model and runtime</div>
-          <h3>Pinned BiRefNet Lite 512</h3>
+          <h3>Model and runtime</h3>
+          <p class="docs-section-summary">
+            The model input is 512 x 512. bgcut restores the matte to the source image size before
+            export.
+          </p>
           <p>
-            bgcut uses the <code>studioludens/birefnet-lite-512</code> model pinned to one source
-            revision and one validated ONNX artifact.
+            bgcut uses <code>studioludens/birefnet-lite-512</code> at one pinned source revision
+            and one verified ONNX artifact.
           </p>
           <div class="spec-table" role="table" aria-label="Model metadata">
             <div class="spec-row" role="row">
@@ -766,58 +1169,46 @@ try {
             </div>
           </div>
           <p>
-            The large model is not bundled in the npm tarball. Native surfaces download it when
-            needed, verify the expected artifact, and keep it in the operating-system user cache.
-            The CLI, packaged local app, and Node API share that validated cache.
+            The npm package does not include the 195,872,736-byte model. The CLI, local app, and
+            Node API download the pinned artifact from the bgcut GitHub release when needed, verify
+            its byte size and SHA-256, and reuse the operating-system user cache.
           </p>
         </section>
 
         <section id="architecture" class="doc-section">
-          <div class="eyebrow">Architecture</div>
-          <h3>One product, two runtime families</h3>
+          <h3>Architecture</h3>
+          <p class="docs-section-summary">
+            Both runtime paths use the same 512 x 512 model and composite the matte at the source
+            image size.
+          </p>
           <div class="architecture-grid">
             <div class="architecture-card">
               <strong>Browser path</strong>
               <span>Browser decode</span>
-              <span>TypeGPU resize + ImageNet normalization</span>
-              <span>ONNX Runtime WebGPU or WASM</span>
-              <span>Matte readback + source-resolution compositing</span>
+              <span>Automatic mode tries WebGPU, then WebAssembly after supported failures</span>
+              <span>WebGPU input uses TypeGPU resize and ImageNet normalization</span>
+              <span>WebAssembly input uses canvas resize and the same normalization</span>
+              <span>Matte compositing at source size</span>
               <span>Transparent PNG export</span>
             </div>
             <div class="architecture-card">
               <strong>Native Node path</strong>
-              <span>Sharp/libvips decode</span>
-              <span>Shared preprocessing contract</span>
+              <span>Sharp/libvips decode and orientation</span>
+              <span>Linear resize and ImageNet normalization</span>
               <span>ONNX Runtime Node WebGPU or CPU</span>
-              <span>Source-resolution matte compositing</span>
-              <span>PNG, WebP, or JPG encode</span>
+              <span>Matte compositing at source size</span>
+              <span>PNG, lossless WebP, or JPG export</span>
             </div>
           </div>
           <p>
-            The hosted site is deployed on Cloudflare Workers. Static app assets are served by the
-            Worker, while the pinned model and discrete ONNX Runtime browser files live in private
-            R2 and are exposed through same-origin <code>/models/*</code> and
-            <code>/runtime/*</code> routes.
+            Cloudflare Workers hosts bgcut.dev. Workers Static Assets serves the app files. Private
+            R2 stores the pinned model and ONNX Runtime browser files, and the Worker exposes them
+            through same-origin <code>/models/*</code> and <code>/runtime/*</code> routes.
           </p>
         </section>
 
-        <section id="privacy" class="doc-section">
-          <div class="eyebrow">Privacy</div>
-          <h3>Your image is not an inference request to bgcut.dev</h3>
-          <p>
-            Source images, decoded pixels, masks, and generated outputs stay on the user's machine.
-            The hosted Worker serves application and runtime files; it does not receive the source
-            image or run image inference for the user.
-          </p>
-          <p>
-            The native package may fetch the pinned model artifact when it is not already cached.
-            That model download is separate from image processing.
-          </p>
-        </section>
-
-        <section class="doc-section">
-          <div class="eyebrow">More</div>
-          <h3>Project links</h3>
+        <section id="resources" class="doc-section">
+          <h3>Resources</h3>
           <div class="link-list">
             <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub repository</a>
             <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">npm package</a>
@@ -830,106 +1221,239 @@ try {
   </main>
 );
 
-const AboutPage = () => (
-  <main class="app-shell content-shell">
-    <SiteHeader page="about" />
+const PrivacyPage = () => (
+  <main class="page-content legal-shell">
+    <article class="legal-page">
+      <div class="eyebrow">Privacy</div>
+      <h2>Your images stay on your device.</h2>
+      <p class="legal-updated">Last updated September 19, 2026</p>
 
-    <article class="content-page about-page">
-      <section class="content-hero">
-        <div class="eyebrow">About</div>
-        <h2>Background removal that runs where your image already is.</h2>
+      <section>
+        <h3>Image processing</h3>
         <p>
-          bgcut is a local-first background-removal tool with public source, built around one pinned
-          BiRefNet model and a small set of surfaces that share the same product contract.
-        </p>
-        <div class="hero-actions">
-          <a class="primary-link" href="/docs">Read the docs</a>
-          <a class="secondary-link" href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
-            View source
-          </a>
-        </div>
-      </section>
-
-      <section class="about-principles" aria-label="Project principles">
-        <div>
-          <span class="principle-number">01</span>
-          <h3>Local by default</h3>
-          <p>
-            The browser and native package process source images on the user's machine rather than
-            sending them to a bgcut inference service.
-          </p>
-        </div>
-        <div>
-          <span class="principle-number">02</span>
-          <h3>One model contract</h3>
-          <p>
-            The project pins the model revision, ONNX artifact, size, and hash so browser and
-            native behavior can be validated against a known input.
-          </p>
-        </div>
-        <div>
-          <span class="principle-number">03</span>
-          <h3>Useful from multiple surfaces</h3>
-          <p>
-            The hosted UI is for direct use, the local app brings that UI to npm, the CLI is for
-            automation, and the Node API is for applications that need reusable sessions.
-          </p>
-        </div>
-      </section>
-
-      <section class="doc-section">
-        <div class="eyebrow">How it works</div>
-        <h3>The same removal pipeline, adapted to each runtime</h3>
-        <p>
-          Images are decoded, resized and normalized for a 512 x 512 BiRefNet inference pass,
-          converted into a foreground matte, resized back to the source dimensions, and composed
-          into the final output. Browser execution prefers WebGPU with a WebAssembly fallback.
-          Native Node execution can use WebGPU or CPU.
+          The hosted app runs background removal in your browser. The local app serves the same
+          browser UI from <code>127.0.0.1</code>, so image inference still runs in the browser.
+          The CLI and Node API process images in the local Node process. bgcut does not send source
+          images, decoded pixels, masks, or generated outputs to a bgcut inference service.
         </p>
       </section>
 
-      <section class="doc-section">
-        <div class="eyebrow">Why a local app too?</div>
-        <h3>The web UI without depending on the hosted site</h3>
+      <section>
+        <h3>Network requests</h3>
         <p>
-          Installing bgcut gives you the same UI on a loopback server. The package serves its own
-          static web build and ONNX Runtime browser files while reusing the validated native model
-          cache. That makes the visual workflow available from <code>npx bgcut</code> as well as
-          from bgcut.dev.
+          The hosted app fetches its app files, ONNX Runtime files, and pinned model from bgcut.dev
+          through Cloudflare. The CLI, local app server, and Node API may download the pinned model
+          from a bgcut GitHub release when the local cache is missing or invalid. Cloudflare and
+          GitHub can receive request metadata such as IP address, user agent, requested URL, and
+          request time.
         </p>
       </section>
 
-      <section class="doc-section">
-        <div class="eyebrow">Project</div>
-        <h3>Public source and inspectable</h3>
+      <section>
+        <h3>Accounts, cookies, and analytics</h3>
         <p>
-          The repository contains the browser app, native CLI, Node API, model validation,
-          Cloudflare Worker, package smoke tests, deployment configuration, benchmarks, and release
-          automation in one codebase.
+          bgcut's application code does not create accounts, set application cookies, or send
+          product analytics or telemetry.
         </p>
-        <div class="link-list">
-          <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">Source on GitHub</a>
-          <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">Package on npm</a>
-          <a href="https://github.com/jhomra21/bgcut/releases" target="_blank" rel="noreferrer">Release history</a>
-          <a href="/docs">Documentation</a>
-        </div>
+      </section>
+
+      <section>
+        <h3>Third-party services</h3>
+        <p>
+          GitHub and npm links take you to third-party sites. Cloudflare delivers bgcut.dev, and
+          GitHub serves native model downloads. Their privacy policies apply to those requests.
+        </p>
+      </section>
+
+      <section>
+        <h3>Changes and questions</h3>
+        <p>
+          The date above changes when this policy changes. Open an issue in the bgcut GitHub
+          repository with privacy questions.
+        </p>
+      </section>
+    </article>
+  </main>
+);
+
+const TermsPage = () => (
+  <main class="page-content legal-shell">
+    <article class="legal-page">
+      <div class="eyebrow">Terms</div>
+      <h2>Terms of use</h2>
+      <p class="legal-updated">Last updated September 19, 2026</p>
+
+      <section>
+        <h3>Scope</h3>
+        <p>
+          These terms cover bgcut.dev and other services operated by the bgcut project. The MIT
+          License governs bgcut's original source code.
+        </p>
+      </section>
+
+      <section>
+        <h3>Your use</h3>
+        <p>
+          Use bgcut only for lawful purposes and only with images you have the right to process.
+          You are responsible for the images you choose and how you use the output.
+        </p>
+      </section>
+
+      <section>
+        <h3>Software licenses</h3>
+        <p>
+          bgcut's original source code is licensed under the MIT License. Third-party dependencies,
+          vendored code, ONNX Runtime components, and model files keep their own licenses and terms.
+        </p>
+      </section>
+
+      <section>
+        <h3>No warranty</h3>
+        <p>
+          bgcut and bgcut.dev are provided "as is" without warranties to the extent permitted by
+          law. Background removal can produce incorrect results. The hosted site may change or
+          become unavailable.
+        </p>
+      </section>
+
+      <section>
+        <h3>Limitation of liability</h3>
+        <p>
+          To the extent permitted by law, the bgcut project and its contributors are not liable for
+          indirect, incidental, special, consequential, or other damages arising from use of the
+          software or hosted site.
+        </p>
+      </section>
+
+      <section>
+        <h3>Third-party software and services</h3>
+        <p>
+          Third-party software and services have their own licenses and terms. Those rules apply
+          when you use them.
+        </p>
+      </section>
+
+      <section>
+        <h3>Changes</h3>
+        <p>
+          Changes to these terms take effect when posted here. The date above shows the current
+          version.
+        </p>
       </section>
     </article>
   </main>
 );
 
 const App = () => {
-  const page = currentPage();
+  const initialPage = currentPage();
+  const [page, setPage] = createSignal<SitePage>(initialPage);
+  const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
+  let routeTarget = initialPage;
+  let transitionTimer: number | undefined;
+  let transitionVersion = 0;
 
-  if (page === "docs") {
-    return <DocsPage />;
-  }
+  const clearRouteTransition = () => {
+    if (transitionTimer !== undefined) {
+      window.clearTimeout(transitionTimer);
+      transitionTimer = undefined;
+    }
+  };
 
-  if (page === "about") {
-    return <AboutPage />;
-  }
+  const transitionTo = (nextPage: SitePage, historyMode: HistoryMode) => {
+    if (nextPage === routeTarget && routePhase() !== "idle") {
+      return;
+    }
 
-  return <HomePage />;
+    if (nextPage === page() && routePhase() === "idle") {
+      return;
+    }
+
+    routeTarget = nextPage;
+    clearRouteTransition();
+    transitionVersion += 1;
+    const version = transitionVersion;
+
+    if (nextPage === page()) {
+      setRoutePhase("idle");
+
+      return;
+    }
+
+    setRoutePhase("out");
+
+    transitionTimer = window.setTimeout(() => {
+      if (version !== transitionVersion) {
+        return;
+      }
+
+      transitionTimer = undefined;
+
+      if (historyMode === "push") {
+        window.history.pushState(null, "", pathForPage(nextPage));
+      }
+
+      setPage(nextPage);
+      window.scrollTo(0, 0);
+      setRoutePhase("in");
+
+      transitionTimer = window.setTimeout(() => {
+        if (version !== transitionVersion) {
+          return;
+        }
+
+        transitionTimer = undefined;
+        setRoutePhase("idle");
+      }, ROUTE_FADE_MS);
+    }, ROUTE_FADE_MS);
+  };
+
+  const navigate: Navigate = (nextPage) => transitionTo(nextPage, "push");
+
+  onSettled(() => {
+    const handlePopState = () => {
+      transitionTo(currentPage(), "none");
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      transitionVersion += 1;
+      clearRouteTransition();
+    };
+  });
+
+  return (
+    <div class="site-root">
+      <div class="site-header-shell">
+        <SiteHeader page={page()} onNavigate={navigate} />
+      </div>
+
+      <div class={`route-stage route-stage-${routePhase()}`}>
+        <Show
+          when={page() === "docs"}
+          fallback={
+            <Show
+              when={page() === "privacy"}
+              fallback={
+                <Show when={page() === "terms"} fallback={<HomePage />}>
+                  <TermsPage />
+                </Show>
+              }
+            >
+              <PrivacyPage />
+            </Show>
+          }
+        >
+          <DocsPage />
+        </Show>
+      </div>
+
+      <div class="site-footer-shell">
+        <SiteFooter onNavigate={navigate} />
+      </div>
+    </div>
+  );
 };
 
 export default App;
