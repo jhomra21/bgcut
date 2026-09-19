@@ -56,8 +56,9 @@ describe("browser product UI", () => {
     expect(appSource).toContain("handlePaste");
     expect(appSource).toContain('window.addEventListener("paste", handlePaste)');
     expect(appSource).toContain('item.type.startsWith("image/")');
-    expect(appSource).toContain("Choose image");
+    expect(appSource).toContain('aria-label="Choose image shortcut, Command O"');
     expect(appSource).toContain("or paste");
+    expect(appSource).toContain("JPEG, PNG, WebP, or AVIF");
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");

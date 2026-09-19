@@ -436,15 +436,17 @@ const HomePage = () => {
           fallback={
             <button class="drop-trigger" type="button" onClick={() => fileInput?.click()}>
               <span class="drop-trigger-copy">
-                <strong>Click or drag image here</strong>
-                <span>JPEG, PNG, WebP, or AVIF. Processed locally.</span>
                 <span class="drop-trigger-shortcuts" aria-label="Image input shortcuts">
                   <span aria-keyshortcuts="Meta+O Control+O">
-                    Choose image <kbd aria-label="Command O">⌘O</kbd>
+                    <kbd class="shortcut-key input-shortcut-key" aria-label="Choose image shortcut, Command O">⌘O</kbd>
                   </span>
+                </span>
+                <strong>Click or drag image here</strong>
+                <span class="drop-trigger-shortcuts" aria-label="Image input shortcuts">
                   <span aria-keyshortcuts="Meta+V Control+V">
-                    or paste <kbd aria-label="Command V">⌘V</kbd>
+                    or paste <kbd class="shortcut-key input-shortcut-key" aria-label="Paste image shortcut, Command V">⌘V</kbd>
                   </span>
+                  <span class="drop-trigger-format">· JPEG, PNG, WebP, or AVIF</span>
                 </span>
               </span>
             </button>
