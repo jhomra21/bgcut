@@ -68,7 +68,7 @@ const modelFileSmokePath = resolve(root, "dist/.model-file-node-smoke.mjs");
 await run([
   "bun",
   "build",
-  "src/shared/model-file.ts",
+  "src/native/model-file.ts",
   "--target=node",
   "--format=esm",
   "--packages=external",

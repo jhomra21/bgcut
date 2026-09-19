@@ -6,8 +6,8 @@ import sharp from "sharp";
 import { MODEL_INPUT_SIZE } from "../engine/image";
 import { logitToAlphaByte } from "../engine/matte";
 import { resizeRgbaLinearToNchw } from "../engine/preprocess";
-import { compositeAlphaMask } from "../cli/alpha-mask";
-import { CliModelError, ensureCliModel } from "../cli/model-cache";
+import { compositeAlphaMask } from "./alpha-mask";
+import { CliModelError, ensureCliModel } from "./model-cache";
 
 export type BgcutEngine = "auto" | "gpu" | "cpu";
 

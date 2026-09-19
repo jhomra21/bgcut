@@ -6,7 +6,7 @@ import {
   type BgcutFormat,
   type BgcutInput,
   type BgcutRemovalResult,
-} from "./runtime";
+} from "../native/runtime";
 
 export type {
   BgcutEngine,
@@ -16,7 +16,7 @@ export type {
   BgcutRemovalResult,
   BgcutRemovalTimings,
   BgcutSetupTimings,
-} from "./runtime";
+} from "../native/runtime";
 
 export type BgcutOptions = {
   readonly engine?: BgcutEngine;

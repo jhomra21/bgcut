@@ -9,7 +9,7 @@ import {
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
 } from "../engine/model-config";
-import { inspectModelFile, type ModelFileFingerprint } from "../shared/model-file";
+import { inspectModelFile, type ModelFileFingerprint } from "./model-file";
 
 export class CliModelError extends Data.TaggedError("CliModelError")<{
   readonly message: string;
