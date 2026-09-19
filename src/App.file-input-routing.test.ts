@@ -106,30 +106,37 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
-  test("tracks the documentation section currently being read", () => {
+  test("tracks the documentation section actually being read", () => {
     expect(appSource).toContain("const DOC_SECTION_IDS");
-    expect(appSource).toContain("new IntersectionObserver");
-    expect(appSource).toContain('rootMargin: "-10% 0px -78% 0px"');
-    expect(appSource).toContain("Math.min(140, window.innerHeight * 0.2)");
+    expect(appSource).toContain("const readingPoint = window.innerHeight * 0.42");
+    expect(appSource).toContain("rect.top <= readingPoint && rect.bottom >= readingPoint");
+    expect(appSource).toContain("const visibleTop = Math.max(rect.top, 0)");
+    expect(appSource).toContain("const visibleBottom = Math.min(rect.bottom, window.innerHeight)");
     expect(appSource).toContain('activeSection() === section ? "location" : undefined');
     expect(appSource).toContain('aria-current={current("quickstart")}');
-    expect(appSource).toContain('aria-current={current("node-api")}');
+    expect(appSource).toContain('aria-current={current("architecture")}');
     expect(appSource).toContain('aria-current={current("resources")}');
     expect(appSource).toContain('window.addEventListener("scroll", pickActiveSection, { passive: true })');
     expect(appSource).toContain("viewportBottom >= documentBottom - 2");
     expect(appSource).toContain('setActiveSection("resources")');
+    expect(appSource).not.toContain("new IntersectionObserver");
     expect(appSource).not.toContain('aria-current={current("privacy")}');
     expect(appSource).not.toContain('aria-current={current("overview")}');
   });
 
 
-  test("keeps sidebar clicks pinned to their requested docs section", () => {
+  test("keeps sidebar clicks pinned and caps scroll animation at 150ms", () => {
+    expect(appSource).toContain("const DOCS_SCROLL_MS = 150");
     expect(appSource).toContain("let pinnedSection: DocsSectionId | undefined");
-    expect(appSource).toContain("const navigateToSection = (event: MouseEvent, section: DocsSectionId)");
+    expect(appSource).toContain("let scrollAnimationFrame: number | undefined");
+    expect(appSource).toContain("const animateScrollTo = (targetY: number)");
+    expect(appSource).toContain("easeOutCubic(progress)");
+    expect(appSource).toContain("(now - startedAt) / DOCS_SCROLL_MS");
+    expect(appSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
     expect(appSource).toContain("pinnedSection = section");
     expect(appSource).toContain("setActiveSection(section)");
     expect(appSource).toContain('section === "model" || section === "architecture" || section === "resources"');
-    expect(appSource).toContain('target.scrollIntoView({ behavior: "smooth", block })');
+    expect(appSource).not.toContain('target.scrollIntoView({ behavior: "smooth", block })');
     expect(appSource).toContain('window.addEventListener("wheel", releasePinnedSection, { passive: true })');
     expect(appSource).toContain('window.addEventListener("touchstart", releasePinnedSection, { passive: true })');
     expect(appSource).toContain('onClick={(event) => navigateToSection(event, "model")}');
