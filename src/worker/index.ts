@@ -1,9 +1,9 @@
-import { MODEL_FILENAME } from "../src/engine/model-config.ts";
+import { MODEL_FILENAME } from "../engine/model-config.ts";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../src/engine/ort-webgpu-runtime.ts";
+} from "../engine/ort-webgpu-runtime.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
 

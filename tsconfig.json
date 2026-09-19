@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "libReplacement": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -15,7 +19,15 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vite/client", "bun"]
+    "types": [
+      "vite/client",
+      "bun"
+    ]
   },
-  "include": ["src", "scripts", "vite.config.ts"]
+  "include": [
+    "src",
+    "scripts",
+    "tests",
+    "vite.config.ts"
+  ]
 }
