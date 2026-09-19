@@ -198,6 +198,31 @@ It contains the commands, supported formats, provider behavior, model caching ru
 
 After installation, the file is available at `node_modules/bgcut/skills/bgcut/SKILL.md`.
 
+## Repository layout
+
+The repository is one package with explicit runtime boundaries. See [`docs/README.md`](docs/README.md) for the full map.
+
+```text
+src/
+  app/       Solid UI and site shell
+  engine/    inference engine and model/image primitives
+  cli/       command-line app and loopback web server
+  node/      public Node API and native runtime
+  shared/    code shared across runtime boundaries
+  worker/    Cloudflare Worker
+
+scripts/
+  build/       build and packaging tasks
+  cloudflare/  Cloudflare runtime/deploy support
+  test/        package-level smoke tests
+  shared/      script-only shared helpers
+
+docs/
+  engineering/  benchmarks, graph-capture notes, roadmap
+  operations/   deployment and release procedures
+  images/       README/site documentation assets
+```
+
 ## Development
 
 Install and start the browser app:
