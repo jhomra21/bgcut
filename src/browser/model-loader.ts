@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import { ModelDownloadFailed } from "./errors";
-import { MODEL_PUBLIC_PATH } from "../shared/model";
+import { MODEL_PUBLIC_PATH } from "../core/model";
 
 export const fetchModelBytes = (): Effect.Effect<Uint8Array, ModelDownloadFailed> =>
   Effect.gen(function* () {
