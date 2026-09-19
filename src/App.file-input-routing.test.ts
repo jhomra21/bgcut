@@ -51,6 +51,13 @@ describe("browser product UI", () => {
     expect(appSource).toContain('aria-keyshortcuts="R"');
     expect(appSource).toContain("handleKeyboardShortcut");
     expect(appSource).toContain('window.addEventListener("keydown", handleKeyboardShortcut)');
+    expect(appSource).toContain('aria-keyshortcuts="Meta+O Control+O"');
+    expect(appSource).toContain('aria-keyshortcuts="Meta+V Control+V"');
+    expect(appSource).toContain("handlePaste");
+    expect(appSource).toContain('window.addEventListener("paste", handlePaste)');
+    expect(appSource).toContain('item.type.startsWith("image/")');
+    expect(appSource).toContain("Choose image");
+    expect(appSource).toContain("or paste");
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");

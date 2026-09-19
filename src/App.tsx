@@ -295,13 +295,48 @@ const HomePage = () => {
     }
   };
 
+  const handlePaste = (event: ClipboardEvent) => {
+    if (processing()) {
+      return;
+    }
+
+    const clipboardItems = event.clipboardData?.items;
+
+    if (clipboardItems === undefined) {
+      return;
+    }
+
+    for (const item of Array.from(clipboardItems)) {
+      if (item.kind !== "file" || !item.type.startsWith("image/")) {
+        continue;
+      }
+
+      const file = item.getAsFile();
+
+      if (file !== null) {
+        event.preventDefault();
+        selectImage(file);
+
+        return;
+      }
+    }
+  };
+
   const handleKeyboardShortcut = (event: KeyboardEvent) => {
-    if (
-      event.defaultPrevented ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.altKey
-    ) {
+    if (event.defaultPrevented || event.altKey) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+
+    if ((event.metaKey || event.ctrlKey) && key === "o" && !processing()) {
+      event.preventDefault();
+      chooseNewImage();
+
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey) {
       return;
     }
 
@@ -318,8 +353,6 @@ const HomePage = () => {
     ) {
       return;
     }
-
-    const key = event.key.toLowerCase();
 
     if (key === "n" && !processing()) {
       event.preventDefault();
@@ -356,9 +389,11 @@ const HomePage = () => {
 
   onSettled(() => {
     window.addEventListener("keydown", handleKeyboardShortcut);
+    window.addEventListener("paste", handlePaste);
 
     return () => {
       window.removeEventListener("keydown", handleKeyboardShortcut);
+      window.removeEventListener("paste", handlePaste);
       selectionVersion += 1;
 
       if (activeSourceUrl !== undefined) {
@@ -403,6 +438,14 @@ const HomePage = () => {
               <span class="drop-trigger-copy">
                 <strong>Click or drag image here</strong>
                 <span>JPEG, PNG, WebP, or AVIF. Processed locally.</span>
+                <span class="drop-trigger-shortcuts" aria-label="Image input shortcuts">
+                  <span aria-keyshortcuts="Meta+O Control+O">
+                    Choose image <kbd aria-label="Command O">⌘O</kbd>
+                  </span>
+                  <span aria-keyshortcuts="Meta+V Control+V">
+                    or paste <kbd aria-label="Command V">⌘V</kbd>
+                  </span>
+                </span>
               </span>
             </button>
           }

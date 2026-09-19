@@ -180,6 +180,20 @@ figure {
   line-height: 1.5;
 }
 
+.drop-trigger-shortcuts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.drop-trigger-shortcuts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .drop-trigger:active {
     transform: scale(0.97);
