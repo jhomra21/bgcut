@@ -23,7 +23,7 @@
 - `src/cli/` owns command parsing, the packaged loopback server, native CLI orchestration, and CLI tests.
 - `src/node/` owns the reusable Node API and native session/removal orchestration.
 - `src/native/` owns Node-only implementation shared by the CLI and Node API, such as model caching and alpha compositing.
-- `src/shared/` contains contracts and helpers shared by runtime boundaries.
+- `src/shared/` contains runtime-neutral model/runtime metadata, pure image math, and helpers shared across runtime boundaries.
 - `worker/` is the Cloudflare Worker entrypoint.
 - `scripts/` contains build, package, model, and deployment automation.
 - `tests/` contains repository-wide policy tests that do not belong to one runtime.

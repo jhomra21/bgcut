@@ -15,8 +15,8 @@ import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
-import { MODEL_REVISION } from "./model-config";
-import { resolveOrtWebGpuWasmUrl } from "./ort-webgpu-runtime";
+import { MODEL_REVISION } from "../shared/model-config";
+import { resolveOrtWebGpuWasmUrl } from "../shared/ort-runtime";
 import { getGpuRuntime } from "./runtime";
 import {
   createRemovalTimingRecorder,

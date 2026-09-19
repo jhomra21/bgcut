@@ -10,7 +10,7 @@ import {
   resolveOrtWasmModuleUrl,
   resolveOrtWasmUrl,
   resolveOrtWebGpuWasmUrl,
-} from "./ort-webgpu-runtime";
+} from "./ort-runtime";
 
 describe("ORT runtime assets", () => {
   test("uses the exact WebGPU, fallback, and module runtime files", () => {

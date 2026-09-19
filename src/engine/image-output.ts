@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 
 import { ExportFailed, ImageProcessingFailed } from "./errors";
-import { MODEL_INPUT_SIZE } from "./image";
-import { logitToAlphaByte } from "./matte";
+import { MODEL_INPUT_SIZE } from "../shared/model-config";
+import { logitToAlphaByte } from "../shared/matte";
 
 export const createMatteCanvas = (
   logits: Float32Array,

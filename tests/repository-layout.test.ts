@@ -37,7 +37,9 @@ describe("repository layout", () => {
     expect(appSource).not.toContain("../cli/");
     expect(appSource).not.toContain("../node/");
     expect(nodeSource).not.toContain("../cli/");
+    expect(nodeSource).not.toContain("../engine/");
     expect(nativeModelSource).not.toContain("../cli/");
+    expect(nativeModelSource).not.toContain("../engine/");
     expect(nativeModelSource).not.toContain("../node/");
   });
 });

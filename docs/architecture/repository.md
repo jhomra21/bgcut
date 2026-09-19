@@ -11,7 +11,7 @@ src/
   cli/       CLI commands, native orchestration, model cache, and loopback server
   node/      reusable Node API and native session/removal orchestration
   native/    Node-only implementation shared by CLI and Node API
-  shared/    helpers shared across runtime boundaries
+  shared/    runtime-neutral model/runtime metadata and pure image math
 ```
 
 The dependency direction should stay simple:
