@@ -674,35 +674,109 @@ const HomePage = () => {
   );
 };
 
+
+const DOC_SECTION_IDS = [
+  "overview",
+  "quickstart",
+  "web-ui",
+  "local-app",
+  "cli",
+  "node-api",
+  "model",
+  "architecture",
+  "privacy",
+  "resources",
+] as const;
+
+type DocsSectionId = (typeof DOC_SECTION_IDS)[number];
+
+const DocsSidebar = () => {
+  const [activeSection, setActiveSection] = createSignal<DocsSectionId>("overview");
+
+  onSettled(() => {
+    const sectionIds = new Set<string>(DOC_SECTION_IDS);
+    const sections = Array.from(
+      document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
+    ).filter((section) => sectionIds.has(section.id));
+
+    const pickActiveSection = () => {
+      const readingLine = window.innerHeight * 0.28;
+      let nextSection: DocsSectionId = "overview";
+
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top > readingLine) {
+          break;
+        }
+
+        nextSection = section.id as DocsSectionId;
+      }
+
+      setActiveSection(nextSection);
+    };
+
+    const observer = new IntersectionObserver(pickActiveSection, {
+      rootMargin: "-18% 0px -68% 0px",
+      threshold: [0, 1],
+    });
+
+    for (const section of sections) {
+      observer.observe(section);
+    }
+
+    window.addEventListener("resize", pickActiveSection);
+    pickActiveSection();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", pickActiveSection);
+    };
+  });
+
+  const current = (section: DocsSectionId): "location" | undefined =>
+    activeSection() === section ? "location" : undefined;
+
+  return (
+    <aside class="docs-sidebar" aria-label="Documentation sections">
+      <div class="docs-sidebar-group">
+        <span class="docs-sidebar-label">Start</span>
+        <a href="#overview" aria-current={current("overview")}>Overview</a>
+        <a href="#quickstart" aria-current={current("quickstart")}>Quickstart</a>
+      </div>
+
+      <div class="docs-sidebar-group">
+        <span class="docs-sidebar-label">Use</span>
+        <a href="#web-ui" aria-current={current("web-ui")}>Web UI</a>
+        <a href="#local-app" aria-current={current("local-app")}>Local app</a>
+        <a href="#cli" aria-current={current("cli")}>CLI</a>
+        <a href="#node-api" aria-current={current("node-api")}>Node API</a>
+      </div>
+
+      <div class="docs-sidebar-group">
+        <span class="docs-sidebar-label">Reference</span>
+        <a href="#model" aria-current={current("model")}>Model & runtime</a>
+        <a href="#architecture" aria-current={current("architecture")}>Architecture</a>
+        <a href="#privacy" aria-current={current("privacy")}>Privacy</a>
+        <a href="#resources" aria-current={current("resources")}>Resources</a>
+      </div>
+    </aside>
+  );
+};
+
 const DocsPage = (props: { readonly onNavigate: Navigate }) => (
   <main class="page-content content-shell">
     <div class="content-layout">
-      <aside class="docs-sidebar" aria-label="Documentation sections">
-        <a href="#overview">Overview</a>
-        <a href="#web-ui">Web UI</a>
-        <a href="#local-app">Local app</a>
-        <a href="#cli">CLI</a>
-        <a href="#node-api">Node API</a>
-        <a href="#model">Model and runtime</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#privacy">Privacy</a>
-      </aside>
+      <DocsSidebar />
 
       <article class="content-page docs-page">
-        <section id="overview" class="content-hero docs-hero">
-          <div class="eyebrow">Documentation</div>
-          <h2>Use bgcut in the browser, from the command line, or inside Node.</h2>
+        <section id="overview" class="docs-intro">
+          <div class="docs-kicker">Documentation</div>
+          <h2>bgcut</h2>
           <p>
-            bgcut is one local background-removal system with four public surfaces: the hosted
-            web app, the packaged local web app, the native CLI, and the reusable Node API.
+            Local background removal for the browser, terminal, and Node. Source images stay on
+            your machine.
           </p>
-          <div class="hero-note">
-            <span class="hero-note-dot" aria-hidden="true"></span>
-            <span>Images stay on your machine. The model runs in your browser or local Node process.</span>
-          </div>
-          <div class="hero-actions">
+          <div class="docs-intro-links">
             <a
-              class="primary-link"
               href="/"
               onClick={(event) => {
                 if (!shouldHandleInternalNavigation(event)) {
@@ -713,43 +787,25 @@ const DocsPage = (props: { readonly onNavigate: Navigate }) => (
                 props.onNavigate("home");
               }}
             >
-              Open web app
+              Open app
             </a>
-            <a class="secondary-link" href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">
-              npm package
-            </a>
+            <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">npm</a>
+            <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub</a>
           </div>
         </section>
 
-        <section class="doc-section">
-          <h3>Quick start</h3>
-          <div class="doc-grid">
-            <div class="doc-card">
-              <div class="doc-card-label">Hosted web</div>
-              <p>Open bgcut.dev, choose an image, and let the browser run inference locally.</p>
-              <pre class="code-block"><code>https://bgcut.dev</code></pre>
-            </div>
-            <div class="doc-card">
-              <div class="doc-card-label">Local web app</div>
-              <p>Run the same UI from the npm package on a loopback server.</p>
-              <pre class="code-block"><code>npx bgcut</code></pre>
-            </div>
-            <div class="doc-card">
-              <div class="doc-card-label">CLI</div>
-              <p>Use the file-in/file-out path for scripts and terminal workflows.</p>
-              <pre class="code-block"><code>npx bgcut photo.jpg</code></pre>
-            </div>
-            <div class="doc-card">
-              <div class="doc-card-label">Node API</div>
-              <p>Keep one native ONNX Runtime session alive across many removals.</p>
-              <pre class="code-block"><code>npm install bgcut</code></pre>
-            </div>
-          </div>
+        <section id="quickstart" class="doc-section docs-quickstart">
+          <h3>Quickstart</h3>
+          <p>Run the packaged local web app without installing anything globally:</p>
+          <pre class="code-block"><code>npx bgcut</code></pre>
+          <p class="docs-related">
+            For a file-in/file-out workflow, run <a href="#cli"><code>npx bgcut photo.jpg</code></a>.
+            To embed bgcut, <a href="#node-api">install the Node package</a>.
+          </p>
         </section>
 
         <section id="web-ui" class="doc-section">
-          <div class="eyebrow">Web UI</div>
-          <h3>The browser workflow</h3>
+          <h3>Web UI</h3>
           <p>
             The product UI is intentionally small: choose or drag an image, wait for removal,
             compare the source and cutout, then copy, download, redo, or choose a new image.
@@ -770,8 +826,7 @@ const DocsPage = (props: { readonly onNavigate: Navigate }) => (
         </section>
 
         <section id="local-app" class="doc-section">
-          <div class="eyebrow">Packaged local app</div>
-          <h3>Run the web UI from npm</h3>
+          <h3>Local app</h3>
           <p>
             Running bgcut with no image starts the packaged UI on <code>127.0.0.1</code> using
             an available port and opens the browser.
@@ -800,8 +855,7 @@ bgcut serve --json`}</code></pre>
         </section>
 
         <section id="cli" class="doc-section">
-          <div class="eyebrow">CLI</div>
-          <h3>One image in, one image out</h3>
+          <h3>CLI</h3>
           <p>
             Passing an image selects the native headless path. The default output is a transparent
             PNG next to the input image. The explicit <code>remove</code> command is equivalent.
@@ -844,8 +898,7 @@ bgcut photo.jpg --cpu`}</code></pre>
         </section>
 
         <section id="node-api" class="doc-section">
-          <div class="eyebrow">Node API</div>
-          <h3>Reuse one inference session</h3>
+          <h3>Node API</h3>
           <p>
             Install bgcut as an application dependency and create an engine. One engine owns one
             native ONNX Runtime session and reuses it until <code>close()</code> is called.
@@ -905,8 +958,8 @@ try {
         </section>
 
         <section id="model" class="doc-section">
-          <div class="eyebrow">Model and runtime</div>
-          <h3>Pinned BiRefNet Lite 512</h3>
+          <h3>Model and runtime</h3>
+          <p class="docs-section-summary">Pinned BiRefNet Lite 512, validated before use.</p>
           <p>
             bgcut uses the <code>studioludens/birefnet-lite-512</code> model pinned to one source
             revision and one validated ONNX artifact.
@@ -945,8 +998,8 @@ try {
         </section>
 
         <section id="architecture" class="doc-section">
-          <div class="eyebrow">Architecture</div>
-          <h3>One product, two runtime families</h3>
+          <h3>Architecture</h3>
+          <p class="docs-section-summary">One removal contract across browser and native runtimes.</p>
           <div class="architecture-grid">
             <div class="architecture-card">
               <strong>Browser path</strong>
@@ -974,8 +1027,7 @@ try {
         </section>
 
         <section id="privacy" class="doc-section">
-          <div class="eyebrow">Privacy</div>
-          <h3>Your image is not an inference request to bgcut.dev</h3>
+          <h3>Privacy</h3>
           <p>
             Source images, decoded pixels, masks, and generated outputs stay on the user's machine.
             The hosted Worker serves application and runtime files; it does not receive the source
@@ -987,9 +1039,8 @@ try {
           </p>
         </section>
 
-        <section class="doc-section">
-          <div class="eyebrow">More</div>
-          <h3>Project links</h3>
+        <section id="resources" class="doc-section">
+          <h3>Resources</h3>
           <div class="link-list">
             <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub repository</a>
             <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">npm package</a>
