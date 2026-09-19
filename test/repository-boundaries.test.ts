@@ -3,6 +3,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 const root = process.cwd();
+
 const sourceRoot = join(root, "src");
 
 type Boundary = {
