@@ -13,7 +13,7 @@ import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../engine/ort-webgpu-runtime";
+} from "../browser/ort-webgpu-runtime";
 import { ensureNativeModel } from "../native/model-cache";
 import type { ServeOptions } from "./args";
 

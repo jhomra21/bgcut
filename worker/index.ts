@@ -3,7 +3,7 @@ import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../src/engine/ort-webgpu-runtime.ts";
+} from "../src/browser/ort-webgpu-runtime.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
 

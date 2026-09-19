@@ -4,7 +4,7 @@ bgcut is one published package, so the repository uses internal module boundarie
 
 - `app/`: Solid UI and site shells.
 - `core/`: runtime-neutral model constants, preprocessing, and matte math.
-- `engine/`: browser inference runtime.
+- `browser/`: browser inference runtime.
 - `native/`: Node-only inference, model cache, model-file integrity, and image-output helpers.
 - `cli/`: command parsing, command execution, and the packaged local server.
 - `node/`: public `createBgcut()` API surface.
@@ -12,7 +12,7 @@ bgcut is one published package, so the repository uses internal module boundarie
 Dependency direction is intentional:
 
 ```text
-app -> engine -> core
+app -> browser -> core
 cli -> native -> core
 node -> native -> core
 ```
