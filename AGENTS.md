@@ -70,7 +70,7 @@
 - Keep `package.json` repository metadata aligned with `jhomra21/bgcut` because npm Trusted Publishing checks repository identity.
 - The npm package must include `skills/bgcut/SKILL.md`.
 - When CLI syntax, formats, provider behavior, caching, privacy behavior, or install commands change, update `README.md`, `skills/bgcut/SKILL.md`, tests, and the changelog together.
-- `scripts/package-smoke.ts` must verify the installed command and bundled skill from the packed tarball.
+- `scripts/test/package-smoke.ts` must verify the installed command and bundled skill from the packed tarball.
 - See `docs/operations/releasing.md` for the release procedure.
 
 ## Reference codebases

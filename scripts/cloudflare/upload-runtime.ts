@@ -4,7 +4,7 @@ import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../src/engine/ort-webgpu-runtime";
+} from "../../src/engine/ort-webgpu-runtime";
 
 const WRANGLER_VERSION = "4.135.0";
 
@@ -14,7 +14,7 @@ const CACHE_CONTROL = "public,max-age=31536000,immutable";
 
 const runtimeDirectory = resolve(
   import.meta.dir,
-  "../node_modules/onnxruntime-web/dist",
+  "../../node_modules/onnxruntime-web/dist",
 );
 
 type RuntimeAsset = {
@@ -59,7 +59,7 @@ for (const asset of assets) {
       "--remote",
     ],
     {
-      cwd: resolve(import.meta.dir, ".."),
+      cwd: resolve(import.meta.dir, "../.."),
       stdout: "inherit",
       stderr: "inherit",
     },

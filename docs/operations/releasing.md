@@ -154,7 +154,7 @@ That file is part of the package contract. Agents should be able to use bgcut wi
 
 When local-app behavior, CLI syntax, Node API behavior, input formats, output formats, engine behavior, caching, privacy behavior, or install commands change, update the README, the packaged skill, tests, and changelog in the same product change.
 
-`scripts/package-smoke.ts` must verify the installed Node CLI, packaged local app, reusable Node API, and bundled skill from the packed tarball.
+`scripts/test/package-smoke.ts` must verify the installed Node CLI, packaged local app, reusable Node API, and bundled skill from the packed tarball.
 
 ## Failed releases
 
