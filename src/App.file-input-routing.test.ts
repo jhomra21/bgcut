@@ -185,6 +185,15 @@ describe("browser product UI", () => {
   });
 
 
+
+  test("documents the hosted-site versus packaged-local distinction", () => {
+    expect(appSource).toContain("The local UI contains the bgcut brand and removal workflow only");
+    expect(appSource).toContain("Docs, GitHub");
+    expect(appSource).toContain("Privacy, Terms, and the site footer remain on bgcut.dev");
+    expect(appSource).toContain("Non-root app routes redirect to <code>/</code>");
+    expect(appSource).toContain("without the hosted site's navigation");
+  });
+
   test("keeps website documentation aligned with the shipped runtime behavior", () => {
     expect(appSource).toContain("If <code>--port</code> is omitted");
     expect(appSource).toContain("The server asks the operating system for an available port by default");
