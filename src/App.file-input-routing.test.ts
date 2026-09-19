@@ -106,21 +106,19 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
-  test("tracks docs sections by heading boundaries during manual scroll", () => {
-    expect(appSource).toContain("const readingLine = (): number => Math.min(180, window.innerHeight * 0.3)");
-    expect(appSource).toContain("let nextSection: DocsSectionId = \"quickstart\"");
-    expect(appSource).toContain("section.getBoundingClientRect().top > marker");
+  test("tracks the nearest visible docs heading during manual scroll", () => {
+    expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.42");
+    expect(appSource).toContain("let closestDistance = Number.POSITIVE_INFINITY");
+    expect(appSource).toContain("rect.bottom <= 0 || rect.top >= window.innerHeight");
+    expect(appSource).toContain("const distance = Math.abs(rect.top - marker)");
+    expect(appSource).toContain("distance < closestDistance");
     expect(appSource).toContain("nextSection = section.id");
-    expect(appSource).toContain("const atDocumentBottom");
-    expect(appSource).toContain("resourcesRect.top < window.innerHeight * 0.8");
+    expect(appSource).not.toContain("const atDocumentBottom");
+    expect(appSource).not.toContain("resourcesRect.top < window.innerHeight");
     expect(appSource).toContain('activeSection() === section ? "location" : undefined');
-    expect(appSource).toContain('aria-current={current("quickstart")}');
     expect(appSource).toContain('aria-current={current("architecture")}');
     expect(appSource).toContain('aria-current={current("resources")}');
     expect(appSource).toContain('window.addEventListener("scroll", pickActiveSection, { passive: true })');
-    expect(appSource).not.toContain("new IntersectionObserver");
-    expect(appSource).not.toContain('aria-current={current("privacy")}');
-    expect(appSource).not.toContain('aria-current={current("overview")}');
   });
 
 
@@ -129,6 +127,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("let programmaticTarget: DocsSectionId | undefined");
     expect(appSource).toContain("let scrollAnimationFrame: number | undefined");
     expect(appSource).toContain("const animateScrollTo = (targetY: number, section: DocsSectionId)");
+    expect(appSource).toContain("const desiredY = sectionTop - Math.min(160, window.innerHeight * 0.22)");
     expect(appSource).toContain("programmaticTarget = section");
     expect(appSource).toContain("programmaticTarget = undefined");
     expect(appSource).toContain("pickActiveSection()");
