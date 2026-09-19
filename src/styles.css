@@ -48,12 +48,6 @@ figure {
   margin: 0;
 }
 
-.app-shell {
-  width: min(920px, calc(100% - 40px));
-  margin: 0 auto;
-  padding: 34px 0 48px;
-}
-
 .app-header {
   display: flex;
   align-items: center;
@@ -967,19 +961,12 @@ figure {
 .site-footer-links a:focus-visible,
 .docs-sidebar a:focus-visible,
 .link-list a:focus-visible,
-.primary-link:focus-visible,
-.secondary-link:focus-visible,
 .brand-link:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
 
 @media (max-width: 640px) {
-  .app-shell {
-    width: min(100% - 20px, 920px);
-    padding-top: 20px;
-  }
-
   .app-header {
     align-items: flex-start;
     flex-direction: column;
@@ -1126,11 +1113,8 @@ figure {
   }
 }
 
-
 @media (prefers-reduced-motion: reduce) {
   .drop-trigger,
-  .primary-link,
-  .secondary-link,
   .result-actions > .text-button,
   .result-action-group > .text-button,
   .result-action-group > .download-button,
@@ -1141,8 +1125,6 @@ figure {
   }
 
   .drop-trigger,
-  .primary-link,
-  .secondary-link,
   .result-actions > .text-button,
   .result-action-group > .text-button,
   .result-action-group > .download-button {
@@ -1159,9 +1141,7 @@ figure {
 
 @media (prefers-contrast: more) {
   .site-nav,
-  .doc-card,
   .code-block,
-  .hero-note,
   .spec-table,
   .shortcut-list {
     border-color: #909089;
