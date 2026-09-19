@@ -14,7 +14,7 @@ import {
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
 } from "../engine/ort-webgpu-runtime";
-import { ensureCliModel } from "./model-cache";
+import { ensureCliModel } from "../native/model-cache";
 import type { ServeOptions } from "./args";
 
 const HOST = "127.0.0.1";

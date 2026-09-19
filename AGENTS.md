@@ -21,7 +21,8 @@
 - `src/app/` owns the Solid UI, hosted-site shell, packaged local-app shell, styles, and UI tests.
 - `src/engine/` owns browser image processing and ONNX Runtime WebGPU/WebAssembly behavior.
 - `src/cli/` owns command parsing, the packaged loopback server, native CLI orchestration, and CLI tests.
-- `src/node/` owns the reusable Node API and native runtime.
+- `src/node/` owns the reusable Node API and native session/removal orchestration.
+- `src/native/` owns Node-only implementation shared by the CLI and Node API, such as model caching and alpha compositing.
 - `src/shared/` contains contracts and helpers shared by runtime boundaries.
 - `worker/` is the Cloudflare Worker entrypoint.
 - `scripts/` contains build, package, model, and deployment automation.

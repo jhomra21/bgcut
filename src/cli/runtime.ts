@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import type { CliOptions } from "./args";
-import { CliModelError } from "./model-cache";
+import { CliModelError } from "../native/model-cache";
 import {
   BgcutImageError,
   BgcutInferenceError,

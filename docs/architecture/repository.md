@@ -9,15 +9,17 @@ src/
   app/       Solid UI, hosted site, packaged local-app shell, and UI tests
   engine/    browser image pipeline and ONNX Runtime WebGPU/WebAssembly integration
   cli/       CLI commands, native orchestration, model cache, and loopback server
-  node/      reusable Node API and native ONNX Runtime implementation
+  node/      reusable Node API and native session/removal orchestration
+  native/    Node-only implementation shared by CLI and Node API
   shared/    helpers shared across runtime boundaries
 ```
 
 The dependency direction should stay simple:
 
 - `app` may use `engine`.
-- `cli` may use `node`, `shared`, and model/runtime metadata from `engine` when that metadata is genuinely shared.
-- `node` may use low-level image/model helpers, but it must not depend on the Solid app.
+- `cli` may use `node`, `native`, `shared`, and model/runtime metadata from `engine` when that metadata is genuinely shared.
+- `node` may use `native` and low-level image/model helpers, but it must not depend on `cli` or the Solid app.
+- `native` may be shared by `cli` and `node`, but it must not depend on either public surface.
 - `shared` must not depend on UI or command surfaces.
 - Browser UI code must not own native Node process behavior.
 

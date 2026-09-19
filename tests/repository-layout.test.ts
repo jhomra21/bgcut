@@ -13,6 +13,7 @@ describe("repository layout", () => {
       "app",
       "cli",
       "engine",
+      "native",
       "node",
       "shared",
     ]);
@@ -28,10 +29,15 @@ describe("repository layout", () => {
     ]);
   });
 
-  test("keeps the Solid app independent from native command surfaces", async () => {
-    const source = await Bun.file("src/app/App.tsx").text();
+  test("keeps surface dependencies pointed toward implementation boundaries", async () => {
+    const appSource = await Bun.file("src/app/App.tsx").text();
+    const nodeSource = await Bun.file("src/node/runtime.ts").text();
+    const nativeModelSource = await Bun.file("src/native/model-cache.ts").text();
 
-    expect(source).not.toContain("../cli/");
-    expect(source).not.toContain("../node/");
+    expect(appSource).not.toContain("../cli/");
+    expect(appSource).not.toContain("../node/");
+    expect(nodeSource).not.toContain("../cli/");
+    expect(nativeModelSource).not.toContain("../cli/");
+    expect(nativeModelSource).not.toContain("../node/");
   });
 });
