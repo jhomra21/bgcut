@@ -8,6 +8,7 @@
     "bgcut": "dist/cli/main.js"
   },
   "files": [
+    "LICENSE",
     "CHANGELOG.md",
     "dist/cli",
     "dist/node",
@@ -92,5 +93,6 @@
       "import": "./dist/node/index.js",
       "default": "./dist/node/index.js"
     }
-  }
+  },
+  "license": "MIT"
 }
