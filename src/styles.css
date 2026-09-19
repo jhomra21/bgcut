@@ -496,7 +496,9 @@ figure {
 
 .site-header-shell,
 .site-footer-shell,
-.home-shell {
+.home-shell,
+.content-shell,
+.legal-shell {
   width: min(920px, calc(100% - 40px));
   margin: 0 auto;
 }
@@ -518,15 +520,10 @@ figure {
   padding-bottom: 48px;
 }
 
-.content-shell {
-  width: min(1160px, calc(100% - 40px));
-  margin: 0 auto;
-}
-
 .content-layout {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 72px;
+  grid-template-columns: 144px minmax(0, 1fr);
+  gap: 36px;
   align-items: start;
 }
 
@@ -534,6 +531,7 @@ figure {
   position: sticky;
   top: 24px;
   display: grid;
+  align-self: start;
   gap: 2px;
   padding-top: 26px;
 }
@@ -541,7 +539,7 @@ figure {
 .docs-sidebar a {
   border-radius: 7px;
   color: var(--ink-soft);
-  padding: 7px 9px;
+  padding: 7px 8px;
   font-size: 11px;
   font-weight: 560;
   line-height: 1.35;
@@ -557,8 +555,8 @@ figure {
 }
 
 .content-page {
+  width: 100%;
   min-width: 0;
-  max-width: 790px;
 }
 
 .content-hero {
@@ -948,11 +946,6 @@ figure {
   color: var(--ink);
 }
 
-.legal-shell {
-  width: min(920px, calc(100% - 40px));
-  margin: 0 auto;
-}
-
 .legal-page {
   max-width: 720px;
   padding: 50px 0 72px;
@@ -1067,16 +1060,13 @@ figure {
   .site-header-shell,
   .site-footer-shell,
   .home-shell,
+  .content-shell,
   .legal-shell {
     width: min(100% - 20px, 920px);
   }
 
   .site-header-shell {
     padding-top: 20px;
-  }
-
-  .content-shell {
-    width: min(100% - 20px, 1160px);
   }
 
   .content-layout {
@@ -1206,7 +1196,6 @@ figure {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .content-shell .app-header,
   .processing-label {
     background: var(--surface);
     backdrop-filter: none;
@@ -1223,8 +1212,7 @@ figure {
     border-color: #909089;
   }
 
-  .content-shell .app-header {
-    background: var(--surface);
-    backdrop-filter: none;
+  .site-header-shell {
+    background: var(--canvas);
   }
 }
