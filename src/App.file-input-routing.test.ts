@@ -88,13 +88,21 @@ describe("browser product UI", () => {
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
   });
 
-  test("uses client-side navigation so shared site chrome stays mounted", () => {
+  test("uses one symmetric two-phase route transition for every internal page", () => {
+    expect(appSource).toContain("const ROUTE_FADE_MS = 75");
+    expect(appSource).toContain('type RouteTransitionPhase = "idle" | "out" | "in"');
+    expect(appSource).toContain('setRoutePhase("out")');
+    expect(appSource).toContain('setRoutePhase("in")');
+    expect(appSource).toContain('setRoutePhase("idle")');
+    expect(appSource).toContain("window.setTimeout");
+    expect(appSource).toContain("window.requestAnimationFrame");
+    expect(appSource).toContain('transitionTo(currentPage(), "none")');
+    expect(appSource).toContain('const navigate: Navigate = (nextPage) => transitionTo(nextPage, "push")');
     expect(appSource).toContain("window.history.pushState");
     expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
+    expect(appSource).toContain("route-stage route-stage-");
     expect(appSource).toContain('<SiteHeader page={page()} onNavigate={navigate} />');
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
-    expect(appSource).toContain('class="page-content home-shell"');
-    expect(appSource).toContain('class="page-content content-shell"');
   });
 
   test("documents the shipped public interfaces", () => {
