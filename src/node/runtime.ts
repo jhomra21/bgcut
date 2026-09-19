@@ -6,8 +6,8 @@ import sharp from "sharp";
 import { MODEL_INPUT_SIZE } from "../engine/image";
 import { logitToAlphaByte } from "../engine/matte";
 import { resizeRgbaLinearToNchw } from "../engine/preprocess";
-import { compositeAlphaMask } from "../cli/alpha-mask";
-import { CliModelError, ensureCliModel } from "../cli/model-cache";
+import { compositeAlphaMask } from "../native/alpha-mask";
+import { ModelCacheError, ensureCachedModel } from "../native/model-cache";
 
 export type BgcutEngine = "auto" | "gpu" | "cpu";
 
@@ -308,10 +308,10 @@ const encodeOutput = (
 
 export const createNativeBgcut = (
   engine: BgcutEngine = "auto",
-): Effect.Effect<NativeBgcut, CliModelError | BgcutSessionError> =>
+): Effect.Effect<NativeBgcut, ModelCacheError | BgcutSessionError> =>
   Effect.gen(function* () {
     let stageStartedAt = performance.now();
-    const modelPath = yield* ensureCliModel();
+    const modelPath = yield* ensureCachedModel();
     const modelMs = performance.now() - stageStartedAt;
 
     stageStartedAt = performance.now();

@@ -6,7 +6,7 @@ import {
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
 } from "../../src/engine/model-config";
-import { inspectModelFile } from "./file";
+import { inspectModelFile } from "../../src/shared/model-file";
 
 class ModelVerificationError extends Data.TaggedError("ModelVerificationError")<{
   readonly message: string;

@@ -20,8 +20,9 @@
 
 - `src/app/`: Solid UI, hosted-site shell, local-app shell, styles, and app-level tests.
 - `src/engine/`: browser inference, WebGPU/WebAssembly runtime code, image processing, and engine tests.
-- `src/cli/`: command parsing, headless CLI behavior, model cache, and the packaged loopback server.
+- `src/cli/`: command parsing, headless CLI behavior, and the packaged loopback server.
 - `src/node/`: reusable Node API and native ONNX Runtime execution.
+- `src/native/`: native-only model caching and image-compositing utilities shared by the CLI and Node API.
 - `src/shared/`: utilities shared by native surfaces without UI or CLI ownership.
 - `src/worker/`: Cloudflare Worker routing and Worker-specific tests.
 - `scripts/brand/`: generated brand assets.
