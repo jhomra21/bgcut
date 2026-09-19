@@ -59,6 +59,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('aria-label="Choose image shortcut, Command O"');
     expect(appSource).toContain("or paste");
     expect(appSource).toContain("JPEG, PNG, WebP, or AVIF");
+    expect(appSource).not.toContain("· JPEG, PNG, WebP, or AVIF");
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");

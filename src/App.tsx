@@ -446,7 +446,7 @@ const HomePage = () => {
                   <span aria-keyshortcuts="Meta+V Control+V">
                     or paste <kbd class="shortcut-key input-shortcut-key" aria-label="Paste image shortcut, Command V">⌘V</kbd>
                   </span>
-                  <span class="drop-trigger-format">· JPEG, PNG, WebP, or AVIF</span>
+                  <span class="drop-trigger-format">JPEG, PNG, WebP, or AVIF</span>
                 </span>
               </span>
             </button>
