@@ -1,6 +1,20 @@
 import { describe, expect, test } from "bun:test";
 
-const appSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
+const appSourcePaths = [
+  "./App.tsx",
+  "./components/SiteChrome.tsx",
+  "./navigation.ts",
+  "./pages/HomePage.tsx",
+  "./pages/DocsPage.tsx",
+  "./pages/PrivacyPage.tsx",
+  "./pages/TermsPage.tsx",
+] as const;
+
+const appSource = (
+  await Promise.all(
+    appSourcePaths.map((path) => Bun.file(new URL(path, import.meta.url)).text()),
+  )
+).join("\n");
 
 const sourceInputBlock = (): string => {
   const start = appSource.indexOf('id="source-file-input"');

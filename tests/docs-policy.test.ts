@@ -13,6 +13,11 @@ const writingSources = [
   "skills/bgcut/SKILL.md",
   "tools/oxlint/anti-slop/UPSTREAM.md",
   "src/app/App.tsx",
+  "src/app/components/SiteChrome.tsx",
+  "src/app/pages/HomePage.tsx",
+  "src/app/pages/DocsPage.tsx",
+  "src/app/pages/PrivacyPage.tsx",
+  "src/app/pages/TermsPage.tsx",
 ] as const;
 
 const readWritingSources = async (): Promise<readonly [string, string][]> =>
