@@ -3,7 +3,7 @@
 bgcut is one published package, so the repository uses internal module boundaries instead of workspaces.
 
 - `app/`: Solid UI and site shells.
-- `core/`: runtime-neutral model constants, preprocessing, and matte math.
+- `core/`: runtime-neutral model/runtime constants, preprocessing, and matte math.
 - `browser/`: browser inference runtime.
 - `native/`: Node-only inference, model cache, model-file integrity, and image-output helpers.
 - `cli/`: command parsing, command execution, and the packaged local server.

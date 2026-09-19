@@ -14,7 +14,7 @@ import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-o
 import type { BackgroundRemovalResult } from "./inference";
 import { fetchModelBytes } from "./model-loader";
 import { MODEL_REVISION } from "../core/model-config";
-import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "./ort-webgpu-runtime";
+import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "../core/runtime-assets";
 import {
   createRemovalTimingRecorder,
   type RemovalTimingRecorder,

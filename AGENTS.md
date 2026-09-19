@@ -19,7 +19,7 @@
 ## Repository layout
 
 - `src/app/` owns the Solid UI, hosted-site shell, local-app shell, and UI contracts.
-- `src/core/` owns runtime-neutral model constants, preprocessing, and matte math.
+- `src/core/` owns runtime-neutral model/runtime constants, preprocessing, and matte math.
 - `src/browser/` owns browser inference and browser runtime integration.
 - `src/native/` owns Node-only inference, model caching, model-file verification, and native compositing helpers.
 - `src/cli/` is the command-line adapter. Keep reusable native behavior out of this directory.
