@@ -60,7 +60,7 @@ bgcut serve --port 8787
 bgcut serve --no-open
 ```
 
-For process discovery, `--json` selects an available port, does not open a browser, and prints the resolved URL, host, port, and PID as one JSON object:
+`--json` does not open a browser. It prints the resolved URL, host, port, and PID as one JSON object. Without `--port`, the operating system chooses an available port:
 
 ```sh
 bgcut serve --json
@@ -143,9 +143,9 @@ The production domain is [`bgcut.dev`](https://bgcut.dev).
 
 The browser uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
 
-The product UI follows one small flow: click or drop an image, wait for local removal, compare the original with the result, then copy, download, redo, or choose a new image. Runtime checks, model details, timing tables, and internal acceptance controls stay out of the normal UI.
+Choose, drag, or paste an image in the browser. bgcut removes the background locally, then lets you compare the original with the result, copy or download the PNG, rerun removal, or choose another image. The normal UI does not show internal runtime checks, model metadata, timing tables, or acceptance controls.
 
-Keyboard shortcuts mirror the result actions: `N` chooses a new image, `C` copies the result, `D` downloads it, and `R` reruns removal. When the comparison slider is focused, the native left and right arrow keys move it.
+Use `Command/Ctrl+O` to choose an image and `Command/Ctrl+V` to paste one. `N` chooses a new image, `C` copies the PNG, `D` downloads it, and `R` reruns removal. When the comparison slider is focused, the left and right arrow keys move it.
 
 The current WebGPU pipeline is:
 
@@ -168,7 +168,7 @@ Install bgcut as an application dependency:
 npm install bgcut
 ```
 
-The package exposes the same native removal engine for applications and scripts. A created engine downloads and verifies the pinned model if needed, creates one ONNX Runtime session, and reuses that session across removals until it is closed.
+The package includes the native removal engine for applications and scripts. `createBgcut()` downloads and verifies the pinned model when needed, creates one ONNX Runtime session, and reuses that session until `close()` is called.
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -260,7 +260,7 @@ See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](
 
 ## Privacy
 
-Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the app shell and reads model/runtime payloads from private R2. It does not receive source images or inference requests.
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. Cloudflare Workers serves the hosted app, model, and ONNX Runtime files. bgcut.dev does not receive source images or run image inference for the user.
 
 
 ## License
