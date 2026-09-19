@@ -691,79 +691,137 @@ type DocsSectionId = (typeof DOC_SECTION_IDS)[number];
 const isDocsSectionId = (sectionId: string): sectionId is DocsSectionId =>
   DOC_SECTION_IDS.some((candidate) => candidate === sectionId);
 
+const DOCS_SCROLL_MS = 150;
+
+const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
+
 const DocsSidebar = () => {
   const [activeSection, setActiveSection] = createSignal<DocsSectionId>("quickstart");
   let pinnedSection: DocsSectionId | undefined;
+  let scrollAnimationFrame: number | undefined;
 
-  onSettled(() => {
+  const cancelScrollAnimation = () => {
+    if (scrollAnimationFrame === undefined) {
+      return;
+    }
+
+    window.cancelAnimationFrame(scrollAnimationFrame);
+    scrollAnimationFrame = undefined;
+  };
+
+  const pickActiveSection = () => {
+    if (pinnedSection !== undefined) {
+      setActiveSection(pinnedSection);
+
+      return;
+    }
+
     const sections = Array.from(
       document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
     ).filter((section) => isDocsSectionId(section.id));
 
-    const pickActiveSection = () => {
-      if (pinnedSection !== undefined) {
-        setActiveSection(pinnedSection);
+    const documentBottom = document.documentElement.scrollHeight;
+    const viewportBottom = window.scrollY + window.innerHeight;
 
-        return;
-      }
+    if (viewportBottom >= documentBottom - 2) {
+      setActiveSection("resources");
 
-      const documentBottom = document.documentElement.scrollHeight;
-      const viewportBottom = window.scrollY + window.innerHeight;
-
-      if (viewportBottom >= documentBottom - 2) {
-        setActiveSection("resources");
-
-        return;
-      }
-
-      const readingLine = Math.min(140, window.innerHeight * 0.2);
-      let nextSection: DocsSectionId = "quickstart";
-
-      for (const section of sections) {
-        if (section.getBoundingClientRect().top > readingLine) {
-          break;
-        }
-
-        if (isDocsSectionId(section.id)) {
-          nextSection = section.id;
-        }
-      }
-
-      setActiveSection(nextSection);
-    };
-
-    const releasePinnedSection = () => {
-      if (pinnedSection === undefined) {
-        return;
-      }
-
-      pinnedSection = undefined;
-      pickActiveSection();
-    };
-
-    const handleScrollKey = (event: KeyboardEvent) => {
-      if (
-        event.key === "ArrowDown" ||
-        event.key === "ArrowUp" ||
-        event.key === "PageDown" ||
-        event.key === "PageUp" ||
-        event.key === "Home" ||
-        event.key === "End" ||
-        event.key === " "
-      ) {
-        releasePinnedSection();
-      }
-    };
-
-    const observer = new IntersectionObserver(pickActiveSection, {
-      rootMargin: "-10% 0px -78% 0px",
-      threshold: [0, 1],
-    });
-
-    for (const section of sections) {
-      observer.observe(section);
+      return;
     }
 
+    const readingPoint = window.innerHeight * 0.42;
+    let bestSection: DocsSectionId = "quickstart";
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const section of sections) {
+      if (!isDocsSectionId(section.id)) {
+        continue;
+      }
+
+      const rect = section.getBoundingClientRect();
+
+      if (rect.top <= readingPoint && rect.bottom >= readingPoint) {
+        setActiveSection(section.id);
+
+        return;
+      }
+
+      const visibleTop = Math.max(rect.top, 0);
+      const visibleBottom = Math.min(rect.bottom, window.innerHeight);
+
+      if (visibleBottom <= visibleTop) {
+        continue;
+      }
+
+      const sectionCenter = (visibleTop + visibleBottom) / 2;
+      const distance = Math.abs(sectionCenter - readingPoint);
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestSection = section.id;
+      }
+    }
+
+    setActiveSection(bestSection);
+  };
+
+  const releasePinnedSection = () => {
+    cancelScrollAnimation();
+
+    if (pinnedSection === undefined) {
+      return;
+    }
+
+    pinnedSection = undefined;
+    pickActiveSection();
+  };
+
+  const handleScrollKey = (event: KeyboardEvent) => {
+    if (
+      event.key === "ArrowDown" ||
+      event.key === "ArrowUp" ||
+      event.key === "PageDown" ||
+      event.key === "PageUp" ||
+      event.key === "Home" ||
+      event.key === "End" ||
+      event.key === " "
+    ) {
+      releasePinnedSection();
+    }
+  };
+
+  const animateScrollTo = (targetY: number) => {
+    cancelScrollAnimation();
+
+    const startY = window.scrollY;
+    const distance = targetY - startY;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion || Math.abs(distance) < 1) {
+      window.scrollTo(0, targetY);
+
+      return;
+    }
+
+    const startedAt = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - startedAt) / DOCS_SCROLL_MS, 1);
+      window.scrollTo(0, startY + distance * easeOutCubic(progress));
+
+      if (progress < 1) {
+        scrollAnimationFrame = window.requestAnimationFrame(tick);
+
+        return;
+      }
+
+      scrollAnimationFrame = undefined;
+    };
+
+    scrollAnimationFrame = window.requestAnimationFrame(tick);
+  };
+
+  onSettled(() => {
     window.addEventListener("scroll", pickActiveSection, { passive: true });
     window.addEventListener("wheel", releasePinnedSection, { passive: true });
     window.addEventListener("touchstart", releasePinnedSection, { passive: true });
@@ -772,7 +830,7 @@ const DocsSidebar = () => {
     pickActiveSection();
 
     return () => {
-      observer.disconnect();
+      cancelScrollAnimation();
       window.removeEventListener("scroll", pickActiveSection);
       window.removeEventListener("wheel", releasePinnedSection);
       window.removeEventListener("touchstart", releasePinnedSection);
@@ -800,12 +858,19 @@ const DocsSidebar = () => {
     setActiveSection(section);
     window.history.replaceState(null, "", `#${section}`);
 
-    const block: ScrollLogicalPosition =
-      section === "model" || section === "architecture" || section === "resources"
-        ? "center"
-        : "start";
+    const rect = target.getBoundingClientRect();
+    const sectionTop = window.scrollY + rect.top;
+    const centerSection =
+      section === "model" || section === "architecture" || section === "resources";
+    const desiredY = centerSection
+      ? sectionTop - (window.innerHeight - rect.height) / 2
+      : sectionTop - 24;
+    const maxScrollY = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
 
-    target.scrollIntoView({ behavior: "smooth", block });
+    animateScrollTo(Math.min(Math.max(desiredY, 0), maxScrollY));
   };
 
   return (
