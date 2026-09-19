@@ -7,7 +7,7 @@ import {
   MODEL_RELEASE_URL,
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
-} from "../../src/shared/model";
+} from "../../src/core/model";
 import { inspectModelFile, type ModelFileFingerprint } from "../../src/native/model-file";
 
 class ModelPrepareError extends Data.TaggedError("ModelPrepareError")<{
