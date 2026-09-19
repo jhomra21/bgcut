@@ -261,3 +261,10 @@ See [`RELEASING.md`](RELEASING.md) for the release process and [`CHANGELOG.md`](
 ## Privacy
 
 Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The Cloudflare Worker serves the app shell and reads model/runtime payloads from private R2. It does not receive source images or inference requests.
+
+
+## License
+
+bgcut's original source code is licensed under the [MIT License](LICENSE).
+
+Third-party dependencies, vendored code, ONNX Runtime components, and model artifacts remain subject to their own licenses and terms.
