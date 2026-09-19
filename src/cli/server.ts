@@ -8,13 +8,13 @@ import { createRequire } from "node:module";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MODEL_FILENAME } from "../engine/model-config";
+import { MODEL_FILENAME } from "../shared/model";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../engine/ort-webgpu-runtime";
-import { ensureCliModel } from "./model-cache";
+} from "../shared/runtime-assets";
+import { ensureCliModel } from "../native/model-cache";
 import type { ServeOptions } from "./args";
 
 const HOST = "127.0.0.1";
