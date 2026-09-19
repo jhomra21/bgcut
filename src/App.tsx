@@ -697,87 +697,70 @@ const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
 
 const DocsSidebar = () => {
   const [activeSection, setActiveSection] = createSignal<DocsSectionId>("quickstart");
-  let pinnedSection: DocsSectionId | undefined;
+  let programmaticTarget: DocsSectionId | undefined;
   let scrollAnimationFrame: number | undefined;
 
-  const cancelScrollAnimation = () => {
-    if (scrollAnimationFrame === undefined) {
-      return;
-    }
-
-    window.cancelAnimationFrame(scrollAnimationFrame);
-    scrollAnimationFrame = undefined;
-  };
-
-  const pickActiveSection = () => {
-    if (pinnedSection !== undefined) {
-      setActiveSection(pinnedSection);
-
-      return;
-    }
-
-    const sections = Array.from(
+  const docsSections = () =>
+    Array.from(
       document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
     ).filter((section) => isDocsSectionId(section.id));
 
-    const viewportHeight = window.innerHeight;
-    const readingPoint = viewportHeight * 0.42;
-    const resources = sections.find((section) => section.id === "resources");
-    const resourcesRect = resources?.getBoundingClientRect();
+  const readingLine = (): number => Math.min(180, window.innerHeight * 0.3);
 
-    if (
-      resourcesRect !== undefined &&
-      resourcesRect.top <= viewportHeight * 0.68 &&
-      resourcesRect.bottom > 0
-    ) {
-      setActiveSection("resources");
-
-      return;
+  const cancelScrollAnimation = () => {
+    if (scrollAnimationFrame !== undefined) {
+      window.cancelAnimationFrame(scrollAnimationFrame);
+      scrollAnimationFrame = undefined;
     }
 
-    let bestSection: DocsSectionId = "quickstart";
-    let bestDistance = Number.POSITIVE_INFINITY;
-
-    for (const section of sections) {
-      if (!isDocsSectionId(section.id) || section.id === "resources") {
-        continue;
-      }
-
-      const rect = section.getBoundingClientRect();
-
-      if (rect.top <= readingPoint && rect.bottom >= readingPoint) {
-        setActiveSection(section.id);
-
-        return;
-      }
-
-      const visibleTop = Math.max(rect.top, 0);
-      const visibleBottom = Math.min(rect.bottom, viewportHeight);
-
-      if (visibleBottom <= visibleTop) {
-        continue;
-      }
-
-      const sectionCenter = (visibleTop + visibleBottom) / 2;
-      const distance = Math.abs(sectionCenter - readingPoint);
-
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestSection = section.id;
-      }
-    }
-
-    setActiveSection(bestSection);
+    programmaticTarget = undefined;
   };
 
-  const releasePinnedSection = () => {
-    cancelScrollAnimation();
+  const pickActiveSection = () => {
+    if (programmaticTarget !== undefined) {
+      setActiveSection(programmaticTarget);
 
-    if (pinnedSection === undefined) {
       return;
     }
 
-    pinnedSection = undefined;
+    const sections = docsSections();
+    const marker = readingLine();
+    let nextSection: DocsSectionId = "quickstart";
+
+    for (const section of sections) {
+      if (!isDocsSectionId(section.id)) {
+        continue;
+      }
+
+      if (section.getBoundingClientRect().top > marker) {
+        break;
+      }
+
+      nextSection = section.id;
+    }
+
+    const resources = sections.find((section) => section.id === "resources");
+    const resourcesRect = resources?.getBoundingClientRect();
+    const atDocumentBottom =
+      window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+
+    if (
+      atDocumentBottom &&
+      resourcesRect !== undefined &&
+      resourcesRect.top < window.innerHeight * 0.8
+    ) {
+      nextSection = "resources";
+    }
+
+    setActiveSection(nextSection);
+  };
+
+  const releaseProgrammaticScroll = () => {
+    if (programmaticTarget === undefined && scrollAnimationFrame === undefined) {
+      return;
+    }
+
+    cancelScrollAnimation();
     pickActiveSection();
   };
 
@@ -791,12 +774,14 @@ const DocsSidebar = () => {
       event.key === "End" ||
       event.key === " "
     ) {
-      releasePinnedSection();
+      releaseProgrammaticScroll();
     }
   };
 
-  const animateScrollTo = (targetY: number) => {
+  const animateScrollTo = (targetY: number, section: DocsSectionId) => {
     cancelScrollAnimation();
+    programmaticTarget = section;
+    setActiveSection(section);
 
     const startY = window.scrollY;
     const distance = targetY - startY;
@@ -804,6 +789,8 @@ const DocsSidebar = () => {
 
     if (reducedMotion || Math.abs(distance) < 1) {
       window.scrollTo(0, targetY);
+      programmaticTarget = undefined;
+      pickActiveSection();
 
       return;
     }
@@ -821,6 +808,8 @@ const DocsSidebar = () => {
       }
 
       scrollAnimationFrame = undefined;
+      programmaticTarget = undefined;
+      pickActiveSection();
     };
 
     scrollAnimationFrame = window.requestAnimationFrame(tick);
@@ -828,8 +817,8 @@ const DocsSidebar = () => {
 
   onSettled(() => {
     window.addEventListener("scroll", pickActiveSection, { passive: true });
-    window.addEventListener("wheel", releasePinnedSection, { passive: true });
-    window.addEventListener("touchstart", releasePinnedSection, { passive: true });
+    window.addEventListener("wheel", releaseProgrammaticScroll, { passive: true });
+    window.addEventListener("touchstart", releaseProgrammaticScroll, { passive: true });
     window.addEventListener("keydown", handleScrollKey);
     window.addEventListener("resize", pickActiveSection);
     pickActiveSection();
@@ -837,8 +826,8 @@ const DocsSidebar = () => {
     return () => {
       cancelScrollAnimation();
       window.removeEventListener("scroll", pickActiveSection);
-      window.removeEventListener("wheel", releasePinnedSection);
-      window.removeEventListener("touchstart", releasePinnedSection);
+      window.removeEventListener("wheel", releaseProgrammaticScroll);
+      window.removeEventListener("touchstart", releaseProgrammaticScroll);
       window.removeEventListener("keydown", handleScrollKey);
       window.removeEventListener("resize", pickActiveSection);
     };
@@ -859,26 +848,16 @@ const DocsSidebar = () => {
     }
 
     event.preventDefault();
-    pinnedSection = section;
-    setActiveSection(section);
     window.history.replaceState(null, "", `#${section}`);
 
-    const rect = target.getBoundingClientRect();
-    const sectionTop = window.scrollY + rect.top;
-
-    const centerSection =
-      section === "model" || section === "architecture" || section === "resources";
-
-    const desiredY = centerSection
-      ? sectionTop - (window.innerHeight - rect.height) / 2
-      : sectionTop - 24;
-
+    const sectionTop = window.scrollY + target.getBoundingClientRect().top;
+    const desiredY = sectionTop - readingLine();
     const maxScrollY = Math.max(
       0,
       document.documentElement.scrollHeight - window.innerHeight,
     );
 
-    animateScrollTo(Math.min(Math.max(desiredY, 0), maxScrollY));
+    animateScrollTo(Math.min(Math.max(desiredY, 0), maxScrollY), section);
   };
 
   return (
