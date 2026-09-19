@@ -7,7 +7,7 @@ const wranglerConfig = await Bun.file(new URL("../wrangler.jsonc", import.meta.u
 const packageSource = await Bun.file(new URL("../package.json", import.meta.url)).text();
 
 const cloudflareBuildSource = await Bun.file(
-  new URL("../scripts/prepare-cloudflare-dist.ts", import.meta.url),
+  new URL("../scripts/build/prepare-cloudflare-dist.ts", import.meta.url),
 ).text();
 
 describe("Cloudflare runtime routing", () => {
