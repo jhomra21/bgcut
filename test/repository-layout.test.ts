@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, normalize, relative, sep } from "node:path";
 
-const SOURCE_LAYERS = ["app", "browser", "cli", "native", "node", "shared"] as const;
+const SOURCE_LAYERS = ["app", "browser", "cli", "native", "node", "core"] as const;
 
 type SourceLayer = (typeof SOURCE_LAYERS)[number];
 
@@ -10,12 +10,12 @@ const isSourceLayer = (value: string): value is SourceLayer =>
   SOURCE_LAYERS.some((candidate) => candidate === value);
 
 const allowedImports = new Map<SourceLayer, ReadonlySet<SourceLayer>>([
-  ["app", new Set(["app", "browser", "shared"])],
-  ["browser", new Set(["browser", "shared"])],
-  ["cli", new Set(["cli", "native", "shared"])],
-  ["native", new Set(["native", "shared"])],
-  ["node", new Set(["node", "native", "shared"])],
-  ["shared", new Set(["shared"])],
+  ["app", new Set(["app", "browser", "core"])],
+  ["browser", new Set(["browser", "core"])],
+  ["cli", new Set(["cli", "native", "core"])],
+  ["native", new Set(["native", "core"])],
+  ["node", new Set(["node", "native", "core"])],
+  ["core", new Set(["core"])],
 ]);
 
 const importPattern = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/gu;
@@ -75,7 +75,7 @@ describe("repository source boundaries", () => {
     expect(layers.sort()).toEqual([...SOURCE_LAYERS].sort());
   });
 
-  test("keeps imports moving toward shared runtime layers", async () => {
+  test("keeps imports moving toward core runtime layers", async () => {
     const files = await listTypeScriptFiles("src");
 
     for (const file of files) {
