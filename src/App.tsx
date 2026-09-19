@@ -676,7 +676,6 @@ const HomePage = () => {
 
 
 const DOC_SECTION_IDS = [
-  "overview",
   "quickstart",
   "web-ui",
   "local-app",
@@ -684,7 +683,6 @@ const DOC_SECTION_IDS = [
   "node-api",
   "model",
   "architecture",
-  "privacy",
   "resources",
 ] as const;
 
@@ -694,7 +692,7 @@ const isDocsSectionId = (sectionId: string): sectionId is DocsSectionId =>
   DOC_SECTION_IDS.some((candidate) => candidate === sectionId);
 
 const DocsSidebar = () => {
-  const [activeSection, setActiveSection] = createSignal<DocsSectionId>("overview");
+  const [activeSection, setActiveSection] = createSignal<DocsSectionId>("quickstart");
 
   onSettled(() => {
     const sections = Array.from(
@@ -702,8 +700,17 @@ const DocsSidebar = () => {
     ).filter((section) => isDocsSectionId(section.id));
 
     const pickActiveSection = () => {
+      const documentBottom = document.documentElement.scrollHeight;
+      const viewportBottom = window.scrollY + window.innerHeight;
+
+      if (viewportBottom >= documentBottom - 2) {
+        setActiveSection("resources");
+
+        return;
+      }
+
       const readingLine = Math.min(140, window.innerHeight * 0.2);
-      let nextSection: DocsSectionId = "overview";
+      let nextSection: DocsSectionId = "quickstart";
 
       for (const section of sections) {
         if (section.getBoundingClientRect().top > readingLine) {
@@ -727,11 +734,13 @@ const DocsSidebar = () => {
       observer.observe(section);
     }
 
+    window.addEventListener("scroll", pickActiveSection, { passive: true });
     window.addEventListener("resize", pickActiveSection);
     pickActiveSection();
 
     return () => {
       observer.disconnect();
+      window.removeEventListener("scroll", pickActiveSection);
       window.removeEventListener("resize", pickActiveSection);
     };
   });
@@ -743,7 +752,6 @@ const DocsSidebar = () => {
     <aside class="docs-sidebar" aria-label="Documentation sections">
       <div class="docs-sidebar-group">
         <span class="docs-sidebar-label">Start</span>
-        <a href="#overview" aria-current={current("overview")}>Overview</a>
         <a href="#quickstart" aria-current={current("quickstart")}>Quickstart</a>
       </div>
 
@@ -759,45 +767,18 @@ const DocsSidebar = () => {
         <span class="docs-sidebar-label">Reference</span>
         <a href="#model" aria-current={current("model")}>Model & runtime</a>
         <a href="#architecture" aria-current={current("architecture")}>Architecture</a>
-        <a href="#privacy" aria-current={current("privacy")}>Privacy</a>
         <a href="#resources" aria-current={current("resources")}>Resources</a>
       </div>
     </aside>
   );
 };
 
-const DocsPage = (props: { readonly onNavigate: Navigate }) => (
+const DocsPage = () => (
   <main class="page-content content-shell">
     <div class="content-layout">
       <DocsSidebar />
 
       <article class="content-page docs-page">
-        <section id="overview" class="docs-intro">
-          <div class="docs-kicker">Documentation</div>
-          <h2>bgcut</h2>
-          <p>
-            Local background removal for the browser, terminal, and Node. Source images stay on
-            your machine.
-          </p>
-          <div class="docs-intro-links">
-            <a
-              href="/"
-              onClick={(event) => {
-                if (!shouldHandleInternalNavigation(event)) {
-                  return;
-                }
-
-                event.preventDefault();
-                props.onNavigate("home");
-              }}
-            >
-              Open app
-            </a>
-            <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">npm</a>
-            <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub</a>
-          </div>
-        </section>
-
         <section id="quickstart" class="doc-section docs-quickstart">
           <h3>Quickstart</h3>
           <p>Run the packaged local web app without installing anything globally:</p>
@@ -1027,19 +1008,6 @@ try {
             Worker, while the pinned model and discrete ONNX Runtime browser files live in private
             R2 and are exposed through same-origin <code>/models/*</code> and
             <code>/runtime/*</code> routes.
-          </p>
-        </section>
-
-        <section id="privacy" class="doc-section">
-          <h3>Privacy</h3>
-          <p>
-            Source images, decoded pixels, masks, and generated outputs stay on the user's machine.
-            The hosted Worker serves application and runtime files; it does not receive the source
-            image or run image inference for the user.
-          </p>
-          <p>
-            The native package may fetch the pinned model artifact when it is not already cached.
-            That model download is separate from image processing.
           </p>
         </section>
 
@@ -1283,7 +1251,7 @@ const App = () => {
             </Show>
           }
         >
-          <DocsPage onNavigate={navigate} />
+          <DocsPage />
         </Show>
       </div>
 
