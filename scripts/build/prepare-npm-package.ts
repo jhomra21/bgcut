@@ -1,7 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const root = resolve(import.meta.dir, "..");
+const root = resolve(import.meta.dir, "../..");
 
 const run = async (args: readonly string[]): Promise<void> => {
   const process = Bun.spawn([...args], {
@@ -36,7 +36,7 @@ await run(["bun", "run", "brand:prepare"]);
 
 await run(["bunx", "vite", "build", "--mode", "package"]);
 
-await run(["bun", "run", "scripts/prepare-package-web.ts"]);
+await run(["bun", "run", "scripts/build/prepare-package-web.ts"]);
 
 await run([
   "bun",
@@ -68,7 +68,7 @@ const modelFileSmokePath = resolve(root, "dist/.model-file-node-smoke.mjs");
 await run([
   "bun",
   "build",
-  "src/shared/model-file.ts",
+  "src/native/model-file.ts",
   "--target=node",
   "--format=esm",
   "--packages=external",
