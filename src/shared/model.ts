@@ -1,3 +1,5 @@
+export const MODEL_INPUT_SIZE = 512;
+
 export const MODEL_FILENAME = "birefnet-lite-512-ort-basic-webgpu-v2.onnx";
 
 export const MODEL_PUBLIC_PATH = `/models/${MODEL_FILENAME}`;
