@@ -14,7 +14,7 @@ const CACHE_CONTROL = "public,max-age=31536000,immutable";
 
 const runtimeDirectory = resolve(
   import.meta.dir,
-  "../node_modules/onnxruntime-web/dist",
+  "../../node_modules/onnxruntime-web/dist",
 );
 
 type RuntimeAsset = {
