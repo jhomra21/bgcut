@@ -705,7 +705,7 @@ const DocsSidebar = () => {
       document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
     ).filter((section) => isDocsSectionId(section.id));
 
-  const readingLine = (): number => Math.min(180, window.innerHeight * 0.3);
+  const readingPosition = (): number => window.innerHeight * 0.42;
 
   const cancelScrollAnimation = () => {
     if (scrollAnimationFrame !== undefined) {
@@ -724,33 +724,27 @@ const DocsSidebar = () => {
     }
 
     const sections = docsSections();
-    const marker = readingLine();
+    const marker = readingPosition();
     let nextSection: DocsSectionId = "quickstart";
+    let closestDistance = Number.POSITIVE_INFINITY;
 
     for (const section of sections) {
       if (!isDocsSectionId(section.id)) {
         continue;
       }
 
-      if (section.getBoundingClientRect().top > marker) {
-        break;
+      const rect = section.getBoundingClientRect();
+
+      if (rect.bottom <= 0 || rect.top >= window.innerHeight) {
+        continue;
       }
 
-      nextSection = section.id;
-    }
+      const distance = Math.abs(rect.top - marker);
 
-    const resources = sections.find((section) => section.id === "resources");
-    const resourcesRect = resources?.getBoundingClientRect();
-
-    const atDocumentBottom =
-      window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
-
-    if (
-      atDocumentBottom &&
-      resourcesRect !== undefined &&
-      resourcesRect.top < window.innerHeight * 0.8
-    ) {
-      nextSection = "resources";
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        nextSection = section.id;
+      }
     }
 
     setActiveSection(nextSection);
@@ -852,7 +846,7 @@ const DocsSidebar = () => {
     window.history.replaceState(null, "", `#${section}`);
 
     const sectionTop = window.scrollY + target.getBoundingClientRect().top;
-    const desiredY = sectionTop - readingLine();
+    const desiredY = sectionTop - Math.min(160, window.innerHeight * 0.22);
 
     const maxScrollY = Math.max(
       0,
