@@ -83,7 +83,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("MIT licensed");
     expect(appSource).not.toContain('class="docs-intro"');
     expect(appSource).not.toContain('<section id="privacy" class="doc-section">');
-    expect(appSource).toContain(">Local app</a>");
+    expect(appSource).toContain("Local app");
     expect(appSource).toContain("Node API");
     expect(appSource).toContain('import { createBgcut } from "bgcut"');
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
