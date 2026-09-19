@@ -120,8 +120,6 @@ describe("browser product UI", () => {
     expect(appSource).toContain('window.addEventListener("scroll", pickActiveSection, { passive: true })');
   });
 
-
-
   test("lets Resources own only the true manual document bottom", () => {
     expect(appSource).toContain("let suppressBottomResourceUntil = 0");
     expect(appSource).toContain("const atDocumentBottom = Math.abs(window.scrollY - maxScrollY) <= 2");
@@ -158,7 +156,23 @@ describe("browser product UI", () => {
     expect(appSource).toContain('engine: "webgpu" | "cpu"');
     expect(appSource).toContain("195,872,736 bytes");
     expect(appSource).toContain("4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c");
-    expect(appSource).toContain("The CLI, packaged local app, and Node API share that validated cache.");
+    expect(appSource).toContain("The CLI, local app, and");
+    expect(appSource).toContain("verify");
+    expect(appSource).toContain("SHA-256");
+  });
+
+
+  test("keeps website documentation aligned with the shipped runtime behavior", () => {
+    expect(appSource).toContain("If <code>--port</code> is omitted");
+    expect(appSource).toContain("The server asks the operating system for an available port by default");
+    expect(appSource).toContain("WebGPU input uses TypeGPU resize and ImageNet normalization");
+    expect(appSource).toContain("WebAssembly input uses canvas resize and the same normalization");
+    expect(appSource).toContain("Sharp/libvips decode and orientation");
+    expect(appSource).toContain("Linear resize and ImageNet normalization");
+    expect(appSource).toContain("Last updated September 19, 2026");
+    expect(appSource.match(/Last updated September 19, 2026/gu)?.length).toBe(2);
+    expect(appSource).not.toContain("The product UI is intentionally small");
+    expect(appSource).not.toContain("Native surfaces");
   });
 
   test("keeps developer diagnostics and external comparison controls out of the product UI", () => {
