@@ -2,4 +2,4 @@ export {
   inspectModelFile,
   ModelFileError,
   type ModelFileFingerprint,
-} from "../src/shared/model-file";
+} from "../../src/native/model-file";
