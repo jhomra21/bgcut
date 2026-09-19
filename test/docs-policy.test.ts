@@ -3,16 +3,16 @@ import { readFile } from "node:fs/promises";
 
 const writingSources = [
   "README.md",
-  "RELEASING.md",
-  "DEPLOYING.md",
+  "docs/operations/RELEASING.md",
+  "docs/operations/DEPLOYING.md",
   "CHANGELOG.md",
   "AGENTS.md",
-  "BENCHMARKS.md",
-  "GRAPH_CAPTURE.md",
-  "IMPROVEMENTS.md",
+  "docs/performance/BENCHMARKS.md",
+  "docs/performance/GRAPH_CAPTURE.md",
+  "docs/roadmap/IMPROVEMENTS.md",
   "skills/bgcut/SKILL.md",
   "tools/oxlint/anti-slop/UPSTREAM.md",
-  "src/App.tsx",
+  "src/app/App.tsx",
 ] as const;
 
 const readWritingSources = async (): Promise<readonly [string, string][]> =>
