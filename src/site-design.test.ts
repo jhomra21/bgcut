@@ -26,8 +26,10 @@ describe("site design contract", () => {
     expect(styles).toContain("width: min(920px, calc(100% - 40px))");
     expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
     expect(styles).toContain("gap: 36px");
-    expect(styles).toContain(".page-content");
-    expect(styles).toContain("transition: opacity 150ms var(--ease-out)");
+    expect(styles).toContain(".route-stage");
+    expect(styles).toContain("transition: opacity 75ms var(--ease-out)");
+    expect(styles).toContain(".route-stage-out");
+    expect(styles).toContain(".route-stage-in");
     expect(styles).toContain(".docs-sidebar");
     expect(styles).toContain("top: 24px");
   });
