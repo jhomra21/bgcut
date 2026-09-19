@@ -35,6 +35,11 @@ type ResultState =
 
 type SitePage = "home" | "docs" | "privacy" | "terms";
 
+const LOCAL_RUNTIME_META_SELECTOR = 'meta[name="bgcut-runtime"][content="local"]';
+
+const isLocalRuntime = (): boolean =>
+  document.querySelector(LOCAL_RUNTIME_META_SELECTOR) !== null;
+
 type Navigate = (page: SitePage) => void;
 
 type RouteTransitionPhase = "idle" | "out" | "in";
@@ -90,6 +95,24 @@ const shouldHandleInternalNavigation = (event: MouseEvent): boolean =>
   !event.ctrlKey &&
   !event.shiftKey &&
   !event.altKey;
+
+const LocalAppHeader = () => (
+  <header class="app-header">
+    <div class="brand-link" aria-label="bgcut">
+      <h1 class="brand-title">
+        <img
+          class="brand-mark"
+          src="/favicon-48x48.png?v=2"
+          alt=""
+          width="32"
+          height="32"
+          aria-hidden="true"
+        />
+        <span>bgcut</span>
+      </h1>
+    </div>
+  </header>
+);
 
 const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
   <header class="app-header">
@@ -1345,6 +1368,17 @@ const TermsPage = () => (
 );
 
 const App = () => {
+  if (isLocalRuntime()) {
+    return (
+      <div class="site-root local-app-root">
+        <div class="site-header-shell">
+          <LocalAppHeader />
+        </div>
+        <HomePage />
+      </div>
+    );
+  }
+
   const initialPage = currentPage();
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
