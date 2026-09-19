@@ -41,6 +41,18 @@ describe("site design contract", () => {
     expect(styles).toContain("box-shadow 150ms ease");
   });
 
+  test("presents docs as compact reference content with an active reading rail", () => {
+    expect(styles).toContain(".docs-intro");
+    expect(styles).toContain("font-size: 32px");
+    expect(styles).toContain(".docs-sidebar-group");
+    expect(styles).toContain('.docs-sidebar a[aria-current="location"]');
+    expect(styles).toContain(".docs-sidebar-label");
+    expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
+    expect(styles).toContain(".spec-table");
+    expect(styles).not.toContain(".doc-card {");
+    expect(styles).not.toContain(".docs-hero");
+  });
+
   test("styles footer and legal pages outside the top navigation", () => {
     expect(styles).toContain(".site-footer");
     expect(styles).toContain(".site-footer-links");
