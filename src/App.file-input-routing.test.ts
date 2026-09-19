@@ -95,7 +95,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('setRoutePhase("in")');
     expect(appSource).toContain('setRoutePhase("idle")');
     expect(appSource).toContain("window.setTimeout");
-    expect(appSource).toContain("window.requestAnimationFrame");
+    expect(appSource.match(/window\\.setTimeout/gu)?.length).toBe(2);
     expect(appSource).toContain('transitionTo(currentPage(), "none")');
     expect(appSource).toContain('const navigate: Navigate = (nextPage) => transitionTo(nextPage, "push")');
     expect(appSource).toContain("window.history.pushState");
