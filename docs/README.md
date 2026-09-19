@@ -6,8 +6,8 @@ bgcut is one published npm package with several runtime boundaries. The reposito
 
 - `src/app/`: Solid UI, hosted-site routing, local-app shell, styles, and UI components.
 - `src/browser/`: browser-only background-removal runtime, including WebGPU, WebAssembly fallback, image decode, compositing, and timing.
-- `src/shared/`: environment-neutral model metadata, runtime asset names, matte conversion, and preprocessing shared by browser and native runtimes.
-- `src/native/`: Node-only implementation shared by the CLI and public Node API, including model caching and native inference.
+- `src/core/`: environment-neutral model metadata, runtime asset names, matte conversion, and preprocessing core by browser and native runtimes.
+- `src/native/`: Node-only implementation core by the CLI and public Node API, including model caching and native inference.
 - `src/node/`: public `bgcut` Node API entry and type declarations.
 - `src/cli/`: command parsing, CLI output, file writing, and the loopback local-app server.
 - `worker/`: Cloudflare Worker entry for hosted static assets, model delivery, and ONNX Runtime asset delivery.
@@ -33,9 +33,9 @@ bgcut is one published npm package with several runtime boundaries. The reposito
 Keep runtime dependencies moving inward:
 
 ```text
-app -> browser -> shared
-cli -> native -> shared
-node -> native -> shared
+app -> browser -> core
+cli -> native -> core
+node -> native -> core
 ```
 
 The Cloudflare Worker is a separate deployment entry. Repository scripts may consume product contracts for build and verification work, but product runtime code must not depend on `scripts/` or `test/`.
