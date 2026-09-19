@@ -38,9 +38,9 @@ For the Node API:
 npm install bgcut
 ```
 
-## Choose the surface
+## Choose how to run bgcut
 
-Use the packaged local app when the user wants the browser UI on their own machine:
+Use the local app when the user wants the browser UI on their own machine:
 
 ```sh
 bgcut
@@ -70,12 +70,14 @@ bgcut serve --no-open
 bgcut serve --json
 ```
 
-`serve --json` does not open a browser. It prints one JSON object containing the resolved URL, host, port, and PID.
+`serve --json` does not open a browser. It prints one JSON object containing the resolved URL, host, port, and PID. Without `--port`, the operating system chooses an available port.
 
 The local server binds to `127.0.0.1`. It serves the packaged browser UI, the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
 
-The result UI supports these shortcuts:
+The browser UI supports these shortcuts:
 
+- `Command/Ctrl+O`: choose an image
+- `Command/Ctrl+V`: paste an image
 - `N`: choose a new image
 - `C`: copy the result
 - `D`: download the result
@@ -84,7 +86,7 @@ The result UI supports these shortcuts:
 
 ## CLI
 
-Passing an image keeps the headless file-in/file-out behavior:
+Pass an image path to run headless removal:
 
 ```sh
 bgcut photo.jpg
@@ -114,7 +116,7 @@ The `-png`, `-webp`, and `-jpg` aliases also work. Do not use `--format png`.
 
 ### Input formats
 
-The supported input contract is JPEG, PNG, WebP, and AVIF.
+Supported inputs are JPEG, PNG, WebP, and AVIF.
 
 The native path uses Sharp and libvips to inspect image contents instead of trusting the filename extension alone. An AVIF file can therefore work even when its name ends in `.jpg`.
 
@@ -175,7 +177,7 @@ Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `pn
 
 ## Model cache
 
-The first native run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use.
+The first native run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating-system user cache and verifies its expected size and SHA-256 before use.
 
 The CLI, packaged local app, and Node API share the same validated model cache. A valid cached model is reused on later runs.
 
