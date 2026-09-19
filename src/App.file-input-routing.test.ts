@@ -68,6 +68,17 @@ describe("browser product UI", () => {
   });
 
 
+  test("keeps the packaged local app on the root tool shell only", () => {
+    expect(appSource).toContain("LOCAL_RUNTIME_META_SELECTOR");
+    expect(appSource).toContain('meta[name="bgcut-runtime"][content="local"]');
+    expect(appSource).toContain("if (isLocalRuntime())");
+    expect(appSource).toContain("<LocalAppHeader />");
+    expect(appSource).toContain('class="site-root local-app-root"');
+    expect(appSource).toContain("<HomePage />");
+    expect(appSource).toContain("const LocalAppHeader = () => (");
+    expect(appSource).not.toContain('<LocalAppHeader />\n        <SiteFooter');
+  });
+
   test("exposes docs plus footer-only legal pages without an about surface", () => {
     expect(appSource).toContain('pathname === "/docs"');
     expect(appSource).toContain('pathname === "/privacy"');
