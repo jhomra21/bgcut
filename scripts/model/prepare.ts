@@ -7,7 +7,7 @@ import {
   MODEL_RELEASE_URL,
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
-} from "../src/engine/model-config";
+} from "../../src/shared/model";
 import { inspectModelFile, type ModelFileFingerprint } from "./model-file";
 
 class ModelPrepareError extends Data.TaggedError("ModelPrepareError")<{
@@ -15,7 +15,7 @@ class ModelPrepareError extends Data.TaggedError("ModelPrepareError")<{
   readonly cause?: unknown;
 }> {}
 
-const modelPath = resolve(import.meta.dir, "../public/models", MODEL_FILENAME);
+const modelPath = resolve(import.meta.dir, "../../public/models", MODEL_FILENAME);
 
 const temporaryPath = `${modelPath}.download`;
 
