@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 
 import { ImageDecodeFailed, ImageProcessingFailed, UnsupportedImage, type ImageError } from "./errors";
-import { MODEL_INPUT_SIZE } from "../shared/model";
-import { normalizeRgbaToNchw } from "../shared/preprocess";
+import { MODEL_INPUT_SIZE } from "../core/model";
+import { normalizeRgbaToNchw } from "../core/preprocess";
 
 
 const supportedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
