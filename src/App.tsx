@@ -35,6 +35,11 @@ type ResultState =
 
 type SitePage = "home" | "docs" | "privacy" | "terms";
 
+const LOCAL_RUNTIME_META_SELECTOR = 'meta[name="bgcut-runtime"][content="local"]';
+
+const isLocalRuntime = (): boolean =>
+  document.querySelector(LOCAL_RUNTIME_META_SELECTOR) !== null;
+
 type Navigate = (page: SitePage) => void;
 
 type RouteTransitionPhase = "idle" | "out" | "in";
@@ -90,6 +95,24 @@ const shouldHandleInternalNavigation = (event: MouseEvent): boolean =>
   !event.ctrlKey &&
   !event.shiftKey &&
   !event.altKey;
+
+const LocalAppHeader = () => (
+  <header class="app-header">
+    <div class="brand-link">
+      <h1 class="brand-title">
+        <img
+          class="brand-mark"
+          src="/favicon-48x48.png?v=2"
+          alt=""
+          width="32"
+          height="32"
+          aria-hidden="true"
+        />
+        <span>bgcut</span>
+      </h1>
+    </div>
+  </header>
+);
 
 const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
   <header class="app-header">
@@ -998,9 +1021,9 @@ const DocsPage = () => (
         <section id="local-app" class="doc-section">
           <h3>Local app</h3>
           <p>
-            Run bgcut with no image to start the packaged web UI on <code>127.0.0.1</code>.
-            The server asks the operating system for an available port by default and opens that
-            URL in the browser.
+            Run bgcut with no image to start the packaged remover on <code>127.0.0.1</code>.
+            The local UI contains the bgcut brand and removal workflow only. Docs, GitHub
+            navigation, Privacy, Terms, and the site footer remain on bgcut.dev.
           </p>
           <pre class="code-block"><code>{`npm install -g bgcut
 bgcut
@@ -1020,9 +1043,10 @@ bgcut serve --json`}</code></pre>
             <code>serve --json</code> does not open a browser. It prints one JSON object with
             <code>url</code>, <code>host</code>, <code>port</code>, and <code>pid</code>.
             If <code>--port</code> is omitted, the operating system chooses an available port.
-            The server exposes <code>/health</code>, the validated model under
-            <code>/models/...</code>, and the installed ONNX Runtime browser files under
-            <code>/runtime/...</code>. Image inference still runs in the browser.
+            Non-root app routes redirect to <code>/</code>. The server exposes
+            <code>/health</code>, the validated model under <code>/models/...</code>, and the
+            installed ONNX Runtime browser files under <code>/runtime/...</code>. Image inference
+            still runs in the browser.
           </p>
         </section>
 
@@ -1232,9 +1256,10 @@ const PrivacyPage = () => (
         <h3>Image processing</h3>
         <p>
           The hosted app runs background removal in your browser. The local app serves the same
-          browser UI from <code>127.0.0.1</code>, so image inference still runs in the browser.
-          The CLI and Node API process images in the local Node process. bgcut does not send source
-          images, decoded pixels, masks, or generated outputs to a bgcut inference service.
+          removal workflow from <code>127.0.0.1</code> without the hosted site's navigation,
+          documentation, or legal pages. Image inference still runs in the browser. The CLI and
+          Node API process images in the local Node process. bgcut does not send source images,
+          decoded pixels, masks, or generated outputs to a bgcut inference service.
         </p>
       </section>
 
@@ -1345,6 +1370,17 @@ const TermsPage = () => (
 );
 
 const App = () => {
+  if (isLocalRuntime()) {
+    return (
+      <div class="site-root local-app-root">
+        <div class="site-header-shell">
+          <LocalAppHeader />
+        </div>
+        <HomePage />
+      </div>
+    );
+  }
+
   const initialPage = currentPage();
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");

@@ -207,9 +207,22 @@ try {
     }
 
     const page = await fetch(startup.url);
+    const pageHtml = await page.text();
 
-    if (!page.ok || !(await page.text()).includes("bgcut")) {
-      throw new Error(`Packaged bgcut web app was not served from ${startup.url}.`);
+    if (
+      !page.ok ||
+      !pageHtml.includes("bgcut") ||
+      !pageHtml.includes('<meta name="bgcut-runtime" content="local" />')
+    ) {
+      throw new Error(`Packaged bgcut local app was not served from ${startup.url}.`);
+    }
+
+    const docsRoute = await fetch(new URL("/docs", startup.url), {
+      redirect: "manual",
+    });
+
+    if (docsRoute.status !== 302 || docsRoute.headers.get("location") !== "/") {
+      throw new Error("Packaged bgcut local app exposed a non-root site route.");
     }
 
     const health = await fetch(new URL("/health", startup.url));

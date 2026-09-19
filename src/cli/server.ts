@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createRequire } from "node:module";
@@ -20,6 +20,8 @@ import type { ServeOptions } from "./args";
 const HOST = "127.0.0.1";
 
 const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+const LOCAL_RUNTIME_META = '<meta name="bgcut-runtime" content="local" />';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -128,6 +130,35 @@ const sendFile = async (
     response.on("error", rejectStream);
     stream.pipe(response);
   });
+};
+
+const sendLocalIndex = async (
+  response: ServerResponse,
+  path: string,
+  method: string,
+): Promise<void> => {
+  const source = await readFile(path, "utf8");
+
+  const html = source.includes(LOCAL_RUNTIME_META)
+    ? source
+    : source.includes("</head>")
+      ? source.replace("</head>", `  ${LOCAL_RUNTIME_META}\n  </head>`)
+      : `${LOCAL_RUNTIME_META}\n${source}`;
+
+  const body = Buffer.from(html, "utf8");
+
+  response.statusCode = 200;
+  response.setHeader("cache-control", "no-cache");
+  response.setHeader("content-length", String(body.byteLength));
+  response.setHeader("content-type", "text/html; charset=utf-8");
+
+  if (method === "HEAD") {
+    response.end();
+
+    return;
+  }
+
+  response.end(body);
 };
 
 const resolveStaticPath = async (pathname: string, webRoot: string): Promise<string> => {
@@ -245,11 +276,24 @@ export const startLocalAppServer = async (
 
       const staticPath = await resolveStaticPath(url.pathname, webRoot);
 
+      if (staticPath.endsWith("index.html") && url.pathname !== "/") {
+        response.statusCode = 302;
+        response.setHeader("cache-control", "no-store");
+        response.setHeader("location", "/");
+        response.end();
+
+        return;
+      }
+
+      if (staticPath.endsWith("index.html")) {
+        await sendLocalIndex(response, staticPath, method);
+
+        return;
+      }
+
       await sendFile(response, staticPath, {
         method,
-        cacheControl: staticPath.endsWith("index.html")
-          ? "no-cache"
-          : "public, max-age=31536000, immutable",
+        cacheControl: "public, max-age=31536000, immutable",
       });
     })().catch((cause: unknown) => {
       if (response.headersSent) {

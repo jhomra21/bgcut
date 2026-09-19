@@ -66,7 +66,7 @@ bgcut serve --no-open
 bgcut serve --json
 ```
 
-The local server only binds to the loopback interface. It serves the same browser UI as `bgcut.dev`, the cached validated model at `/models/...`, the installed ONNX Runtime files at `/runtime/...`, and a small `/health` endpoint. Source images remain in the browser.
+The local server only binds to the loopback interface. Its UI contains the bgcut remover only; the hosted Docs, GitHub navigation, Privacy, and Terms links stay on `bgcut.dev`. The server exposes the cached validated model at `/models/...`, the installed ONNX Runtime files at `/runtime/...`, and a small `/health` endpoint. Non-root app routes redirect to `/`. Source images remain in the browser.
 
 ## CLI
 

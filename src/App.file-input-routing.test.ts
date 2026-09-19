@@ -68,6 +68,29 @@ describe("browser product UI", () => {
   });
 
 
+  test("keeps the packaged local app on the root tool shell only", () => {
+    expect(appSource).toContain("LOCAL_RUNTIME_META_SELECTOR");
+    expect(appSource).toContain('meta[name="bgcut-runtime"][content="local"]');
+    expect(appSource).toContain("const LocalAppHeader = () => (");
+
+    const localStart = appSource.indexOf("if (isLocalRuntime())");
+    const hostedStart = appSource.indexOf("const initialPage = currentPage()", localStart);
+
+    expect(localStart).toBeGreaterThanOrEqual(0);
+    expect(hostedStart).toBeGreaterThan(localStart);
+
+    const localBranch = appSource.slice(localStart, hostedStart);
+
+    expect(localBranch).toContain("<LocalAppHeader />");
+    expect(localBranch).toContain('class="site-root local-app-root"');
+    expect(localBranch).toContain("<HomePage />");
+    expect(localBranch).not.toContain("<SiteHeader");
+    expect(localBranch).not.toContain("<SiteFooter");
+    expect(localBranch).not.toContain("<DocsPage");
+    expect(localBranch).not.toContain("<PrivacyPage");
+    expect(localBranch).not.toContain("<TermsPage");
+  });
+
   test("exposes docs plus footer-only legal pages without an about surface", () => {
     expect(appSource).toContain('pathname === "/docs"');
     expect(appSource).toContain('pathname === "/privacy"');
@@ -162,9 +185,18 @@ describe("browser product UI", () => {
   });
 
 
+
+  test("documents the hosted-site versus packaged-local distinction", () => {
+    expect(appSource).toContain("The local UI contains the bgcut brand and removal workflow only");
+    expect(appSource).toContain("Docs, GitHub");
+    expect(appSource).toContain("Privacy, Terms, and the site footer remain on bgcut.dev");
+    expect(appSource).toContain("Non-root app routes redirect to <code>/</code>");
+    expect(appSource).toContain("without the hosted site's navigation");
+  });
+
   test("keeps website documentation aligned with the shipped runtime behavior", () => {
     expect(appSource).toContain("If <code>--port</code> is omitted");
-    expect(appSource).toContain("The server asks the operating system for an available port by default");
+    expect(appSource).toContain("The local UI contains the bgcut brand and removal workflow only");
     expect(appSource).toContain("WebGPU input uses TypeGPU resize and ImageNet normalization");
     expect(appSource).toContain("WebAssembly input uses canvas resize and the same normalization");
     expect(appSource).toContain("Sharp/libvips decode and orientation");
