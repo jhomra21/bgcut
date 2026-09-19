@@ -98,7 +98,7 @@ const shouldHandleInternalNavigation = (event: MouseEvent): boolean =>
 
 const LocalAppHeader = () => (
   <header class="app-header">
-    <div class="brand-link" aria-label="bgcut">
+    <div class="brand-link">
       <h1 class="brand-title">
         <img
           class="brand-mark"
