@@ -3,7 +3,7 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { InferenceFailed } from "./errors";
 import type { GpuRuntime } from "./gpu";
-import { MODEL_INPUT_SIZE } from "./image";
+import { MODEL_INPUT_SIZE } from "../shared/model";
 import type { RemovalTimingRecorder } from "./timing";
 
 const MODEL_OUTPUT_ELEMENT_COUNT = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
