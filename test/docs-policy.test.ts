@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const writingSources = [
   "README.md",
+  "docs/README.md",
   "docs/operations/RELEASING.md",
   "docs/operations/DEPLOYING.md",
   "CHANGELOG.md",
