@@ -138,7 +138,29 @@ const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navig
 const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
   <footer class="site-footer">
     <div class="site-footer-meta">
-      <span>bgcut</span>
+      <a
+        class="site-footer-brand brand-link"
+        href="/"
+        aria-label="bgcut home"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("home");
+        }}
+      >
+        <img
+          class="brand-mark"
+          src="/favicon-48x48.png?v=2"
+          alt=""
+          width="22"
+          height="22"
+          aria-hidden="true"
+        />
+        <span>bgcut</span>
+      </a>
       <span>MIT licensed</span>
     </div>
     <nav class="site-footer-links" aria-label="Footer navigation">

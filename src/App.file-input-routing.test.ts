@@ -79,6 +79,7 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain('href="/about"');
     expect(appSource).not.toContain("AboutPage");
     expect(appSource).toContain("SiteFooter");
+    expect(appSource).toContain('class="site-footer-brand brand-link"');
     expect(appSource).toContain("MIT licensed");
     expect(appSource).toContain("Documentation");
     expect(appSource).toContain("Packaged local app");

@@ -921,11 +921,29 @@ figure {
   gap: 16px;
 }
 
-.site-footer-meta span + span {
+.site-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.site-footer-brand .brand-mark {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
+  border-radius: 6px;
+}
+
+.site-footer-meta > * + * {
   position: relative;
 }
 
-.site-footer-meta span + span::before {
+.site-footer-meta > * + *::before {
   content: "";
   position: absolute;
   top: 50%;
