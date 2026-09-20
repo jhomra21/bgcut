@@ -129,11 +129,12 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
-  test("tracks the nearest visible docs heading during manual scroll", () => {
-    expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.42");
+  test("tracks the docs section containing the viewport reading position", () => {
+    expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.52");
     expect(appSource).toContain("let closestDistance = Number.POSITIVE_INFINITY");
     expect(appSource).toContain("rect.bottom <= 0 || rect.top >= window.innerHeight");
-    expect(appSource).toContain("const distance = Math.abs(rect.top - marker)");
+    expect(appSource).toContain("rect.top <= marker && rect.bottom >= marker");
+    expect(appSource).toContain("marker < rect.top ? rect.top - marker : Math.max(marker - rect.bottom, 0)");
     expect(appSource).toContain("distance < closestDistance");
     expect(appSource).toContain("nextSection = section.id");
     expect(appSource).not.toContain("resourcesRect.top < window.innerHeight");
