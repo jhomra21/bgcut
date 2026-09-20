@@ -1,9 +1,9 @@
-import { MODEL_FILENAME } from "../engine/model-config.ts";
+import { MODEL_FILENAME } from "../shared/model-config.ts";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../engine/ort-webgpu-runtime.ts";
+} from "../shared/ort-assets.ts";
 import type { AssetFetcher, R2BucketBinding, R2ObjectMetadata } from "./types.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;

@@ -11,9 +11,9 @@ import { MODEL_INPUT_SIZE, loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import type { BackgroundRemovalResult } from "./inference";
 import { fetchModelBytes } from "./model-loader";
-import { MODEL_REVISION } from "./model-config";
+import { MODEL_REVISION } from "../shared/model-config";
 import { resolveOrtWasmModuleUrl, resolveOrtWasmUrl } from "./ort-webgpu-runtime";
-import { normalizeRgbaToNchw } from "./preprocess";
+import { normalizeRgbaToNchw } from "../shared/preprocess";
 import {
   createRemovalTimingRecorder,
   type RemovalTimingRecorder,

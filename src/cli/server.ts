@@ -8,12 +8,12 @@ import { createRequire } from "node:module";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MODEL_FILENAME } from "../engine/model-config";
+import { MODEL_FILENAME } from "../shared/model-config";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../engine/ort-webgpu-runtime";
+} from "../shared/ort-assets";
 import { ensureCachedModel } from "../native/model-cache";
 import type { ServeOptions } from "./args";
 
