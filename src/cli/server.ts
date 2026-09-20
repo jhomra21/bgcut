@@ -8,13 +8,13 @@ import { createRequire } from "node:module";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MODEL_FILENAME } from "../engine/model-config";
+import { MODEL_FILENAME } from "../shared/model-config";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WEBGPU_WASM_FILENAME,
-} from "../engine/ort-webgpu-runtime";
-import { ensureCliModel } from "./model-cache";
+} from "../shared/ort-assets";
+import { ensureCachedModel } from "../native/model-cache";
 import type { ServeOptions } from "./args";
 
 const HOST = "127.0.0.1";
@@ -251,7 +251,7 @@ export const startLocalAppServer = async (
       }
 
       if (url.pathname === `/models/${MODEL_FILENAME}`) {
-        const modelPath = await Effect.runPromise(ensureCliModel());
+        const modelPath = await Effect.runPromise(ensureCachedModel());
 
         await sendFile(response, modelPath, {
           method,

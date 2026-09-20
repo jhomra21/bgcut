@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 
-import { MODEL_INPUT_SIZE } from "../engine/image";
+import { MODEL_INPUT_SIZE } from "../shared/model-config";
 import { prepareImage } from "./runtime";
 
 test("prepareImage decodes AVIF by content even when the filename ends in .jpg", async () => {
