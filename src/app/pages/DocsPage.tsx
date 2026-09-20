@@ -51,6 +51,12 @@ const DocsSidebar = () => {
       return;
     }
 
+    if (window.scrollY <= 2) {
+      setActiveSection("quickstart");
+
+      return;
+    }
+
     const sections = docsSections();
     const marker = readingPosition();
     let nextSection: DocsSectionId = "quickstart";
