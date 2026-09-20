@@ -10,7 +10,7 @@ import {
   ORT_WEBGPU_WASM_PUBLIC_PATH,
 } from "../../src/shared/ort-assets";
 
-const WRANGLER_VERSION = "4.133.0";
+const WRANGLER_VERSION = "4.135.0";
 
 const PORT = 8790;
 
