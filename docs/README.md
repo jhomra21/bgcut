@@ -15,3 +15,10 @@ bgcut keeps user-facing package documentation in the root `README.md`. The files
 ## Roadmap
 
 - [`roadmap.md`](roadmap.md): work outside the current public product contract.
+
+
+## Public release history
+
+- The repository source of truth is [`../CHANGELOG.md`](../CHANGELOG.md).
+- The hosted site renders that same file at [`bgcut.dev/changelog`](https://bgcut.dev/changelog).
+- GitHub release notes are extracted from the matching version section of the same file.
