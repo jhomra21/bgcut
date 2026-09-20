@@ -52,7 +52,7 @@ Use the CLI when the user wants file-in/file-out automation:
 bgcut input.jpg -o output.png
 ```
 
-Use the Node API when an application needs to keep one ONNX Runtime session alive across multiple removals.
+Use the Node API for application code. Prefer `removeBackground()` for one image and `createBgcut()` when several removals should share one warm ONNX Runtime session.
 
 ## Local app
 
@@ -72,7 +72,7 @@ bgcut serve --json
 
 `serve --json` does not open a browser. It prints one JSON object containing the resolved URL, host, port, and PID. Without `--port`, the operating system chooses an available port.
 
-The local server binds to `127.0.0.1`. Its UI is the remover only; hosted Docs, GitHub navigation, Privacy, and Terms are not part of the local app. Non-root app routes redirect to `/`. The server also serves the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
+The local server binds to `127.0.0.1`. Its UI is the remover only; hosted Docs, Changelog, GitHub navigation, Privacy, and Terms are not part of the local app. Non-root app routes redirect to `/`. The server also serves the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
 
 The browser UI supports these shortcuts:
 
@@ -211,9 +211,10 @@ When the user asks to remove a background:
 4. Preserve explicit provider constraints. Do not turn a requested GPU-only run into CPU silently.
 5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
-7. Reuse one `createBgcut()` instance when application code will process multiple images.
-8. Close a Node API engine when the caller is finished with it.
-9. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
+7. Use `removeBackground()` for a one-shot Node API removal.
+8. Reuse one `createBgcut()` instance when application code will process multiple images, and close it when finished.
+9. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
+10. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
 
 ## Examples
 
