@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 
 import { ModelCacheError } from "../native/model-cache";
 import {
@@ -75,6 +75,18 @@ export type Bgcut = {
   readonly close: () => Promise<void>;
 };
 
+const runPublicEffect = async <A, E extends Error>(
+  effect: Effect.Effect<A, E>,
+): Promise<A> => {
+  const result = await Effect.runPromise(Effect.either(effect));
+
+  if (Either.isLeft(result)) {
+    throw result.left;
+  }
+
+  return result.right;
+};
+
 const mapCreateError = (
   error: ModelCacheError | BgcutSessionError,
 ): BgcutError => {
@@ -102,7 +114,7 @@ const mapRemoveError = (
 export const createBgcut = async (
   options: BgcutOptions = {},
 ): Promise<Bgcut> => {
-  const native = await Effect.runPromise(
+  const native = await runPublicEffect(
     createNativeBgcut(options.engine ?? "auto").pipe(
       Effect.mapError(mapCreateError),
     ),
@@ -121,7 +133,7 @@ export const createBgcut = async (
         );
       }
 
-      return Effect.runPromise(
+      return runPublicEffect(
         native.remove(input, removeOptions.format ?? "png").pipe(
           Effect.mapError(mapRemoveError),
         ),
