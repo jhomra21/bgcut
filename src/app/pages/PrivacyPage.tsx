@@ -10,7 +10,7 @@ export const PrivacyPage = () => (
         <p>
           The hosted app runs background removal in your browser. The local app serves the same
           removal workflow from <code>127.0.0.1</code> without the hosted site's navigation,
-          documentation, or legal pages. Image inference still runs in the browser. The CLI and
+          documentation, changelog, or legal pages. Image inference still runs in the browser. The CLI and
           Node API process images in the local Node process. bgcut does not send source images,
           decoded pixels, masks, or generated outputs to a bgcut inference service.
         </p>
