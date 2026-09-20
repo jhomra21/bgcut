@@ -47,6 +47,7 @@ const parseChangelog = (source: string): ChangelogDocument => {
       if (heading !== undefined) {
         items.push(line.slice(2));
       }
+
       continue;
     }
 
