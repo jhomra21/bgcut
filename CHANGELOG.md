@@ -6,7 +6,10 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.4.0-beta.1 - 2026-09-20
+
 - Fixed the Node API error boundary so documented `BgcutError` instances reach callers directly instead of being wrapped as Effect `FiberFailure` objects. Malformed image bytes now reject with `BgcutError` and code `input` from both `removeBackground()` and reusable `createBgcut()` instances.
+- Added packed-package regression coverage for malformed-image errors through both public Node API paths, while retaining the existing closed-instance error check.
 
 ## 0.4.0-beta.0 - 2026-09-20
 
