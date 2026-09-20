@@ -281,6 +281,32 @@ try {
     `import { writeFile } from "node:fs/promises";
 import { BgcutError, createBgcut, removeBackground } from "bgcut";
 
+const expectBgcutError = async (operation, expectedCode, exitCode) => {
+  let received;
+
+  try {
+    await operation();
+  } catch (error) {
+    received = error;
+  }
+
+  if (
+    !(received instanceof BgcutError) ||
+    received.name !== "BgcutError" ||
+    received.code !== expectedCode
+  ) {
+    process.exit(exitCode);
+  }
+};
+
+const invalidImage = new Uint8Array([0, 1, 2, 3]);
+
+await expectBgcutError(
+  () => removeBackground(invalidImage, { engine: "cpu" }),
+  "input",
+  2,
+);
+
 const oneShot = await removeBackground(process.argv[2], {
   engine: "cpu",
   format: "png",
@@ -295,12 +321,18 @@ if (
   "timings" in oneShot ||
   "fallbackReason" in oneShot
 ) {
-  process.exit(2);
+  process.exit(3);
 }
 
 const bgcut = await createBgcut({ engine: "cpu" });
 
 try {
+  await expectBgcutError(
+    () => bgcut.remove(invalidImage),
+    "input",
+    4,
+  );
+
   const first = await bgcut.remove(process.argv[2]);
   const second = await bgcut.remove(process.argv[2], { format: "webp" });
 
@@ -311,21 +343,16 @@ try {
     first.data.length === 0 ||
     second.data.length === 0
   ) {
-    process.exit(3);
+    process.exit(5);
   }
 
   await bgcut.close();
 
-  let closedError;
-  try {
-    await bgcut.remove(process.argv[2]);
-  } catch (error) {
-    closedError = error;
-  }
-
-  if (!(closedError instanceof BgcutError) || closedError.code !== "closed") {
-    process.exit(4);
-  }
+  await expectBgcutError(
+    () => bgcut.remove(process.argv[2]),
+    "closed",
+    6,
+  );
 
   await writeFile(process.argv[3], second.data);
 } finally {
@@ -361,7 +388,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model route, reusable Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model route, public Node API errors, reusable Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
