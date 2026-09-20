@@ -33,7 +33,7 @@ const DocsSidebar = () => {
       document.querySelectorAll<HTMLElement>(".docs-page > section[id]"),
     ).filter((section) => isDocsSectionId(section.id));
 
-  const readingPosition = (): number => window.innerHeight * 0.42;
+  const readingPosition = (): number => window.innerHeight * 0.52;
 
   const cancelScrollAnimation = () => {
     if (scrollAnimationFrame !== undefined) {
@@ -73,7 +73,14 @@ const DocsSidebar = () => {
         continue;
       }
 
-      const distance = Math.abs(rect.top - marker);
+      if (rect.top <= marker && rect.bottom >= marker) {
+        nextSection = section.id;
+
+        break;
+      }
+
+      const distance =
+        marker < rect.top ? rect.top - marker : Math.max(marker - rect.bottom, 0);
 
       if (distance < closestDistance) {
         closestDistance = distance;
