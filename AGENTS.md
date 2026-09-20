@@ -59,6 +59,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - Keep model-specific behavior behind the inference boundary so the UI does not depend on ONNX details.
 - Keep public documentation focused on bgcut. Do not expose internal comparison-tool names or acceptance fixtures unless they become part of the public product contract.
 - Keep the normal browser UI limited to the user flow. Developer diagnostics and benchmark controls do not belong in the main product surface.
+- The hosted `/changelog` page must render from root `CHANGELOG.md`; do not duplicate release prose in app source.
 
 ## Web deployment policy
 
@@ -86,7 +87,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
 - Prepare each release in a dedicated PR after the product changes are merged and accepted.
-- Update `CHANGELOG.md` and user-facing docs before the release version is finalized.
+- Update `CHANGELOG.md`, the hosted `/docs` surface, and other user-facing docs before the release version is finalized.
 - Merge only after CI passes on the exact release head.
 - Never reuse or overwrite an npm version that already exists.
 - Keep `package.json` repository metadata aligned with `jhomra21/bgcut` because npm Trusted Publishing checks repository identity.
