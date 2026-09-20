@@ -6,6 +6,15 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.3.2 - 2026-09-20
+
+- Reorganized the repository around explicit app, browser, CLI, Node, native, shared, Worker, documentation, and tooling directories while keeping the published CLI and Node API behavior intact.
+- Split the browser application into focused pages, navigation, and shared site chrome, and kept the accepted documentation scrollspy fix so section highlighting follows the reader more accurately.
+- Moved engineering, operations, roadmap, model, package, Cloudflare, and brand files into clearer locations and added repository-layout checks to prevent old boundaries from creeping back in.
+- Tightened the repository's anti-slop guidance and kept the vendored anti-slop rules current and enforced through oxlint.
+- Removed the obsolete Cloudflare observability setting that Wrangler no longer supports and aligned the runtime smoke path with Wrangler 4.135.0.
+- No background-removal model, inference algorithm, CLI command syntax, Node API contract, or packaged local-app workflow changed in this release.
+
 ## 0.3.1 - 2026-09-19
 
 - Promoted the accepted `0.3.1-beta.0` package to stable after published-package validation of the packaged local shell, image removal, comparison slider, clipboard and paste actions, keyboard shortcuts, file download, health endpoint, and local route redirects.
