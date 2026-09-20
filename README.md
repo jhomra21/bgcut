@@ -162,11 +162,13 @@ image
 
 ## Node API
 
-Install bgcut as an application dependency:
+Install the 0.4 beta while validating the simplified Node API:
 
 ```sh
-npm install bgcut
+npm install bgcut@beta
 ```
+
+Stable installs remain on `bgcut@latest` until this beta is accepted.
 
 For one image, use `removeBackground()`. It creates the runtime, removes the background, and closes the runtime before returning:
 
