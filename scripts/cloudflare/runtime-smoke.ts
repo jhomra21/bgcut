@@ -8,7 +8,7 @@ import {
   ORT_WASM_PUBLIC_PATH,
   ORT_WEBGPU_WASM_FILENAME,
   ORT_WEBGPU_WASM_PUBLIC_PATH,
-} from "../../src/engine/ort-webgpu-runtime";
+} from "../../src/shared/ort-assets";
 
 const WRANGLER_VERSION = "4.133.0";
 
