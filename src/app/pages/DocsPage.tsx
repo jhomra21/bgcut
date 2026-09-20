@@ -340,7 +340,7 @@ export const DocsPage = () => (
           <h3>Local app</h3>
           <p>
             Run bgcut with no image to start the packaged remover on <code>127.0.0.1</code>.
-            The local UI contains the bgcut brand and removal workflow only. Docs, GitHub
+            The local UI contains the bgcut brand and removal workflow only. Docs, Changelog, GitHub
             navigation, Privacy, Terms, and the site footer remain on bgcut.dev.
           </p>
           <pre class="code-block"><code>{`npm install -g bgcut
@@ -415,62 +415,74 @@ bgcut photo.jpg --cpu`}</code></pre>
         <section id="node-api" class="doc-section">
           <h3>Node API</h3>
           <p>
-            Install bgcut as an application dependency, then call <code>createBgcut()</code>.
-            Each created engine owns one ONNX Runtime session and reuses it until
-            <code>close()</code>.
+            Install bgcut as an application dependency. For one image, use
+            <code>removeBackground()</code>. It owns setup and cleanup for the call and returns
+            only the image result fields most callers need.
           </p>
           <pre class="code-block"><code>{`import { writeFile } from "node:fs/promises";
-import { createBgcut } from "bgcut";
+import { removeBackground } from "bgcut";
 
-const bgcut = await createBgcut();
+const result = await removeBackground("photo.jpg");
+await writeFile("photo-nobg.png", result.data);`}</code></pre>
 
-try {
-  const result = await bgcut.remove("photo.jpg", { format: "png" });
-  await writeFile("photo-nobg.png", result.data);
-} finally {
-  await bgcut.close();
-}`}</code></pre>
-
-          <h4>createBgcut options</h4>
-          <div class="spec-table" role="table" aria-label="Node API engines">
-            <div class="spec-row" role="row">
-              <strong role="cell"><code>auto</code></strong>
-              <span role="cell">Create a WebGPU session first, then use CPU if creation fails</span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell"><code>gpu</code></strong>
-              <span role="cell">Require a WebGPU session</span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell"><code>cpu</code></strong>
-              <span role="cell">Require a CPU session</span>
-            </div>
-          </div>
-
-          <h4>Inputs and results</h4>
+          <h4>One-shot options and result</h4>
           <p>
-            <code>remove()</code> accepts a file path, <code>Uint8Array</code>, or
-            <code>ArrayBuffer</code>. The format can be <code>png</code>, <code>webp</code>, or
+            Pass <code>format</code> or <code>engine</code> only when you need to override the
+            defaults. Inputs can be a file path, <code>Uint8Array</code>, or
+            <code>ArrayBuffer</code>. Output formats are <code>png</code>, <code>webp</code>, and
             <code>jpg</code>.
           </p>
-          <pre class="code-block"><code>{`type BgcutRemovalResult = {
+          <pre class="code-block"><code>{`const result = await removeBackground("photo.jpg", {
+  format: "webp",
+  engine: "cpu",
+});
+
+type RemoveBackgroundResult = {
   data: Uint8Array;
   width: number;
   height: number;
   format: "png" | "webp" | "jpg";
-  engine: "webgpu" | "cpu";
-  fallbackReason: string | undefined;
-  timings: {
-    totalMs: number;
-    prepareMs: number;
-    inferenceMs: number;
-    encodeMs: number;
-  };
 };`}</code></pre>
+
+          <h4>Reusable session</h4>
           <p>
-            The returned engine also reports the selected <code>engine</code>, any
-            <code>fallbackReason</code>, and setup timings for model preparation and session
-            creation.
+            When processing several images, create one bgcut instance so the ONNX Runtime session
+            stays warm across removals.
+          </p>
+          <pre class="code-block"><code>{`import { createBgcut } from "bgcut";
+
+const bgcut = await createBgcut();
+
+try {
+  const first = await bgcut.remove("first.jpg");
+  const second = await bgcut.remove("second.jpg", { format: "webp" });
+} finally {
+  await bgcut.close();
+}`}</code></pre>
+          <p>
+            <code>createBgcut()</code> defaults to automatic engine selection. Use
+            <code>engine: "gpu"</code> to require native WebGPU or <code>engine: "cpu"</code> to
+            require CPU. The reusable instance also exposes the selected engine, fallback reason,
+            setup timings, and per-removal timings for callers that need runtime diagnostics.
+          </p>
+
+          <h4>Errors</h4>
+          <p>
+            Node API failures use one public error type. Handle <code>BgcutError.code</code>
+            instead of depending on Effect or ONNX Runtime error classes.
+          </p>
+          <pre class="code-block"><code>{`import { BgcutError, removeBackground } from "bgcut";
+
+try {
+  await removeBackground("photo.jpg");
+} catch (error) {
+  if (error instanceof BgcutError) {
+    console.error(error.code, error.message);
+  }
+}`}</code></pre>
+          <p>
+            Error codes are <code>model</code>, <code>engine</code>, <code>input</code>,
+            <code>inference</code>, <code>output</code>, and <code>closed</code>.
           </p>
         </section>
 
@@ -554,7 +566,8 @@ try {
           <div class="link-list">
             <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub repository</a>
             <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">npm package</a>
-            <a href="https://github.com/jhomra21/bgcut/releases" target="_blank" rel="noreferrer">Releases</a>
+            <a href="/changelog">Changelog</a>
+            <a href="https://github.com/jhomra21/bgcut/releases" target="_blank" rel="noreferrer">GitHub releases</a>
             <a href="https://github.com/jhomra21/bgcut/blob/main/README.md" target="_blank" rel="noreferrer">README</a>
           </div>
         </section>
