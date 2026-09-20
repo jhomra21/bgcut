@@ -19,11 +19,11 @@
 ## Repository layout
 
 - `src/app/`: Solid UI, hosted-site shell, local-app shell, styles, and app-level tests.
-- `src/engine/`: browser inference, WebGPU/WebAssembly runtime code, image processing, and engine tests.
+- `src/browser/`: browser-only inference, WebGPU/WebAssembly runtime code, browser image handling, and colocated browser tests.
 - `src/cli/`: command parsing, headless CLI behavior, and the packaged loopback server.
 - `src/node/`: reusable Node API and native ONNX Runtime execution.
 - `src/native/`: native-only model caching and image-compositing utilities shared by the CLI and Node API.
-- `src/shared/`: utilities shared by native surfaces without UI or CLI ownership.
+- `src/shared/`: runtime-neutral model metadata, preprocessing/matte math, runtime asset metadata, and file-integrity helpers shared across browser, native, Worker, and tooling boundaries.
 - `src/worker/`: Cloudflare Worker routing and Worker-specific tests.
 - `scripts/brand/`: generated brand assets.
 - `scripts/cloudflare/`: Cloudflare build, runtime upload, and smoke tooling.
@@ -33,6 +33,8 @@
 - `docs/operations/`: deployment and release runbooks.
 - `docs/engineering/`: benchmark and implementation records.
 - `docs/roadmap.md`: planned work that is outside the current public product contract.
+
+Keep dependency flow directional: app -> browser/shared, CLI -> node/native/shared, node -> native/shared, Worker -> shared, and scripts -> shared. Browser code must not become a dependency of the native, Worker, or tooling layers.
 
 Keep the repository as one package until a concrete second package needs an independent dependency or release boundary. OpenCode and Pi use workspaces because they ship many distinct packages; bgcut should copy their ownership clarity, not their monorepo size.
 
