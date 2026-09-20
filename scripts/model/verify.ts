@@ -5,7 +5,7 @@ import {
   MODEL_FILENAME,
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
-} from "../../src/engine/model-config";
+} from "../../src/shared/model-config";
 import { inspectModelFile } from "../../src/shared/model-file";
 
 class ModelVerificationError extends Data.TaggedError("ModelVerificationError")<{
