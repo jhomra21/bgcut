@@ -34,12 +34,14 @@ test("local app server binds an available loopback port and serves the web UI", 
     expect(pageHtml).toContain("bgcut local");
     expect(pageHtml).toContain('<meta name="bgcut-runtime" content="local" />');
 
-    const fallbackPage = await fetch(new URL("/docs", server.url), {
-      redirect: "manual",
-    });
+    for (const pathname of ["/docs", "/changelog", "/privacy", "/terms"]) {
+      const hostedPage = await fetch(new URL(pathname, server.url), {
+        redirect: "manual",
+      });
 
-    expect(fallbackPage.status).toBe(302);
-    expect(fallbackPage.headers.get("location")).toBe("/");
+      expect(hostedPage.status).toBe(302);
+      expect(hostedPage.headers.get("location")).toBe("/");
+    }
   } finally {
     await server.close();
     await rm(directory, { recursive: true, force: true });
