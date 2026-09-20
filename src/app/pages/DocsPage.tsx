@@ -415,7 +415,8 @@ bgcut photo.jpg --cpu`}</code></pre>
         <section id="node-api" class="doc-section">
           <h3>Node API</h3>
           <p>
-            Install bgcut as an application dependency. For one image, use
+            During 0.4 beta validation, install <code>bgcut@beta</code>. Stable installs remain on
+            <code>bgcut@latest</code> until the beta is accepted. For one image, use
             <code>removeBackground()</code>. It owns setup and cleanup for the call and returns
             only the image result fields most callers need.
           </p>

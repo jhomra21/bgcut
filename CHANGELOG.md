@@ -6,9 +6,12 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.4.0-beta.0 - 2026-09-20
+
 - Added a one-shot Node API, `removeBackground(input, options?)`, for the common single-image case. It returns only encoded image data, dimensions, and format, while `createBgcut()` remains the reusable session path with runtime diagnostics for batch work.
 - Added the public `BgcutError` type with stable error codes so callers can handle model, engine, input, inference, output, and closed-instance failures without depending on Effect or ONNX Runtime internals.
 - Updated the hosted and repository documentation for the new Node API and added `/changelog` to bgcut.dev, rendered directly from `CHANGELOG.md` so the website and GitHub release notes share one source of truth.
+- This beta is for published-package validation before 0.4.0 stable. The background-removal model, CLI syntax, browser inference path, and output behavior are unchanged.
 
 ## 0.3.2 - 2026-09-20
 
