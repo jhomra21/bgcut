@@ -5,6 +5,7 @@ const appSourcePaths = [
   "./components/SiteChrome.tsx",
   "./navigation.ts",
   "./pages/HomePage.tsx",
+  "./pages/ChangelogPage.tsx",
   "./pages/DocsPage.tsx",
   "./pages/PrivacyPage.tsx",
   "./pages/TermsPage.tsx",
@@ -101,15 +102,18 @@ describe("browser product UI", () => {
     expect(localBranch).not.toContain("<SiteHeader");
     expect(localBranch).not.toContain("<SiteFooter");
     expect(localBranch).not.toContain("<DocsPage");
+    expect(localBranch).not.toContain("<ChangelogPage");
     expect(localBranch).not.toContain("<PrivacyPage");
     expect(localBranch).not.toContain("<TermsPage");
   });
 
   test("exposes docs plus footer-only legal pages without an about surface", () => {
     expect(appSource).toContain('pathname === "/docs"');
+    expect(appSource).toContain('pathname === "/changelog"');
     expect(appSource).toContain('pathname === "/privacy"');
     expect(appSource).toContain('pathname === "/terms"');
     expect(appSource).toContain('href="/docs"');
+    expect(appSource).toContain('href="/changelog"');
     expect(appSource).toContain('href="/privacy"');
     expect(appSource).toContain('href="/terms"');
     expect(appSource).not.toContain('pathname === "/about"');
@@ -122,7 +126,11 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain('<section id="privacy" class="doc-section">');
     expect(appSource).toContain("Local app");
     expect(appSource).toContain("Node API");
+    expect(appSource).toContain('import { removeBackground } from "bgcut"');
     expect(appSource).toContain('import { createBgcut } from "bgcut"');
+    expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
+    expect(appSource).toContain("RemoveBackgroundResult");
+    expect(appSource).toContain("../../../CHANGELOG.md?raw");
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
   });
 
@@ -211,6 +219,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("The local UI contains the bgcut brand and removal workflow only");
     expect(appSource).toContain("Docs, GitHub");
     expect(appSource).toContain("Privacy, Terms, and the site footer remain on bgcut.dev");
+    expect(appSource).toContain("Docs, Changelog, GitHub");
     expect(appSource).toContain("Non-root app routes redirect to <code>/</code>");
     expect(appSource).toContain("without the hosted site's navigation");
   });
