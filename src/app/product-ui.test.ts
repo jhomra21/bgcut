@@ -5,6 +5,7 @@ const appSourcePaths = [
   "./components/SiteChrome.tsx",
   "./navigation.ts",
   "./pages/HomePage.tsx",
+  "./pages/ChangelogPage.tsx",
   "./pages/DocsPage.tsx",
   "./pages/PrivacyPage.tsx",
   "./pages/TermsPage.tsx",
@@ -15,6 +16,8 @@ const appSource = (
     appSourcePaths.map((path) => Bun.file(new URL(path, import.meta.url)).text()),
   )
 ).join("\n");
+
+const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
 const sourceInputBlock = (): string => {
   const start = appSource.indexOf('id="source-file-input"');
@@ -101,15 +104,18 @@ describe("browser product UI", () => {
     expect(localBranch).not.toContain("<SiteHeader");
     expect(localBranch).not.toContain("<SiteFooter");
     expect(localBranch).not.toContain("<DocsPage");
+    expect(localBranch).not.toContain("<ChangelogPage");
     expect(localBranch).not.toContain("<PrivacyPage");
     expect(localBranch).not.toContain("<TermsPage");
   });
 
   test("exposes docs plus footer-only legal pages without an about surface", () => {
     expect(appSource).toContain('pathname === "/docs"');
+    expect(appSource).toContain('pathname === "/changelog"');
     expect(appSource).toContain('pathname === "/privacy"');
     expect(appSource).toContain('pathname === "/terms"');
     expect(appSource).toContain('href="/docs"');
+    expect(appSource).toContain('href="/changelog"');
     expect(appSource).toContain('href="/privacy"');
     expect(appSource).toContain('href="/terms"');
     expect(appSource).not.toContain('pathname === "/about"');
@@ -122,7 +128,11 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain('<section id="privacy" class="doc-section">');
     expect(appSource).toContain("Local app");
     expect(appSource).toContain("Node API");
+    expect(appSource).toContain('import { removeBackground } from "bgcut"');
     expect(appSource).toContain('import { createBgcut } from "bgcut"');
+    expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
+    expect(appSource).toContain("RemoveBackgroundResult");
+    expect(appSource).toContain("../../../CHANGELOG.md?raw");
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
   });
 
@@ -197,7 +207,10 @@ describe("browser product UI", () => {
     expect(appSource).toContain("bgcut serve --json");
     expect(appSource).toContain("bgcut photo.jpg --gpu");
     expect(appSource).toContain("bgcut photo.jpg --cpu");
-    expect(appSource).toContain('engine: "webgpu" | "cpu"');
+    expect(appSource).toContain("RemoveBackgroundResult");
+    expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
+    expect(appSource).toContain('engine: "gpu"');
+    expect(appSource).toContain('engine: "cpu"');
     expect(appSource).toContain("195,872,736 bytes");
     expect(appSource).toContain("4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c");
     expect(appSource).toContain("The CLI, local app, and");
@@ -209,7 +222,7 @@ describe("browser product UI", () => {
 
   test("documents the hosted-site versus packaged-local distinction", () => {
     expect(appSource).toContain("The local UI contains the bgcut brand and removal workflow only");
-    expect(appSource).toContain("Docs, GitHub");
+    expect(appSource).toContain("Docs, Changelog, GitHub");
     expect(appSource).toContain("Privacy, Terms, and the site footer remain on bgcut.dev");
     expect(appSource).toContain("Non-root app routes redirect to <code>/</code>");
     expect(appSource).toContain("without the hosted site's navigation");
@@ -231,10 +244,10 @@ describe("browser product UI", () => {
   test("keeps developer diagnostics and external comparison controls out of the product UI", () => {
     const internalComparisonName = ["B", "G", "0"].join("");
 
-    expect(appSource).not.toContain("diagnostics");
-    expect(appSource).not.toContain("Pipeline timing");
-    expect(appSource).not.toContain("Execution path");
-    expect(appSource).not.toContain("reference-file-input");
-    expect(appSource).not.toContain(internalComparisonName);
+    expect(homeSource).not.toContain("diagnostics");
+    expect(homeSource).not.toContain("Pipeline timing");
+    expect(homeSource).not.toContain("Execution path");
+    expect(homeSource).not.toContain("reference-file-input");
+    expect(homeSource).not.toContain(internalComparisonName);
   });
 });

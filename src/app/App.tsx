@@ -12,6 +12,7 @@ import {
   type RouteTransitionPhase,
   type SitePage,
 } from "./navigation";
+import { ChangelogPage } from "./pages/ChangelogPage";
 import { DocsPage } from "./pages/DocsPage";
 import { HomePage } from "./pages/HomePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -118,14 +119,21 @@ const App = () => {
           when={page() === "docs"}
           fallback={
             <Show
-              when={page() === "privacy"}
+              when={page() === "changelog"}
               fallback={
-                <Show when={page() === "terms"} fallback={<HomePage />}>
-                  <TermsPage />
+                <Show
+                  when={page() === "privacy"}
+                  fallback={
+                    <Show when={page() === "terms"} fallback={<HomePage />}>
+                      <TermsPage />
+                    </Show>
+                  }
+                >
+                  <PrivacyPage />
                 </Show>
               }
             >
-              <PrivacyPage />
+              <ChangelogPage />
             </Show>
           }
         >

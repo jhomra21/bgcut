@@ -57,5 +57,7 @@ describe("site design contract", () => {
     expect(styles).toContain(".site-footer");
     expect(styles).toContain(".site-footer-links");
     expect(styles).toContain(".legal-page");
+    expect(styles).toContain(".changelog-page");
+    expect(styles).toContain(".changelog-release");
   });
 });

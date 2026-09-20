@@ -282,7 +282,7 @@ Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
 
 Stable versions publish to npm `latest` and create normal GitHub releases. Prerelease versions publish to their matching prerelease tag, such as `beta`.
 
-See [release guide](docs/operations/releasing.md) for the release process and [`CHANGELOG.md`](CHANGELOG.md) for release history.
+See [release guide](docs/operations/releasing.md) for the release process. Release history is published from the same [`CHANGELOG.md`](CHANGELOG.md) source at [bgcut.dev/changelog](https://bgcut.dev/changelog), so the website and GitHub release notes use the same wording.
 
 ## Model
 

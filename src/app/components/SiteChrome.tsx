@@ -61,6 +61,20 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
       >
         Docs
       </a>
+      <a
+        href="/changelog"
+        aria-current={props.page === "changelog" ? "page" : undefined}
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("changelog");
+        }}
+      >
+        Changelog
+      </a>
       <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
         GitHub
       </a>
@@ -97,6 +111,19 @@ export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
       <span>MIT licensed</span>
     </div>
     <nav class="site-footer-links" aria-label="Footer navigation">
+      <a
+        href="/changelog"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("changelog");
+        }}
+      >
+        Changelog
+      </a>
       <a
         href="/privacy"
         onClick={(event) => {

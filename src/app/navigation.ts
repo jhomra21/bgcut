@@ -1,4 +1,4 @@
-export type SitePage = "home" | "docs" | "privacy" | "terms";
+export type SitePage = "home" | "docs" | "changelog" | "privacy" | "terms";
 
 const LOCAL_RUNTIME_META_SELECTOR = 'meta[name="bgcut-runtime"][content="local"]';
 
@@ -20,6 +20,10 @@ export const currentPage = (): SitePage => {
     return "docs";
   }
 
+  if (pathname === "/changelog") {
+    return "changelog";
+  }
+
   if (pathname === "/privacy") {
     return "privacy";
   }
@@ -34,6 +38,10 @@ export const currentPage = (): SitePage => {
 export const pathForPage = (page: SitePage): string => {
   if (page === "docs") {
     return "/docs";
+  }
+
+  if (page === "changelog") {
+    return "/changelog";
   }
 
   if (page === "privacy") {
