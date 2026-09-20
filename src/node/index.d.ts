@@ -60,7 +60,12 @@ export type RemoveBackgroundOptions = {
   readonly format?: BgcutFormat;
 };
 
-export type RemoveBackgroundResult = BgcutRemovalResult;
+export type RemoveBackgroundResult = {
+  readonly data: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+  readonly format: BgcutFormat;
+};
 
 export type Bgcut = {
   readonly engine: BgcutExecutionEngine;

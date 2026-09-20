@@ -208,7 +208,7 @@ try {
 
 `createBgcut({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if the WebGPU session cannot start. Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`.
 
-Both entry points return the encoded bytes, source width and height, output format, selected execution engine, fallback reason when applicable, and timing data.
+`removeBackground()` returns the encoded bytes, source width and height, and output format. The reusable `createBgcut()` path also exposes selected-engine, fallback, and timing diagnostics.
 
 Node API failures use one public error type:
 

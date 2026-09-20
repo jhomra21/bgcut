@@ -54,7 +54,12 @@ export type RemoveBackgroundOptions = {
   readonly format?: BgcutFormat;
 };
 
-export type RemoveBackgroundResult = BgcutRemovalResult;
+export type RemoveBackgroundResult = {
+  readonly data: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+  readonly format: BgcutFormat;
+};
 
 export type Bgcut = {
   readonly engine: "webgpu" | "cpu";
@@ -140,7 +145,14 @@ export const removeBackground = async (
   const bgcut = await createBgcut({ engine: options.engine });
 
   try {
-    return await bgcut.remove(input, { format: options.format });
+    const result = await bgcut.remove(input, { format: options.format });
+
+    return {
+      data: result.data,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+    };
   } finally {
     await bgcut.close();
   }

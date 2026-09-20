@@ -284,7 +284,15 @@ const oneShot = await removeBackground(process.argv[2], {
   format: "png",
 });
 
-if (oneShot.engine !== "cpu" || oneShot.data.length === 0) {
+if (
+  oneShot.format !== "png" ||
+  oneShot.width !== 8 ||
+  oneShot.height !== 8 ||
+  oneShot.data.length === 0 ||
+  "engine" in oneShot ||
+  "timings" in oneShot ||
+  "fallbackReason" in oneShot
+) {
   process.exit(2);
 }
 
