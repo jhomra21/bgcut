@@ -149,23 +149,39 @@ The `-gpu` and `-cpu` aliases also work. If the user explicitly chooses `--gpu`,
 
 ## Node API
 
-Import `createBgcut` from `bgcut`:
+For one image, import `removeBackground`:
 
 ```ts
 import { writeFile } from "node:fs/promises";
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg");
+await writeFile("photo-nobg.png", result.data);
+```
+
+Use the one-shot options when the caller needs a specific output format or engine:
+
+```ts
+const result = await removeBackground("photo.jpg", {
+  format: "webp",
+  engine: "cpu",
+});
+```
+
+For several images, use `createBgcut` so one ONNX Runtime session is reused:
+
+```ts
 import { createBgcut } from "bgcut";
 
 const bgcut = await createBgcut();
 
 try {
-  const result = await bgcut.remove("photo.jpg", { format: "png" });
-  await writeFile("photo-nobg.png", result.data);
+  const first = await bgcut.remove("first.jpg");
+  const second = await bgcut.remove("second.jpg", { format: "webp" });
 } finally {
   await bgcut.close();
 }
 ```
-
-One created engine owns one ONNX Runtime session and reuses it across removals until `close()` is called.
 
 Engine options:
 
@@ -173,7 +189,11 @@ Engine options:
 - `createBgcut({ engine: "gpu" })`: require native WebGPU
 - `createBgcut({ engine: "cpu" })`: require CPU
 
+`removeBackground()` accepts the same `engine` values together with an optional `format`.
+
 Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+
+Node API failures are `BgcutError` instances. Use `error.code` for programmatic handling. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
 
 ## Model cache
 
