@@ -104,9 +104,10 @@ Use these repositories to study concrete implementations. Do not copy their arch
 Repositories:
 
 - `diffusionstudio/editor`
+- `diffusionstudio/api`
 - Diffusion Studio `monorepo-new` when it is available through authorized access
 
-Use it for editor architecture, media pipelines, worker boundaries, rendering, export, and performance-sensitive interactions.
+Use `diffusionstudio/editor` for editor architecture, media pipelines, worker boundaries, rendering, export, and performance-sensitive interactions. Use `diffusionstudio/api` when designing public contracts, domain-named operations, and type boundaries that keep backend internals out of caller-facing code.
 
 ### DialKit
 
@@ -137,6 +138,12 @@ Use it for worker architecture, realtime processing, high-frequency state, and e
 Repository: `earendil-works/pi`
 
 Use it as a reference for small interfaces, explicit capabilities, and code that remains easy to follow.
+
+### Matt Pocock engineering skills
+
+Repository: `mattpocock/skills`
+
+Use `skills/engineering/codebase-design` when changing caller-facing interfaces and `skills/engineering/tdd` when choosing tests for those interfaces. Prefer deep modules, small caller-facing surfaces, and tests through the public seam.
 
 ## Reference policy
 

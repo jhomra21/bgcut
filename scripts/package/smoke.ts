@@ -143,7 +143,7 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import('bgcut').then((module) => { if (typeof module.createBgcut !== 'function') process.exit(2) })",
+      "import('bgcut').then((module) => { if (typeof module.createBgcut !== 'function' || typeof module.removeBackground !== 'function' || typeof module.BgcutError !== 'function') process.exit(2) })",
     ],
     consumerDirectory,
   );
@@ -277,7 +277,24 @@ try {
   await writeFile(
     apiSmokePath,
     `import { writeFile } from "node:fs/promises";
-import { createBgcut } from "bgcut";
+import { BgcutError, createBgcut, removeBackground } from "bgcut";
+
+const oneShot = await removeBackground(process.argv[2], {
+  engine: "cpu",
+  format: "png",
+});
+
+if (
+  oneShot.format !== "png" ||
+  oneShot.width !== 8 ||
+  oneShot.height !== 8 ||
+  oneShot.data.length === 0 ||
+  "engine" in oneShot ||
+  "timings" in oneShot ||
+  "fallbackReason" in oneShot
+) {
+  process.exit(2);
+}
 
 const bgcut = await createBgcut({ engine: "cpu" });
 
@@ -292,7 +309,20 @@ try {
     first.data.length === 0 ||
     second.data.length === 0
   ) {
-    process.exit(2);
+    process.exit(3);
+  }
+
+  await bgcut.close();
+
+  let closedError;
+  try {
+    await bgcut.remove(process.argv[2]);
+  } catch (error) {
+    closedError = error;
+  }
+
+  if (!(closedError instanceof BgcutError) || closedError.code !== "closed") {
+    process.exit(4);
   }
 
   await writeFile(process.argv[3], second.data);
@@ -320,6 +350,7 @@ try {
     !skill.includes("name: bgcut") ||
     !skill.includes("npx bgcut input.jpg") ||
     !skill.includes("bgcut serve --json") ||
+    !skill.includes('import { removeBackground } from "bgcut"') ||
     !skill.includes('import { createBgcut } from "bgcut"') ||
     !skill.includes("share the same validated model cache") ||
     skill.includes("The installed CLI currently requires Bun.")

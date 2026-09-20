@@ -168,7 +168,26 @@ Install bgcut as an application dependency:
 npm install bgcut
 ```
 
-The package includes the native removal engine for applications and scripts. `createBgcut()` downloads and verifies the pinned model when needed, creates one ONNX Runtime session, and reuses that session until `close()` is called.
+For one image, use `removeBackground()`. It creates the runtime, removes the background, and closes the runtime before returning:
+
+```ts
+import { writeFile } from "node:fs/promises";
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg");
+await writeFile("photo-nobg.png", result.data);
+```
+
+Pass output format or engine preferences only when you need them:
+
+```ts
+const result = await removeBackground("photo.jpg", {
+  format: "webp",
+  engine: "cpu",
+});
+```
+
+For several images, create one bgcut instance and reuse its ONNX Runtime session:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -177,14 +196,35 @@ import { createBgcut } from "bgcut";
 const bgcut = await createBgcut();
 
 try {
-  const result = await bgcut.remove("photo.jpg", { format: "png" });
-  await writeFile("photo-nobg.png", result.data);
+  const first = await bgcut.remove("first.jpg");
+  const second = await bgcut.remove("second.jpg", { format: "webp" });
+
+  await writeFile("first-nobg.png", first.data);
+  await writeFile("second-nobg.webp", second.data);
 } finally {
   await bgcut.close();
 }
 ```
 
 `createBgcut({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if the WebGPU session cannot start. Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`.
+
+`removeBackground()` returns the encoded bytes, source width and height, and output format. The reusable `createBgcut()` path also exposes selected-engine, fallback, and timing diagnostics.
+
+Node API failures use one public error type:
+
+```ts
+import { BgcutError, removeBackground } from "bgcut";
+
+try {
+  await removeBackground("photo.jpg");
+} catch (error) {
+  if (error instanceof BgcutError) {
+    console.error(error.code, error.message);
+  }
+}
+```
+
+`BgcutError.code` is one of `model`, `engine`, `input`, `inference`, `output`, or `closed`.
 
 ## Agent skill
 
