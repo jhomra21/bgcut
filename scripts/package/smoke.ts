@@ -217,12 +217,14 @@ try {
       throw new Error(`Packaged bgcut local app was not served from ${startup.url}.`);
     }
 
-    const docsRoute = await fetch(new URL("/docs", startup.url), {
-      redirect: "manual",
-    });
+    for (const pathname of ["/docs", "/changelog", "/privacy", "/terms"]) {
+      const siteRoute = await fetch(new URL(pathname, startup.url), {
+        redirect: "manual",
+      });
 
-    if (docsRoute.status !== 302 || docsRoute.headers.get("location") !== "/") {
-      throw new Error("Packaged bgcut local app exposed a non-root site route.");
+      if (siteRoute.status !== 302 || siteRoute.headers.get("location") !== "/") {
+        throw new Error(`Packaged bgcut local app exposed hosted site route ${pathname}.`);
+      }
     }
 
     const health = await fetch(new URL("/health", startup.url));
