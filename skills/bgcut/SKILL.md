@@ -32,11 +32,13 @@ bgcut
 
 The published executable is built for Node. npm and npx users do not need Bun installed.
 
-For the Node API:
+For the 0.4 beta Node API:
 
 ```sh
-npm install bgcut
+npm install bgcut@beta
 ```
+
+Use `bgcut@latest` for the current stable package until the beta is accepted.
 
 ## Choose how to run bgcut
 
