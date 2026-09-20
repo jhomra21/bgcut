@@ -143,6 +143,12 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
+  test("keeps Quickstart active at the top before using nearest-heading tracking", () => {
+    expect(appSource).toContain("if (window.scrollY <= 2)");
+    expect(appSource).toContain('setActiveSection("quickstart")');
+    expect(appSource).toContain('aria-current={current("quickstart")}');
+  });
+
   test("tracks the nearest visible docs heading during manual scroll", () => {
     expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.42");
     expect(appSource).toContain("let closestDistance = Number.POSITIVE_INFINITY");
