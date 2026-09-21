@@ -16,17 +16,40 @@ type ReferencePageProps = {
   readonly children: JSX.Element;
 };
 
+type TitleFrame = {
+  readonly left: number;
+  readonly top: number;
+  readonly fontSize: number;
+};
+
 const TITLE_MOVE_MS = 130;
 
-const TITLE_MOVE_EASING = "cubic-bezier(0.2, 0, 0, 1)";
+const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
+
+const interpolate = (from: number, to: number, progress: number): number =>
+  from + (to - from) * progress;
+
+const readTitleFrame = (element: HTMLElement): TitleFrame => {
+  const rect = element.getBoundingClientRect();
+  const fontSize = Number.parseFloat(window.getComputedStyle(element).fontSize);
+
+  return {
+    left: rect.left,
+    top: rect.top,
+    fontSize: Number.isFinite(fontSize) ? fontSize : rect.height,
+  };
+};
 
 export const ReferencePage = (props: ReferencePageProps) => {
   const [compactTitle, setCompactTitle] = createSignal(false);
   let pageTitleElement: HTMLHeadingElement | undefined;
   let railTitleElement: HTMLSpanElement | undefined;
-  let titleAnimation: Animation | undefined;
+  let titleAnimationFrame: number | undefined;
   let titleOverlay: HTMLSpanElement | undefined;
   let titleMoveTarget: boolean | undefined;
+  let titleMoveSource: TitleFrame | undefined;
+  let titleMoveCurrent: TitleFrame | undefined;
+  let titleMoveStartedAt = 0;
 
   const restoreTitleEndpoints = () => {
     pageTitleElement?.style.removeProperty("visibility");
@@ -34,25 +57,91 @@ export const ReferencePage = (props: ReferencePageProps) => {
   };
 
   const clearTitleMove = () => {
-    if (titleAnimation !== undefined) {
-      titleAnimation.onfinish = null;
-      titleAnimation.cancel();
-      titleAnimation = undefined;
+    if (titleAnimationFrame !== undefined) {
+      window.cancelAnimationFrame(titleAnimationFrame);
+      titleAnimationFrame = undefined;
     }
 
     titleOverlay?.remove();
     titleOverlay = undefined;
     titleMoveTarget = undefined;
+    titleMoveSource = undefined;
+    titleMoveCurrent = undefined;
     restoreTitleEndpoints();
+  };
+
+  const finishTitleMove = (compact: boolean) => {
+    setCompactTitle(compact);
+    titleAnimationFrame = undefined;
+    titleMoveTarget = undefined;
+    titleMoveSource = undefined;
+    titleMoveCurrent = undefined;
+    restoreTitleEndpoints();
+    titleOverlay?.remove();
+    titleOverlay = undefined;
+  };
+
+  const tickTitleMove = (now: number) => {
+    const overlay = titleOverlay;
+    const source = titleMoveSource;
+    const compact = titleMoveTarget;
+    const target = compact ? railTitleElement : pageTitleElement;
+
+    if (
+      overlay === undefined ||
+      source === undefined ||
+      compact === undefined ||
+      target === undefined
+    ) {
+      clearTitleMove();
+
+      return;
+    }
+
+    const targetFrame = readTitleFrame(target);
+    const progress = Math.min((now - titleMoveStartedAt) / TITLE_MOVE_MS, 1);
+    const eased = easeOutCubic(progress);
+    const current = {
+      left: interpolate(source.left, targetFrame.left, eased),
+      top: interpolate(source.top, targetFrame.top, eased),
+      fontSize: interpolate(source.fontSize, targetFrame.fontSize, eased),
+    };
+
+    overlay.style.left = `${current.left}px`;
+    overlay.style.top = `${current.top}px`;
+    overlay.style.fontSize = `${current.fontSize}px`;
+    titleMoveCurrent = current;
+
+    if (progress < 1) {
+      titleAnimationFrame = window.requestAnimationFrame(tickTitleMove);
+
+      return;
+    }
+
+    finishTitleMove(compact);
+  };
+
+  const retargetTitleMove = (compact: boolean) => {
+    if (titleMoveTarget === compact) {
+      return;
+    }
+
+    const current = titleMoveCurrent;
+
+    if (current === undefined) {
+      clearTitleMove();
+
+      return;
+    }
+
+    titleMoveTarget = compact;
+    titleMoveSource = current;
+    titleMoveStartedAt = performance.now();
   };
 
   const moveTitle = (compact: boolean) => {
     if (titleMoveTarget !== undefined) {
-      if (titleMoveTarget === compact) {
-        return;
-      }
-
-      clearTitleMove();
+      retargetTitleMove(compact);
 
       return;
     }
@@ -63,7 +152,6 @@ export const ReferencePage = (props: ReferencePageProps) => {
 
     const pageTitle = pageTitleElement;
     const railTitle = railTitleElement;
-
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -76,14 +164,14 @@ export const ReferencePage = (props: ReferencePageProps) => {
 
     const source = compactTitle() ? railTitle : pageTitle;
     const target = compact ? railTitle : pageTitle;
-    const sourceRect = source.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
+    const sourceFrame = readTitleFrame(source);
+    const targetFrame = readTitleFrame(target);
 
     if (
-      sourceRect.width <= 0 ||
-      sourceRect.height <= 0 ||
-      targetRect.width <= 0 ||
-      targetRect.height <= 0
+      sourceFrame.fontSize <= 0 ||
+      targetFrame.fontSize <= 0 ||
+      source.getBoundingClientRect().width <= 0 ||
+      target.getBoundingClientRect().width <= 0
     ) {
       setCompactTitle(compact);
 
@@ -91,17 +179,16 @@ export const ReferencePage = (props: ReferencePageProps) => {
     }
 
     const sourceStyle = window.getComputedStyle(source);
-    const targetStyle = window.getComputedStyle(target);
     const overlay = document.createElement("span");
 
     overlay.className = "reference-title-motion";
     overlay.textContent = props.title;
     overlay.setAttribute("aria-hidden", "true");
-    overlay.style.left = `${sourceRect.left}px`;
-    overlay.style.top = `${sourceRect.top}px`;
+    overlay.style.left = `${sourceFrame.left}px`;
+    overlay.style.top = `${sourceFrame.top}px`;
     overlay.style.color = sourceStyle.color;
     overlay.style.fontFamily = sourceStyle.fontFamily;
-    overlay.style.fontSize = sourceStyle.fontSize;
+    overlay.style.fontSize = `${sourceFrame.fontSize}px`;
     overlay.style.fontWeight = sourceStyle.fontWeight;
     overlay.style.letterSpacing = sourceStyle.letterSpacing;
     overlay.style.lineHeight = sourceStyle.lineHeight;
@@ -112,41 +199,10 @@ export const ReferencePage = (props: ReferencePageProps) => {
     target.style.visibility = "hidden";
     titleOverlay = overlay;
     titleMoveTarget = compact;
-
-    const animation = overlay.animate(
-      [
-        {
-          left: `${sourceRect.left}px`,
-          top: `${sourceRect.top}px`,
-          fontSize: sourceStyle.fontSize,
-        },
-        {
-          left: `${targetRect.left}px`,
-          top: `${targetRect.top}px`,
-          fontSize: targetStyle.fontSize,
-        },
-      ],
-      {
-        duration: TITLE_MOVE_MS,
-        easing: TITLE_MOVE_EASING,
-        fill: "forwards",
-      },
-    );
-
-    titleAnimation = animation;
-
-    animation.onfinish = () => {
-      if (titleAnimation !== animation) {
-        return;
-      }
-
-      setCompactTitle(compact);
-      titleAnimation = undefined;
-      titleOverlay = undefined;
-      titleMoveTarget = undefined;
-      restoreTitleEndpoints();
-      overlay.remove();
-    };
+    titleMoveSource = sourceFrame;
+    titleMoveCurrent = sourceFrame;
+    titleMoveStartedAt = performance.now();
+    titleAnimationFrame = window.requestAnimationFrame(tickTitleMove);
   };
 
   onCleanup(clearTitleMove);
