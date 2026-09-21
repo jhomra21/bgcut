@@ -84,6 +84,7 @@ const InlineText = (props: { readonly text: string }) => (
 );
 
 const document = parseChangelog(changelogSource);
+
 const releaseItems: SectionRailItem[] = [];
 
 for (const section of document.sections) {
@@ -101,6 +102,7 @@ const releaseGroups: readonly SectionRailGroup[] = [
 ];
 
 const latestReleaseId = document.sections[0]?.id ?? "release";
+
 const oldestReleaseId =
   document.sections[document.sections.length - 1]?.id ?? latestReleaseId;
 
