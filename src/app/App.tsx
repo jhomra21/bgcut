@@ -1,5 +1,5 @@
 import { Show } from "@solidjs/web";
-import { createSignal, onSettled } from "solid-js";
+import { createEffect, createSignal, onSettled } from "solid-js";
 
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
@@ -13,6 +13,7 @@ import {
   type SitePage,
 } from "./navigation";
 import { ChangelogPage } from "./pages/ChangelogPage";
+import { applySiteMetadata } from "./site-metadata";
 import { DocsPage } from "./pages/DocsPage";
 import { HomePage } from "./pages/HomePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -33,6 +34,10 @@ const App = () => {
   const initialPage = currentPage();
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
+
+  createEffect(() => {
+    applySiteMetadata(page());
+  });
   let routeTarget = initialPage;
   let transitionTimer: number | undefined;
   let transitionVersion = 0;
@@ -124,7 +129,7 @@ const App = () => {
                 <Show
                   when={page() === "privacy"}
                   fallback={
-                    <Show when={page() === "terms"} fallback={<HomePage />}>
+                    <Show when={page() === "terms"} fallback={<HomePage showIntro />}>
                       <TermsPage />
                     </Show>
                   }
