@@ -169,18 +169,19 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("site-page-context");
   });
 
-  test("moves the shared reference title directly between measured endpoints", () => {
+  test("keeps the shared reference title attached to its live scroll destination", () => {
     expect(appSource).toContain("const TITLE_MOVE_MS = 130");
-    expect(appSource).toContain('const TITLE_MOVE_EASING = "cubic-bezier(0.2, 0, 0, 1)"');
-    expect(appSource).toContain("source.getBoundingClientRect()");
-    expect(appSource).toContain("target.getBoundingClientRect()");
+    expect(appSource).toContain("const readTitleFrame = (element: HTMLElement): TitleFrame");
+    expect(appSource).toContain("element.getBoundingClientRect()");
     expect(appSource).toContain('document.createElement("span")');
     expect(appSource).toContain('className = "reference-title-motion"');
-    expect(appSource).toContain("overlay.animate(");
-    expect(appSource).toContain("left: `${sourceRect.left}px`");
-    expect(appSource).toContain("left: `${targetRect.left}px`");
-    expect(appSource).toContain("fontSize: sourceStyle.fontSize");
-    expect(appSource).toContain("fontSize: targetStyle.fontSize");
+    expect(appSource).toContain("const tickTitleMove = (now: number)");
+    expect(appSource).toContain("const targetFrame = readTitleFrame(target)");
+    expect(appSource).toContain("window.requestAnimationFrame(tickTitleMove)");
+    expect(appSource).toContain("const retargetTitleMove = (compact: boolean)");
+    expect(appSource).toContain("titleMoveSource = current");
+    expect(appSource).toContain("titleMoveStartedAt = performance.now()");
+    expect(appSource).not.toContain("overlay.animate(");
     expect(appSource).toContain("pageTitleVisible={compactTitle()}");
     expect(appSource).toContain("onPageTitleVisibilityChange={moveTitle}");
     expect(appSource).toContain("onPageTitleElement=");
