@@ -35,6 +35,10 @@ Secondary navigation and footer text must keep at least WCAG AA contrast against
 
 Cloudflare Web Analytics injects `beacon.min.js` when automatic Web Analytics is enabled. Search Console does not require that beacon. If Cloudflare RUM data is not useful for bgcut, disable automatic Web Analytics in the Cloudflare dashboard to remove that third-party request from Lighthouse runs.
 
+The hosted static app also ships security headers from `public/_headers`. Keep the CSP compatible with the same-origin JavaScript chunks, blob image previews, WebAssembly compilation, and Cloudflare's analytics beacon. Hashed `/assets/*` files use one-year immutable browser caching.
+
+Do not add `require-trusted-types-for 'script'` only to satisfy Lighthouse. Trusted Types enforcement should be introduced only after validating Solid and every browser-processing dependency against the policy.
+
 ## Route metadata
 
 The root `index.html` contains the homepage metadata and WebApplication structured data.
