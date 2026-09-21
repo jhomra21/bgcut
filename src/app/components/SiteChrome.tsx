@@ -70,7 +70,7 @@ export const SiteHeader = (props: {
           class="site-page-context"
           data-reference={pageContext === "" ? "false" : "true"}
           data-visible={props.showPageContext && pageContext !== "" ? "true" : "false"}
-          aria-hidden={!props.showPageContext || pageContext === ""}
+          aria-hidden={!props.showPageContext || pageContext === "" ? "true" : undefined}
         >
           {pageContext}
         </span>
