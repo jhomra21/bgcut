@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 const appSourcePaths = [
   "./App.tsx",
+  "./components/SectionRail.tsx",
   "./components/SiteChrome.tsx",
   "./navigation.ts",
   "./pages/HomePage.tsx",
@@ -143,6 +144,16 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("document.intro");
   });
 
+  test("tracks published changelog releases with the shared reading rail", () => {
+    expect(appSource).toContain("const releaseId = (version: string)");
+    expect(appSource).toContain("const releaseItems: SectionRailItem[] = []");
+    expect(appSource).toContain('label: "Releases"');
+    expect(appSource).toContain('ariaLabel="Changelog releases"');
+    expect(appSource).toContain('sectionSelector=".changelog-page > section[id]"');
+    expect(appSource).toContain("bottomSectionId={oldestReleaseId}");
+    expect(appSource).toContain('id={section.id} class="changelog-release"');
+  });
+
   test("keeps top navigation geometry stable and moves selection immediately", () => {
     expect(appSource).toContain('class="site-nav-indicator"');
     expect(appSource).toContain('data-active={props.page}');
@@ -181,13 +192,14 @@ describe("browser product UI", () => {
     );
   });
 
-  test("keeps Quickstart active at the top before using nearest-heading tracking", () => {
+  test("keeps each reading rail on its first section at the page top", () => {
     expect(appSource).toContain("if (window.scrollY <= 2)");
-    expect(appSource).toContain('setActiveSection("quickstart")');
-    expect(appSource).toContain('aria-current={current("quickstart")}');
+    expect(appSource).toContain("setActiveSection(props.initialSectionId)");
+    expect(appSource).toContain('initialSectionId="quickstart"');
+    expect(appSource).toContain("initialSectionId={latestReleaseId}");
   });
 
-  test("tracks the docs section containing the viewport reading position", () => {
+  test("tracks the section containing the shared viewport reading position", () => {
     expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.52");
     expect(appSource).toContain("let closestDistance = Number.POSITIVE_INFINITY");
     expect(appSource).toContain("rect.bottom <= 0 || rect.top >= window.innerHeight");
@@ -195,40 +207,40 @@ describe("browser product UI", () => {
     expect(appSource).toContain("marker < rect.top ? rect.top - marker : Math.max(marker - rect.bottom, 0)");
     expect(appSource).toContain("distance < closestDistance");
     expect(appSource).toContain("nextSection = section.id");
-    expect(appSource).not.toContain("resourcesRect.top < window.innerHeight");
-    expect(appSource).toContain('activeSection() === section ? "location" : undefined');
-    expect(appSource).toContain('aria-current={current("architecture")}');
-    expect(appSource).toContain('aria-current={current("resources")}');
+    expect(appSource).toContain('activeSection() === sectionId ? "location" : undefined');
     expect(appSource).toContain('window.addEventListener("scroll", pickActiveSection, { passive: true })');
+    expect(appSource).toContain('sectionSelector=".docs-page > section[id]"');
+    expect(appSource).toContain('sectionSelector=".changelog-page > section[id]"');
   });
 
-  test("lets Resources own only the true manual document bottom", () => {
-    expect(appSource).toContain("let suppressBottomResourceUntil = 0");
+  test("lets each configured final section own the true manual page bottom", () => {
+    expect(appSource).toContain("let suppressBottomSectionUntil = 0");
+    expect(appSource).toContain("const bottomSectionId = props.bottomSectionId");
     expect(appSource).toContain("const atDocumentBottom = Math.abs(window.scrollY - maxScrollY) <= 2");
-    expect(appSource).toContain("const resourcesVisible = sections.some");
-    expect(appSource).toContain("performance.now() >= suppressBottomResourceUntil");
-    expect(appSource).toContain('nextSection = "resources"');
-    expect(appSource).toContain('section === "resources" ? 0 : performance.now() + DOCS_SCROLL_MS + 120');
+    expect(appSource).toContain("let bottomSectionVisible = false");
+    expect(appSource).toContain("performance.now() >= suppressBottomSectionUntil");
+    expect(appSource).toContain("nextSection = bottomSectionId");
+    expect(appSource).toContain('bottomSectionId="resources"');
+    expect(appSource).toContain("bottomSectionId={oldestReleaseId}");
   });
 
-  test("keeps click highlighting only for the 120ms programmatic scroll", () => {
-    expect(appSource).toContain("const DOCS_SCROLL_MS = 120");
-    expect(appSource).toContain("let programmaticTarget: DocsSectionId | undefined");
+  test("shares the 120ms click scroll and interruption behavior across reading rails", () => {
+    expect(appSource).toContain("const SECTION_SCROLL_MS = 120");
+    expect(appSource).toContain("let programmaticTarget: string | undefined");
     expect(appSource).toContain("let scrollAnimationFrame: number | undefined");
-    expect(appSource).toContain("const animateScrollTo = (targetY: number, section: DocsSectionId)");
+    expect(appSource).toContain("const animateScrollTo = (targetY: number, sectionId: string)");
     expect(appSource).toContain("const desiredY = sectionTop - Math.min(160, window.innerHeight * 0.22)");
-    expect(appSource).toContain("programmaticTarget = section");
+    expect(appSource).toContain("programmaticTarget = sectionId");
     expect(appSource).toContain("programmaticTarget = undefined");
     expect(appSource).toContain("pickActiveSection()");
     expect(appSource).toContain("easeOutCubic(progress)");
-    expect(appSource).toContain("(now - startedAt) / DOCS_SCROLL_MS");
+    expect(appSource).toContain("(now - startedAt) / SECTION_SCROLL_MS");
     expect(appSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
     expect(appSource).not.toContain("let pinnedSection");
     expect(appSource).not.toContain('target.scrollIntoView({ behavior: "smooth", block })');
     expect(appSource).toContain('window.addEventListener("wheel", releaseProgrammaticScroll, { passive: true })');
     expect(appSource).toContain('window.addEventListener("touchstart", releaseProgrammaticScroll, { passive: true })');
-    expect(appSource).toContain('onClick={(event) => navigateToSection(event, "model")}');
-    expect(appSource).toContain('onClick={(event) => navigateToSection(event, "architecture")}');
+    expect(appSource).toContain('onClick={(event) => navigateToSection(event, item.id)}');
   });
 
   test("documents the shipped public interfaces", () => {
