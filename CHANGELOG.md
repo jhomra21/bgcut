@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Moved Docs and Changelog section tracking into the upper third of the viewport so the rail reflects the section being read instead of activating a lower section too early, and pinned the bgcut logo, current page name, and main navigation while scrolling reference pages.
+
 - Unified the hosted Docs and Changelog page shell so both use the same title position, typography, content width, release/section spacing, separators, reading rail placement, and responsive layout.
 
 - Reused the Docs reading rail on Changelog so each published release is navigable from the same sticky desktop and horizontal mobile rail, with shared scroll tracking, click animation, reduced-motion handling, and active-section behavior.
