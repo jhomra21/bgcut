@@ -2,7 +2,7 @@ export const PrivacyPage = () => (
   <main class="page-content legal-shell">
     <article class="legal-page">
       <div class="eyebrow">Privacy</div>
-      <h2>Your images stay on your device.</h2>
+      <h1>Your images stay on your device.</h1>
       <p class="legal-updated">Last updated September 19, 2026</p>
 
       <section>
