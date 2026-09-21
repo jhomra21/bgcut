@@ -1,0 +1,9 @@
+# bgcut
+
+bgcut is a free background remover that runs locally in the browser, from the command line, or through a Node.js API. The hosted browser app keeps source images on the user's device and uses WebGPU when available.
+
+- [Background remover](https://bgcut.dev/)
+- [Documentation](https://bgcut.dev/docs)
+- [Changelog](https://bgcut.dev/changelog)
+- [GitHub repository](https://github.com/jhomra21/bgcut)
+- [npm package](https://www.npmjs.com/package/bgcut)
