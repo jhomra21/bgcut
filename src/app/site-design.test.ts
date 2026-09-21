@@ -31,7 +31,7 @@ describe("site design contract", () => {
     expect(styles).toContain("animation: route-fade-in 75ms var(--ease-out) both");
     expect(styles).toContain("@keyframes route-fade-out");
     expect(styles).toContain("@keyframes route-fade-in");
-    expect(styles).toContain(".docs-sidebar");
+    expect(styles).toContain(".section-rail");
     expect(styles).toContain("top: 24px");
   });
 
@@ -48,15 +48,18 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("presents docs as compact reference content with an active reading rail", () => {
+  test("shares one compact reading rail across docs and changelog", () => {
     expect(styles).toContain(".docs-page-header");
     expect(styles).toContain("font-size: clamp(38px, 6vw, 56px)");
     expect(styles).toContain(".docs-quickstart");
     expect(styles).not.toContain(".docs-intro");
-    expect(styles).toContain(".docs-sidebar-group");
-    expect(styles).toContain('.docs-sidebar a[aria-current="location"]');
-    expect(styles).toContain(".docs-sidebar-label");
+    expect(styles).toContain(".section-rail-group");
+    expect(styles).toContain('.section-rail a[aria-current="location"]');
+    expect(styles).toContain(".section-rail-label");
+    expect(styles).toContain("max-height: calc(100vh - 48px)");
     expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
+    expect(styles).toContain(".changelog-release");
+    expect(styles).toContain("scroll-margin-top: 58px");
     expect(styles).toContain(".spec-table");
     expect(styles).not.toContain(".doc-card {");
     expect(styles).not.toContain(".docs-hero");
