@@ -35,10 +35,17 @@ describe("site design contract", () => {
     expect(styles).toContain("top: 24px");
   });
 
-  test("animates top navigation state changes at 150ms", () => {
-    expect(styles).toContain("background-color 150ms ease");
-    expect(styles).toContain("color 150ms ease");
-    expect(styles).toContain("box-shadow 150ms ease");
+  test("uses a stable sliding top-navigation indicator", () => {
+    expect(styles).toContain("--site-nav-docs-width: 48px");
+    expect(styles).toContain("--site-nav-changelog-width: 76px");
+    expect(styles).toContain("--site-nav-github-width: 58px");
+    expect(styles).toContain(".site-nav-indicator");
+    expect(styles).toContain('site-nav[data-active="docs"]');
+    expect(styles).toContain('site-nav[data-active="changelog"]');
+    expect(styles).toContain("transform 180ms var(--ease-out)");
+    expect(styles).toContain("font-weight: 620");
+    expect(styles).not.toContain('a[aria-current="page"] {\n  background: var(--surface)');
+    expect(styles).toContain("scrollbar-gutter: stable");
   });
 
   test("presents docs as compact reference content with an active reading rail", () => {
