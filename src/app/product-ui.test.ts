@@ -163,7 +163,20 @@ describe("browser product UI", () => {
     expect(appSource).toContain('class="site-nav-github"');
     expect(appSource).toContain("const [navPage, setNavPage] = createSignal<SitePage>(initialPage)");
     expect(appSource).toContain("setNavPage(nextPage)");
-    expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
+    expect(appSource).toContain("const [headerScrolled, setHeaderScrolled] = createSignal(false)");
+    expect(appSource).toContain("setHeaderScrolled(window.scrollY > 96)");
+    expect(appSource).toContain('class="site-page-context"');
+    expect(appSource).toContain('data-visible={props.showPageContext && pageContext !== "" ? "true" : "false"}');
+    expect(appSource).toContain("showPageContext={isReferencePage(navPage()) && headerScrolled()}");
+  });
+
+  test("pins reference-page chrome after scrolling", () => {
+    expect(appSource).toContain("const isReferencePage = (page: SitePage): boolean");
+    expect(appSource).toContain('"site-header-shell-sticky"');
+    expect(appSource).toContain('data-scrolled={isReferencePage(navPage()) && headerScrolled() ? "true" : "false"}');
+    expect(appSource).toContain('window.addEventListener("scroll", handleScroll, { passive: true })');
+    expect(appSource).toContain("Documentation");
+    expect(appSource).toContain("Changelog");
   });
 
   test("uses one symmetric two-phase route transition for every internal page", () => {
@@ -179,7 +192,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("window.history.pushState");
     expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
     expect(appSource).toContain("route-stage route-stage-");
-    expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
+    expect(appSource).toContain("showPageContext={isReferencePage(navPage()) && headerScrolled()}");
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
@@ -210,7 +223,7 @@ describe("browser product UI", () => {
   });
 
   test("tracks the section containing the shared viewport reading position", () => {
-    expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.52");
+    expect(appSource).toContain("const readingPosition = (): number => window.innerHeight * 0.34");
     expect(appSource).toContain("let closestDistance = Number.POSITIVE_INFINITY");
     expect(appSource).toContain("rect.bottom <= 0 || rect.top >= window.innerHeight");
     expect(appSource).toContain("rect.top <= marker && rect.bottom >= marker");
