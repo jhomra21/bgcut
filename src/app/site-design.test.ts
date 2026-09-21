@@ -49,6 +49,8 @@ describe("site design contract", () => {
   });
 
   test("presents docs as compact reference content with an active reading rail", () => {
+    expect(styles).toContain(".docs-page-header");
+    expect(styles).toContain("font-size: clamp(38px, 6vw, 56px)");
     expect(styles).toContain(".docs-quickstart");
     expect(styles).not.toContain(".docs-intro");
     expect(styles).toContain(".docs-sidebar-group");
