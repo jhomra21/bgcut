@@ -1,5 +1,5 @@
 import { Show } from "@solidjs/web";
-import { createEffect, createSignal, onSettled } from "solid-js";
+import { createSignal, onSettled } from "solid-js";
 
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
@@ -35,9 +35,7 @@ const App = () => {
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
 
-  createEffect(() => {
-    applySiteMetadata(page());
-  });
+  applySiteMetadata(initialPage);
   let routeTarget = initialPage;
   let transitionTimer: number | undefined;
   let transitionVersion = 0;
@@ -83,6 +81,7 @@ const App = () => {
       }
 
       setPage(nextPage);
+      applySiteMetadata(nextPage);
       window.scrollTo(0, 0);
       setRoutePhase("in");
 
