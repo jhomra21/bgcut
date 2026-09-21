@@ -143,6 +143,17 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("document.intro");
   });
 
+  test("keeps top navigation geometry stable and moves selection immediately", () => {
+    expect(appSource).toContain('class="site-nav-indicator"');
+    expect(appSource).toContain('data-active={props.page}');
+    expect(appSource).toContain('class="site-nav-docs"');
+    expect(appSource).toContain('class="site-nav-changelog"');
+    expect(appSource).toContain('class="site-nav-github"');
+    expect(appSource).toContain("const [navPage, setNavPage] = createSignal<SitePage>(initialPage)");
+    expect(appSource).toContain("setNavPage(nextPage)");
+    expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
+  });
+
   test("uses one symmetric two-phase route transition for every internal page", () => {
     expect(appSource).toContain("const ROUTE_FADE_MS = 75");
     expect(appSource).toContain('type RouteTransitionPhase = "idle" | "out" | "in"');
@@ -156,7 +167,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("window.history.pushState");
     expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
     expect(appSource).toContain("route-stage route-stage-");
-    expect(appSource).toContain('<SiteHeader page={page()} onNavigate={navigate} />');
+    expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
