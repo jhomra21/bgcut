@@ -149,7 +149,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("const releaseId = (version: string)");
     expect(appSource).toContain("const releaseItems: SectionRailItem[] = []");
     expect(appSource).toContain('label: "Releases"');
-    expect(appSource).toContain('ariaLabel="Changelog releases"');
+    expect(appSource).toContain('railAriaLabel="Changelog releases"');
     expect(appSource).toContain('sectionSelector=".reference-page > section[id]"');
     expect(appSource).toContain("bottomSectionId={oldestReleaseId}");
     expect(appSource).toContain('id={section.id} class="reference-section changelog-release"');
