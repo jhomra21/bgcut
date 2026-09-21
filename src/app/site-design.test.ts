@@ -69,7 +69,6 @@ describe("site design contract", () => {
 
   test("shares one reference-page layout across docs and changelog", () => {
     expect(styles).toContain(".reference-section");
-    expect(styles).toContain(".reference-page > .reference-section:first-of-type");
     expect(styles).toContain("padding: 34px 0 38px");
     expect(styles).toContain(".reference-page > .reference-section:first-of-type");
     expect(styles).toContain("padding-top: 24px");
