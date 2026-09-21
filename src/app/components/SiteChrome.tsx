@@ -18,17 +18,24 @@ export const LocalAppHeader = () => (
   </header>
 );
 
+const pageContextForPage = (page: SitePage): string => {
+  if (page === "docs") {
+    return "Documentation";
+  }
+
+  if (page === "changelog") {
+    return "Changelog";
+  }
+
+  return "";
+};
+
 export const SiteHeader = (props: {
   readonly page: SitePage;
   readonly onNavigate: Navigate;
   readonly showPageContext: boolean;
 }) => {
-  const pageContext =
-    props.page === "docs"
-      ? "Documentation"
-      : props.page === "changelog"
-        ? "Changelog"
-        : "";
+  const pageContext = pageContextForPage(props.page);
 
   return (
     <header class="app-header">
