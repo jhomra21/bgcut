@@ -6,7 +6,7 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
-- Fixed the Documentation/Changelog title handoff so the rail title stays visible until the large page title has cleared the sticky navigation, using live header/title geometry instead of a fixed scroll offset.
+- Simplified Documentation and Changelog to one permanent left-rail page title, removed the duplicate centered title and its transition logic, and pulled the page content upward into the space the centered header used to occupy.
 
 ## 0.4.0 - 2026-09-21
 
