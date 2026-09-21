@@ -33,6 +33,7 @@ const App = () => {
 
   const initialPage = currentPage();
   const [page, setPage] = createSignal<SitePage>(initialPage);
+  const [navPage, setNavPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
 
   applySiteMetadata(initialPage);
@@ -57,6 +58,7 @@ const App = () => {
     }
 
     routeTarget = nextPage;
+    setNavPage(nextPage);
     clearRouteTransition();
     transitionVersion += 1;
     const version = transitionVersion;
@@ -115,7 +117,7 @@ const App = () => {
   return (
     <div class="site-root">
       <div class="site-header-shell">
-        <SiteHeader page={page()} onNavigate={navigate} />
+        <SiteHeader page={navPage()} onNavigate={navigate} />
       </div>
 
       <div class={`route-stage route-stage-${routePhase()}`}>

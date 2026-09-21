@@ -46,8 +46,10 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
       </div>
     </a>
 
-    <nav class="site-nav" aria-label="Main navigation">
+    <nav class="site-nav" aria-label="Main navigation" data-active={props.page}>
+      <span class="site-nav-indicator" aria-hidden="true" />
       <a
+        class="site-nav-docs"
         href="/docs"
         aria-current={props.page === "docs" ? "page" : undefined}
         onClick={(event) => {
@@ -62,6 +64,7 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         Docs
       </a>
       <a
+        class="site-nav-changelog"
         href="/changelog"
         aria-current={props.page === "changelog" ? "page" : undefined}
         onClick={(event) => {
@@ -75,7 +78,7 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
       >
         Changelog
       </a>
-      <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
+      <a class="site-nav-github" href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
         GitHub
       </a>
     </nav>

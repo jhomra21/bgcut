@@ -21,6 +21,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -80,41 +84,82 @@ figure {
 }
 
 .site-nav {
-  display: flex;
+  --site-nav-docs-width: 48px;
+  --site-nav-changelog-width: 76px;
+  --site-nav-github-width: 58px;
+  --site-nav-gap: 3px;
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--site-nav-docs-width)
+    var(--site-nav-changelog-width)
+    var(--site-nav-github-width);
   align-items: center;
-  gap: 3px;
+  gap: var(--site-nav-gap);
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(246, 246, 243, 0.82);
 }
 
+.site-nav-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: var(--site-nav-docs-width);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.06);
+  opacity: 0;
+  transform: translateX(0);
+  transition:
+    width 180ms var(--ease-out),
+    transform 180ms var(--ease-out),
+    opacity 120ms ease;
+  pointer-events: none;
+}
+
+.site-nav[data-active="docs"] .site-nav-indicator {
+  width: var(--site-nav-docs-width);
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.site-nav[data-active="changelog"] .site-nav-indicator {
+  width: var(--site-nav-changelog-width);
+  opacity: 1;
+  transform: translateX(calc(var(--site-nav-docs-width) + var(--site-nav-gap)));
+}
+
 .site-nav a {
+  position: relative;
+  z-index: 1;
   min-height: 29px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border-radius: 7px;
   color: var(--ink-soft);
-  padding: 0 10px;
+  padding: 0 8px;
   font-size: 11px;
-  font-weight: 560;
+  font-weight: 620;
   white-space: nowrap;
   text-decoration: none;
   transition:
-    background-color 150ms ease,
     color 150ms ease,
-    box-shadow 150ms ease;
+    background-color 150ms ease;
 }
 
 .site-nav a:hover {
   color: var(--ink);
+  background: rgba(255, 255, 255, 0.42);
 }
 
 .site-nav a[aria-current="page"] {
-  background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.06);
-  font-weight: 650;
+  background: transparent;
 }
 
 .drop-surface {
@@ -1093,12 +1138,26 @@ figure {
   .site-nav {
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
   }
 
+  .site-nav-indicator {
+    width: calc((100% - 10px) / 3);
+  }
+
+  .site-nav[data-active="docs"] .site-nav-indicator {
+    width: calc((100% - 10px) / 3);
+    transform: translateX(0);
+  }
+
+  .site-nav[data-active="changelog"] .site-nav-indicator {
+    width: calc((100% - 10px) / 3);
+    transform: translateX(calc(100% + 2px));
+  }
+
   .site-nav a {
-    flex: 0 0 auto;
+    min-width: 0;
     white-space: nowrap;
   }
 
@@ -1170,7 +1229,7 @@ figure {
     padding: 34px 0 54px;
   }
 
-  .changelog-header h2,
+  .changelog-header h1,
   .legal-page > h1 {
     font-size: clamp(34px, 11vw, 48px);
   }
@@ -1222,6 +1281,11 @@ figure {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .site-nav-indicator {
+    transition-duration: 120ms;
+    transition-property: opacity;
+  }
+
   .drop-trigger,
   .result-actions > .text-button,
   .result-action-group > .text-button,
