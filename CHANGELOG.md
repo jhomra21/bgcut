@@ -6,6 +6,14 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+## 0.4.0 - 2026-09-21
+
+- Promoted the accepted 0.4 beta line to stable after clean installed-package validation of the one-shot Node API, reusable WebGPU sessions, public error contract, CLI inference, packaged local app, health route, and model delivery.
+- Added `removeBackground(input, options?)` for one-shot Node.js removal while keeping `createBgcut()` for reusable sessions and batch work.
+- Added the public `BgcutError` contract with stable `model`, `engine`, `input`, `inference`, `output`, and `closed` codes, including direct malformed-input errors through both Node API paths.
+- Shipped the shared Documentation/Changelog reference layout, search-discovery improvements, accessibility contrast work, static-asset security/cache headers, and the simplified 75ms fade-out plus 75ms fade-in title handoff.
+- Hardened Cloudflare runtime deployment around unchanged R2 assets, transient upload failures, and post-upload verification.
+
 ## 0.4.0-beta.2 - 2026-09-21
 
 - Replaced the Documentation/Changelog title morph with a simple two-phase handoff: the current title fades out for 75ms, then the title at the destination fades in for 75ms. The page and rail titles keep their own fixed layout positions, so the handoff no longer depends on measured coordinates or font-size interpolation.
