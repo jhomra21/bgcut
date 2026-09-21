@@ -48,28 +48,29 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("shares one compact reading rail across docs and changelog", () => {
-    expect(styles).toContain(".docs-page-header");
+  test("shares one reference-page layout across docs and changelog", () => {
+    expect(styles).toContain(".reference-page-header");
+    expect(styles).toContain(".reference-page-header h1");
+    expect(styles).toContain(".reference-section");
+    expect(styles).toContain(".reference-page > .reference-section:first-of-type");
     expect(styles).toContain("font-size: clamp(38px, 6vw, 56px)");
-    expect(styles).toContain(".docs-quickstart");
-    expect(styles).not.toContain(".docs-intro");
+    expect(styles).toContain("padding: 34px 0 38px");
+    expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
     expect(styles).toContain(".section-rail-group");
     expect(styles).toContain('.section-rail a[aria-current="location"]');
     expect(styles).toContain(".section-rail-label");
     expect(styles).toContain("max-height: calc(100vh - 48px)");
-    expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
-    expect(styles).toContain(".changelog-release");
-    expect(styles).toContain("scroll-margin-top: 58px");
+    expect(styles).not.toContain(".docs-page-header");
+    expect(styles).not.toContain(".changelog-header");
+    expect(styles).not.toContain(".changelog-page {\n  max-width");
     expect(styles).toContain(".spec-table");
-    expect(styles).not.toContain(".doc-card {");
-    expect(styles).not.toContain(".docs-hero");
   });
 
   test("styles footer and legal pages outside the top navigation", () => {
     expect(styles).toContain(".site-footer");
     expect(styles).toContain(".site-footer-links");
     expect(styles).toContain(".legal-page");
-    expect(styles).toContain(".changelog-page");
+    expect(styles).toContain(".reference-page");
     expect(styles).toContain(".changelog-release");
   });
 });
