@@ -48,7 +48,7 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("fades the reference title without moving its endpoints", () => {
+  test("keeps the reference title permanently in the left reading rail", () => {
     expect(styles).toContain(".site-header-shell-sticky");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
@@ -56,13 +56,10 @@ describe("site design contract", () => {
     expect(styles).toContain("font-size: 18px");
     expect(styles).toContain("font-weight: 760");
     expect(styles).toContain("letter-spacing: -0.05em");
-    expect(styles).toContain(".reference-page-title");
-    expect(styles).toContain("animation: reference-title-fade-out 75ms var(--ease-out) both");
-    expect(styles).toContain("animation: reference-title-fade-in 75ms var(--ease-out) both");
-    expect(styles).toContain("@keyframes reference-title-fade-out");
-    expect(styles).toContain("@keyframes reference-title-fade-in");
+    expect(styles).not.toContain(".reference-page-title");
+    expect(styles).not.toContain(".reference-page-header");
+    expect(styles).not.toContain("reference-title-fade");
     expect(styles).not.toContain(".reference-title-motion");
-    expect(styles).not.toContain("will-change: left, top, font-size");
     expect(styles).not.toContain("view-transition-name: reference-page-title");
     expect(styles).not.toContain("::view-transition-group(reference-page-title)");
     expect(styles).not.toContain(".site-page-context");
@@ -71,12 +68,10 @@ describe("site design contract", () => {
   });
 
   test("shares one reference-page layout across docs and changelog", () => {
-    expect(styles).toContain(".reference-page-header");
-    expect(styles).toContain(".reference-page-title");
     expect(styles).toContain(".reference-section");
-    expect(styles).toContain(".reference-page > .reference-section:first-of-type");
-    expect(styles).toContain("font-size: clamp(38px, 6vw, 56px)");
     expect(styles).toContain("padding: 34px 0 38px");
+    expect(styles).toContain(".reference-page > .reference-section:first-of-type");
+    expect(styles).toContain("padding-top: 24px");
     expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
     expect(styles).toContain(".section-rail-group");
     expect(styles).toContain('.section-rail a[aria-current="location"]');
