@@ -8,6 +8,7 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 - Improved search discoverability with descriptive visible page headings, route-specific HTML titles, descriptions, canonical URLs and robots directives, a focused sitemap, and WebApplication structured data for the free hosted background remover.
 - Reduced the hosted site's initial JavaScript by loading the browser inference stack only after image selection, raised secondary text contrast to meet WCAG AA on the site canvas, and added a root `llms.txt` discovery file for Lighthouse's Agentic Browsing audit.
+- Added Cloudflare Static Assets security headers for CSP, clickjacking protection, content-type sniffing, opener isolation, referrer and permissions policies, and HSTS, plus one-year immutable browser caching for hashed `/assets/*` files.
 
 ## 0.4.0-beta.1 - 2026-09-20
 
