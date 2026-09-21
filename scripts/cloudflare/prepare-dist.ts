@@ -8,6 +8,7 @@ const distDirectory = resolve(import.meta.dir, "../../dist");
 const publicDirectory = resolve(import.meta.dir, "../../public");
 
 const SITE_ROOT_FILES = [
+  "_headers",
   "apple-touch-icon.png",
   "favicon-48x48.png",
   "icon-192x192.png",

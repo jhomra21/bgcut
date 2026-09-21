@@ -10,6 +10,10 @@ const cloudflareBuildSource = await Bun.file(
   new URL("../../scripts/cloudflare/prepare-dist.ts", import.meta.url),
 ).text();
 
+const staticHeadersSource = await Bun.file(
+  new URL("../../public/_headers", import.meta.url),
+).text();
+
 describe("Cloudflare runtime routing", () => {
   test("routes model and runtime assets through the Worker before SPA fallback", () => {
     expect(wranglerConfig).toContain('"/models/*"');
@@ -40,6 +44,16 @@ describe("Cloudflare runtime routing", () => {
     expect(cloudflareBuildSource).toContain('"llms.txt"');
     expect(cloudflareBuildSource).toContain('"docs.html"');
     expect(cloudflareBuildSource).toContain('"changelog.html"');
+  });
+
+  test("hardens static responses and caches fingerprinted assets", () => {
+    expect(cloudflareBuildSource).toContain('"_headers"');
+    expect(staticHeadersSource).toContain("Content-Security-Policy:");
+    expect(staticHeadersSource).toContain("X-Frame-Options: DENY");
+    expect(staticHeadersSource).toContain("Cross-Origin-Opener-Policy: same-origin");
+    expect(staticHeadersSource).toContain("Strict-Transport-Security: max-age=31536000");
+    expect(staticHeadersSource).toContain("/assets/*");
+    expect(staticHeadersSource).toContain("max-age=31536000, immutable");
   });
 
   test("keeps discrete ONNX Runtime assets out of Workers Static Assets", () => {
