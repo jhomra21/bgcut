@@ -48,13 +48,14 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("pins reference chrome without shifting the header geometry", () => {
+  test("pins borderless reference chrome and keeps the page name in the rail", () => {
     expect(styles).toContain(".site-header-shell-sticky");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
-    expect(styles).toContain(".site-page-context");
-    expect(styles).toContain("min-width: 94px");
-    expect(styles).toContain('.site-page-context[data-visible="true"]');
+    expect(styles).not.toContain("site-header-shell-sticky[data-scrolled");
+    expect(styles).toContain(".section-rail-page-title");
+    expect(styles).toContain('.section-rail-page-title[data-visible="true"]');
+    expect(styles).not.toContain(".site-page-context");
     expect(styles).toContain("top: 100px");
     expect(styles).toContain("scroll-margin-top: 154px");
   });
