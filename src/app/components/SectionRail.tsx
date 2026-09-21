@@ -16,9 +16,6 @@ export type SectionRailGroup = {
 type SectionRailProps = {
   readonly ariaLabel: string;
   readonly pageTitle: string;
-  readonly pageTitleVisible: boolean;
-  readonly pageTitlePhase: "idle" | "out" | "in";
-  readonly onPageTitleVisibilityChange: (visible: boolean) => void;
   readonly groups: readonly SectionRailGroup[];
   readonly initialSectionId: string;
   readonly sectionSelector: string;
@@ -26,8 +23,6 @@ type SectionRailProps = {
 };
 
 const SECTION_SCROLL_MS = 120;
-
-const TITLE_REVEAL_GAP = 12;
 
 const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
 
@@ -63,20 +58,6 @@ export const SectionRail = (props: SectionRailProps) => {
 
   const readingPosition = (): number => window.innerHeight * 0.34;
 
-  const compactTitleVisible = (): boolean => {
-    const pageTitle = document.querySelector<HTMLElement>(".reference-page-title");
-    const stickyHeader = document.querySelector<HTMLElement>(".site-header-shell-sticky");
-
-    if (pageTitle === null || stickyHeader === null) {
-      return false;
-    }
-
-    const titleTop = pageTitle.getBoundingClientRect().top;
-    const headerBottom = stickyHeader.getBoundingClientRect().bottom;
-
-    return titleTop < headerBottom + TITLE_REVEAL_GAP;
-  };
-
   const cancelScrollAnimation = () => {
     if (scrollAnimationFrame !== undefined) {
       window.cancelAnimationFrame(scrollAnimationFrame);
@@ -87,8 +68,6 @@ export const SectionRail = (props: SectionRailProps) => {
   };
 
   const pickActiveSection = () => {
-    props.onPageTitleVisibilityChange(compactTitleVisible());
-
     if (programmaticTarget !== undefined) {
       setActiveSection(programmaticTarget);
 
@@ -274,14 +253,7 @@ export const SectionRail = (props: SectionRailProps) => {
 
   return (
     <aside class="section-rail" aria-label={props.ariaLabel}>
-      <span
-        class="section-rail-page-title"
-        data-title-active={props.pageTitleVisible ? "true" : "false"}
-        data-title-phase={props.pageTitlePhase}
-        aria-hidden={props.pageTitleVisible ? undefined : "true"}
-      >
-        {props.pageTitle}
-      </span>
+      <h1 class="section-rail-page-title">{props.pageTitle}</h1>
 
       <For each={props.groups}>
         {(group) => (
