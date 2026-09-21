@@ -169,22 +169,25 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("site-page-context");
   });
 
-  test("moves the shared reference title between page and rail", () => {
-    expect(appSource).toContain("const [compactTitle, setCompactTitle] = createSignal(false)");
-    expect(appSource).toContain("startViewTransition");
-    expect(appSource).toContain("activeTitleTransition?.skipTransition()");
+  test("moves the shared reference title directly between measured endpoints", () => {
+    expect(appSource).toContain("const TITLE_MOVE_MS = 130");
+    expect(appSource).toContain('const TITLE_MOVE_EASING = "cubic-bezier(0.2, 0, 0, 1)"');
+    expect(appSource).toContain("source.getBoundingClientRect()");
+    expect(appSource).toContain("target.getBoundingClientRect()");
+    expect(appSource).toContain('document.createElement("span")');
+    expect(appSource).toContain('className = "reference-title-motion"');
+    expect(appSource).toContain("overlay.animate(");
+    expect(appSource).toContain("left: `${sourceRect.left}px`");
+    expect(appSource).toContain("left: `${targetRect.left}px`");
+    expect(appSource).toContain("fontSize: sourceStyle.fontSize");
+    expect(appSource).toContain("fontSize: targetStyle.fontSize");
     expect(appSource).toContain("pageTitleVisible={compactTitle()}");
     expect(appSource).toContain("onPageTitleVisibilityChange={moveTitle}");
+    expect(appSource).toContain("onPageTitleElement=");
     expect(appSource).toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
-    expect(appSource).toContain('class="reference-page-title"');
-    expect(appSource).toContain('class="section-rail-page-title"');
-    expect(appSource).toContain('data-title-active={compactTitle() ? "false" : "true"}');
-    expect(appSource).toContain(
-      'data-title-active={props.pageTitleVisible ? "true" : "false"}'
-    );
     expect(appSource).toContain('"(prefers-reduced-motion: reduce)"');
-    expect(appSource).not.toContain("showPageTitle");
-    expect(appSource).not.toContain("site-page-context");
+    expect(appSource).not.toContain("startViewTransition");
+    expect(appSource).not.toContain("view-transition-name");
   });
 
   test("uses one symmetric two-phase route transition for every internal page", () => {
