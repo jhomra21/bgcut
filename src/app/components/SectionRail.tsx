@@ -26,6 +26,7 @@ type SectionRailProps = {
 };
 
 const SECTION_SCROLL_MS = 120;
+const TITLE_REVEAL_GAP = 12;
 
 const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
 
@@ -61,6 +62,20 @@ export const SectionRail = (props: SectionRailProps) => {
 
   const readingPosition = (): number => window.innerHeight * 0.34;
 
+  const compactTitleVisible = (): boolean => {
+    const pageTitle = document.querySelector<HTMLElement>(".reference-page-title");
+    const stickyHeader = document.querySelector<HTMLElement>(".site-header-shell-sticky");
+
+    if (pageTitle === null || stickyHeader === null) {
+      return false;
+    }
+
+    const titleTop = pageTitle.getBoundingClientRect().top;
+    const headerBottom = stickyHeader.getBoundingClientRect().bottom;
+
+    return titleTop < headerBottom + TITLE_REVEAL_GAP;
+  };
+
   const cancelScrollAnimation = () => {
     if (scrollAnimationFrame !== undefined) {
       window.cancelAnimationFrame(scrollAnimationFrame);
@@ -71,7 +86,7 @@ export const SectionRail = (props: SectionRailProps) => {
   };
 
   const pickActiveSection = () => {
-    props.onPageTitleVisibilityChange(window.scrollY > 64);
+    props.onPageTitleVisibilityChange(compactTitleVisible());
 
     if (programmaticTarget !== undefined) {
       setActiveSection(programmaticTarget);
