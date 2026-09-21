@@ -55,7 +55,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
 export const canonicalUrlForPage = (page: PublicSitePage): string =>
   new URL(SITE_PAGE_METADATA[page].path, SITE_ORIGIN).href;
 
-export const structuredDataForPage = (page: PublicSitePage): unknown => {
+export const structuredDataForPage = (page: PublicSitePage) => {
   const metadata = SITE_PAGE_METADATA[page];
   const url = canonicalUrlForPage(page);
 
