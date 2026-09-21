@@ -18,7 +18,7 @@ const htmlEscape = (value: string): string =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
-const jsonForHtml = (value: unknown): string =>
+const jsonForHtml = (value: ReturnType<typeof structuredDataForPage>): string =>
   JSON.stringify(value).replaceAll("<", "\\u003c");
 
 const renderPageHtml = (template: string, page: PublicSitePage): string => {
