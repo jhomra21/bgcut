@@ -18,72 +18,108 @@ export const LocalAppHeader = () => (
   </header>
 );
 
-export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
-  <header class="app-header">
-    <a
-      class="brand-link"
-      href="/"
-      aria-label="bgcut home"
-      onClick={(event) => {
-        if (!shouldHandleInternalNavigation(event)) {
-          return;
-        }
+const pageContextForPage = (page: SitePage): string => {
+  if (page === "docs") {
+    return "Documentation";
+  }
 
-        event.preventDefault();
-        props.onNavigate("home");
-      }}
-    >
-      <div class="brand-title">
-        <img
-          class="brand-mark"
-          src="/favicon-48x48.png?v=2"
-          alt=""
-          width="32"
-          height="32"
-          aria-hidden="true"
-        />
-        <span>bgcut</span>
+  if (page === "changelog") {
+    return "Changelog";
+  }
+
+  return "";
+};
+
+export const SiteHeader = (props: {
+  readonly page: SitePage;
+  readonly onNavigate: Navigate;
+  readonly showPageContext: boolean;
+}) => {
+  const pageContext = pageContextForPage(props.page);
+
+  return (
+    <header class="app-header">
+      <div class="site-header-leading">
+        <a
+          class="brand-link"
+          href="/"
+          aria-label="bgcut home"
+          onClick={(event) => {
+            if (!shouldHandleInternalNavigation(event)) {
+              return;
+            }
+
+            event.preventDefault();
+            props.onNavigate("home");
+          }}
+        >
+          <div class="brand-title">
+            <img
+              class="brand-mark"
+              src="/favicon-48x48.png?v=2"
+              alt=""
+              width="32"
+              height="32"
+              aria-hidden="true"
+            />
+            <span>bgcut</span>
+          </div>
+        </a>
+
+        <span
+          class="site-page-context"
+          data-reference={pageContext === "" ? "false" : "true"}
+          data-visible={props.showPageContext && pageContext !== "" ? "true" : "false"}
+          aria-hidden={!props.showPageContext || pageContext === "" ? "true" : undefined}
+        >
+          {pageContext}
+        </span>
       </div>
-    </a>
 
-    <nav class="site-nav" aria-label="Main navigation" data-active={props.page}>
-      <span class="site-nav-indicator" aria-hidden="true" />
-      <a
-        class="site-nav-docs"
-        href="/docs"
-        aria-current={props.page === "docs" ? "page" : undefined}
-        onClick={(event) => {
-          if (!shouldHandleInternalNavigation(event)) {
-            return;
-          }
+      <nav class="site-nav" aria-label="Main navigation" data-active={props.page}>
+        <span class="site-nav-indicator" aria-hidden="true" />
+        <a
+          class="site-nav-docs"
+          href="/docs"
+          aria-current={props.page === "docs" ? "page" : undefined}
+          onClick={(event) => {
+            if (!shouldHandleInternalNavigation(event)) {
+              return;
+            }
 
-          event.preventDefault();
-          props.onNavigate("docs");
-        }}
-      >
-        Docs
-      </a>
-      <a
-        class="site-nav-changelog"
-        href="/changelog"
-        aria-current={props.page === "changelog" ? "page" : undefined}
-        onClick={(event) => {
-          if (!shouldHandleInternalNavigation(event)) {
-            return;
-          }
+            event.preventDefault();
+            props.onNavigate("docs");
+          }}
+        >
+          Docs
+        </a>
+        <a
+          class="site-nav-changelog"
+          href="/changelog"
+          aria-current={props.page === "changelog" ? "page" : undefined}
+          onClick={(event) => {
+            if (!shouldHandleInternalNavigation(event)) {
+              return;
+            }
 
-          event.preventDefault();
-          props.onNavigate("changelog");
-        }}
-      >
-        Changelog
-      </a>
-      <a class="site-nav-github" href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">
-        GitHub
-      </a>
-    </nav>
-  </header>
-);
+            event.preventDefault();
+            props.onNavigate("changelog");
+          }}
+        >
+          Changelog
+        </a>
+        <a
+          class="site-nav-github"
+          href="https://github.com/jhomra21/bgcut"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
+        </a>
+      </nav>
+    </header>
+  );
+};
 
 export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
   <footer class="site-footer">

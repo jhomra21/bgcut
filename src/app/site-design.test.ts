@@ -32,7 +32,7 @@ describe("site design contract", () => {
     expect(styles).toContain("@keyframes route-fade-out");
     expect(styles).toContain("@keyframes route-fade-in");
     expect(styles).toContain(".section-rail");
-    expect(styles).toContain("top: 24px");
+    expect(styles).toContain("top: 82px");
   });
 
   test("uses a stable sliding top-navigation indicator", () => {
@@ -48,6 +48,17 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
+  test("pins reference chrome without shifting the header geometry", () => {
+    expect(styles).toContain(".site-header-shell-sticky");
+    expect(styles).toContain("position: sticky");
+    expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
+    expect(styles).toContain(".site-page-context");
+    expect(styles).toContain("min-width: 94px");
+    expect(styles).toContain('.site-page-context[data-visible="true"]');
+    expect(styles).toContain("top: 100px");
+    expect(styles).toContain("scroll-margin-top: 154px");
+  });
+
   test("shares one reference-page layout across docs and changelog", () => {
     expect(styles).toContain(".reference-page-header");
     expect(styles).toContain(".reference-page-header h1");
@@ -59,7 +70,7 @@ describe("site design contract", () => {
     expect(styles).toContain(".section-rail-group");
     expect(styles).toContain('.section-rail a[aria-current="location"]');
     expect(styles).toContain(".section-rail-label");
-    expect(styles).toContain("max-height: calc(100vh - 48px)");
+    expect(styles).toContain("max-height: calc(100vh - 98px)");
     expect(styles).not.toContain(".docs-page-header");
     expect(styles).not.toContain(".changelog-header");
     expect(styles).not.toContain(".changelog-page {\n  max-width");

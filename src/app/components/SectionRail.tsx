@@ -55,7 +55,7 @@ export const SectionRail = (props: SectionRailProps) => {
     return matched;
   };
 
-  const readingPosition = (): number => window.innerHeight * 0.52;
+  const readingPosition = (): number => window.innerHeight * 0.34;
 
   const cancelScrollAnimation = () => {
     if (scrollAnimationFrame !== undefined) {

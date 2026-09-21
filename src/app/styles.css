@@ -60,6 +60,38 @@ figure {
   margin-bottom: 18px;
 }
 
+.site-header-leading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.site-page-context {
+  min-width: 94px;
+  border-left: 1px solid var(--line);
+  color: var(--ink-muted);
+  padding-left: 14px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 140ms ease,
+    transform 160ms var(--ease-out);
+  white-space: nowrap;
+}
+
+.site-page-context[data-reference="false"] {
+  display: none;
+}
+
+.site-page-context[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .brand-title {
   display: inline-flex;
   align-items: center;
@@ -550,6 +582,36 @@ figure {
   margin-bottom: 18px;
 }
 
+.site-header-shell-sticky {
+  position: sticky;
+  z-index: 40;
+  top: 0;
+  padding-top: 18px;
+  padding-bottom: 14px;
+}
+
+.site-header-shell-sticky::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  border-bottom: 1px solid transparent;
+  background: rgba(251, 251, 250, 0.94);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+}
+
+.site-header-shell-sticky[data-scrolled="true"]::before {
+  border-bottom-color: var(--line);
+}
+
+.site-header-shell-sticky .app-header {
+  margin-bottom: 0;
+}
+
 .route-stage {
   opacity: 1;
 }
@@ -618,11 +680,11 @@ figure {
 
 .section-rail {
   position: sticky;
-  top: 24px;
+  top: 82px;
   display: grid;
   align-self: start;
   gap: 18px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 98px);
   overflow-y: auto;
   padding-top: 24px;
   scrollbar-width: none;
@@ -726,7 +788,7 @@ figure {
 .reference-section {
   padding: 34px 0 38px;
   border-bottom: 1px solid var(--line);
-  scroll-margin-top: 24px;
+  scroll-margin-top: 96px;
 }
 
 .reference-page > .reference-section:first-of-type {
@@ -1145,6 +1207,28 @@ figure {
     padding-top: 20px;
   }
 
+  .site-header-shell-sticky {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+
+  .site-header-shell-sticky .app-header {
+    margin-bottom: 0;
+  }
+
+  .site-header-leading {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .site-page-context {
+    min-width: 0;
+    border-left: 0;
+    padding-left: 0;
+    text-align: right;
+  }
+
   .content-layout {
     display: block;
   }
@@ -1152,7 +1236,7 @@ figure {
   .section-rail {
     position: sticky;
     z-index: 12;
-    top: 0;
+    top: 100px;
     display: flex;
     max-height: none;
     overflow-x: auto;
@@ -1191,7 +1275,7 @@ figure {
 
   .reference-section {
     padding: 32px 0 35px;
-    scroll-margin-top: 58px;
+    scroll-margin-top: 154px;
   }
 
   .reference-page > .reference-section:first-of-type {
@@ -1254,7 +1338,8 @@ figure {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-nav-indicator {
+  .site-nav-indicator,
+  .site-page-context {
     transition-duration: 120ms;
     transition-property: opacity;
   }
