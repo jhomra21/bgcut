@@ -150,9 +150,9 @@ describe("browser product UI", () => {
     expect(appSource).toContain("const releaseItems: SectionRailItem[] = []");
     expect(appSource).toContain('label: "Releases"');
     expect(appSource).toContain('ariaLabel="Changelog releases"');
-    expect(appSource).toContain('sectionSelector=".changelog-page > section[id]"');
+    expect(appSource).toContain('sectionSelector=".reference-page > section[id]"');
     expect(appSource).toContain("bottomSectionId={oldestReleaseId}");
-    expect(appSource).toContain('id={section.id} class="changelog-release"');
+    expect(appSource).toContain('id={section.id} class="reference-section changelog-release"');
   });
 
   test("keeps top navigation geometry stable and moves selection immediately", () => {
@@ -184,7 +184,7 @@ describe("browser product UI", () => {
   });
 
   test("keeps docs and changelog on one shared reference-page shell", () => {
-    expect(appSource).toContain('class="content-page reference-page');
+    expect(appSource).toContain("content-page reference-page ${props.pageClass}");
     expect(appSource).toContain('<header class="reference-page-header">');
     expect(appSource).toContain('title="Documentation"');
     expect(appSource).toContain("title={document.title}");
