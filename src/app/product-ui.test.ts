@@ -171,23 +171,17 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("site-page-context");
   });
 
-  test("fades the shared reference title between page and rail positions", () => {
-    expect(appSource).toContain("const TITLE_FADE_MS = 75");
-    expect(appSource).toContain('type TitleTransitionPhase = "idle" | "out" | "in"');
-    expect(appSource).toContain('setTitlePhase("out")');
-    expect(appSource).toContain('setTitlePhase("in")');
-    expect(appSource).toContain('setTitlePhase("idle")');
-    expect(appSource).toContain("window.setTimeout");
-    expect(appSource).toContain("pageTitleVisible={compactTitle()}");
-    expect(appSource).toContain('pageTitlePhase={compactTitle() ? titlePhase() : "idle"}');
-    expect(appSource).toContain("onPageTitleVisibilityChange={fadeTitle}");
-    expect(appSource).toContain("const TITLE_REVEAL_GAP = 12");
-    expect(appSource).toContain('document.querySelector<HTMLElement>(".reference-page-title")');
-    expect(appSource).toContain('document.querySelector<HTMLElement>(".site-header-shell-sticky")');
-    expect(appSource).toContain("titleTop < headerBottom + TITLE_REVEAL_GAP");
-    expect(appSource).toContain("props.onPageTitleVisibilityChange(compactTitleVisible())");
-    expect(appSource).not.toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
-    expect(appSource).toContain('"(prefers-reduced-motion: reduce)"');
+  test("keeps the reference page title permanently in the reading rail", () => {
+    expect(appSource).toContain('<h1 class="section-rail-page-title">{props.pageTitle}</h1>');
+    expect(appSource).not.toContain("TITLE_FADE_MS");
+    expect(appSource).not.toContain("TitleTransitionPhase");
+    expect(appSource).not.toContain("compactTitle");
+    expect(appSource).not.toContain("titlePhase");
+    expect(appSource).not.toContain("onPageTitleVisibilityChange");
+    expect(appSource).not.toContain("TITLE_REVEAL_GAP");
+    expect(appSource).not.toContain("reference-page-title");
+    expect(appSource).not.toContain("reference-page-header");
+    expect(appSource).not.toContain("reference-title-fade");
     expect(appSource).not.toContain("reference-title-motion");
     expect(appSource).not.toContain("startViewTransition");
     expect(appSource).not.toContain("view-transition-name");
@@ -212,7 +206,6 @@ describe("browser product UI", () => {
 
   test("keeps docs and changelog on one shared reference-page shell", () => {
     expect(appSource).toContain("content-page reference-page ${props.pageClass}");
-    expect(appSource).toContain('<header class="reference-page-header">');
     expect(appSource).toContain('title="Documentation"');
     expect(appSource).toContain("title={document.title}");
     expect(appSource).toContain('pageClass="docs-page"');
@@ -221,6 +214,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain('class="reference-section changelog-release"');
     expect(appSource).not.toContain('class="docs-page-header"');
     expect(appSource).not.toContain('class="changelog-header"');
+    expect(appSource).not.toContain('class="reference-page-header"');
+    expect(appSource).not.toContain('class="reference-page-title"');
     expect(appSource).not.toContain("<h1>Documentation</h1>");
     expect(appSource).not.toContain('<div class="eyebrow">Documentation</div>');
     expect(appSource).not.toContain("Browser, CLI and Node.js background removal");
