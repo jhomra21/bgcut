@@ -101,6 +101,7 @@ export const ReferencePage = (props: ReferencePageProps) => {
     const targetFrame = readTitleFrame(target);
     const progress = Math.min((now - titleMoveStartedAt) / TITLE_MOVE_MS, 1);
     const eased = easeOutCubic(progress);
+
     const current = {
       left: interpolate(source.left, targetFrame.left, eased),
       top: interpolate(source.top, targetFrame.top, eased),
@@ -152,6 +153,7 @@ export const ReferencePage = (props: ReferencePageProps) => {
 
     const pageTitle = pageTitleElement;
     const railTitle = railTitleElement;
+
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
