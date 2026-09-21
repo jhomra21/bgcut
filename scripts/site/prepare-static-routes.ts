@@ -9,6 +9,7 @@ import {
 } from "../../src/shared/site-metadata";
 
 const root = resolve(import.meta.dir, "../..");
+
 const distDirectory = resolve(root, "dist");
 
 const htmlEscape = (value: string): string =>
@@ -24,6 +25,7 @@ const jsonForHtml = (value: ReturnType<typeof structuredDataForPage>): string =>
 const renderPageHtml = (template: string, page: PublicSitePage): string => {
   const metadata = SITE_PAGE_METADATA[page];
   const canonicalUrl = canonicalUrlForPage(page);
+
   const robots = metadata.index
     ? "index, follow, max-image-preview:large"
     : "noindex, follow, max-image-preview:large";
@@ -69,6 +71,7 @@ const renderPageHtml = (template: string, page: PublicSitePage): string => {
 };
 
 const templatePath = resolve(distDirectory, "index.html");
+
 const template = await readFile(templatePath, "utf8");
 
 for (const page of ["docs", "changelog", "privacy", "terms"] as const) {
