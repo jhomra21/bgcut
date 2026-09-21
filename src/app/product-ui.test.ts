@@ -171,6 +171,16 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
+  test("keeps the docs header as a single Documentation title", () => {
+    expect(appSource).toContain('<header class="docs-page-header">');
+    expect(appSource).toContain("<h1>Documentation</h1>");
+    expect(appSource).not.toContain('<div class="eyebrow">Documentation</div>');
+    expect(appSource).not.toContain("Browser, CLI and Node.js background removal");
+    expect(appSource).not.toContain(
+      "Use bgcut as a private browser background remover, a local command-line tool, or a Node.js background removal API."
+    );
+  });
+
   test("keeps Quickstart active at the top before using nearest-heading tracking", () => {
     expect(appSource).toContain("if (window.scrollY <= 2)");
     expect(appSource).toContain('setActiveSection("quickstart")');
