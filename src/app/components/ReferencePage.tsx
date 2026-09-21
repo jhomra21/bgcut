@@ -16,198 +16,65 @@ type ReferencePageProps = {
   readonly children: JSX.Element;
 };
 
-type TitleFrame = {
-  readonly left: number;
-  readonly top: number;
-  readonly fontSize: number;
-};
+type TitleTransitionPhase = "idle" | "out" | "in";
 
-const TITLE_MOVE_MS = 130;
-
-const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
-
-const interpolate = (from: number, to: number, progress: number): number =>
-  from + (to - from) * progress;
-
-const readTitleFrame = (element: HTMLElement): TitleFrame => {
-  const rect = element.getBoundingClientRect();
-  const fontSize = Number.parseFloat(window.getComputedStyle(element).fontSize);
-
-  return {
-    left: rect.left,
-    top: rect.top,
-    fontSize: Number.isFinite(fontSize) ? fontSize : rect.height,
-  };
-};
+const TITLE_FADE_MS = 75;
 
 export const ReferencePage = (props: ReferencePageProps) => {
   const [compactTitle, setCompactTitle] = createSignal(false);
-  let pageTitleElement: HTMLHeadingElement | undefined;
-  let railTitleElement: HTMLSpanElement | undefined;
-  let titleAnimationFrame: number | undefined;
-  let titleOverlay: HTMLSpanElement | undefined;
-  let titleMoveTarget: boolean | undefined;
-  let titleMoveSource: TitleFrame | undefined;
-  let titleMoveCurrent: TitleFrame | undefined;
-  let titleMoveStartedAt = 0;
+  const [titlePhase, setTitlePhase] = createSignal<TitleTransitionPhase>("idle");
+  let requestedCompactTitle = false;
+  let titleFadeTimeout: number | undefined;
 
-  const restoreTitleEndpoints = () => {
-    pageTitleElement?.style.removeProperty("visibility");
-    railTitleElement?.style.removeProperty("visibility");
-  };
-
-  const clearTitleMove = () => {
-    if (titleAnimationFrame !== undefined) {
-      window.cancelAnimationFrame(titleAnimationFrame);
-      titleAnimationFrame = undefined;
+  const clearTitleFadeTimeout = () => {
+    if (titleFadeTimeout === undefined) {
+      return;
     }
 
-    titleOverlay?.remove();
-    titleOverlay = undefined;
-    titleMoveTarget = undefined;
-    titleMoveSource = undefined;
-    titleMoveCurrent = undefined;
-    restoreTitleEndpoints();
+    window.clearTimeout(titleFadeTimeout);
+    titleFadeTimeout = undefined;
   };
 
-  const finishTitleMove = (compact: boolean) => {
-    setCompactTitle(compact);
-    titleAnimationFrame = undefined;
-    titleMoveTarget = undefined;
-    titleMoveSource = undefined;
-    titleMoveCurrent = undefined;
-    restoreTitleEndpoints();
-    titleOverlay?.remove();
-    titleOverlay = undefined;
-  };
-
-  const tickTitleMove = (now: number) => {
-    const overlay = titleOverlay;
-    const source = titleMoveSource;
-    const compact = titleMoveTarget;
-    const target = compact ? railTitleElement : pageTitleElement;
-
+  const startTitleFade = () => {
     if (
-      overlay === undefined ||
-      source === undefined ||
-      compact === undefined ||
-      target === undefined
+      titlePhase() !== "idle" ||
+      requestedCompactTitle === compactTitle()
     ) {
-      clearTitleMove();
-
       return;
     }
 
-    const targetFrame = readTitleFrame(target);
-    const progress = Math.min((now - titleMoveStartedAt) / TITLE_MOVE_MS, 1);
-    const eased = easeOutCubic(progress);
+    setTitlePhase("out");
 
-    const current = {
-      left: interpolate(source.left, targetFrame.left, eased),
-      top: interpolate(source.top, targetFrame.top, eased),
-      fontSize: interpolate(source.fontSize, targetFrame.fontSize, eased),
-    };
+    titleFadeTimeout = window.setTimeout(() => {
+      setCompactTitle(requestedCompactTitle);
+      setTitlePhase("in");
 
-    overlay.style.left = `${current.left}px`;
-    overlay.style.top = `${current.top}px`;
-    overlay.style.fontSize = `${current.fontSize}px`;
-    titleMoveCurrent = current;
+      titleFadeTimeout = window.setTimeout(() => {
+        titleFadeTimeout = undefined;
+        setTitlePhase("idle");
 
-    if (progress < 1) {
-      titleAnimationFrame = window.requestAnimationFrame(tickTitleMove);
-
-      return;
-    }
-
-    finishTitleMove(compact);
+        if (requestedCompactTitle !== compactTitle()) {
+          startTitleFade();
+        }
+      }, TITLE_FADE_MS);
+    }, TITLE_FADE_MS);
   };
 
-  const retargetTitleMove = (compact: boolean) => {
-    if (titleMoveTarget === compact) {
-      return;
-    }
+  const fadeTitle = (compact: boolean) => {
+    requestedCompactTitle = compact;
 
-    const current = titleMoveCurrent;
-
-    if (current === undefined) {
-      clearTitleMove();
-
-      return;
-    }
-
-    titleMoveTarget = compact;
-    titleMoveSource = current;
-    titleMoveStartedAt = performance.now();
-  };
-
-  const moveTitle = (compact: boolean) => {
-    if (titleMoveTarget !== undefined) {
-      retargetTitleMove(compact);
-
-      return;
-    }
-
-    if (compactTitle() === compact) {
-      return;
-    }
-
-    const pageTitle = pageTitleElement;
-    const railTitle = railTitleElement;
-
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    if (reducedMotion || pageTitle === undefined || railTitle === undefined) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      clearTitleFadeTimeout();
       setCompactTitle(compact);
+      setTitlePhase("idle");
 
       return;
     }
 
-    const source = compactTitle() ? railTitle : pageTitle;
-    const target = compact ? railTitle : pageTitle;
-    const sourceFrame = readTitleFrame(source);
-    const targetFrame = readTitleFrame(target);
-
-    if (
-      sourceFrame.fontSize <= 0 ||
-      targetFrame.fontSize <= 0 ||
-      source.getBoundingClientRect().width <= 0 ||
-      target.getBoundingClientRect().width <= 0
-    ) {
-      setCompactTitle(compact);
-
-      return;
-    }
-
-    const sourceStyle = window.getComputedStyle(source);
-    const overlay = document.createElement("span");
-
-    overlay.className = "reference-title-motion";
-    overlay.textContent = props.title;
-    overlay.setAttribute("aria-hidden", "true");
-    overlay.style.left = `${sourceFrame.left}px`;
-    overlay.style.top = `${sourceFrame.top}px`;
-    overlay.style.color = sourceStyle.color;
-    overlay.style.fontFamily = sourceStyle.fontFamily;
-    overlay.style.fontSize = `${sourceFrame.fontSize}px`;
-    overlay.style.fontWeight = sourceStyle.fontWeight;
-    overlay.style.letterSpacing = sourceStyle.letterSpacing;
-    overlay.style.lineHeight = sourceStyle.lineHeight;
-
-    document.body.append(overlay);
-
-    source.style.visibility = "hidden";
-    target.style.visibility = "hidden";
-    titleOverlay = overlay;
-    titleMoveTarget = compact;
-    titleMoveSource = sourceFrame;
-    titleMoveCurrent = sourceFrame;
-    titleMoveStartedAt = performance.now();
-    titleAnimationFrame = window.requestAnimationFrame(tickTitleMove);
+    startTitleFade();
   };
 
-  onCleanup(clearTitleMove);
+  onCleanup(clearTitleFadeTimeout);
 
   return (
     <main class="page-content content-shell">
@@ -216,10 +83,8 @@ export const ReferencePage = (props: ReferencePageProps) => {
           ariaLabel={props.railAriaLabel}
           pageTitle={props.title}
           pageTitleVisible={compactTitle()}
-          onPageTitleVisibilityChange={moveTitle}
-          onPageTitleElement={(element) => {
-            railTitleElement = element;
-          }}
+          pageTitlePhase={compactTitle() ? titlePhase() : "idle"}
+          onPageTitleVisibilityChange={fadeTitle}
           groups={props.railGroups}
           initialSectionId={props.initialSectionId}
           sectionSelector=".reference-page > section[id]"
@@ -229,11 +94,9 @@ export const ReferencePage = (props: ReferencePageProps) => {
         <article class={`content-page reference-page ${props.pageClass}`}>
           <header class="reference-page-header">
             <h1
-              ref={(element) => {
-                pageTitleElement = element;
-              }}
               class="reference-page-title"
               data-title-active={compactTitle() ? "false" : "true"}
+              data-title-phase={compactTitle() ? "idle" : titlePhase()}
               aria-hidden={compactTitle() ? "true" : undefined}
             >
               {props.title}

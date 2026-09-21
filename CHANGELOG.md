@@ -6,25 +6,17 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
-- Enlarged the compact Documentation/Changelog rail title and replaced the browser snapshot morph with a controlled 130ms move between the measured page and rail positions. The title now changes position and font size monotonically without the sideways drift or size overshoot from the previous transition.
+## 0.4.0-beta.2 - 2026-09-21
 
-- Hardened Cloudflare production deploys so pinned ONNX Runtime assets are verified through the live runtime HEAD routes, unchanged objects skip R2 uploads, and changed or missing objects use bounded retry/backoff instead of failing on the first transient R2 API error.
-
-- Moved the compact Documentation/Changelog context label out of the sticky top bar and into the shared left reading rail, while keeping the rail geometry stable and removing the sticky header's scroll-time bottom border.
-
-- Moved Docs and Changelog section tracking into the upper third of the viewport so the rail reflects the section being read instead of activating a lower section too early, and pinned the bgcut logo, current page name, and main navigation while scrolling reference pages.
-
-- Unified the hosted Docs and Changelog page shell so both use the same title position, typography, content width, release/section spacing, separators, reading rail placement, and responsive layout.
-
-- Reused the Docs reading rail on Changelog so each published release is navigable from the same sticky desktop and horizontal mobile rail, with shared scroll tracking, click animation, reduced-motion handling, and active-section behavior.
-
-- Simplified the hosted Docs header to a single `Documentation` title, matching the Changelog page hierarchy and removing the redundant eyebrow, long heading, and intro sentence.
-
-- Stabilized the hosted top navigation so active tabs no longer change text width or shift the control, and added a shared pill that animates immediately between Docs and Changelog during route changes.
-
-- Improved search discoverability with descriptive visible page headings, route-specific HTML titles, descriptions, canonical URLs and robots directives, a focused sitemap, and WebApplication structured data for the free hosted background remover.
-- Reduced the hosted site's initial JavaScript by loading the browser inference stack only after image selection, raised secondary text contrast to meet WCAG AA on the site canvas, and added a root `llms.txt` discovery file for Lighthouse's Agentic Browsing audit.
-- Added Cloudflare Static Assets security headers for CSP, clickjacking protection, content-type sniffing, opener isolation, referrer and permissions policies, and HSTS, plus one-year immutable browser caching for hashed `/assets/*` files.
+- Replaced the Documentation/Changelog title morph with a simple two-phase handoff: the current title fades out for 75ms, then the title at the destination fades in for 75ms. The page and rail titles keep their own fixed layout positions, so the handoff no longer depends on measured coordinates or font-size interpolation.
+- Hardened Cloudflare production deploys so pinned ONNX Runtime assets are checked through the live runtime routes, unchanged objects skip R2 uploads, and changed or missing objects retry transient R2 failures before the deploy fails.
+- Moved the compact Documentation/Changelog title into the shared reading rail, removed the sticky header border, and kept the bgcut brand plus Docs/Changelog/GitHub navigation pinned while reference pages scroll.
+- Moved Docs and Changelog section tracking into the upper third of the viewport and reused the same reading rail, scroll tracking, click scrolling, reduced-motion behavior, and responsive layout on both pages.
+- Unified the Docs and Changelog page shell so title placement, typography, content width, section spacing, separators, and rail geometry stay consistent.
+- Simplified the Documentation page header and public Changelog presentation, including keeping `Unreleased` notes out of the hosted changelog.
+- Stabilized the Docs/Changelog/GitHub switcher so changing routes does not alter tab width, and added the shared sliding active-tab indicator.
+- Improved search discovery with route-specific metadata, canonical URLs, a focused sitemap, WebApplication structured data, and `llms.txt`. The hosted app also defers the browser inference stack until image selection.
+- Raised secondary text contrast to WCAG AA and added Cloudflare Static Assets security headers plus immutable caching for fingerprinted assets.
 
 ## 0.4.0-beta.1 - 2026-09-20
 

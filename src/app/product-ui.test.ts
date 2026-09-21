@@ -19,6 +19,8 @@ const appSource = (
   )
 ).join("\n");
 
+const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
+
 const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
 const sourceInputBlock = (): string => {
@@ -169,24 +171,19 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("site-page-context");
   });
 
-  test("keeps the shared reference title attached to its live scroll destination", () => {
-    expect(appSource).toContain("const TITLE_MOVE_MS = 130");
-    expect(appSource).toContain("const readTitleFrame = (element: HTMLElement): TitleFrame");
-    expect(appSource).toContain("element.getBoundingClientRect()");
-    expect(appSource).toContain('document.createElement("span")');
-    expect(appSource).toContain('className = "reference-title-motion"');
-    expect(appSource).toContain("const tickTitleMove = (now: number)");
-    expect(appSource).toContain("const targetFrame = readTitleFrame(target)");
-    expect(appSource).toContain("window.requestAnimationFrame(tickTitleMove)");
-    expect(appSource).toContain("const retargetTitleMove = (compact: boolean)");
-    expect(appSource).toContain("titleMoveSource = current");
-    expect(appSource).toContain("titleMoveStartedAt = performance.now()");
-    expect(appSource).not.toContain("overlay.animate(");
+  test("fades the shared reference title between page and rail positions", () => {
+    expect(appSource).toContain("const TITLE_FADE_MS = 75");
+    expect(appSource).toContain('type TitleTransitionPhase = "idle" | "out" | "in"');
+    expect(appSource).toContain('setTitlePhase("out")');
+    expect(appSource).toContain('setTitlePhase("in")');
+    expect(appSource).toContain('setTitlePhase("idle")');
+    expect(appSource).toContain("window.setTimeout");
     expect(appSource).toContain("pageTitleVisible={compactTitle()}");
-    expect(appSource).toContain("onPageTitleVisibilityChange={moveTitle}");
-    expect(appSource).toContain("onPageTitleElement=");
+    expect(appSource).toContain('pageTitlePhase={compactTitle() ? titlePhase() : "idle"}');
+    expect(appSource).toContain("onPageTitleVisibilityChange={fadeTitle}");
     expect(appSource).toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
     expect(appSource).toContain('"(prefers-reduced-motion: reduce)"');
+    expect(appSource).not.toContain("reference-title-motion");
     expect(appSource).not.toContain("startViewTransition");
     expect(appSource).not.toContain("view-transition-name");
   });
@@ -198,7 +195,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('setRoutePhase("in")');
     expect(appSource).toContain('setRoutePhase("idle")');
     expect(appSource).toContain("window.setTimeout");
-    expect(appSource.match(/window\.setTimeout/gu)?.length).toBe(2);
+    expect(appComponentSource.match(/window\.setTimeout/gu)?.length).toBe(2);
     expect(appSource).toContain('transitionTo(currentPage(), "none")');
     expect(appSource).toContain('const navigate: Navigate = (nextPage) => transitionTo(nextPage, "push")');
     expect(appSource).toContain("window.history.pushState");

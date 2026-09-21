@@ -48,7 +48,7 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("moves the reference title without snapshot overshoot", () => {
+  test("fades the reference title without moving its endpoints", () => {
     expect(styles).toContain(".site-header-shell-sticky");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
@@ -57,8 +57,12 @@ describe("site design contract", () => {
     expect(styles).toContain("font-weight: 760");
     expect(styles).toContain("letter-spacing: -0.05em");
     expect(styles).toContain(".reference-page-title");
-    expect(styles).toContain(".reference-title-motion");
-    expect(styles).toContain("will-change: left, top, font-size");
+    expect(styles).toContain("animation: reference-title-fade-out 75ms var(--ease-out) both");
+    expect(styles).toContain("animation: reference-title-fade-in 75ms var(--ease-out) both");
+    expect(styles).toContain("@keyframes reference-title-fade-out");
+    expect(styles).toContain("@keyframes reference-title-fade-in");
+    expect(styles).not.toContain(".reference-title-motion");
+    expect(styles).not.toContain("will-change: left, top, font-size");
     expect(styles).not.toContain("view-transition-name: reference-page-title");
     expect(styles).not.toContain("::view-transition-group(reference-page-title)");
     expect(styles).not.toContain(".site-page-context");
