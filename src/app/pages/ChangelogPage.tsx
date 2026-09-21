@@ -9,24 +9,23 @@ type ChangelogSection = {
 
 type ChangelogDocument = {
   readonly title: string;
-  readonly intro: readonly string[];
   readonly sections: readonly ChangelogSection[];
 };
 
+const releaseHeading = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)? - \d{4}-\d{2}-\d{2}$/u;
+
 const parseChangelog = (source: string): ChangelogDocument => {
   const lines = source.split(/\r?\n/u);
-  const intro: string[] = [];
   const sections: ChangelogSection[] = [];
   let title = "Changelog";
   let heading: string | undefined;
   let items: string[] = [];
 
   const finishSection = () => {
-    if (heading === undefined) {
-      return;
+    if (heading !== undefined && releaseHeading.test(heading)) {
+      sections.push({ heading, items });
     }
 
-    sections.push({ heading, items });
     heading = undefined;
     items = [];
   };
@@ -43,22 +42,14 @@ const parseChangelog = (source: string): ChangelogDocument => {
       continue;
     }
 
-    if (line.startsWith("- ")) {
-      if (heading !== undefined) {
-        items.push(line.slice(2));
-      }
-
-      continue;
-    }
-
-    if (line.length > 0 && heading === undefined) {
-      intro.push(line);
+    if (line.startsWith("- ") && heading !== undefined) {
+      items.push(line.slice(2));
     }
   }
 
   finishSection();
 
-  return { title, intro, sections };
+  return { title, sections };
 };
 
 const inlineParts = (value: string): readonly string[] =>
@@ -80,11 +71,7 @@ export const ChangelogPage = () => (
   <main class="page-content content-shell">
     <article class="changelog-page">
       <header class="changelog-header">
-        <div class="eyebrow">Releases</div>
         <h1>{document.title}</h1>
-        <For each={document.intro}>
-          {(paragraph) => <p>{paragraph}</p>}
-        </For>
       </header>
 
       <For each={document.sections}>

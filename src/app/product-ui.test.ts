@@ -136,6 +136,13 @@ describe("browser product UI", () => {
     expect(appSource).toContain("birefnet-lite-512-ort-basic-webgpu-v2.onnx");
   });
 
+  test("shows only published release entries on the public changelog", () => {
+    expect(appSource).toContain("const releaseHeading");
+    expect(appSource).toContain("releaseHeading.test(heading)");
+    expect(appSource).not.toContain('<div class="eyebrow">Releases</div>');
+    expect(appSource).not.toContain("document.intro");
+  });
+
   test("uses one symmetric two-phase route transition for every internal page", () => {
     expect(appSource).toContain("const ROUTE_FADE_MS = 75");
     expect(appSource).toContain('type RouteTransitionPhase = "idle" | "out" | "in"');

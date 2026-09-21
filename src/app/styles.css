@@ -956,14 +956,6 @@ figure {
   font-weight: 760;
 }
 
-.changelog-header p {
-  max-width: 680px;
-  margin: 0 0 9px;
-  color: var(--ink-muted);
-  font-size: 13px;
-  line-height: 1.72;
-}
-
 .changelog-release {
   padding: 28px 0 31px;
   border-top: 1px solid var(--line);
