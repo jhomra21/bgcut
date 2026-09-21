@@ -189,6 +189,39 @@ const verifyDiscoveryFiles = async (): Promise<void> => {
   }
 };
 
+const verifySecurityHeaders = async (): Promise<void> => {
+  const response = await fetch(ORIGIN);
+  const csp = response.headers.get("content-security-policy") ?? "";
+
+  if (
+    response.headers.get("x-frame-options") !== "DENY" ||
+    response.headers.get("x-content-type-options") !== "nosniff" ||
+    response.headers.get("cross-origin-opener-policy") !== "same-origin" ||
+    response.headers.get("referrer-policy") !== "strict-origin-when-cross-origin" ||
+    response.headers.get("strict-transport-security") !== "max-age=31536000" ||
+    !csp.includes("default-src 'self'") ||
+    !csp.includes("frame-ancestors 'none'") ||
+    !csp.includes("object-src 'none'")
+  ) {
+    throw new Error("Hosted HTML is missing the expected security headers.");
+  }
+
+  const html = await response.text();
+  const stylesheetMatch = html.match(/href="(\/assets\/[^"]+\.css)"/u);
+  const stylesheetPath = stylesheetMatch?.[1];
+
+  if (stylesheetPath === undefined) {
+    throw new Error("Could not find the built stylesheet in the hosted HTML.");
+  }
+
+  const stylesheet = await fetch(`${ORIGIN}${stylesheetPath}`);
+  const cacheControl = stylesheet.headers.get("cache-control") ?? "";
+
+  if (!cacheControl.includes("max-age=31536000") || !cacheControl.includes("immutable")) {
+    throw new Error("Fingerprinted static assets are missing immutable browser caching.");
+  }
+};
+
 await rm(smokeState, { recursive: true, force: true });
 
 try {
@@ -238,7 +271,8 @@ try {
       "noindex, follow, max-image-preview:large",
     );
     await verifyDiscoveryFiles();
-    console.log("Cloudflare runtime and search-surface smoke passed.");
+    await verifySecurityHeaders();
+    console.log("Cloudflare runtime, search-surface, and security-header smoke passed.");
   } finally {
     worker.kill();
     await worker.exited;
