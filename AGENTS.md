@@ -59,7 +59,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - Keep model-specific behavior behind the inference boundary so the UI does not depend on ONNX details.
 - Keep public documentation focused on bgcut. Do not expose internal comparison-tool names or acceptance fixtures unless they become part of the public product contract.
 - Keep the normal browser UI limited to the user flow. Developer diagnostics and benchmark controls do not belong in the main product surface.
-- The hosted `/changelog` page must render from root `CHANGELOG.md`; do not duplicate release prose in app source.
+- The hosted `/changelog` page must render published release sections from root `CHANGELOG.md`; do not duplicate release prose in app source. Never render the `Unreleased` section or changelog intro copy on the public page.
 
 ## Web deployment policy
 
