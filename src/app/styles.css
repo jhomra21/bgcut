@@ -1136,9 +1136,6 @@ figure {
   }
 
   .site-nav {
-    --site-nav-docs-width: 1fr;
-    --site-nav-changelog-width: 1fr;
-    --site-nav-github-width: 1fr;
     width: 100%;
     max-width: 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1284,8 +1281,8 @@ figure {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-nav-indicator,
   .site-nav-indicator {
+    transition-duration: 120ms;
     transition-property: opacity;
   }
 
