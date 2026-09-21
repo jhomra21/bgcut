@@ -658,20 +658,14 @@ figure {
 }
 
 .section-rail-page-title {
-  min-height: 22px;
-  margin: 0 8px -2px;
+  min-height: 18px;
+  margin: 0 8px 2px;
   color: var(--ink);
   font-size: 18px;
-  font-weight: 730;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: -0.05em;
   white-space: nowrap;
-}
-
-.reference-page-title[data-title-active="true"],
-.section-rail-page-title[data-title-active="true"] {
-  visibility: visible;
-  view-transition-name: reference-page-title;
 }
 
 .reference-page-title[data-title-active="false"],
@@ -679,16 +673,14 @@ figure {
   visibility: hidden;
 }
 
-::view-transition-group(reference-page-title),
-::view-transition-old(reference-page-title),
-::view-transition-new(reference-page-title) {
-  animation-duration: 140ms;
-  animation-timing-function: var(--ease-out);
-}
-
-::view-transition-old(reference-page-title),
-::view-transition-new(reference-page-title) {
-  mix-blend-mode: normal;
+.reference-title-motion {
+  position: fixed;
+  z-index: 60;
+  display: inline-block;
+  margin: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: left, top, font-size;
 }
 
 .section-rail-group {
@@ -1333,12 +1325,6 @@ figure {
   .site-nav-indicator {
     transition-duration: 120ms;
     transition-property: opacity;
-  }
-
-  ::view-transition-group(reference-page-title),
-  ::view-transition-old(reference-page-title),
-  ::view-transition-new(reference-page-title) {
-    animation-duration: 0ms;
   }
 
   .drop-trigger,

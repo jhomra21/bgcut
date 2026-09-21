@@ -18,6 +18,7 @@ type SectionRailProps = {
   readonly pageTitle: string;
   readonly pageTitleVisible: boolean;
   readonly onPageTitleVisibilityChange: (visible: boolean) => void;
+  readonly onPageTitleElement: (element: HTMLSpanElement) => void;
   readonly groups: readonly SectionRailGroup[];
   readonly initialSectionId: string;
   readonly sectionSelector: string;
@@ -258,6 +259,9 @@ export const SectionRail = (props: SectionRailProps) => {
   return (
     <aside class="section-rail" aria-label={props.ariaLabel}>
       <span
+        ref={(element) => {
+          props.onPageTitleElement(element);
+        }}
         class="section-rail-page-title"
         data-title-active={props.pageTitleVisible ? "true" : "false"}
         aria-hidden={props.pageTitleVisible ? undefined : "true"}

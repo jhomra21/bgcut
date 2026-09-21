@@ -48,17 +48,19 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("morphs the reference title into a larger rail title in under 150ms", () => {
+  test("moves the reference title without snapshot overshoot", () => {
     expect(styles).toContain(".site-header-shell-sticky");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
     expect(styles).toContain(".section-rail-page-title");
     expect(styles).toContain("font-size: 18px");
+    expect(styles).toContain("font-weight: 760");
+    expect(styles).toContain("letter-spacing: -0.05em");
     expect(styles).toContain(".reference-page-title");
-    expect(styles).toContain('data-title-active="true"');
-    expect(styles).toContain("view-transition-name: reference-page-title");
-    expect(styles).toContain("::view-transition-group(reference-page-title)");
-    expect(styles).toContain("animation-duration: 140ms");
+    expect(styles).toContain(".reference-title-motion");
+    expect(styles).toContain("will-change: left, top, font-size");
+    expect(styles).not.toContain("view-transition-name: reference-page-title");
+    expect(styles).not.toContain("::view-transition-group(reference-page-title)");
     expect(styles).not.toContain(".site-page-context");
     expect(styles).toContain("top: 100px");
     expect(styles).toContain("scroll-margin-top: 154px");
