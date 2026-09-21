@@ -26,6 +26,7 @@ type SectionRailProps = {
 };
 
 const SECTION_SCROLL_MS = 120;
+
 const TITLE_REVEAL_GAP = 12;
 
 const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
