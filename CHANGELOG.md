@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Hardened Cloudflare production deploys so pinned ONNX Runtime assets are verified through the live runtime HEAD routes, unchanged objects skip R2 uploads, and changed or missing objects use bounded retry/backoff instead of failing on the first transient R2 API error.
+
 - Moved the compact Documentation/Changelog context label out of the sticky top bar and into the shared left reading rail, while keeping the rail geometry stable and removing the sticky header's scroll-time bottom border.
 
 - Moved Docs and Changelog section tracking into the upper third of the viewport so the rail reflects the section being read instead of activating a lower section too early, and pinned the bgcut logo, current page name, and main navigation while scrolling reference pages.
