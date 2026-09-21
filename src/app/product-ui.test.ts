@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 const appSourcePaths = [
   "./App.tsx",
+  "./components/ReferencePage.tsx",
   "./components/SectionRail.tsx",
   "./components/SiteChrome.tsx",
   "./navigation.ts",
@@ -182,9 +183,18 @@ describe("browser product UI", () => {
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
-  test("keeps the docs header as a single Documentation title", () => {
-    expect(appSource).toContain('<header class="docs-page-header">');
-    expect(appSource).toContain("<h1>Documentation</h1>");
+  test("keeps docs and changelog on one shared reference-page shell", () => {
+    expect(appSource).toContain('class="content-page reference-page');
+    expect(appSource).toContain('<header class="reference-page-header">');
+    expect(appSource).toContain('title="Documentation"');
+    expect(appSource).toContain("title={document.title}");
+    expect(appSource).toContain('pageClass="docs-page"');
+    expect(appSource).toContain('pageClass="changelog-page"');
+    expect(appSource).toContain('class="reference-section doc-section');
+    expect(appSource).toContain('class="reference-section changelog-release"');
+    expect(appSource).not.toContain('class="docs-page-header"');
+    expect(appSource).not.toContain('class="changelog-header"');
+    expect(appSource).not.toContain("<h1>Documentation</h1>");
     expect(appSource).not.toContain('<div class="eyebrow">Documentation</div>');
     expect(appSource).not.toContain("Browser, CLI and Node.js background removal");
     expect(appSource).not.toContain(
@@ -209,8 +219,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain("nextSection = section.id");
     expect(appSource).toContain('activeSection() === sectionId ? "location" : undefined');
     expect(appSource).toContain('window.addEventListener("scroll", pickActiveSection, { passive: true })');
-    expect(appSource).toContain('sectionSelector=".docs-page > section[id]"');
-    expect(appSource).toContain('sectionSelector=".changelog-page > section[id]"');
+    expect(appSource).toContain('sectionSelector=".reference-page > section[id]"');
+    expect(appSource.match(/sectionSelector="\.reference-page > section\[id\]"/gu)?.length).toBe(1);
   });
 
   test("lets each configured final section own the true manual page bottom", () => {
