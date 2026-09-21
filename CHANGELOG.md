@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Simplified the hosted Docs header to a single `Documentation` title, matching the Changelog page hierarchy and removing the redundant eyebrow, long heading, and intro sentence.
+
 - Stabilized the hosted top navigation so active tabs no longer change text width or shift the control, and added a shared pill that animates immediately between Docs and Changelog during route changes.
 
 - Improved search discoverability with descriptive visible page headings, route-specific HTML titles, descriptions, canonical URLs and robots directives, a focused sitemap, and WebApplication structured data for the free hosted background remover.
