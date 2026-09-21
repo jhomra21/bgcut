@@ -19,6 +19,9 @@ import { HomePage } from "./pages/HomePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
 
+const isReferencePage = (page: SitePage): boolean =>
+  page === "docs" || page === "changelog";
+
 const App = () => {
   if (isLocalRuntime()) {
     return (
@@ -35,6 +38,7 @@ const App = () => {
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [navPage, setNavPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
+  const [headerScrolled, setHeaderScrolled] = createSignal(false);
 
   applySiteMetadata(initialPage);
   let routeTarget = initialPage;
@@ -85,6 +89,7 @@ const App = () => {
       setPage(nextPage);
       applySiteMetadata(nextPage);
       window.scrollTo(0, 0);
+      setHeaderScrolled(false);
       setRoutePhase("in");
 
       transitionTimer = window.setTimeout(() => {
@@ -105,10 +110,17 @@ const App = () => {
       transitionTo(currentPage(), "none");
     };
 
+    const handleScroll = () => {
+      setHeaderScrolled(window.scrollY > 96);
+    };
+
     window.addEventListener("popstate", handlePopState);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("scroll", handleScroll);
       transitionVersion += 1;
       clearRouteTransition();
     };
@@ -116,8 +128,15 @@ const App = () => {
 
   return (
     <div class="site-root">
-      <div class="site-header-shell">
-        <SiteHeader page={navPage()} onNavigate={navigate} />
+      <div
+        class={`site-header-shell ${isReferencePage(navPage()) ? "site-header-shell-sticky" : ""}`}
+        data-scrolled={isReferencePage(navPage()) && headerScrolled() ? "true" : "false"}
+      >
+        <SiteHeader
+          page={navPage()}
+          onNavigate={navigate}
+          showPageContext={isReferencePage(navPage()) && headerScrolled()}
+        />
       </div>
 
       <div class={`route-stage route-stage-${routePhase()}`}>
