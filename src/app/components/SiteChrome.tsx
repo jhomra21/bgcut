@@ -18,9 +18,22 @@ export const LocalAppHeader = () => (
   </header>
 );
 
-export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
-  <header class="app-header">
-    <a
+export const SiteHeader = (props: {
+  readonly page: SitePage;
+  readonly onNavigate: Navigate;
+  readonly showPageContext: boolean;
+}) => {
+  const pageContext =
+    props.page === "docs"
+      ? "Documentation"
+      : props.page === "changelog"
+        ? "Changelog"
+        : "";
+
+  return (
+    <header class="app-header">
+      <div class="site-header-leading">
+        <a
       class="brand-link"
       href="/"
       aria-label="bgcut home"
@@ -44,7 +57,17 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         />
         <span>bgcut</span>
       </div>
-    </a>
+        </a>
+
+        <span
+          class="site-page-context"
+          data-reference={pageContext === "" ? "false" : "true"}
+          data-visible={props.showPageContext && pageContext !== "" ? "true" : "false"}
+          aria-hidden={!props.showPageContext || pageContext === ""}
+        >
+          {pageContext}
+        </span>
+      </div>
 
     <nav class="site-nav" aria-label="Main navigation" data-active={props.page}>
       <span class="site-nav-indicator" aria-hidden="true" />
@@ -82,8 +105,9 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         GitHub
       </a>
     </nav>
-  </header>
-);
+    </header>
+  );
+};
 
 export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
   <footer class="site-footer">
