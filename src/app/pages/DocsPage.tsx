@@ -304,12 +304,7 @@ export const DocsPage = () => (
 
       <article class="content-page docs-page">
         <header class="docs-page-header">
-          <div class="eyebrow">Documentation</div>
-          <h1>Browser, CLI and Node.js background removal</h1>
-          <p>
-            Use bgcut as a private browser background remover, a local command-line tool, or a
-            Node.js background removal API.
-          </p>
+          <h1>Documentation</h1>
         </header>
 
         <section id="quickstart" class="doc-section docs-quickstart">
