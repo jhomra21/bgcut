@@ -169,16 +169,22 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("site-page-context");
   });
 
-  test("keeps page context in the shared rail while the top chrome stays minimal", () => {
-    expect(appSource).toContain("const isReferencePage = (page: SitePage): boolean");
-    expect(appSource).toContain('"site-header-shell-sticky"');
-    expect(appSource).toContain("pageTitle={props.title}");
-    expect(appSource).toContain("const [showPageTitle, setShowPageTitle] = createSignal(false)");
-    expect(appSource).toContain("setShowPageTitle(window.scrollY > 96)");
+  test("moves the shared reference title between page and rail", () => {
+    expect(appSource).toContain("const [compactTitle, setCompactTitle] = createSignal(false)");
+    expect(appSource).toContain("startViewTransition");
+    expect(appSource).toContain("activeTitleTransition?.skipTransition()");
+    expect(appSource).toContain("pageTitleVisible={compactTitle()}");
+    expect(appSource).toContain("onPageTitleVisibilityChange={moveTitle}");
+    expect(appSource).toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
+    expect(appSource).toContain('class="reference-page-title"');
     expect(appSource).toContain('class="section-rail-page-title"');
-    expect(appSource).toContain('data-visible={showPageTitle() ? "true" : "false"}');
+    expect(appSource).toContain('data-title-active={compactTitle() ? "false" : "true"}');
+    expect(appSource).toContain(
+      'data-title-active={props.pageTitleVisible ? "true" : "false"}'
+    );
+    expect(appSource).toContain('"(prefers-reduced-motion: reduce)"');
+    expect(appSource).not.toContain("showPageTitle");
     expect(appSource).not.toContain("site-page-context");
-    expect(appSource).not.toContain("data-scrolled");
   });
 
   test("uses one symmetric two-phase route transition for every internal page", () => {
