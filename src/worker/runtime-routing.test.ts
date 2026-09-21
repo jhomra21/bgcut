@@ -35,6 +35,13 @@ describe("Cloudflare runtime routing", () => {
     expect(packageSource).toContain("cloudflare:model:local");
   });
 
+  test("ships static search metadata and discovery files through Cloudflare assets", () => {
+    expect(packageSource).toContain('"site:prepare-routes"');
+    expect(cloudflareBuildSource).toContain('"llms.txt"');
+    expect(cloudflareBuildSource).toContain('"docs.html"');
+    expect(cloudflareBuildSource).toContain('"changelog.html"');
+  });
+
   test("keeps discrete ONNX Runtime assets out of Workers Static Assets", () => {
     expect(cloudflareBuildSource).toContain("isOrtRuntimeAsset");
     expect(cloudflareBuildSource).toContain(
