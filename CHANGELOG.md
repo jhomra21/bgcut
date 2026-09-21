@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Enlarged the compact Documentation/Changelog rail title and turned the page-to-rail handoff into a 140ms shared-element transition that visibly moves and resizes the title in both directions, with an immediate reduced-motion fallback.
+
 - Hardened Cloudflare production deploys so pinned ONNX Runtime assets are verified through the live runtime HEAD routes, unchanged objects skip R2 uploads, and changed or missing objects use bounded retry/backoff instead of failing on the first transient R2 API error.
 
 - Moved the compact Documentation/Changelog context label out of the sticky top bar and into the shared left reading rail, while keeping the rail geometry stable and removing the sticky header's scroll-time bottom border.
