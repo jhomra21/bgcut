@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>bgcut — Remove backgrounds locally</title>
+    <title>Free Background Remover - Private & Local | bgcut</title>
     <meta
       name="description"
-      content="Remove image backgrounds locally in your browser with on-device WebGPU acceleration. Your images stay on your device."
+      content="Remove image backgrounds free in your browser. bgcut runs locally with WebGPU when available, supports PNG, JPEG, WebP and AVIF, and does not upload your images."
     />
     <meta name="application-name" content="bgcut" />
     <meta name="apple-mobile-web-app-title" content="bgcut" />
@@ -22,34 +22,54 @@
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="bgcut" />
-    <meta property="og:title" content="bgcut — Remove backgrounds locally" />
+    <meta property="og:title" content="Free Background Remover - Private & Local | bgcut" />
     <meta
       property="og:description"
-      content="Remove image backgrounds locally in your browser with on-device WebGPU acceleration. Your images stay on your device."
+      content="Remove image backgrounds free in your browser. bgcut runs locally with WebGPU when available, supports PNG, JPEG, WebP and AVIF, and does not upload your images."
     />
     <meta property="og:url" content="https://bgcut.dev/" />
     <meta property="og:image" content="https://bgcut.dev/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="bgcut" />
+    <meta property="og:image:alt" content="bgcut background remover" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="bgcut — Remove backgrounds locally" />
+    <meta name="twitter:title" content="Free Background Remover - Private & Local | bgcut" />
     <meta
       name="twitter:description"
-      content="Remove image backgrounds locally in your browser with on-device WebGPU acceleration. Your images stay on your device."
+      content="Remove image backgrounds free in your browser. bgcut runs locally with WebGPU when available, supports PNG, JPEG, WebP and AVIF, and does not upload your images."
     />
     <meta name="twitter:image" content="https://bgcut.dev/og-image.png" />
-    <meta name="twitter:image:alt" content="bgcut" />
+    <meta name="twitter:image:alt" content="bgcut background remover" />
 
-    <script type="application/ld+json">
+    <script id="site-structured-data" type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "bgcut",
-        "url": "https://bgcut.dev/",
-        "description": "Remove image backgrounds locally in your browser with on-device WebGPU acceleration.",
-        "image": "https://bgcut.dev/og-image.png"
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://bgcut.dev/#website",
+            "name": "bgcut",
+            "url": "https://bgcut.dev/",
+            "description": "Remove image backgrounds free in your browser. bgcut runs locally with WebGPU when available, supports PNG, JPEG, WebP and AVIF, and does not upload your images."
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://bgcut.dev/#app",
+            "name": "bgcut",
+            "url": "https://bgcut.dev/",
+            "description": "Remove image backgrounds free in your browser. bgcut runs locally with WebGPU when available, supports PNG, JPEG, WebP and AVIF, and does not upload your images.",
+            "applicationCategory": "DesignApplication",
+            "operatingSystem": "Any",
+            "image": "https://bgcut.dev/og-image.png",
+            "isAccessibleForFree": true,
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          }
+        ]
       }
     </script>
   </head>

@@ -12,6 +12,7 @@ const SITE_ROOT_FILES = [
   "favicon-48x48.png",
   "icon-192x192.png",
   "icon-512x512.png",
+  "llms.txt",
   "og-image.png",
   "robots.txt",
   "site.webmanifest",
@@ -72,6 +73,12 @@ if (oversized.length > 0) {
   throw new Error(
     `Cloudflare static assets must be at most ${CLOUDFLARE_ASSET_LIMIT_BYTES} bytes. Oversized files: ${oversized.join(", ")}`,
   );
+}
+
+for (const routePage of ["docs.html", "changelog.html", "privacy.html", "terms.html"]) {
+  if (!deployNames.includes(routePage)) {
+    throw new Error(`Cloudflare builds must include static metadata route ${routePage}.`);
+  }
 }
 
 if (deployNames.some((name) => name.startsWith("models/"))) {

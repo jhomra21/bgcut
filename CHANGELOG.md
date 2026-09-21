@@ -6,6 +6,9 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Improved search discoverability with descriptive visible page headings, route-specific HTML titles, descriptions, canonical URLs and robots directives, a focused sitemap, and WebApplication structured data for the free hosted background remover.
+- Reduced the hosted site's initial JavaScript by loading the browser inference stack only after image selection, raised secondary text contrast to meet WCAG AA on the site canvas, and added a root `llms.txt` discovery file for Lighthouse's Agentic Browsing audit.
+
 ## 0.4.0-beta.1 - 2026-09-20
 
 - Fixed the Node API error boundary so documented `BgcutError` instances reach callers directly instead of being wrapped as Effect `FiberFailure` objects. Malformed image bytes now reject with `BgcutError` and code `input` from both `removeBackground()` and reusable `createBgcut()` instances.

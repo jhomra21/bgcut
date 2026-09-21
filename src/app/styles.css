@@ -4,7 +4,7 @@
   --surface-subtle: #f6f6f3;
   --ink: #171717;
   --ink-muted: #666660;
-  --ink-soft: #85857e;
+  --ink-soft: #70706a;
   --line: #e5e5df;
   --line-strong: #d7d7d0;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -543,6 +543,27 @@ figure {
   padding-bottom: 48px;
 }
 
+.home-intro {
+  padding: 6px 0 20px;
+}
+
+.home-intro h1 {
+  max-width: 720px;
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: clamp(28px, 4.5vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  font-weight: 760;
+}
+
+.home-intro p {
+  max-width: 680px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 .content-layout {
   display: grid;
   grid-template-columns: 144px minmax(0, 1fr);
@@ -566,7 +587,7 @@ figure {
 
 .docs-sidebar-label {
   margin: 0 8px 5px;
-  color: #a0a09a;
+  color: var(--ink-soft);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -616,7 +637,7 @@ figure {
 
 .eyebrow {
   margin-bottom: 9px;
-  color: #85857e;
+  color: var(--ink-soft);
   font-size: 10px;
   font-weight: 680;
   letter-spacing: 0.08em;
@@ -641,6 +662,27 @@ figure {
   padding: 34px 0 38px;
   border-bottom: 1px solid var(--line);
   scroll-margin-top: 24px;
+}
+
+.docs-page-header {
+  padding: 24px 0 18px;
+}
+
+.docs-page-header h1 {
+  max-width: 680px;
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: clamp(30px, 4.5vw, 42px);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  font-weight: 760;
+}
+
+.docs-page-header p {
+  max-width: 680px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .docs-quickstart {
@@ -905,7 +947,7 @@ figure {
   padding: 8px 0 34px;
 }
 
-.changelog-header h2 {
+.changelog-header h1 {
   margin: 0 0 18px;
   color: var(--ink);
   font-size: clamp(38px, 6vw, 56px);
@@ -964,7 +1006,7 @@ figure {
   padding: 50px 0 72px;
 }
 
-.legal-page > h2 {
+.legal-page > h1 {
   max-width: 680px;
   margin: 0;
   color: var(--ink);
@@ -1039,6 +1081,15 @@ figure {
 
   .brand-title {
     font-size: 25px;
+  }
+
+  .home-intro {
+    padding-top: 2px;
+  }
+
+  .home-intro h1,
+  .docs-page-header h1 {
+    font-size: 30px;
   }
 
   .brand-mark {
@@ -1128,7 +1179,7 @@ figure {
   }
 
   .changelog-header h2,
-  .legal-page > h2 {
+  .legal-page > h1 {
     font-size: clamp(34px, 11vw, 48px);
   }
 

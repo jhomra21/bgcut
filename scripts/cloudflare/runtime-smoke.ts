@@ -141,6 +141,54 @@ const verifyModuleResponse = async (): Promise<void> => {
   }
 };
 
+const verifySitePage = async (
+  pathname: string,
+  expectedTitle: string,
+  expectedCanonical: string,
+  expectedRobots: string,
+): Promise<void> => {
+  const response = await fetch(`${ORIGIN}${pathname}`);
+
+  if (!response.ok) {
+    throw new Error(`${pathname} returned HTTP ${response.status}.`);
+  }
+
+  const html = await response.text();
+
+  if (
+    !html.includes(`<title>${expectedTitle}</title>`) ||
+    !html.includes(`rel="canonical" href="${expectedCanonical}"`) ||
+    !html.includes(`name="robots" content="${expectedRobots}"`)
+  ) {
+    throw new Error(`${pathname} did not serve its route-specific search metadata.`);
+  }
+};
+
+const verifyDiscoveryFiles = async (): Promise<void> => {
+  const llms = await fetch(`${ORIGIN}/llms.txt`);
+  const llmsBody = await llms.text();
+
+  if (
+    !llms.ok ||
+    !llmsBody.startsWith("# bgcut") ||
+    !llmsBody.includes("[Documentation](https://bgcut.dev/docs)")
+  ) {
+    throw new Error("llms.txt is missing its heading or discovery links.");
+  }
+
+  const sitemap = await fetch(`${ORIGIN}/sitemap.xml`);
+  const sitemapBody = await sitemap.text();
+
+  if (
+    !sitemap.ok ||
+    !sitemapBody.includes("<loc>https://bgcut.dev/changelog</loc>") ||
+    sitemapBody.includes("<loc>https://bgcut.dev/privacy</loc>") ||
+    sitemapBody.includes("<loc>https://bgcut.dev/terms</loc>")
+  ) {
+    throw new Error("sitemap.xml does not match the indexable site routes.");
+  }
+};
+
 await rm(smokeState, { recursive: true, force: true });
 
 try {
@@ -171,7 +219,26 @@ try {
     await verifyWasmResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
     await verifyWasmResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
     await verifyModuleResponse();
-    console.log("Cloudflare R2 runtime smoke passed.");
+    await verifySitePage(
+      "/docs",
+      "bgcut Docs - Browser, CLI and Node.js Background Removal",
+      "https://bgcut.dev/docs",
+      "index, follow, max-image-preview:large",
+    );
+    await verifySitePage(
+      "/changelog",
+      "bgcut Changelog - Releases and API Changes",
+      "https://bgcut.dev/changelog",
+      "index, follow, max-image-preview:large",
+    );
+    await verifySitePage(
+      "/privacy",
+      "Privacy | bgcut",
+      "https://bgcut.dev/privacy",
+      "noindex, follow, max-image-preview:large",
+    );
+    await verifyDiscoveryFiles();
+    console.log("Cloudflare runtime and search-surface smoke passed.");
   } finally {
     worker.kill();
     await worker.exited;

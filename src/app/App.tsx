@@ -13,6 +13,7 @@ import {
   type SitePage,
 } from "./navigation";
 import { ChangelogPage } from "./pages/ChangelogPage";
+import { applySiteMetadata } from "./site-metadata";
 import { DocsPage } from "./pages/DocsPage";
 import { HomePage } from "./pages/HomePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -33,6 +34,8 @@ const App = () => {
   const initialPage = currentPage();
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
+
+  applySiteMetadata(initialPage);
   let routeTarget = initialPage;
   let transitionTimer: number | undefined;
   let transitionVersion = 0;
@@ -78,6 +81,7 @@ const App = () => {
       }
 
       setPage(nextPage);
+      applySiteMetadata(nextPage);
       window.scrollTo(0, 0);
       setRoutePhase("in");
 
@@ -124,7 +128,7 @@ const App = () => {
                 <Show
                   when={page() === "privacy"}
                   fallback={
-                    <Show when={page() === "terms"} fallback={<HomePage />}>
+                    <Show when={page() === "terms"} fallback={<HomePage showIntro />}>
                       <TermsPage />
                     </Show>
                   }

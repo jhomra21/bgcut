@@ -1,11 +1,7 @@
-import { Effect } from "effect";
 import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
 import ComparisonSlider from "../components/ComparisonSlider";
-import { formatBackgroundRemovalError, formatImageError } from "../../browser/errors";
-import { removeBackground } from "../../browser/inference";
-import { decodeImage } from "../../browser/image";
 
 type ReadyImage = {
   readonly status: "ready";
@@ -33,6 +29,16 @@ type ResultState =
   | ReadyResult
   | { readonly status: "error"; readonly message: string };
 
+type BrowserActions = typeof import("../../browser/actions");
+
+let browserActionsPromise: Promise<BrowserActions> | undefined;
+
+const loadBrowserActions = (): Promise<BrowserActions> => {
+  browserActionsPromise ??= import("../../browser/actions");
+
+  return browserActionsPromise;
+};
+
 const transparentName = (fileName: string): string => {
   const lastDot = fileName.lastIndexOf(".");
   const baseName = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
@@ -40,7 +46,7 @@ const transparentName = (fileName: string): string => {
   return `${baseName || "image"}-transparent.png`;
 };
 
-export const HomePage = () => {
+export const HomePage = (props: { readonly showIntro?: boolean }) => {
   const [imageState, setImageState] = createSignal<ImageState>({ status: "empty" });
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
   const [copyState, setCopyState] = createSignal<"idle" | "copied" | "error">("idle");
@@ -107,30 +113,35 @@ export const HomePage = () => {
   const runRemoval = (file: File, version: number) => {
     setResultState({ status: "processing" });
 
-    void Effect.runPromise(
-      removeBackground(file).pipe(
-        Effect.match({
-          onFailure: (error) => {
-            if (version === selectionVersion) {
-              setResultState({ status: "error", message: formatBackgroundRemovalError(error) });
-            }
-          },
-          onSuccess: (result) => {
-            if (version !== selectionVersion) {
-              return;
-            }
+    void loadBrowserActions()
+      .then((actions) => actions.removeBrowserBackground(file))
+      .then((outcome) => {
+        if (version !== selectionVersion) {
+          return;
+        }
 
-            activeResultUrl = URL.createObjectURL(result.blob);
-            setResultState({
-              status: "ready",
-              blob: result.blob,
-              url: activeResultUrl,
-              downloadName: transparentName(file.name),
-            });
-          },
-        }),
-      ),
-    );
+        if (!outcome.ok) {
+          setResultState({ status: "error", message: outcome.message });
+
+          return;
+        }
+
+        activeResultUrl = URL.createObjectURL(outcome.result.blob);
+        setResultState({
+          status: "ready",
+          blob: outcome.result.blob,
+          url: activeResultUrl,
+          downloadName: transparentName(file.name),
+        });
+      })
+      .catch(() => {
+        if (version === selectionVersion) {
+          setResultState({
+            status: "error",
+            message: "Background removal could not start in this browser.",
+          });
+        }
+      });
   };
 
   const selectImage = (file: File) => {
@@ -150,33 +161,38 @@ export const HomePage = () => {
 
     activeSourceFile = undefined;
 
-    void Effect.runPromise(
-      decodeImage(file).pipe(
-        Effect.match({
-          onFailure: (error) => {
-            if (version === selectionVersion) {
-              setImageState({ status: "error", message: formatImageError(error) });
-            }
-          },
-          onSuccess: (dimensions) => {
-            if (version !== selectionVersion) {
-              return;
-            }
+    void loadBrowserActions()
+      .then((actions) => actions.decodeBrowserImage(file))
+      .then((outcome) => {
+        if (version !== selectionVersion) {
+          return;
+        }
 
-            activeSourceUrl = URL.createObjectURL(file);
-            activeSourceFile = file;
-            setImageState({
-              status: "ready",
-              width: dimensions.width,
-              height: dimensions.height,
-              name: file.name,
-              url: activeSourceUrl,
-            });
-            runRemoval(file, version);
-          },
-        }),
-      ),
-    );
+        if (!outcome.ok) {
+          setImageState({ status: "error", message: outcome.message });
+
+          return;
+        }
+
+        activeSourceUrl = URL.createObjectURL(file);
+        activeSourceFile = file;
+        setImageState({
+          status: "ready",
+          width: outcome.dimensions.width,
+          height: outcome.dimensions.height,
+          name: file.name,
+          url: activeSourceUrl,
+        });
+        runRemoval(file, version);
+      })
+      .catch(() => {
+        if (version === selectionVersion) {
+          setImageState({
+            status: "error",
+            message: "This image could not be opened in the browser.",
+          });
+        }
+      });
   };
 
   const copyResult = (result: ReadyResult) => {
@@ -371,6 +387,16 @@ export const HomePage = () => {
 
   return (
     <main class="page-content home-shell">
+      <Show when={props.showIntro}>
+        <header class="home-intro">
+          <h1>Remove image backgrounds locally</h1>
+          <p>
+            Free, private background remover for PNG, JPEG, WebP, and AVIF. Processing runs in
+            your browser with WebGPU when available, and your images stay on your device.
+          </p>
+        </header>
+      </Show>
+
       <section
         class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
         onClick={handleSurfaceClick}

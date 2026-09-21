@@ -33,7 +33,7 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         props.onNavigate("home");
       }}
     >
-      <h1 class="brand-title">
+      <div class="brand-title">
         <img
           class="brand-mark"
           src="/favicon-48x48.png?v=2"
@@ -43,7 +43,7 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
           aria-hidden="true"
         />
         <span>bgcut</span>
-      </h1>
+      </div>
     </a>
 
     <nav class="site-nav" aria-label="Main navigation">
