@@ -2,7 +2,7 @@ export const TermsPage = () => (
   <main class="page-content legal-shell">
     <article class="legal-page">
       <div class="eyebrow">Terms</div>
-      <h2>Terms of use</h2>
+      <h1>Terms of use</h1>
       <p class="legal-updated">Last updated September 19, 2026</p>
 
       <section>
