@@ -1,8 +1,8 @@
 import { For, Show } from "@solidjs/web";
 
 import changelogSource from "../../../CHANGELOG.md?raw";
+import { ReferencePage } from "../components/ReferencePage";
 import {
-  SectionRail,
   type SectionRailGroup,
   type SectionRailItem,
 } from "../components/SectionRail";
@@ -107,24 +107,18 @@ const oldestReleaseId =
   document.sections[document.sections.length - 1]?.id ?? latestReleaseId;
 
 export const ChangelogPage = () => (
-  <main class="page-content content-shell">
-    <div class="content-layout">
-      <SectionRail
-        ariaLabel="Changelog releases"
-        groups={releaseGroups}
-        initialSectionId={latestReleaseId}
-        sectionSelector=".changelog-page > section[id]"
-        bottomSectionId={oldestReleaseId}
-      />
-
-      <article class="content-page changelog-page">
-        <header class="changelog-header">
-          <h1>{document.title}</h1>
-        </header>
+  <ReferencePage
+    title={document.title}
+    pageClass="changelog-page"
+    railAriaLabel="Changelog releases"
+    railGroups={releaseGroups}
+    initialSectionId={latestReleaseId}
+    bottomSectionId={oldestReleaseId}
+  >
 
         <For each={document.sections}>
           {(section) => (
-            <section id={section.id} class="changelog-release">
+            <section id={section.id} class="reference-section changelog-release">
               <h3>{section.heading}</h3>
               <Show when={section.items.length > 0}>
                 <ul>
@@ -136,7 +130,5 @@ export const ChangelogPage = () => (
             </section>
           )}
         </For>
-      </article>
-    </div>
-  </main>
+  </ReferencePage>
 );

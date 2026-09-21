@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Unified the hosted Docs and Changelog page shell so both use the same title position, typography, content width, release/section spacing, separators, reading rail placement, and responsive layout.
+
 - Reused the Docs reading rail on Changelog so each published release is navigable from the same sticky desktop and horizontal mobile rail, with shared scroll tracking, click animation, reduced-motion handling, and active-section behavior.
 
 - Simplified the hosted Docs header to a single `Documentation` title, matching the Changelog page hierarchy and removing the redundant eyebrow, long heading, and intro sentence.

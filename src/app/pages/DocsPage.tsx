@@ -1,4 +1,5 @@
-import { SectionRail, type SectionRailGroup } from "../components/SectionRail";
+import { ReferencePage } from "../components/ReferencePage";
+import type { SectionRailGroup } from "../components/SectionRail";
 
 const DOC_SECTION_GROUPS: readonly SectionRailGroup[] = [
   {
@@ -27,22 +28,16 @@ const DOC_SECTION_GROUPS: readonly SectionRailGroup[] = [
 ];
 
 export const DocsPage = () => (
-  <main class="page-content content-shell">
-    <div class="content-layout">
-      <SectionRail
-        ariaLabel="Documentation sections"
-        groups={DOC_SECTION_GROUPS}
-        initialSectionId="quickstart"
-        sectionSelector=".docs-page > section[id]"
-        bottomSectionId="resources"
-      />
+  <ReferencePage
+    title="Documentation"
+    pageClass="docs-page"
+    railAriaLabel="Documentation sections"
+    railGroups={DOC_SECTION_GROUPS}
+    initialSectionId="quickstart"
+    bottomSectionId="resources"
+  >
 
-      <article class="content-page docs-page">
-        <header class="docs-page-header">
-          <h1>Documentation</h1>
-        </header>
-
-        <section id="quickstart" class="doc-section docs-quickstart">
+        <section id="quickstart" class="reference-section doc-section docs-quickstart">
           <h3>Quickstart</h3>
           <p>Run the local web app from npm without installing bgcut globally:</p>
           <pre class="code-block"><code>npx bgcut</code></pre>
@@ -52,7 +47,7 @@ export const DocsPage = () => (
           </p>
         </section>
 
-        <section id="web-ui" class="doc-section">
+        <section id="web-ui" class="reference-section doc-section">
           <h3>Web UI</h3>
           <p>
             Choose, drag, or paste an image. bgcut removes the background in the browser. Use the
@@ -75,7 +70,7 @@ export const DocsPage = () => (
           </p>
         </section>
 
-        <section id="local-app" class="doc-section">
+        <section id="local-app" class="reference-section doc-section">
           <h3>Local app</h3>
           <p>
             Run bgcut with no image to start the packaged remover on <code>127.0.0.1</code>.
@@ -107,7 +102,7 @@ bgcut serve --json`}</code></pre>
           </p>
         </section>
 
-        <section id="cli" class="doc-section">
+        <section id="cli" class="reference-section doc-section">
           <h3>CLI</h3>
           <p>
             Pass one image path to run headless removal. By default, bgcut writes
@@ -151,7 +146,7 @@ bgcut photo.jpg --cpu`}</code></pre>
           </p>
         </section>
 
-        <section id="node-api" class="doc-section">
+        <section id="node-api" class="reference-section doc-section">
           <h3>Node API</h3>
           <p>
             During 0.4 beta validation, install <code>bgcut@beta</code>. Stable installs remain on
@@ -226,7 +221,7 @@ try {
           </p>
         </section>
 
-        <section id="model" class="doc-section">
+        <section id="model" class="reference-section doc-section">
           <h3>Model and runtime</h3>
           <p class="docs-section-summary">
             The model input is 512 x 512. bgcut restores the matte to the source image size before
@@ -269,7 +264,7 @@ try {
           </p>
         </section>
 
-        <section id="architecture" class="doc-section">
+        <section id="architecture" class="reference-section doc-section">
           <h3>Architecture</h3>
           <p class="docs-section-summary">
             Both runtime paths use the same 512 x 512 model and composite the matte at the source
@@ -301,7 +296,7 @@ try {
           </p>
         </section>
 
-        <section id="resources" class="doc-section">
+        <section id="resources" class="reference-section doc-section">
           <h3>Resources</h3>
           <div class="link-list">
             <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub repository</a>
@@ -311,7 +306,5 @@ try {
             <a href="https://github.com/jhomra21/bgcut/blob/main/README.md" target="_blank" rel="noreferrer">README</a>
           </div>
         </section>
-      </article>
-    </div>
-  </main>
+  </ReferencePage>
 );
