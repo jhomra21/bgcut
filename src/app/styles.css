@@ -668,19 +668,45 @@ figure {
   white-space: nowrap;
 }
 
+.reference-page-title,
+.section-rail-page-title {
+  opacity: 1;
+}
+
 .reference-page-title[data-title-active="false"],
 .section-rail-page-title[data-title-active="false"] {
   visibility: hidden;
+  opacity: 0;
 }
 
-.reference-title-motion {
-  position: fixed;
-  z-index: 60;
-  display: inline-block;
-  margin: 0;
-  white-space: nowrap;
-  pointer-events: none;
-  will-change: left, top, font-size;
+.reference-page-title[data-title-active="true"][data-title-phase="out"],
+.section-rail-page-title[data-title-active="true"][data-title-phase="out"] {
+  animation: reference-title-fade-out 75ms var(--ease-out) both;
+}
+
+.reference-page-title[data-title-active="true"][data-title-phase="in"],
+.section-rail-page-title[data-title-active="true"][data-title-phase="in"] {
+  animation: reference-title-fade-in 75ms var(--ease-out) both;
+}
+
+@keyframes reference-title-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes reference-title-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .section-rail-group {
