@@ -20,6 +20,7 @@ export const ReferencePage = (props: ReferencePageProps) => (
     <div class="content-layout">
       <SectionRail
         ariaLabel={props.railAriaLabel}
+        pageTitle={props.title}
         groups={props.railGroups}
         initialSectionId={props.initialSectionId}
         sectionSelector=".reference-page > section[id]"

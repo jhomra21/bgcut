@@ -60,38 +60,6 @@ figure {
   margin-bottom: 18px;
 }
 
-.site-header-leading {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.site-page-context {
-  min-width: 94px;
-  border-left: 1px solid var(--line);
-  color: var(--ink-muted);
-  padding-left: 14px;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.2;
-  opacity: 0;
-  transform: translateY(2px);
-  transition:
-    opacity 140ms ease,
-    transform 160ms var(--ease-out);
-  white-space: nowrap;
-}
-
-.site-page-context[data-reference="false"] {
-  display: none;
-}
-
-.site-page-context[data-visible="true"] {
-  opacity: 1;
-  transform: translateY(0);
-}
-
 .brand-title {
   display: inline-flex;
   align-items: center;
@@ -598,14 +566,9 @@ figure {
   bottom: 0;
   left: 50%;
   width: 100vw;
-  border-bottom: 1px solid transparent;
   background: rgba(251, 251, 250, 0.94);
   backdrop-filter: blur(14px);
   transform: translateX(-50%);
-}
-
-.site-header-shell-sticky[data-scrolled="true"]::before {
-  border-bottom-color: var(--line);
 }
 
 .site-header-shell-sticky .app-header {
@@ -692,6 +655,22 @@ figure {
 
 .section-rail::-webkit-scrollbar {
   display: none;
+}
+
+.section-rail-page-title {
+  min-height: 18px;
+  margin: 0 8px -4px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 1.35;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  white-space: nowrap;
+}
+
+.section-rail-page-title[data-visible="true"] {
+  opacity: 1;
 }
 
 .section-rail-group {
@@ -1216,19 +1195,6 @@ figure {
     margin-bottom: 0;
   }
 
-  .site-header-leading {
-    width: 100%;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .site-page-context {
-    min-width: 0;
-    border-left: 0;
-    padding-left: 0;
-    text-align: right;
-  }
-
   .content-layout {
     display: block;
   }
@@ -1251,6 +1217,13 @@ figure {
 
   .section-rail::-webkit-scrollbar {
     display: none;
+  }
+
+  .section-rail-page-title {
+    min-height: 0;
+    flex: 0 0 auto;
+    margin: 0 4px 0 0;
+    padding: 6px 8px;
   }
 
   .section-rail-group {
@@ -1339,7 +1312,7 @@ figure {
 
 @media (prefers-reduced-motion: reduce) {
   .site-nav-indicator,
-  .site-page-context {
+  .section-rail-page-title {
     transition-duration: 120ms;
     transition-property: opacity;
   }
