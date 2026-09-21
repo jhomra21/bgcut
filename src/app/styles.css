@@ -710,24 +710,16 @@ figure {
 }
 
 .docs-page-header {
-  padding: 24px 0 18px;
+  padding: 8px 0 34px;
 }
 
 .docs-page-header h1 {
-  max-width: 680px;
-  margin: 0 0 10px;
+  margin: 0;
   color: var(--ink);
-  font-size: clamp(30px, 4.5vw, 42px);
-  line-height: 1.05;
-  letter-spacing: -0.045em;
+  font-size: clamp(38px, 6vw, 56px);
+  line-height: 1;
+  letter-spacing: -0.05em;
   font-weight: 760;
-}
-
-.docs-page-header p {
-  max-width: 680px;
-  color: var(--ink-muted);
-  font-size: 13px;
-  line-height: 1.7;
 }
 
 .docs-quickstart {
@@ -1124,9 +1116,13 @@ figure {
     padding-top: 2px;
   }
 
-  .home-intro h1,
-  .docs-page-header h1 {
+  .home-intro h1 {
     font-size: 30px;
+  }
+
+  .docs-page-header h1,
+  .changelog-header h1 {
+    font-size: clamp(34px, 11vw, 48px);
   }
 
   .brand-mark {
