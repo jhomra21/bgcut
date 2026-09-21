@@ -163,20 +163,22 @@ describe("browser product UI", () => {
     expect(appSource).toContain('class="site-nav-github"');
     expect(appSource).toContain("const [navPage, setNavPage] = createSignal<SitePage>(initialPage)");
     expect(appSource).toContain("setNavPage(nextPage)");
-    expect(appSource).toContain("const [headerScrolled, setHeaderScrolled] = createSignal(false)");
-    expect(appSource).toContain("setHeaderScrolled(window.scrollY > 96)");
-    expect(appSource).toContain('class="site-page-context"');
-    expect(appSource).toContain('data-visible={props.showPageContext && pageContext !== "" ? "true" : "false"}');
-    expect(appSource).toContain("showPageContext={isReferencePage(navPage()) && headerScrolled()}");
+    expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
+    expect(appSource).not.toContain("headerScrolled");
+    expect(appSource).not.toContain("showPageContext");
+    expect(appSource).not.toContain("site-page-context");
   });
 
-  test("pins reference-page chrome after scrolling", () => {
+  test("keeps page context in the shared rail while the top chrome stays minimal", () => {
     expect(appSource).toContain("const isReferencePage = (page: SitePage): boolean");
     expect(appSource).toContain('"site-header-shell-sticky"');
-    expect(appSource).toContain('data-scrolled={isReferencePage(navPage()) && headerScrolled() ? "true" : "false"}');
-    expect(appSource).toContain('window.addEventListener("scroll", handleScroll, { passive: true })');
-    expect(appSource).toContain("Documentation");
-    expect(appSource).toContain("Changelog");
+    expect(appSource).toContain("pageTitle={props.title}");
+    expect(appSource).toContain("const [showPageTitle, setShowPageTitle] = createSignal(false)");
+    expect(appSource).toContain("setShowPageTitle(window.scrollY > 96)");
+    expect(appSource).toContain('class="section-rail-page-title"');
+    expect(appSource).toContain('data-visible={showPageTitle() ? "true" : "false"}');
+    expect(appSource).not.toContain("site-page-context");
+    expect(appSource).not.toContain("data-scrolled");
   });
 
   test("uses one symmetric two-phase route transition for every internal page", () => {
@@ -192,7 +194,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("window.history.pushState");
     expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
     expect(appSource).toContain("route-stage route-stage-");
-    expect(appSource).toContain("showPageContext={isReferencePage(navPage()) && headerScrolled()}");
+    expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
     expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
   });
 
