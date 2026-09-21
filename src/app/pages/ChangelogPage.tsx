@@ -1,8 +1,15 @@
 import { For, Show } from "@solidjs/web";
 
 import changelogSource from "../../../CHANGELOG.md?raw";
+import {
+  SectionRail,
+  type SectionRailGroup,
+  type SectionRailItem,
+} from "../components/SectionRail";
 
 type ChangelogSection = {
+  readonly id: string;
+  readonly version: string;
   readonly heading: string;
   readonly items: readonly string[];
 };
@@ -14,6 +21,9 @@ type ChangelogDocument = {
 
 const releaseHeading = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)? - \d{4}-\d{2}-\d{2}$/u;
 
+const releaseId = (version: string): string =>
+  `release-${version.replaceAll(".", "-")}`;
+
 const parseChangelog = (source: string): ChangelogDocument => {
   const lines = source.split(/\r?\n/u);
   const sections: ChangelogSection[] = [];
@@ -23,7 +33,15 @@ const parseChangelog = (source: string): ChangelogDocument => {
 
   const finishSection = () => {
     if (heading !== undefined && releaseHeading.test(heading)) {
-      sections.push({ heading, items });
+      const separatorIndex = heading.indexOf(" - ");
+      const version = separatorIndex < 0 ? heading : heading.slice(0, separatorIndex);
+
+      sections.push({
+        id: releaseId(version),
+        version,
+        heading,
+        items,
+      });
     }
 
     heading = undefined;
@@ -66,28 +84,57 @@ const InlineText = (props: { readonly text: string }) => (
 );
 
 const document = parseChangelog(changelogSource);
+const releaseItems: SectionRailItem[] = [];
+
+for (const section of document.sections) {
+  releaseItems.push({
+    id: section.id,
+    label: section.version,
+  });
+}
+
+const releaseGroups: readonly SectionRailGroup[] = [
+  {
+    label: "Releases",
+    items: releaseItems,
+  },
+];
+
+const latestReleaseId = document.sections[0]?.id ?? "release";
+const oldestReleaseId =
+  document.sections[document.sections.length - 1]?.id ?? latestReleaseId;
 
 export const ChangelogPage = () => (
   <main class="page-content content-shell">
-    <article class="changelog-page">
-      <header class="changelog-header">
-        <h1>{document.title}</h1>
-      </header>
+    <div class="content-layout">
+      <SectionRail
+        ariaLabel="Changelog releases"
+        groups={releaseGroups}
+        initialSectionId={latestReleaseId}
+        sectionSelector=".changelog-page > section[id]"
+        bottomSectionId={oldestReleaseId}
+      />
 
-      <For each={document.sections}>
-        {(section) => (
-          <section class="changelog-release">
-            <h3>{section.heading}</h3>
-            <Show when={section.items.length > 0}>
-              <ul>
-                <For each={section.items}>
-                  {(item) => <li><InlineText text={item} /></li>}
-                </For>
-              </ul>
-            </Show>
-          </section>
-        )}
-      </For>
-    </article>
+      <article class="content-page changelog-page">
+        <header class="changelog-header">
+          <h1>{document.title}</h1>
+        </header>
+
+        <For each={document.sections}>
+          {(section) => (
+            <section id={section.id} class="changelog-release">
+              <h3>{section.heading}</h3>
+              <Show when={section.items.length > 0}>
+                <ul>
+                  <For each={section.items}>
+                    {(item) => <li><InlineText text={item} /></li>}
+                  </For>
+                </ul>
+              </Show>
+            </section>
+          )}
+        </For>
+      </article>
+    </div>
   </main>
 );
