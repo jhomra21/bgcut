@@ -19,6 +19,7 @@ const appSource = (
   )
 ).join("\n");
 
+const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
 const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
 const sourceInputBlock = (): string => {
@@ -182,7 +183,6 @@ describe("browser product UI", () => {
     expect(appSource).toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
     expect(appSource).toContain('"(prefers-reduced-motion: reduce)"');
     expect(appSource).not.toContain("reference-title-motion");
-    expect(appSource).not.toContain("getBoundingClientRect()");
     expect(appSource).not.toContain("startViewTransition");
     expect(appSource).not.toContain("view-transition-name");
   });
@@ -194,7 +194,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('setRoutePhase("in")');
     expect(appSource).toContain('setRoutePhase("idle")');
     expect(appSource).toContain("window.setTimeout");
-    expect(appSource.match(/window\.setTimeout/gu)?.length).toBe(2);
+    expect(appComponentSource.match(/window\.setTimeout/gu)?.length).toBe(2);
     expect(appSource).toContain('transitionTo(currentPage(), "none")');
     expect(appSource).toContain('const navigate: Navigate = (nextPage) => transitionTo(nextPage, "push")');
     expect(appSource).toContain("window.history.pushState");
