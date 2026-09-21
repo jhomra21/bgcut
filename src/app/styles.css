@@ -659,6 +659,7 @@ figure {
 
 .section-rail-page-title {
   min-height: 18px;
+  margin-block: 0;
   margin: 0 8px 2px;
   color: var(--ink);
   font-size: 18px;
@@ -666,47 +667,6 @@ figure {
   line-height: 1;
   letter-spacing: -0.05em;
   white-space: nowrap;
-}
-
-.reference-page-title,
-.section-rail-page-title {
-  opacity: 1;
-}
-
-.reference-page-title[data-title-active="false"],
-.section-rail-page-title[data-title-active="false"] {
-  visibility: hidden;
-  opacity: 0;
-}
-
-.reference-page-title[data-title-active="true"][data-title-phase="out"],
-.section-rail-page-title[data-title-active="true"][data-title-phase="out"] {
-  animation: reference-title-fade-out 75ms var(--ease-out) both;
-}
-
-.reference-page-title[data-title-active="true"][data-title-phase="in"],
-.section-rail-page-title[data-title-active="true"][data-title-phase="in"] {
-  animation: reference-title-fade-in 75ms var(--ease-out) both;
-}
-
-@keyframes reference-title-fade-out {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes reference-title-fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
 }
 
 .section-rail-group {
@@ -785,19 +745,6 @@ figure {
 .docs-related a:hover {
   color: var(--ink);
   text-decoration-color: var(--ink);
-}
-
-.reference-page-header {
-  padding: 8px 0 34px;
-}
-
-.reference-page-title {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(38px, 6vw, 56px);
-  line-height: 1;
-  letter-spacing: -0.05em;
-  font-weight: 760;
 }
 
 .reference-section {
@@ -1174,10 +1121,6 @@ figure {
     font-size: 30px;
   }
 
-  .reference-page-title {
-    font-size: clamp(34px, 11vw, 48px);
-  }
-
   .brand-mark {
     width: 29px;
     height: 29px;
@@ -1292,7 +1235,6 @@ figure {
     padding-top: 24px;
   }
 
-  .reference-page-title,
   .legal-page > h1 {
     font-size: clamp(34px, 11vw, 48px);
   }
