@@ -303,6 +303,15 @@ export const DocsPage = () => (
       <DocsSidebar />
 
       <article class="content-page docs-page">
+        <header class="docs-page-header">
+          <div class="eyebrow">Documentation</div>
+          <h1>Browser, CLI and Node.js background removal</h1>
+          <p>
+            Use bgcut as a private browser background remover, a local command-line tool, or a
+            Node.js background removal API.
+          </p>
+        </header>
+
         <section id="quickstart" class="doc-section docs-quickstart">
           <h3>Quickstart</h3>
           <p>Run the local web app from npm without installing bgcut globally:</p>
