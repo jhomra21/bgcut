@@ -20,6 +20,7 @@ const appSource = (
 ).join("\n");
 
 const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
+
 const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
 const sourceInputBlock = (): string => {
