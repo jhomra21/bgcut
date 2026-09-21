@@ -38,6 +38,7 @@ export const ReferencePage = (props: ReferencePageProps) => {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
+    // SAFETY: The optional member is feature-checked before use and falls back to an immediate state update.
     const transitionDocument = document as ViewTransitionDocument;
     const startViewTransition = transitionDocument.startViewTransition;
 
