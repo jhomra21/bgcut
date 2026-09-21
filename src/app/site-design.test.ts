@@ -48,13 +48,17 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
-  test("pins borderless reference chrome and keeps the page name in the rail", () => {
+  test("morphs the reference title into a larger rail title in under 150ms", () => {
     expect(styles).toContain(".site-header-shell-sticky");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
-    expect(styles).not.toContain("site-header-shell-sticky[data-scrolled");
     expect(styles).toContain(".section-rail-page-title");
-    expect(styles).toContain('.section-rail-page-title[data-visible="true"]');
+    expect(styles).toContain("font-size: 18px");
+    expect(styles).toContain(".reference-page-title");
+    expect(styles).toContain('data-title-active="true"');
+    expect(styles).toContain("view-transition-name: reference-page-title");
+    expect(styles).toContain("::view-transition-group(reference-page-title)");
+    expect(styles).toContain("animation-duration: 140ms");
     expect(styles).not.toContain(".site-page-context");
     expect(styles).toContain("top: 100px");
     expect(styles).toContain("scroll-margin-top: 154px");
@@ -62,7 +66,7 @@ describe("site design contract", () => {
 
   test("shares one reference-page layout across docs and changelog", () => {
     expect(styles).toContain(".reference-page-header");
-    expect(styles).toContain(".reference-page-header h1");
+    expect(styles).toContain(".reference-page-title");
     expect(styles).toContain(".reference-section");
     expect(styles).toContain(".reference-page > .reference-section:first-of-type");
     expect(styles).toContain("font-size: clamp(38px, 6vw, 56px)");

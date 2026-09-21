@@ -658,19 +658,37 @@ figure {
 }
 
 .section-rail-page-title {
-  min-height: 18px;
-  margin: 0 8px -4px;
+  min-height: 22px;
+  margin: 0 8px -2px;
   color: var(--ink);
-  font-size: 11px;
-  font-weight: 680;
-  line-height: 1.35;
-  opacity: 0;
-  transition: opacity 140ms ease;
+  font-size: 18px;
+  font-weight: 730;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
   white-space: nowrap;
 }
 
-.section-rail-page-title[data-visible="true"] {
-  opacity: 1;
+.reference-page-title[data-title-active="true"],
+.section-rail-page-title[data-title-active="true"] {
+  visibility: visible;
+  view-transition-name: reference-page-title;
+}
+
+.reference-page-title[data-title-active="false"],
+.section-rail-page-title[data-title-active="false"] {
+  visibility: hidden;
+}
+
+::view-transition-group(reference-page-title),
+::view-transition-old(reference-page-title),
+::view-transition-new(reference-page-title) {
+  animation-duration: 140ms;
+  animation-timing-function: var(--ease-out);
+}
+
+::view-transition-old(reference-page-title),
+::view-transition-new(reference-page-title) {
+  mix-blend-mode: normal;
 }
 
 .section-rail-group {
@@ -755,7 +773,7 @@ figure {
   padding: 8px 0 34px;
 }
 
-.reference-page-header h1 {
+.reference-page-title {
   margin: 0;
   color: var(--ink);
   font-size: clamp(38px, 6vw, 56px);
@@ -1138,7 +1156,7 @@ figure {
     font-size: 30px;
   }
 
-  .reference-page-header h1 {
+  .reference-page-title {
     font-size: clamp(34px, 11vw, 48px);
   }
 
@@ -1224,6 +1242,7 @@ figure {
     flex: 0 0 auto;
     margin: 0 4px 0 0;
     padding: 6px 8px;
+    font-size: 15px;
   }
 
   .section-rail-group {
@@ -1255,7 +1274,7 @@ figure {
     padding-top: 24px;
   }
 
-  .reference-page-header h1,
+  .reference-page-title,
   .legal-page > h1 {
     font-size: clamp(34px, 11vw, 48px);
   }
@@ -1311,10 +1330,15 @@ figure {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-nav-indicator,
-  .section-rail-page-title {
+  .site-nav-indicator {
     transition-duration: 120ms;
     transition-property: opacity;
+  }
+
+  ::view-transition-group(reference-page-title),
+  ::view-transition-old(reference-page-title),
+  ::view-transition-new(reference-page-title) {
+    animation-duration: 0ms;
   }
 
   .drop-trigger,

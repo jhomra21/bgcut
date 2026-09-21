@@ -16,6 +16,8 @@ export type SectionRailGroup = {
 type SectionRailProps = {
   readonly ariaLabel: string;
   readonly pageTitle: string;
+  readonly pageTitleVisible: boolean;
+  readonly onPageTitleVisibilityChange: (visible: boolean) => void;
   readonly groups: readonly SectionRailGroup[];
   readonly initialSectionId: string;
   readonly sectionSelector: string;
@@ -28,7 +30,6 @@ const easeOutCubic = (progress: number): number => 1 - (1 - progress) ** 3;
 
 export const SectionRail = (props: SectionRailProps) => {
   const [activeSection, setActiveSection] = createSignal(props.initialSectionId);
-  const [showPageTitle, setShowPageTitle] = createSignal(false);
   let programmaticTarget: string | undefined;
   let scrollAnimationFrame: number | undefined;
   let suppressBottomSectionUntil = 0;
@@ -69,7 +70,7 @@ export const SectionRail = (props: SectionRailProps) => {
   };
 
   const pickActiveSection = () => {
-    setShowPageTitle(window.scrollY > 96);
+    props.onPageTitleVisibilityChange(window.scrollY > 64);
 
     if (programmaticTarget !== undefined) {
       setActiveSection(programmaticTarget);
@@ -258,8 +259,8 @@ export const SectionRail = (props: SectionRailProps) => {
     <aside class="section-rail" aria-label={props.ariaLabel}>
       <span
         class="section-rail-page-title"
-        data-visible={showPageTitle() ? "true" : "false"}
-        aria-hidden={showPageTitle() ? undefined : "true"}
+        data-title-active={props.pageTitleVisible ? "true" : "false"}
+        aria-hidden={props.pageTitleVisible ? undefined : "true"}
       >
         {props.pageTitle}
       </span>
