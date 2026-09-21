@@ -14,6 +14,10 @@ const staticHeadersSource = await Bun.file(
   new URL("../../public/_headers", import.meta.url),
 ).text();
 
+const remoteRuntimeUploadSource = await Bun.file(
+  new URL("../../scripts/cloudflare/upload-runtime.ts", import.meta.url),
+).text();
+
 describe("Cloudflare runtime routing", () => {
   test("routes model and runtime assets through the Worker before SPA fallback", () => {
     expect(wranglerConfig).toContain('"/models/*"');
@@ -26,6 +30,18 @@ describe("Cloudflare runtime routing", () => {
     expect(workerSource).toContain("ORT_WASM_MODULE_FILENAME");
     expect(workerSource).toContain('"application/wasm"');
     expect(workerSource).toContain('"text/javascript; charset=utf-8"');
+  });
+
+  test("keeps production runtime uploads idempotent and retryable", () => {
+    expect(packageSource).toContain('"cloudflare:runtime:remote"');
+    expect(remoteRuntimeUploadSource).toContain("PRODUCTION_ORIGIN");
+    expect(remoteRuntimeUploadSource).toContain('method: "HEAD"');
+    expect(remoteRuntimeUploadSource).toContain("content-length");
+    expect(remoteRuntimeUploadSource).toContain("normalizeEtag(etag) === integrity.md5");
+    expect(remoteRuntimeUploadSource).toContain("skipping upload");
+    expect(remoteRuntimeUploadSource).toContain("UPLOAD_RETRY_DELAYS_MS");
+    expect(remoteRuntimeUploadSource).toContain("await Bun.sleep(delay)");
+    expect(remoteRuntimeUploadSource).toContain("await remoteMatches(asset, integrity)");
   });
 
   test("seeds all pinned ONNX Runtime files into local R2", () => {
