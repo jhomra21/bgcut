@@ -181,7 +181,12 @@ describe("browser product UI", () => {
     expect(appSource).toContain("pageTitleVisible={compactTitle()}");
     expect(appSource).toContain('pageTitlePhase={compactTitle() ? titlePhase() : "idle"}');
     expect(appSource).toContain("onPageTitleVisibilityChange={fadeTitle}");
-    expect(appSource).toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
+    expect(appSource).toContain("const TITLE_REVEAL_GAP = 12");
+    expect(appSource).toContain('document.querySelector<HTMLElement>(".reference-page-title")');
+    expect(appSource).toContain('document.querySelector<HTMLElement>(".site-header-shell-sticky")');
+    expect(appSource).toContain("titleTop < headerBottom + TITLE_REVEAL_GAP");
+    expect(appSource).toContain("props.onPageTitleVisibilityChange(compactTitleVisible())");
+    expect(appSource).not.toContain("props.onPageTitleVisibilityChange(window.scrollY > 64)");
     expect(appSource).toContain('"(prefers-reduced-motion: reduce)"');
     expect(appSource).not.toContain("reference-title-motion");
     expect(appSource).not.toContain("startViewTransition");

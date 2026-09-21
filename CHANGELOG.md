@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Fixed the Documentation/Changelog title handoff so the rail title stays visible until the large page title has cleared the sticky navigation, using live header/title geometry instead of a fixed scroll offset.
+
 ## 0.4.0 - 2026-09-21
 
 - Promoted the accepted 0.4 beta line to stable after clean installed-package validation of the one-shot Node API, reusable WebGPU sessions, public error contract, CLI inference, packaged local app, health route, and model delivery.
