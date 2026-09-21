@@ -81,7 +81,7 @@ export const ChangelogPage = () => (
     <article class="changelog-page">
       <header class="changelog-header">
         <div class="eyebrow">Releases</div>
-        <h2>{document.title}</h2>
+        <h1>{document.title}</h1>
         <For each={document.intro}>
           {(paragraph) => <p>{paragraph}</p>}
         </For>
