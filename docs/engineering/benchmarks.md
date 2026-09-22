@@ -90,6 +90,45 @@ Run both modes before changing the public API. If the raw candidate cannot creat
 
 For BiRefNet General Lite, use a 1024 input. rembg's current General-family session preprocesses with ImageNet mean/std at 1024x1024 and applies sigmoid plus min/max normalization before resizing the mask to the source image.
 
+### 2026-09-22 candidate results
+
+PR #93 first tested whether rembg-style preprocessing and mask handling could improve bgcut's existing 512x512 model without changing the model.
+
+That experiment did not help overall.
+
+| Pipeline | Warm median | Pooled alpha MAE | Pooled IoU |
+| --- | ---: | ---: | ---: |
+| bgcut 512 WebGPU | 448.8 ms | 0.02210 | 0.9648 |
+| bgcut 512 with rembg-style processing | 501.4 ms | 0.02319 | 0.9631 |
+
+Per-image IoU moved from `0.881` to `0.893` on Amelia and from `0.969` to `0.970` on Yoda kitten. Cat in sink, Teya, and Blind dog were effectively unchanged. Molly moved from `0.696` to `0.678`. The processing-only variant is not a product candidate.
+
+The next experiment used the exact `birefnet-general-lite` ONNX model from the rembg comparison at 1024x1024. ONNX Runtime 1.30.0 created the WebGPU session, then the first inference failed at `/decoder/Split_33`. The shader needed 11 storage buffers while the M3 Pro WebGPU device exposed a per-stage limit of 10.
+
+ONNX Runtime's native WebGPU Split implementation binds one storage buffer for the input and one for each non-empty output. A Split with ten outputs therefore needs eleven storage buffers in one shader. See [ONNX Runtime's WebGPU Split implementation](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/core/providers/webgpu/tensor/split.cc).
+
+PR #93 now includes a benchmark-only rewrite for this class of failure. It replaces every Split whose input plus outputs exceeds the configured storage-buffer limit with equivalent Slice nodes. Each Slice dispatch binds one input and one output instead of all Split outputs at once. ONNX Runtime WebGPU supports Slice for floating-point tensors.
+
+The rewrite command uses Python's `onnx` package. Keep that dependency in the disposable benchmark environment rather than adding it to bgcut's runtime dependencies.
+
+```sh
+bun run model:rewrite-webgpu-splits -- \
+  /path/to/birefnet-general-lite.onnx \
+  /path/to/birefnet-general-lite-webgpu.onnx \
+  --max-storage-buffers-per-stage 10
+```
+
+Before benchmarking the rewritten model on WebGPU, compare its CPU logits with the original model on the same deterministic 1024x1024 tensor:
+
+```sh
+bun run benchmark:model-equivalence -- \
+  /path/to/birefnet-general-lite.onnx \
+  /path/to/birefnet-general-lite-webgpu.onnx \
+  1024 \
+  ./tmp/general-lite-equivalence.json
+```
+
+A rewritten candidate should not proceed to the quality benchmark unless this comparison is exact or any non-zero difference is explained and bounded.
 ### Published reference numbers
 
 These numbers are context only. They were not collected on the same hardware or with the same model, input, output path, or timing boundaries.
