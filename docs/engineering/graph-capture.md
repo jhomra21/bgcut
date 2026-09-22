@@ -44,6 +44,8 @@ The v2 graph has:
 
 PR #93 added `scripts/model/rewrite-webgpu-shape-ops.py` so this exact guarded transformation is reproducible for compatible model candidates. The command requires 40 matching int64 one-element axis-3 `Slice` nodes and 20 matching four-input `Sum` nodes by default, and refuses to write a model when the pattern differs.
 
+A later General Lite 1024 experiment reused the same rewrite after first replacing 50 wide `Split` nodes. The fully rewritten model remained bit-exact against the original model, but Safari graph capture still failed at runtime because one shader needed nine storage buffers and the tested device allowed eight. That experiment stopped there. The accepted 512 model below remains the browser graph-capture path.
+
 ## Accepted browser benchmark
 
 The same 1600x1598 cat fixture was used for one cold run and five warm reruns without reloading.
