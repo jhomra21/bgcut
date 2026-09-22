@@ -78,9 +78,13 @@ if (manifestArgument === undefined || outputArgument === undefined) {
 }
 
 const manifestPath = resolve(manifestArgument);
+
 const manifestRoot = dirname(manifestPath);
+
 const outputRoot = resolve(outputArgument);
+
 const requestedEngine = parseEngine(engineArgument);
+
 const warmRepeats = parseRepeats(repeatsArgument);
 
 const manifest = Schema.decodeUnknownSync(BenchmarkManifestSchema)(
@@ -90,6 +94,7 @@ const manifest = Schema.decodeUnknownSync(BenchmarkManifestSchema)(
 await mkdir(outputRoot, { recursive: true });
 
 const bgcut = await createBgcut({ engine: requestedEngine });
+
 const caseReports: CaseReport[] = [];
 
 try {
@@ -142,7 +147,9 @@ const report = {
 };
 
 const reportPath = join(outputRoot, "timings.json");
+
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
 console.log(`Wrote ${caseReports.length} bgcut benchmark outputs to ${outputRoot}.`);
+
 console.log(`Timing report: ${reportPath}`);
