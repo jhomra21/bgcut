@@ -240,7 +240,7 @@ def main() -> None:
     replacements_by_index: dict[
         int,
         tuple[list[onnx.NodeProto], list[onnx.TensorProto], int, list[int]],
-    ] = []
+    ] = {}
 
     for node_index, node in enumerate(model.graph.node):
         if node.op_type != "Split":
