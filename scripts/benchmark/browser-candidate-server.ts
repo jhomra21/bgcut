@@ -112,11 +112,6 @@ const ortSourceEntry = resolve(
   "../../node_modules/onnxruntime-web/lib/index.ts",
 );
 
-const ortSessionOptionsPath = resolve(
-  import.meta.dir,
-  "../../node_modules/onnxruntime-web/lib/wasm/session-options.ts",
-);
-
 const ortProviderPatchPlugin = {
   name: "bgcut-ort-webgpu-provider-options",
   setup(build: {
