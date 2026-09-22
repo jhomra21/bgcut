@@ -4,6 +4,88 @@ This file records measured bgcut runtime results and the rules for comparing the
 
 These numbers belong to specific commits, images, runtimes, and machines. Do not reuse them as general performance claims.
 
+## Cross-tool benchmark harness
+
+The repository includes two benchmark commands. They keep timing and quality measurement separate so outputs from other tools can use the same quality scorer.
+
+```sh
+bun run benchmark:bgcut -- /path/to/manifest.json ./tmp/bench/bgcut gpu 5
+bun run benchmark:score -- /path/to/manifest.json ./tmp/bench/bgcut ./tmp/bench/bgcut-quality.json
+```
+
+The manifest uses paths relative to the manifest file.
+
+```json
+{
+  "cases": [
+    {
+      "id": "hair-01",
+      "input": "inputs/hair-01.png",
+      "mask": "masks/hair-01.png"
+    }
+  ]
+}
+```
+
+`benchmark:bgcut` creates one reusable bgcut session, records model and session setup separately, records the first removal for each image, then records the median of the requested warm reruns. It writes source-resolution PNG results plus `timings.json`.
+
+`benchmark:score` reads `<id>.png` from any tool output directory. Transparent PNGs use their alpha channel. Grayscale or RGB files are treated as masks. Output dimensions must match the reference mask. The report contains normalized alpha MAE and MSE plus foreground IoU and F1 at an alpha threshold of 128.
+
+For a cross-tool run:
+
+1. Use the exact same source files and reference masks.
+2. Keep the machine, browser, power state, and network conditions fixed.
+3. Report setup, first-run processing, and warm processing separately.
+4. Use a reusable session for tools that support one. Do not compare a warm bgcut session with a competitor that starts a new process for every image.
+5. Save every output at the source dimensions. Record any model-side resize separately.
+6. Score the saved outputs with the same `benchmark:score` command.
+7. For remote services, label timing as end-to-end API latency. It includes upload, server queue, processing, and download time and is not a local inference measurement.
+8. Record the exact tool version, model, options, and model download size.
+
+### Quality sets
+
+Use more than one dataset. DIS5K is useful for reproducible dichotomous segmentation, but its V1.0 authors note that real-world humans, animals, and cars are underrepresented. Keep a separate alpha-detail set for hair, fur, thin structures, semi-transparent edges, product photography, and cases where foreground and background colors are similar.
+
+Do not copy third-party benchmark images into this repository unless their terms allow redistribution. The DIS repository publishes separate dataset terms. Keep a local dataset checkout outside this repository and point the manifest at it.
+
+For true soft-alpha reference mattes, add standard alpha-matting metrics such as SAD, gradient error, and connectivity error before treating the benchmark as a matting benchmark. The current scorer is intended for fast regression checks and cross-tool segmentation comparisons.
+
+### Tools to compare
+
+Use these as the first comparison set:
+
+- [IMG.LY background-removal-js](https://github.com/imgly/background-removal-js) for a local browser comparison. Its public API has explicit preload, WebGPU or CPU selection, foreground segmentation, alpha-mask output, original-size output, and reusable mask application.
+- [rembg](https://github.com/danielgatis/rembg) for a native local comparison. Record the model name because its current default BRIA RMBG model is much larger than bgcut's model and runs at a different input size. rembg also exposes optional color decontamination and ViTMatte edge refinement.
+- [remove.bg](https://www.remove.bg/api) for a hosted-service quality reference. Keep its latency in a separate remote-service column because network and service time are part of the measurement.
+
+Do not use published timing claims from another machine as a head-to-head result. They are useful for choosing what to measure, not for ranking tools.
+
+### Published reference numbers
+
+These numbers are context only. They were not collected on the same hardware or with the same model, input, output path, or timing boundaries.
+
+| Tool | Environment | Reported number | Boundary |
+| --- | --- | --- | --- |
+| bgcut | Apple M3 Pro, current accepted browser fast path | 422 ms warm median | Full browser removal from decoded source through source-resolution PNG export |
+| IMG.LY background-removal-js | Apple M3 Max, June 2024 WebGPU fp16 benchmark | about 100 ms on consecutive runs; about 300 ms for the first neural-network run | ONNX model initialization and neural-network execution, with model download discussed separately |
+
+The IMG.LY post is useful as a WebGPU reference, but it is not evidence that either tool is faster. bgcut's current WebGPU timing also records `session.run()` submission separately from the later output-buffer synchronization, so the small submit span is not a GPU execution measurement.
+
+Source: [IMG.LY's WebGPU benchmark](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/).
+
+### Ideas worth testing
+
+The competitor review points to a small set of changes that fit bgcut:
+
+- Add a mask-only or raw alpha output to the Node and browser APIs. This avoids encoding a full cutout when callers only need the matte and makes quality benchmarking cheaper.
+- Add an explicit browser preload call and progress stages for model fetch, session creation, preprocessing, inference, readback, and encode.
+- Test optional edge color decontamination after compositing. This targets background color fringing without changing the segmentation model.
+- Test edge refinement as an opt-in quality mode for hair and other soft boundaries. Keep it out of the default fast path unless the benchmark shows a useful gain.
+- Consider separate speed and quality model profiles only after measuring model size, cold-start cost, warm latency, and quality on the same suite.
+- Measure whether model resource chunking improves interrupted downloads and repeat visits before changing the current model delivery path.
+
+These are benchmark candidates, not accepted product features. Each one needs a quality result, a speed cost, and a clear API contract before it ships.
+
 ## Current accepted browser fast path
 
 Exact SHA:

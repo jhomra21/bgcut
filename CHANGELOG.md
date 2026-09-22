@@ -6,6 +6,8 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
+- Added persistent light and dark site themes backed by semantic color tokens, with the existing palette preserved as the light theme.
+- Added repeatable cross-tool benchmark commands for bgcut timing and output-quality scoring, plus a documented comparison protocol.
 - Simplified Documentation and Changelog to one permanent left-rail page title, removed the duplicate centered title and its transition logic, and pulled the page content upward into the space the centered header used to occupy.
 
 ## 0.4.0 - 2026-09-21

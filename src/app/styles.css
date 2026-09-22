@@ -1,20 +1,114 @@
 :root {
-  --canvas: #fbfbfa;
-  --surface: #ffffff;
-  --surface-subtle: #f6f6f3;
-  --ink: #171717;
-  --ink-muted: #666660;
-  --ink-soft: #70706a;
-  --line: #e5e5df;
-  --line-strong: #d7d7d0;
+  --background-primary: #fbfbfa;
+  --background-surface: #ffffff;
+  --background-subtle: #f6f6f3;
+  --background-hover: #f1f1ed;
+  --background-active: #e4e4de;
+  --background-code: #f5f5f2;
+  --background-key: #f7f7f4;
+  --background-key-inverse: #2a2a28;
+  --background-inverse: #171717;
+  --background-inverse-hover: #333330;
+  --background-inverse-active: #4b4b47;
+  --background-error: #fff3f1;
+  --background-nav: rgba(246, 246, 243, 0.82);
+  --background-nav-hover: rgba(255, 255, 255, 0.42);
+  --background-drop-glow: rgba(245, 245, 241, 0.9);
+  --background-floating: rgba(255, 255, 255, 0.78);
+  --background-header: rgba(251, 251, 250, 0.94);
+  --background-header-mobile: rgba(251, 251, 250, 0.96);
+  --background-checker: #eeeeeb;
+  --text-primary: #171717;
+  --text-secondary: #666660;
+  --text-muted: #70706a;
+  --text-tertiary: #777771;
+  --text-control: #333330;
+  --text-control-muted: #595953;
+  --text-floating: #4f4f49;
+  --text-heading-secondary: #30302d;
+  --text-link: #454541;
+  --text-table-heading: #3b3b37;
+  --text-card: #6a6a64;
+  --text-code: #2b2b28;
+  --text-code-inline: #3f3f3a;
+  --text-inverse: #ffffff;
+  --text-inverse-muted: #d8d8d2;
+  --text-error: #7b302b;
+  --border-primary: #e5e5df;
+  --border-strong: #d7d7d0;
+  --border-control: #d8d8d2;
+  --border-drop: #b9b9b2;
+  --border-subtle: #ecece7;
+  --border-link: #c9c9c3;
+  --border-input: #cfcfc8;
+  --border-key-inverse: #4b4b47;
+  --border-error: #e4bdb9;
+  --border-high-contrast: #909089;
+  --border-floating: rgba(255, 255, 255, 0.72);
+  --comparison-control: #efefe8;
+  --shadow-nav: rgba(23, 23, 23, 0.06);
+  --shadow-floating: rgba(23, 23, 23, 0.1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  color: var(--ink);
-  background: var(--canvas);
+  color: var(--text-primary);
+  background: var(--background-primary);
   color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+html[data-theme="dark"] {
+  --background-primary: #11110f;
+  --background-surface: #171716;
+  --background-subtle: #1f1f1c;
+  --background-hover: #242421;
+  --background-active: #30302c;
+  --background-code: #1b1b19;
+  --background-key: #22221f;
+  --background-key-inverse: #deded8;
+  --background-inverse: #f2f2ee;
+  --background-inverse-hover: #ffffff;
+  --background-inverse-active: #ddddd7;
+  --background-error: #2a1715;
+  --background-nav: rgba(31, 31, 28, 0.82);
+  --background-nav-hover: rgba(255, 255, 255, 0.06);
+  --background-drop-glow: rgba(34, 34, 31, 0.9);
+  --background-floating: rgba(24, 24, 22, 0.84);
+  --background-header: rgba(17, 17, 15, 0.94);
+  --background-header-mobile: rgba(17, 17, 15, 0.96);
+  --background-checker: #242421;
+  --text-primary: #f4f4f0;
+  --text-secondary: #b8b8b1;
+  --text-muted: #999992;
+  --text-tertiary: #8a8a84;
+  --text-control: #d9d9d3;
+  --text-control-muted: #adada6;
+  --text-floating: #d0d0ca;
+  --text-heading-secondary: #e8e8e3;
+  --text-link: #c9c9c3;
+  --text-table-heading: #d9d9d3;
+  --text-card: #aaa9a3;
+  --text-code: #deded8;
+  --text-code-inline: #d1d1ca;
+  --text-inverse: #171717;
+  --text-inverse-muted: #484843;
+  --text-error: #f0aaa3;
+  --border-primary: #2d2d2a;
+  --border-strong: #3b3b36;
+  --border-control: #42423d;
+  --border-drop: #4c4c46;
+  --border-subtle: #262623;
+  --border-link: #5b5b55;
+  --border-input: #494942;
+  --border-key-inverse: #c5c5bf;
+  --border-error: #693833;
+  --border-high-contrast: #7b7b73;
+  --border-floating: rgba(255, 255, 255, 0.14);
+  --comparison-control: #efefe8;
+  --shadow-nav: rgba(0, 0, 0, 0.28);
+  --shadow-floating: rgba(0, 0, 0, 0.36);
+  color-scheme: dark;
 }
 
 * {
@@ -29,7 +123,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: var(--canvas);
+  background: var(--background-primary);
 }
 
 button,
@@ -83,6 +177,56 @@ figure {
   text-decoration: none;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-toggle {
+  width: 37px;
+  height: 37px;
+  flex: 0 0 37px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  background: var(--background-nav);
+  color: var(--text-muted);
+  padding: 0;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.theme-toggle:hover {
+  background: var(--background-nav-hover);
+  color: var(--text-primary);
+}
+
+.theme-toggle-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-toggle-sun {
+  display: none;
+}
+
+.theme-toggle[data-theme="dark"] .theme-toggle-moon {
+  display: none;
+}
+
+.theme-toggle[data-theme="dark"] .theme-toggle-sun {
+  display: block;
+}
+
 .site-nav {
   --site-nav-docs-width: 48px;
   --site-nav-changelog-width: 76px;
@@ -97,9 +241,9 @@ figure {
   align-items: center;
   gap: var(--site-nav-gap);
   padding: 3px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-primary);
   border-radius: 10px;
-  background: rgba(246, 246, 243, 0.82);
+  background: var(--background-nav);
 }
 
 .site-nav-indicator {
@@ -110,8 +254,8 @@ figure {
   left: 3px;
   width: var(--site-nav-docs-width);
   border-radius: 7px;
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.06);
+  background: var(--background-surface);
+  box-shadow: 0 1px 2px var(--shadow-nav);
   opacity: 0;
   transform: translateX(0);
   transition:
@@ -141,7 +285,7 @@ figure {
   align-items: center;
   justify-content: center;
   border-radius: 7px;
-  color: var(--ink-soft);
+  color: var(--text-muted);
   padding: 0 8px;
   font-size: 11px;
   font-weight: 620;
@@ -153,12 +297,12 @@ figure {
 }
 
 .site-nav a:hover {
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.42);
+  color: var(--text-primary);
+  background: var(--background-nav-hover);
 }
 
 .site-nav a[aria-current="page"] {
-  color: var(--ink);
+  color: var(--text-primary);
   background: transparent;
 }
 
@@ -169,11 +313,11 @@ figure {
   place-items: center;
   overflow: hidden;
   padding: 16px;
-  border: 1px dashed #b9b9b2;
+  border: 1px dashed var(--border-drop);
   border-radius: 18px;
   background:
-    radial-gradient(circle at 50% 38%, rgba(245, 245, 241, 0.9), transparent 42%),
-    var(--surface);
+    radial-gradient(circle at 50% 38%, var(--background-drop-glow), transparent 42%),
+    var(--background-surface);
 }
 
 .drop-surface.has-image {
@@ -196,7 +340,7 @@ figure {
   gap: 14px;
   border: 0;
   background: transparent;
-  color: var(--ink);
+  color: var(--text-primary);
   padding: 28px;
   text-align: center;
   transition: transform 140ms var(--ease-out);
@@ -214,7 +358,7 @@ figure {
 }
 
 .drop-trigger-copy span {
-  color: var(--ink-soft);
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -241,7 +385,7 @@ figure {
 .drop-trigger:focus-visible,
 .text-button:focus-visible,
 .download-button:focus-visible {
-  outline: 2px solid #171717;
+  outline: 2px solid var(--text-primary);
   outline-offset: 3px;
 }
 
@@ -260,12 +404,12 @@ figure {
 }
 
 .comparison-slider {
-  background-color: #ffffff;
+  background-color: var(--background-surface);
   background-image:
-    linear-gradient(45deg, #eeeeeb 25%, transparent 25%),
-    linear-gradient(-45deg, #eeeeeb 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #eeeeeb 75%),
-    linear-gradient(-45deg, transparent 75%, #eeeeeb 75%);
+    linear-gradient(45deg, var(--background-checker) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--background-checker) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--background-checker) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--background-checker) 75%);
   background-size: 24px 24px;
   background-position: 0 0, 0 12px, 12px -12px, -12px 0;
 }
@@ -282,13 +426,13 @@ figure {
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--border-floating);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 6px 24px rgba(23, 23, 23, 0.1);
+  background: var(--background-floating);
+  box-shadow: 0 6px 24px var(--shadow-floating);
   backdrop-filter: blur(18px) saturate(150%);
   padding: 8px 12px;
-  color: #4f4f49;
+  color: var(--text-floating);
   font-size: 11px;
   font-weight: 570;
   white-space: nowrap;
@@ -301,8 +445,8 @@ figure {
   --comparison-position: 50%;
   --comparison-left-opacity: 1;
   --comparison-right-opacity: 1;
-  --comparison-left-color: #efefe8;
-  --comparison-right-color: #efefe8;
+  --comparison-left-color: var(--comparison-control);
+  --comparison-right-color: var(--comparison-control);
   position: relative;
   min-height: 0;
   aspect-ratio: var(--comparison-aspect-ratio);
@@ -335,7 +479,7 @@ figure {
   left: var(--comparison-position);
   width: 1px;
   transform: translateX(-0.5px);
-  background: #efefe8;
+  background: var(--comparison-control);
   pointer-events: none;
 }
 
@@ -393,7 +537,7 @@ figure {
   justify-content: space-between;
   min-height: 34px;
   padding: 0;
-  border-top: 1px dashed #b9b9b2;
+  border-top: 1px dashed var(--border-drop);
 }
 
 .result-flow > .error-card {
@@ -412,7 +556,7 @@ figure {
 .result-action-group > .download-button {
   min-height: 34px;
   border: 0;
-  border-left: 1px solid #d8d8d2;
+  border-left: 1px solid var(--border-control);
   border-radius: 0;
   padding: 0 22px;
   transition:
@@ -429,24 +573,24 @@ figure {
 .result-actions > .text-button:hover:not(:disabled),
 .result-action-group > .text-button:hover,
 .result-action-group > .download-button:hover {
-  background: #f1f1ed;
-  color: #171717;
+  background: var(--background-hover);
+  color: var(--text-primary);
 }
 
 .result-actions > .text-button:active:not(:disabled),
 .result-action-group > .text-button:active,
 .result-action-group > .download-button:active {
   transform: scale(0.98);
-  background: #e4e4de;
+  background: var(--background-active);
 }
 
 .result-action-group > .download-button:hover {
-  background: #333330;
-  color: #ffffff;
+  background: var(--background-inverse-hover);
+  color: var(--text-inverse);
 }
 
 .result-action-group > .download-button:active {
-  background: #4b4b47;
+  background: var(--background-inverse-active);
 }
 
 .text-button,
@@ -468,10 +612,10 @@ figure {
   height: 18px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid #d8d8d2;
+  border: 1px solid var(--border-control);
   border-radius: 4px;
-  background: #f7f7f4;
-  color: #777771;
+  background: var(--background-key);
+  color: var(--text-tertiary);
   padding: 0 4px;
   font: inherit;
   font-size: 9px;
@@ -480,17 +624,17 @@ figure {
 }
 
 .shortcut-key-inverted {
-  border-color: #4b4b47;
-  background: #2a2a28;
-  color: #d8d8d2;
+  border-color: var(--border-key-inverse);
+  background: var(--background-key-inverse);
+  color: var(--text-inverse-muted);
 }
 
 .input-shortcut-key {
   min-width: 27px;
   height: 23px;
-  border-color: #cfcfc8;
-  background: #ffffff;
-  color: #595953;
+  border-color: var(--border-input);
+  background: var(--background-surface);
+  color: var(--text-control-muted);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Symbol", "Apple Symbols", sans-serif;
   font-size: 11px;
   font-weight: 650;
@@ -498,22 +642,22 @@ figure {
 }
 
 .text-button {
-  border: 1px solid #d8d8d2;
-  background: #ffffff;
-  color: #333330;
+  border: 1px solid var(--border-control);
+  background: var(--background-surface);
+  color: var(--text-control);
 }
 
 .download-button {
-  border: 1px solid #171717;
-  background: #171717;
-  color: #ffffff;
+  border: 1px solid var(--background-inverse);
+  background: var(--background-inverse);
+  color: var(--text-inverse);
 }
 
 .error-card {
-  border: 1px solid #e4bdb9;
+  border: 1px solid var(--border-error);
   border-radius: 8px;
-  background: #fff3f1;
-  color: #7b302b;
+  background: var(--background-error);
+  color: var(--text-error);
   padding: 10px 12px;
   font-size: 12px;
   line-height: 1.45;
@@ -566,7 +710,7 @@ figure {
   bottom: 0;
   left: 50%;
   width: 100vw;
-  background: rgba(251, 251, 250, 0.94);
+  background: var(--background-header);
   backdrop-filter: blur(14px);
   transform: translateX(-50%);
 }
@@ -620,7 +764,7 @@ figure {
 .home-intro h1 {
   max-width: 720px;
   margin: 0 0 8px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: clamp(28px, 4.5vw, 40px);
   line-height: 1.05;
   letter-spacing: -0.045em;
@@ -629,7 +773,7 @@ figure {
 
 .home-intro p {
   max-width: 680px;
-  color: var(--ink-muted);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -660,7 +804,7 @@ figure {
 .section-rail-page-title {
   min-height: 18px;
   margin: 0 8px 2px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 18px;
   font-weight: 760;
   line-height: 1;
@@ -675,7 +819,7 @@ figure {
 
 .section-rail-label {
   margin: 0 8px 5px;
-  color: var(--ink-soft);
+  color: var(--text-muted);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -686,7 +830,7 @@ figure {
 .section-rail a {
   position: relative;
   border-radius: 6px;
-  color: var(--ink-soft);
+  color: var(--text-muted);
   padding: 6px 8px;
   font-size: 11px;
   font-weight: 560;
@@ -698,12 +842,12 @@ figure {
 }
 
 .section-rail a:hover {
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .section-rail a[aria-current="location"] {
-  background: var(--surface-subtle);
-  color: var(--ink);
+  background: var(--background-subtle);
+  color: var(--text-primary);
   font-weight: 650;
 }
 
@@ -715,7 +859,7 @@ figure {
   left: 0;
   width: 2px;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--text-primary);
 }
 
 .content-page {
@@ -725,7 +869,7 @@ figure {
 
 .eyebrow {
   margin-bottom: 9px;
-  color: var(--ink-soft);
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 680;
   letter-spacing: 0.08em;
@@ -733,22 +877,22 @@ figure {
 }
 
 .docs-related a {
-  color: #454541;
+  color: var(--text-link);
   font-size: 12px;
   font-weight: 620;
   text-decoration: underline;
-  text-decoration-color: #c9c9c3;
+  text-decoration-color: var(--border-link);
   text-underline-offset: 3px;
 }
 
 .docs-related a:hover {
-  color: var(--ink);
-  text-decoration-color: var(--ink);
+  color: var(--text-primary);
+  text-decoration-color: var(--text-primary);
 }
 
 .reference-section {
   padding: 34px 0 38px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-primary);
   scroll-margin-top: 96px;
 }
 
@@ -762,7 +906,7 @@ figure {
 
 .reference-section h3 {
   margin: 0 0 11px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 20px;
   line-height: 1.25;
   letter-spacing: -0.025em;
@@ -771,7 +915,7 @@ figure {
 
 .doc-section h4 {
   margin: 28px 0 9px;
-  color: #30302d;
+  color: var(--text-heading-secondary);
   font-size: 13px;
   line-height: 1.4;
   font-weight: 680;
@@ -780,7 +924,7 @@ figure {
 .doc-section p {
   max-width: 680px;
   margin: 0 0 15px;
-  color: var(--ink-muted);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.72;
 }
@@ -791,11 +935,11 @@ figure {
 
 .docs-section-summary {
   margin-top: -4px !important;
-  color: var(--ink-soft) !important;
+  color: var(--text-muted) !important;
 }
 
 .docs-related {
-  color: var(--ink-soft) !important;
+  color: var(--text-muted) !important;
   font-size: 12px !important;
 }
 
@@ -807,11 +951,11 @@ figure {
 .code-block {
   overflow-x: auto;
   margin: 16px 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  background: #f5f5f2;
+  background: var(--background-code);
   padding: 14px 15px;
-  color: #2b2b28;
+  color: var(--text-code);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 11.5px;
   line-height: 1.7;
@@ -826,8 +970,8 @@ figure {
 .shortcut-list {
   display: grid;
   margin: 18px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .shortcut-list > div {
@@ -835,9 +979,9 @@ figure {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid #ecece7;
+  border-bottom: 1px solid var(--border-subtle);
   padding: 7px 0;
-  color: #5f5f5a;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -850,10 +994,10 @@ figure {
   height: 23px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid #d8d8d2;
+  border: 1px solid var(--border-control);
   border-radius: 5px;
-  background: var(--surface);
-  color: #4f4f49;
+  background: var(--background-surface);
+  color: var(--text-floating);
   padding: 0 5px;
   font: inherit;
   font-weight: 650;
@@ -861,13 +1005,13 @@ figure {
 
 .spec-table {
   margin: 18px 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-primary);
 }
 
 .spec-row {
   display: grid;
   grid-template-columns: minmax(150px, 0.34fr) minmax(0, 1fr);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .spec-row > * {
@@ -878,12 +1022,12 @@ figure {
 }
 
 .spec-row strong {
-  color: #3b3b37;
+  color: var(--text-table-heading);
   font-weight: 650;
 }
 
 .spec-row span {
-  color: var(--ink-muted);
+  color: var(--text-secondary);
   padding-left: 18px;
 }
 
@@ -901,19 +1045,19 @@ figure {
 .architecture-card {
   display: grid;
   gap: 8px;
-  border-left: 1px solid var(--line-strong);
+  border-left: 1px solid var(--border-strong);
   padding-left: 14px;
 }
 
 .architecture-card strong {
   margin-bottom: 3px;
-  color: #30302d;
+  color: var(--text-heading-secondary);
   font-size: 12px;
   font-weight: 680;
 }
 
 .architecture-card span {
-  color: #6a6a64;
+  color: var(--text-card);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -925,17 +1069,17 @@ figure {
 }
 
 .link-list a {
-  color: #454541;
+  color: var(--text-link);
   font-size: 12px;
   font-weight: 620;
   text-decoration: underline;
-  text-decoration-color: #c9c9c3;
+  text-decoration-color: var(--border-link);
   text-underline-offset: 3px;
 }
 
 .link-list a:hover {
-  color: var(--ink);
-  text-decoration-color: var(--ink);
+  color: var(--text-primary);
+  text-decoration-color: var(--text-primary);
 }
 
 .site-footer-shell {
@@ -949,8 +1093,8 @@ figure {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
+  border-top: 1px solid var(--border-primary);
+  color: var(--text-muted);
   padding-top: 18px;
   font-size: 11px;
 }
@@ -966,7 +1110,7 @@ figure {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 750;
   letter-spacing: -0.045em;
@@ -992,17 +1136,17 @@ figure {
   width: 2px;
   height: 2px;
   border-radius: 50%;
-  background: #b9b9b2;
+  background: var(--border-drop);
 }
 
 .site-footer-links a {
-  color: var(--ink-soft);
+  color: var(--text-muted);
   text-decoration: none;
   transition: color 150ms ease;
 }
 
 .site-footer-links a:hover {
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 
@@ -1016,16 +1160,16 @@ figure {
 
 .changelog-release li {
   max-width: 680px;
-  color: var(--ink-muted);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.65;
 }
 
 .changelog-release code {
   border-radius: 4px;
-  background: var(--surface-subtle);
+  background: var(--background-subtle);
   padding: 1px 4px;
-  color: #3f3f3a;
+  color: var(--text-code-inline);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.9em;
 }
@@ -1038,7 +1182,7 @@ figure {
 .legal-page > h1 {
   max-width: 680px;
   margin: 0;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: clamp(38px, 6vw, 56px);
   line-height: 1;
   letter-spacing: -0.05em;
@@ -1047,18 +1191,18 @@ figure {
 
 .legal-updated {
   margin: 16px 0 42px;
-  color: var(--ink-soft);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
 .legal-page section {
   padding: 28px 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-primary);
 }
 
 .legal-page section h3 {
   margin: 0 0 10px;
-  color: var(--ink);
+  color: var(--text-primary);
   font-size: 16px;
   line-height: 1.3;
   letter-spacing: -0.02em;
@@ -1067,7 +1211,7 @@ figure {
 .legal-page section p {
   max-width: 680px;
   margin: 0;
-  color: var(--ink-muted);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.75;
 }
@@ -1095,8 +1239,9 @@ figure {
 .site-footer-links a:focus-visible,
 .section-rail a:focus-visible,
 .link-list a:focus-visible,
-.brand-link:focus-visible {
-  outline: 2px solid var(--ink);
+.brand-link:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--text-primary);
   outline-offset: 3px;
 }
 
@@ -1120,14 +1265,24 @@ figure {
     font-size: 30px;
   }
 
+  .local-app-header {
+    align-items: center;
+    flex-direction: row;
+  }
+
   .brand-mark {
     width: 29px;
     height: 29px;
     flex-basis: 29px;
   }
 
+  .header-controls {
+    width: 100%;
+  }
+
   .site-nav {
     width: 100%;
+    flex: 1;
     max-width: 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
@@ -1187,8 +1342,8 @@ figure {
     overflow-y: hidden;
     gap: 12px;
     margin: 0 -10px;
-    border-bottom: 1px solid var(--line);
-    background: rgba(251, 251, 250, 0.96);
+    border-bottom: 1px solid var(--border-primary);
+    background: var(--background-header-mobile);
     padding: 8px 10px;
     scrollbar-width: none;
   }
@@ -1258,7 +1413,7 @@ figure {
   }
 
   .spec-row strong {
-    border-bottom: 1px solid #ecece7;
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .drop-surface {
@@ -1314,7 +1469,7 @@ figure {
 
 @media (prefers-reduced-transparency: reduce) {
   .processing-label {
-    background: var(--surface);
+    background: var(--background-surface);
     backdrop-filter: none;
   }
 }
@@ -1324,10 +1479,10 @@ figure {
   .code-block,
   .spec-table,
   .shortcut-list {
-    border-color: #909089;
+    border-color: var(--border-high-contrast);
   }
 
   .site-header-shell {
-    background: var(--canvas);
+    background: var(--background-primary);
   }
 }

@@ -86,7 +86,7 @@ describe("search and Lighthouse surface", () => {
   });
 
   test("keeps normal secondary text above WCAG AA contrast on the site canvas", () => {
-    const match = styles.match(/--ink-soft:\s*(#[0-9a-f]{6})/u);
+    const match = styles.match(/--text-muted:\s*(#[0-9a-f]{6})/u);
 
     expect(match?.[1]).toBeDefined();
     expect(contrastRatio(match?.[1] ?? "#000000", "#fbfbfa")).toBeGreaterThanOrEqual(4.5);
