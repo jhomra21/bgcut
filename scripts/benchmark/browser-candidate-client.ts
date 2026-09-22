@@ -424,12 +424,14 @@ const runRemoval = async (
   let stageStartedAt = performance.now();
 
   const bitmap = await createImageBitmap(source);
+
   const decodeMs = performance.now() - stageStartedAt;
+  let sourceTexture: GPUTexture | undefined;
 
   try {
     stageStartedAt = performance.now();
 
-    const sourceTexture = uploadModelInput(
+    sourceTexture = uploadModelInput(
       device,
       bitmap,
       io.inputBuffer,
@@ -479,8 +481,6 @@ const runRemoval = async (
     const blob = await canvasToPng(output);
     const exportMs = performance.now() - stageStartedAt;
 
-    sourceTexture.destroy();
-
     return {
       blob,
       timings: {
@@ -495,6 +495,7 @@ const runRemoval = async (
       },
     };
   } finally {
+    sourceTexture?.destroy();
     bitmap.close();
   }
 };
