@@ -689,4 +689,12 @@ void main().catch((error) => {
   writeStatus("");
   writeStatus("BENCHMARK FAILED");
   writeStatus(message);
+
+  void fetch("/failure", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ message }),
+  });
 });
