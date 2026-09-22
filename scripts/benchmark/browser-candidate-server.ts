@@ -226,6 +226,12 @@ if (!(await runtimeModuleFile.exists())) {
   );
 }
 
+if (process.env.BGCUT_BROWSER_BENCHMARK_BUILD_ONLY === "1") {
+  console.log("Browser candidate bundle check passed.");
+
+  process.exit(0);
+}
+
 const safeOutputName = (id: string): string =>
   `${id.replaceAll("/", "__").replaceAll("\\", "__")}.png`;
 
