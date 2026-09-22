@@ -63,32 +63,26 @@ const writeStatus = (message: string): void => {
   status.textContent += `${message}\n`;
 };
 
-const stringifyDiagnosticValue = (value: unknown): string => {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (value instanceof Error) {
-    return `${value.message}\n${value.stack ?? ""}`;
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
+type DiagnosticConsoleValue =
+  | string
+  | number
+  | boolean
+  | bigint
+  | symbol
+  | object
+  | null
+  | undefined;
 
 const captureDiagnosticLog = (
   level: string,
-  values: readonly unknown[],
+  values: readonly DiagnosticConsoleValue[],
 ): void => {
   if (diagnosticLogs.length >= 5000) {
     return;
   }
 
   diagnosticLogs.push(
-    `[${level}] ${values.map(stringifyDiagnosticValue).join(" ")}`,
+    `[${level}] ${values.map((value) => String(value)).join(" ")}`,
   );
 };
 
@@ -99,27 +93,27 @@ const installConsoleCapture = (): void => {
   const originalWarn = console.warn.bind(console);
   const originalError = console.error.bind(console);
 
-  console.debug = (...values: unknown[]): void => {
+  console.debug = (...values: DiagnosticConsoleValue[]): void => {
     captureDiagnosticLog("debug", values);
     originalDebug(...values);
   };
 
-  console.info = (...values: unknown[]): void => {
+  console.info = (...values: DiagnosticConsoleValue[]): void => {
     captureDiagnosticLog("info", values);
     originalInfo(...values);
   };
 
-  console.log = (...values: unknown[]): void => {
+  console.log = (...values: DiagnosticConsoleValue[]): void => {
     captureDiagnosticLog("log", values);
     originalLog(...values);
   };
 
-  console.warn = (...values: unknown[]): void => {
+  console.warn = (...values: DiagnosticConsoleValue[]): void => {
     captureDiagnosticLog("warn", values);
     originalWarn(...values);
   };
 
-  console.error = (...values: unknown[]): void => {
+  console.error = (...values: DiagnosticConsoleValue[]): void => {
     captureDiagnosticLog("error", values);
     originalError(...values);
   };
