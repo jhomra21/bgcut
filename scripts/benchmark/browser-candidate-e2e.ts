@@ -72,10 +72,12 @@ const waitForArtifacts = async (
   const reportPath = join(outputRoot, "browser-timings.json");
   const qualityPath = join(outputRoot, "quality.json");
   const failurePath = join(outputRoot, "browser-failure.json");
+
   const timeoutMs = Number.parseInt(
     process.env.BGCUT_BROWSER_BENCHMARK_TIMEOUT_MS ?? "900000",
     10,
   );
+
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
@@ -119,14 +121,21 @@ if (args.length < 4) {
 }
 
 const outputRoot = resolve(args[1]);
+
 const port = args[5] ?? "4177";
+
 const url = `http://127.0.0.1:${port}/`;
+
 const repoRoot = resolve(import.meta.dir, "../..");
+
 const reportPath = join(outputRoot, "browser-timings.json");
+
 const qualityPath = join(outputRoot, "quality.json");
+
 const failurePath = join(outputRoot, "browser-failure.json");
 
 await mkdir(outputRoot, { recursive: true });
+
 await Promise.all([
   rm(reportPath, { force: true }),
   rm(qualityPath, { force: true }),
@@ -134,6 +143,7 @@ await Promise.all([
 ]);
 
 const chromePath = await findChrome();
+
 const profileDirectory = await mkdtemp(
   join(tmpdir(), "bgcut-browser-benchmark-"),
 );
@@ -152,11 +162,15 @@ const server = Bun.spawn(
     stderr: "pipe",
   },
 );
+
 const serverStdout = new Response(server.stdout).text();
+
 const serverStderr = new Response(server.stderr).text();
 
 let browser: Bun.Subprocess | undefined;
+
 let browserStdout: Promise<string> | undefined;
+
 let browserStderr: Promise<string> | undefined;
 
 try {
