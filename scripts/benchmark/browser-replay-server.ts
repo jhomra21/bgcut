@@ -254,6 +254,30 @@ const app = Bun.serve({
       return new Response("saved");
     }
 
+    const runMatch =
+      url.pathname.match(/^\/run\/(\d+)$/u);
+
+    if (
+      request.method === "POST" &&
+      runMatch !== null
+    ) {
+      const index = Number.parseInt(runMatch[1], 10);
+
+      await writeFile(
+        join(
+          outputRoot,
+          `run-${index + 1}.json`,
+        ),
+        `${JSON.stringify(
+          await request.json(),
+          null,
+          2,
+        )}\n`,
+      );
+
+      return new Response("saved");
+    }
+
     if (
       request.method === "POST" &&
       url.pathname === "/failure"
