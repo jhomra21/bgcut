@@ -3,11 +3,6 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { logitToAlphaByte } from "../../src/shared/matte";
 
-type BenchmarkCase = {
-  readonly id: string;
-  readonly inputUrl: string;
-};
-
 const BenchmarkCaseSchema = Schema.Struct({
   id: Schema.String,
   inputUrl: Schema.String,
@@ -20,8 +15,6 @@ const BenchmarkConfigSchema = Schema.Struct({
   warmRepeats: Schema.Number,
   cases: Schema.Array(BenchmarkCaseSchema),
 });
-
-type BenchmarkConfig = typeof BenchmarkConfigSchema.Type;
 
 type RunTimings = {
   readonly totalMs: number;
