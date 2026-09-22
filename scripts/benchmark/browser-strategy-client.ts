@@ -173,6 +173,7 @@ const main = async (): Promise<void> => {
   const config = Schema.decodeUnknownSync(ConfigSchema)(
     await configResponse.json(),
   );
+
   const defaultStrategy =
     resolveDefaultWebGpuSessionStrategy(
       navigator.userAgent,
@@ -195,6 +196,7 @@ const main = async (): Promise<void> => {
     caseIndex += 1
   ) {
     const benchmarkCase = config.cases[caseIndex];
+
     const inputResponse = await fetch(
       benchmarkCase.inputUrl,
       { cache: "no-store" },
@@ -261,6 +263,7 @@ const main = async (): Promise<void> => {
     caseIndex += 1
   ) {
     const benchmarkCase = config.cases[caseIndex];
+
     const inputResponse = await fetch(
       benchmarkCase.inputUrl,
       { cache: "no-store" },
@@ -313,9 +316,13 @@ const main = async (): Promise<void> => {
     captureReferenceRuns.push(record);
   }
 
-  const productionWarmTotals = productionRuns
-    .filter((record) => record.timings.sessionReused)
-    .map((record) => record.timings.totalMs);
+  const productionWarmTotals = productionRuns.flatMap(
+    (record) =>
+      record.timings.sessionReused
+        ? [record.timings.totalMs]
+        : [],
+  );
+
   const captureTotals = captureReferenceRuns.map(
     (record) => record.timings.totalMs,
   );
