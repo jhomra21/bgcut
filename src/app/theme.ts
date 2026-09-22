@@ -5,6 +5,7 @@ export type SiteTheme = "light" | "dark";
 export const THEME_STORAGE_KEY = "bgcut-theme";
 
 const LIGHT_THEME_COLOR = "#fbfbfa";
+
 const DARK_THEME_COLOR = "#11110f";
 
 const initialTheme: SiteTheme =
