@@ -207,7 +207,17 @@ bun run benchmark:model-equivalence -- \
   ./tmp/general-lite-capture-equivalence.json
 ```
 
-Do not retry the browser benchmark unless the equivalence report is exact. If it is exact, run the browser candidate against the fully rewritten model. If graph capture still fails after this rewrite, stop modifying this General Lite candidate and treat the remaining incompatibility as a reason to evaluate a different quality model.
+The final rewrite matched all 40 Slice nodes and all 20 Sum nodes. The fully rewritten model remained bit-exact against the original General Lite model across 1,048,576 deterministic output values: zero differing values, zero maximum absolute difference, and zero mean absolute difference.
+
+The final Safari graph-capture attempt still failed before any benchmark image completed. ONNX Runtime reached `OrtRun()` with WebGPU int64 enabled, then generated a shader requiring nine storage buffers while the device exposed a limit of eight:
+
+```text
+Too many storage buffers in shader. Current: 9, Max is 8
+```
+
+The last recorded dispatch was `Split[8|4]`. This is a separate device/shader resource limit from the earlier CPU placement problem. No browser timing, quality report, or PNG output was produced.
+
+Stop the General Lite graph-capture experiment here. Do not add another model rewrite for this candidate. The native 1024 quality result remains useful evidence that General Lite improves the six-image binary-mask benchmark, but it is not a viable quality profile for bgcut's current Safari/M3 Pro graph-capture path. Evaluate another quality model or a different execution strategy instead.
 
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
