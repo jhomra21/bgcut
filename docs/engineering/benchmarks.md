@@ -90,37 +90,54 @@ Run both modes before changing the public API. If the raw candidate cannot creat
 
 For BiRefNet General Lite, use a 1024 input. rembg's current General-family session preprocesses with ImageNet mean/std at 1024x1024 and applies sigmoid plus min/max normalization before resizing the mask to the source image.
 
-### 2026-09-22 candidate results
+### 2026-09-22 General Lite candidate
 
-PR #93 first tested whether rembg-style preprocessing and mask handling could improve bgcut's existing 512x512 model without changing the model.
+PR #93 tested two ways to improve the six-image binary-mask benchmark without changing the default product path.
 
-That experiment did not help overall.
+First, rembg-style preprocessing and mask handling were applied to bgcut's existing 512x512 model. That variant was slower and slightly worse overall.
 
 | Pipeline | Warm median | Pooled alpha MAE | Pooled IoU |
 | --- | ---: | ---: | ---: |
-| bgcut 512 WebGPU | 448.8 ms | 0.02210 | 0.9648 |
-| bgcut 512 with rembg-style processing | 501.4 ms | 0.02319 | 0.9631 |
+| bgcut 512 WebGPU | 448.8 ms | 0.02210 | 0.96476 |
+| bgcut 512 with rembg-style processing | 501.4 ms | 0.02319 | 0.96312 |
 
-Per-image IoU moved from `0.881` to `0.893` on Amelia and from `0.969` to `0.970` on Yoda kitten. Cat in sink, Teya, and Blind dog were effectively unchanged. Molly moved from `0.696` to `0.678`. The processing-only variant is not a product candidate.
+The processing-only variant improved Amelia from `0.881` to `0.893` IoU and Yoda kitten from `0.969` to `0.970`, but Molly fell from `0.696` to `0.678`. It is not a product candidate.
 
-The next experiment used the exact `birefnet-general-lite` ONNX model from the rembg comparison at 1024x1024. ONNX Runtime 1.30.0 created the WebGPU session, then the first inference failed at `/decoder/Split_33`. The shader needed 11 storage buffers while the M3 Pro WebGPU device exposed a per-stage limit of 10.
+The second experiment used rembg's BiRefNet General Lite model at 1024x1024. The original model has SHA-256 `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333` and size `224,005,088` bytes.
 
-ONNX Runtime's native WebGPU Split implementation binds one storage buffer for the input and one for each non-empty output. A Split with ten outputs therefore needs eleven storage buffers in one shader. See [ONNX Runtime's WebGPU Split implementation](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/core/providers/webgpu/tensor/split.cc).
+The raw model created an ONNX Runtime 1.30.0 WebGPU session, then failed at `/decoder/Split_33`. The Split shader needed eleven storage buffers while the M3 Pro device limit was ten. ONNX Runtime's native WebGPU Split implementation binds one storage buffer for the input and one for each non-empty output.
 
-PR #93 now includes a benchmark-only rewrite for this class of failure. It replaces every Split whose input plus outputs exceeds the configured storage-buffer limit with equivalent Slice nodes. Each Slice dispatch binds one input and one output instead of all Split outputs at once. ONNX Runtime WebGPU supports Slice for floating-point tensors.
+The benchmark rewrite replaced 50 wide Split nodes, `/decoder/Split` through `/decoder/Split_49`, with equivalent Slice nodes. The rewritten model has SHA-256 `12b606d8170f0ab4aff57b44df8127c5d4cc046628596a7eb5e39459b06fe3d3` and size `224,371,603` bytes.
 
-The rewrite command uses Python's `onnx` package. Keep that dependency in the disposable benchmark environment rather than adding it to bgcut's runtime dependencies.
+The rewrite passed the deterministic CPU equivalence gate exactly. The original and rewritten models produced 1,048,576 output values with zero differences. Maximum and mean absolute difference were both `0`.
+
+Both rewritten-model WebGPU benchmark modes then completed all six images.
+
+| Run | Warm median across image medians | Pooled IoU | Alpha MAE | F1 |
+| --- | ---: | ---: | ---: | ---: |
+| Current bgcut 512 WebGPU | 448.75 ms | 0.964762 | 0.022099 | 0.982065 |
+| General Lite original rembg CPU reference | 7.19 s | 0.977479 | 0.016113 | 0.988611 |
+| General Lite rewritten WebGPU + rembg processing | 6.73 s | 0.969981 | 0.018650 | 0.984762 |
+| General Lite rewritten WebGPU + bgcut processing | 6.76 s | 0.977448 | 0.014031 | 0.988595 |
+
+The 1024 model with bgcut processing produced the strongest candidate result. Molly improved from `0.696216` IoU on the current 512 model to `0.864092`. The aggregate IoU nearly matched the original rembg CPU result, and aggregate alpha MAE was lower on this set.
+
+The current 512 model remains the default. The 1024 candidate is about 15 times slower in the native WebGPU benchmark and is only a possible opt-in quality profile.
+
+The native candidate runner does not measure the browser production path. It uses `onnxruntime-node`, while bgcut's browser path uses ONNX Runtime Web graph capture plus persistent GPU input and output buffers. ONNX Runtime documents JavaScript `enableGraphCapture` as Web-only for the WebGPU execution provider. A browser benchmark is required before using the 6.7-second native result as the expected latency of a browser quality profile.
+
+ONNX Runtime printed a provider-placement notice for some shape-related nodes during the successful 1024 runs. No WebGPU kernel failed after the Split rewrite.
+
+These quality numbers use six binary segmentation masks. They do not measure soft fur or hair alpha, translucency, or edge-color cleanup. A quality-profile decision still needs visual inspection and a soft-alpha reference set.
+
+The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
 bun run model:rewrite-webgpu-splits -- \
   /path/to/birefnet-general-lite.onnx \
   /path/to/birefnet-general-lite-webgpu.onnx \
   --max-storage-buffers-per-stage 10
-```
 
-Before benchmarking the rewritten model on WebGPU, compare its CPU logits with the original model on the same deterministic 1024x1024 tensor:
-
-```sh
 bun run benchmark:model-equivalence -- \
   /path/to/birefnet-general-lite.onnx \
   /path/to/birefnet-general-lite-webgpu.onnx \
@@ -128,7 +145,7 @@ bun run benchmark:model-equivalence -- \
   ./tmp/general-lite-equivalence.json
 ```
 
-A rewritten candidate should not proceed to the quality benchmark unless this comparison is exact or any non-zero difference is explained and bounded.
+See [ONNX Runtime's WebGPU Split implementation](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/core/providers/webgpu/tensor/split.cc) for the storage-buffer behavior behind the rewrite.
 ### Published reference numbers
 
 These numbers are context only. They were not collected on the same hardware or with the same model, input, output path, or timing boundaries.
