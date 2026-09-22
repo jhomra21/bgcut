@@ -16,6 +16,12 @@ const BenchmarkConfigSchema = Schema.Struct({
   cases: Schema.Array(BenchmarkCaseSchema),
 });
 
+const diagnosticLogs: string[] = [];
+
+let diagnosticSessionCreated = false;
+
+let diagnosticSessionError = "";
+
 type RunTimings = {
   readonly totalMs: number;
   readonly decodeMs: number;
@@ -56,6 +62,71 @@ if (status === null) {
 const writeStatus = (message: string): void => {
   status.textContent += `${message}\n`;
 };
+
+const stringifyDiagnosticValue = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value instanceof Error) {
+    return `${value.message}\n${value.stack ?? ""}`;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const captureDiagnosticLog = (
+  level: string,
+  values: readonly unknown[],
+): void => {
+  if (diagnosticLogs.length >= 5000) {
+    return;
+  }
+
+  diagnosticLogs.push(
+    `[${level}] ${values.map(stringifyDiagnosticValue).join(" ")}`,
+  );
+};
+
+const installConsoleCapture = (): void => {
+  const originalDebug = console.debug.bind(console);
+  const originalInfo = console.info.bind(console);
+  const originalLog = console.log.bind(console);
+  const originalWarn = console.warn.bind(console);
+  const originalError = console.error.bind(console);
+
+  console.debug = (...values: unknown[]): void => {
+    captureDiagnosticLog("debug", values);
+    originalDebug(...values);
+  };
+
+  console.info = (...values: unknown[]): void => {
+    captureDiagnosticLog("info", values);
+    originalInfo(...values);
+  };
+
+  console.log = (...values: unknown[]): void => {
+    captureDiagnosticLog("log", values);
+    originalLog(...values);
+  };
+
+  console.warn = (...values: unknown[]): void => {
+    captureDiagnosticLog("warn", values);
+    originalWarn(...values);
+  };
+
+  console.error = (...values: unknown[]): void => {
+    captureDiagnosticLog("error", values);
+    originalError(...values);
+  };
+};
+
+installConsoleCapture();
+
 
 const median = (values: readonly number[]): number => {
   const sorted = [...values].sort((left, right) => left - right);
@@ -551,14 +622,55 @@ const main = async (): Promise<void> => {
 
   writeStatus(`Model loaded in ${modelMs.toFixed(1)} ms. Creating graph-capture session.`);
 
-  const sessionStartedAt = performance.now();
+  ort.env.logLevel = "verbose";
 
-  const session = await ort.InferenceSession.create(model, {
-    executionProviders: [{ name: "webgpu", device }],
-    enableGraphCapture: true,
-    graphOptimizationLevel: "all",
-    preferredOutputLocation: "gpu-buffer",
-  });
+  const sessionStartedAt = performance.now();
+  let session: ort.InferenceSession;
+
+  try {
+    session = await ort.InferenceSession.create(model, {
+      executionProviders: [{ name: "webgpu", device }],
+      enableGraphCapture: true,
+      graphOptimizationLevel: "all",
+      preferredOutputLocation: "gpu-buffer",
+      logSeverityLevel: 0,
+      logVerbosityLevel: 1,
+    });
+  } catch (captureError) {
+    writeStatus(
+      "Graph-capture session failed. Creating a no-capture diagnostic session for node placement.",
+    );
+
+    try {
+      const diagnosticSession = await ort.InferenceSession.create(model, {
+        executionProviders: [{ name: "webgpu", device }],
+        enableGraphCapture: false,
+        graphOptimizationLevel: "all",
+        preferredOutputLocation: "gpu-buffer",
+        logSeverityLevel: 0,
+        logVerbosityLevel: 1,
+      });
+
+      diagnosticSessionCreated = true;
+
+      await diagnosticSession.release();
+    } catch (diagnosticError) {
+      const parsedDiagnosticError =
+        diagnosticError instanceof Error
+          ? diagnosticError
+          : new Error(String(diagnosticError));
+
+      diagnosticSessionError =
+        `${parsedDiagnosticError.message}\n${parsedDiagnosticError.stack ?? ""}`;
+
+      captureDiagnosticLog(
+        "diagnostic-session-error",
+        [diagnosticSessionError],
+      );
+    }
+
+    throw captureError;
+  }
 
   const sessionMs = performance.now() - sessionStartedAt;
   const reports: CaseReport[] = [];
@@ -649,6 +761,7 @@ const main = async (): Promise<void> => {
     inputSize: config.inputSize,
     warmRepeats: config.warmRepeats,
     graphCapture: true,
+    diagnosticLogs,
     persistentGpuInput: true,
     persistentGpuOutput: true,
     cases: reports,
@@ -695,6 +808,11 @@ void main().catch((error) => {
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({
+      message,
+      diagnosticSessionCreated,
+      diagnosticSessionError,
+      logs: diagnosticLogs,
+    }),
   });
 });
