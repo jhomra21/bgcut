@@ -543,6 +543,7 @@ const app = Bun.serve({
         const stats = await sharp(targetPath)
           .ensureAlpha()
           .stats();
+
         const alpha = stats.channels.at(3);
 
         if (alpha === undefined || alpha.max === 0) {
