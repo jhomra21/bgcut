@@ -79,42 +79,42 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
       <nav class="site-nav" aria-label="Main navigation" data-active={props.page}>
         <span class="site-nav-indicator" aria-hidden="true" />
         <a
-        class="site-nav-docs"
-        href="/docs"
-        aria-current={props.page === "docs" ? "page" : undefined}
-        onClick={(event) => {
-          if (!shouldHandleInternalNavigation(event)) {
-            return;
-          }
+          class="site-nav-docs"
+          href="/docs"
+          aria-current={props.page === "docs" ? "page" : undefined}
+          onClick={(event) => {
+            if (!shouldHandleInternalNavigation(event)) {
+              return;
+            }
 
-          event.preventDefault();
-          props.onNavigate("docs");
-        }}
-      >
-        Docs
+            event.preventDefault();
+            props.onNavigate("docs");
+          }}
+        >
+          Docs
         </a>
         <a
-        class="site-nav-changelog"
-        href="/changelog"
-        aria-current={props.page === "changelog" ? "page" : undefined}
-        onClick={(event) => {
-          if (!shouldHandleInternalNavigation(event)) {
-            return;
-          }
+          class="site-nav-changelog"
+          href="/changelog"
+          aria-current={props.page === "changelog" ? "page" : undefined}
+          onClick={(event) => {
+            if (!shouldHandleInternalNavigation(event)) {
+              return;
+            }
 
-          event.preventDefault();
-          props.onNavigate("changelog");
-        }}
-      >
-        Changelog
+            event.preventDefault();
+            props.onNavigate("changelog");
+          }}
+        >
+          Changelog
         </a>
         <a
-        class="site-nav-github"
-        href="https://github.com/jhomra21/bgcut"
-        target="_blank"
-        rel="noreferrer"
-      >
-        GitHub
+          class="site-nav-github"
+          href="https://github.com/jhomra21/bgcut"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
         </a>
       </nav>
       <ThemeToggle />
