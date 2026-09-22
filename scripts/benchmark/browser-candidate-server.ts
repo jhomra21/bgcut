@@ -73,6 +73,12 @@ const outputRoot = resolve(outputArgument);
 
 const modelPath = resolve(modelArgument);
 
+const modelFile = Bun.file(modelPath);
+
+if (!(await modelFile.exists())) {
+  throw new Error(`Candidate model does not exist at ${modelPath}.`);
+}
+
 const inputSize = parsePositiveInteger(inputSizeArgument, "Input size");
 
 const warmRepeats = parsePositiveInteger(repeatsArgument, "Warm repeats");
@@ -235,7 +241,7 @@ const app = Bun.serve({
     }
 
     if (request.method === "GET" && url.pathname === "/model.onnx") {
-      return new Response(Bun.file(modelPath), {
+      return new Response(modelFile, {
         headers: {
           "content-type": "application/octet-stream",
           "cache-control": "no-store",
