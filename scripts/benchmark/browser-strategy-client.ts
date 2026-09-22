@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect";
 import { formatBackgroundRemovalError } from "../../src/browser/errors";
 import {
   removeBackgroundWebGpuWithStrategy,
+  type BrowserInferenceEngine,
   type WebGpuSessionStrategy,
 } from "../../src/browser/inference";
 import type { RemovalTimings } from "../../src/browser/timing";
@@ -22,7 +23,7 @@ type StrategyRunRecord = {
   readonly schemaVersion: 1;
   readonly strategy: WebGpuSessionStrategy;
   readonly run: number;
-  readonly engine: "webgpu";
+  readonly engine: BrowserInferenceEngine;
   readonly timings: RemovalTimings;
 };
 
