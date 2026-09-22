@@ -51,7 +51,7 @@ describe("site design contract", () => {
   test("uses semantic color tokens for light and dark themes", () => {
     expect(styles).toContain("--text-primary: #171717");
     expect(styles).toContain("--background-primary: #fbfbfa");
-    expect(styles).toContain('--theme-control: #efefe8');
+    expect(styles).toContain('--comparison-control: #efefe8');
     expect(styles).toContain('html[data-theme="dark"]');
     expect(styles).toContain("--text-primary: #f4f4f0");
     expect(styles).toContain("--background-primary: #11110f");
