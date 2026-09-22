@@ -100,7 +100,6 @@ const build = await Bun.build({
   format: "esm",
   minify: false,
   sourcemap: "inline",
-  write: false,
 });
 
 if (!build.success) {
