@@ -5,6 +5,7 @@ import {
   removeBackgroundWebGpuWithStrategy,
   type WebGpuSessionStrategy,
 } from "../../src/browser/inference";
+import type { RemovalTimings } from "../../src/browser/timing";
 
 const ConfigSchema = Schema.Struct({
   id: Schema.String,
@@ -16,6 +17,28 @@ const strategies = [
   "no-capture-reuse",
   "capture-recreate",
 ] as const satisfies readonly WebGpuSessionStrategy[];
+
+type StrategyRunRecord = {
+  readonly schemaVersion: 1;
+  readonly strategy: WebGpuSessionStrategy;
+  readonly run: number;
+  readonly engine: "webgpu";
+  readonly timings: RemovalTimings;
+};
+
+type StrategyReportEntry = {
+  readonly strategy: WebGpuSessionStrategy;
+  readonly runs: StrategyRunRecord[];
+};
+
+type StrategyReport = {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly userAgent: string;
+  readonly id: string;
+  readonly runsPerStrategy: number;
+  readonly strategies: StrategyReportEntry[];
+};
 
 const status = document.querySelector<HTMLPreElement>("#status");
 
@@ -71,23 +94,21 @@ const main = async (): Promise<void> => {
   }
 
   const source = await inputResponse.blob();
-  const report = {
+
+  const report: StrategyReport = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     userAgent: navigator.userAgent,
     id: config.id,
     runsPerStrategy: config.runsPerStrategy,
-    strategies: [] as Array<{
-      strategy: WebGpuSessionStrategy;
-      runs: unknown[];
-    }>,
+    strategies: [],
   };
 
   for (const strategy of strategies) {
     writeStatus("");
     writeStatus(`Strategy: ${strategy}`);
 
-    const runs: unknown[] = [];
+    const runs: StrategyRunRecord[] = [];
 
     for (
       let run = 0;
@@ -129,13 +150,14 @@ const main = async (): Promise<void> => {
         );
       }
 
-      const runRecord = {
+      const runRecord: StrategyRunRecord = {
         schemaVersion: 1,
         strategy,
         run: run + 1,
         engine: outcome.result.engine,
         timings: outcome.result.timings,
       };
+
       const runResponse = await fetch(
         `/run/${strategy}/${run}`,
         {
