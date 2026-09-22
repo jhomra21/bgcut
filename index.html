@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,9 +11,27 @@
     />
     <meta name="application-name" content="bgcut" />
     <meta name="apple-mobile-web-app-title" content="bgcut" />
-    <meta name="theme-color" content="#ffffff" />
-    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#fbfbfa" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
+    <script>
+      (() => {
+        try {
+          const storedTheme = window.localStorage.getItem("bgcut-theme");
+
+          if (storedTheme !== "light" && storedTheme !== "dark") {
+            return;
+          }
+
+          document.documentElement.dataset.theme = storedTheme;
+          document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute("content", storedTheme === "dark" ? "#11110f" : "#fbfbfa");
+        } catch {
+          // The default light theme remains active when storage is unavailable.
+        }
+      })();
+    </script>
 
     <link rel="canonical" href="https://bgcut.dev/" />
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png?v=2" />
