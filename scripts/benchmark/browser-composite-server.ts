@@ -242,10 +242,13 @@ const runScore = async (
       stderr: "pipe",
     },
   );
+
   const stdout =
     await new Response(process.stdout).text();
+
   const stderr =
     await new Response(process.stderr).text();
+
   const exitCode = await process.exited;
 
   if (exitCode !== 0) {
@@ -255,7 +258,25 @@ const runScore = async (
   }
 };
 
-const compareOutputs = async (): Promise<unknown> => {
+type PixelComparison = {
+  readonly schemaVersion: 1;
+  readonly pixels: number;
+  readonly alpha: {
+    readonly meanAbsoluteByteDifference: number;
+    readonly maxAbsoluteByteDifference: number;
+    readonly differingPixels: number;
+    readonly differingPixelFraction: number;
+    readonly pixelsOverOneByte: number;
+    readonly pixelsOverOneByteFraction: number;
+  };
+  readonly visibleRgb: {
+    readonly meanAbsoluteByteDifference: number;
+    readonly maxAbsoluteByteDifference: number;
+    readonly comparedValues: number;
+  };
+};
+
+const compareOutputs = async (): Promise<PixelComparison> => {
   let alphaAbsolute = 0;
   let alphaMaximum = 0;
   let alphaDifferent = 0;
@@ -267,6 +288,7 @@ const compareOutputs = async (): Promise<unknown> => {
 
   for (const benchmarkCase of manifest.cases) {
     const name = safeOutputName(benchmarkCase.id);
+
     const [cpu, gpu] = await Promise.all([
       sharp(join(cpuOutputRoot, name))
         .ensureAlpha()
@@ -300,6 +322,7 @@ const compareOutputs = async (): Promise<unknown> => {
       const index = pixel * 4;
       const cpuAlpha = cpu.data[index + 3];
       const gpuAlpha = gpu.data[index + 3];
+
       const alphaDifference =
         Math.abs(cpuAlpha - gpuAlpha);
 
@@ -440,6 +463,7 @@ const app = Bun.serve({
         inputMatch[1],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(index);
 
@@ -474,13 +498,20 @@ const app = Bun.serve({
       request.method === "POST" &&
       outputMatch !== null
     ) {
-      const mode = outputMatch[1] as
-        | "cpu"
-        | "gpu";
+      const mode = outputMatch[1];
+
+      if (mode !== "cpu" && mode !== "gpu") {
+        return new Response(
+          "Unknown benchmark output mode.",
+          { status: 404 },
+        );
+      }
+
       const index = Number.parseInt(
         outputMatch[2],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(index);
 
@@ -586,10 +617,13 @@ const app = Bun.serve({
 });
 
 console.log("");
+
 console.log(
   "Browser composite benchmark is ready.",
 );
+
 console.log(
   `Open http://${app.hostname}:${app.port}/ in a WebGPU browser.`,
 );
+
 console.log(`Outputs: ${outputRoot}`);
