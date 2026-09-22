@@ -164,6 +164,11 @@ The browser runner enables ONNX Runtime Web graph capture and keeps the model in
 
 This test is necessary because `onnxruntime-node` does not expose the JavaScript WebGPU graph-capture option used by bgcut's browser runtime. The native 6.7-second result is therefore not the expected browser latency for a possible quality profile.
 
+The Safari E2E run on the rewritten General Lite model reached ONNX Runtime session creation and then rejected graph capture because the final graph was not fully compatible with the WebGPU capture policy. No image ran.
+
+ONNX Runtime 1.30 already allows CPU shape-only nodes during WebGPU graph capture when they do not introduce host/device copy nodes. Its capture check rejects the graph if another provider owns compute or if `MemcpyFromHost` / `MemcpyToHost` nodes are present. The generic warning that some shape-related nodes use CPU is therefore not enough to identify the blocker.
+
+The browser harness now captures verbose ORT session logs. When graph-capture creation fails, it automatically creates a second no-capture diagnostic session, records ORT's `Node placements` output, releases that session, and includes the captured log lines plus diagnostic-session status in `browser-failure.json`. This diagnostic session is not used as a benchmark fallback.
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
