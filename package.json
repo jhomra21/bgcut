@@ -55,7 +55,7 @@
     "test": "bun test",
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package/smoke.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run build && bun run package:dry-run && bun run package:smoke",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-replay:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
     "cloudflare:runtime:remote": "bun run scripts/cloudflare/upload-runtime.ts",
@@ -66,7 +66,8 @@
     "benchmark:bgcut": "bun run scripts/benchmark/bgcut.ts",
     "benchmark:score": "bun run scripts/benchmark/score.ts",
     "benchmark:browser-replay": "bun run scripts/benchmark/browser-replay-server.ts",
-    "benchmark:browser-replay:e2e": "bun run scripts/benchmark/browser-replay-e2e.ts"
+    "benchmark:browser-replay:e2e": "bun run scripts/benchmark/browser-replay-e2e.ts",
+    "benchmark:browser-replay:bundle-check": "bun run scripts/benchmark/browser-replay-bundle-check.ts"
   },
   "dependencies": {
     "effect": "3.22.2",
