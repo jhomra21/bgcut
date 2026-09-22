@@ -25,6 +25,17 @@ type BrowserTarget =
       readonly experimental: boolean;
     };
 
+type ChromiumLaunch = {
+  readonly process: Bun.Subprocess;
+  readonly stdout: Promise<string>;
+  readonly stderr: Promise<string>;
+};
+
+type MacosLaunch = {
+  readonly stdout: string;
+  readonly stderr: string;
+};
+
 const chromiumCandidates = (): readonly {
   readonly name: string;
   readonly executable: string;
@@ -251,11 +262,7 @@ const launchChromium = (
   target: Extract<BrowserTarget, { readonly kind: "chromium" }>,
   profileDirectory: string,
   url: string,
-): {
-  readonly process: Bun.Subprocess;
-  readonly stdout: Promise<string>;
-  readonly stderr: Promise<string>;
-} => {
+): ChromiumLaunch => {
   const process = Bun.spawn(
     [
       target.executable,
@@ -290,10 +297,7 @@ const launchChromium = (
 const launchMacosApp = async (
   target: Extract<BrowserTarget, { readonly kind: "macos-open" }>,
   url: string,
-): Promise<{
-  readonly stdout: string;
-  readonly stderr: string;
-}> => {
+): Promise<MacosLaunch> => {
   const process = Bun.spawn(
     ["open", "-na", target.appName, url],
     {
@@ -302,8 +306,11 @@ const launchMacosApp = async (
       stderr: "pipe",
     },
   );
+
   const stdout = readSubprocessPipe(process.stdout);
+
   const stderr = readSubprocessPipe(process.stderr);
+
   const exitCode = await process.exited;
   const [capturedStdout, capturedStderr] = await Promise.all([
     stdout,
