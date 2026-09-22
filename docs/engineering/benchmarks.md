@@ -169,6 +169,12 @@ The Safari E2E run on the rewritten General Lite model reached ONNX Runtime sess
 ONNX Runtime 1.30 already allows CPU shape-only nodes during WebGPU graph capture when they do not introduce host/device copy nodes. Its capture check rejects the graph if another provider owns compute or if `MemcpyFromHost` / `MemcpyToHost` nodes are present. The generic warning that some shape-related nodes use CPU is therefore not enough to identify the blocker.
 
 The browser harness now captures verbose ORT session logs. When graph-capture creation fails, it automatically creates a second no-capture diagnostic session, records ORT's `Node placements` output, releases that session, and includes the captured log lines plus diagnostic-session status in `browser-failure.json`. This diagnostic session is not used as a benchmark fallback.
+
+The placement diagnostic exposed 320 CPU nodes and 5,145 WebGPU nodes. The CPU islands repeat across five ASPP regions and include 20 `Split` nodes produced by ORT's `GatherSliceToSplitFusion`.
+
+In ONNX Runtime 1.30, `GatherSliceToSplitFusion` is a Level 2 graph transformer registered only for CPU and CUDA execution providers. The browser candidate had been using `graphOptimizationLevel: "all"`, which enabled that transformer and created CPU-only `Split` nodes inside otherwise WebGPU-oriented regions. The browser candidate now uses `graphOptimizationLevel: "basic"` for both the capture attempt and the no-capture placement diagnostic. This skips Level 2 so the original Gather/Slice form remains available to WebGPU partitioning.
+
+This change is preferable to rewriting the 320-node CPU regions by hand. If basic optimization removes the CPU compute islands, the existing Split-to-Slice model rewrite remains the only candidate-model graph rewrite needed.
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
