@@ -282,6 +282,7 @@ try {
   );
   const completionDeadline =
     Date.now() + timeoutMs;
+  let completed = false;
 
   while (Date.now() < completionDeadline) {
     const failurePath = join(
@@ -311,6 +312,8 @@ try {
       ));
 
     if (complete.every(Boolean)) {
+      completed = true;
+
       console.log(
         "Browser composite benchmark completed.",
       );
@@ -334,6 +337,12 @@ try {
     }
 
     await Bun.sleep(500);
+  }
+
+  if (!completed) {
+    throw new Error(
+      `Browser composite benchmark timed out after ${timeoutMs} ms.`,
+    );
   }
 } finally {
   browser?.kill();
