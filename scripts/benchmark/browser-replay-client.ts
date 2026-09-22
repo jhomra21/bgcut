@@ -1,6 +1,7 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 
-import { removeBrowserBackground } from "../../src/browser/actions";
+import { formatBackgroundRemovalError } from "../../src/browser/errors";
+import { removeBackgroundWebGpu } from "../../src/browser/inference";
 
 const ConfigSchema = Schema.Struct({
   id: Schema.String,
@@ -16,6 +17,26 @@ if (status === null) {
 const writeStatus = (message: string): void => {
   status.textContent += `${message}\n`;
 };
+
+let completedRuns = 0;
+
+const removeWithWebGpuOnly = async (
+  file: File,
+) =>
+  Effect.runPromise(
+    removeBackgroundWebGpu(file).pipe(
+      Effect.match({
+        onFailure: (error) => ({
+          ok: false as const,
+          message: formatBackgroundRemovalError(error),
+        }),
+        onSuccess: (result) => ({
+          ok: true as const,
+          result,
+        }),
+      }),
+    ),
+  );
 
 const main = async (): Promise<void> => {
   const configResponse = await fetch("/config.json");
@@ -55,7 +76,7 @@ const main = async (): Promise<void> => {
       },
     );
 
-    const outcome = await removeBrowserBackground(file);
+    const outcome = await removeWithWebGpuOnly(file);
 
     if (!outcome.ok) {
       throw new Error(
@@ -77,6 +98,30 @@ const main = async (): Promise<void> => {
       );
     }
 
+    const timingRecord = {
+      schemaVersion: 1,
+      run: run + 1,
+      engine: outcome.result.engine,
+      timings: outcome.result.timings,
+    };
+    const timingUpload = await fetch(
+      `/run/${run}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(timingRecord),
+      },
+    );
+
+    if (!timingUpload.ok) {
+      throw new Error(
+        `Could not save run ${run + 1} timing: ${await timingUpload.text()}`,
+      );
+    }
+
+    completedRuns = run + 1;
     runs.push(outcome.result.timings);
   }
 
@@ -121,6 +166,11 @@ void main().catch((error) => {
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({
+      message,
+      mode: "webgpu-only",
+      graphId: "1",
+      completedRuns,
+    }),
   });
 });
