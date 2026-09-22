@@ -18,6 +18,8 @@ const BenchmarkConfigSchema = Schema.Struct({
 
 const diagnosticLogs: string[] = [];
 
+const MAX_DIAGNOSTIC_LOGS = 50_000;
+
 let diagnosticSessionCreated = false;
 
 let diagnosticSessionError = "";
@@ -77,7 +79,7 @@ const captureDiagnosticLog = (
   level: string,
   values: readonly DiagnosticConsoleValue[],
 ): void => {
-  if (diagnosticLogs.length >= 5000) {
+  if (diagnosticLogs.length >= MAX_DIAGNOSTIC_LOGS) {
     return;
   }
 
