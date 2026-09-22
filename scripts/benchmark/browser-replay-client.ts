@@ -104,6 +104,7 @@ const main = async (): Promise<void> => {
       engine: outcome.result.engine,
       timings: outcome.result.timings,
     };
+
     const timingUpload = await fetch(
       `/run/${run}`,
       {
