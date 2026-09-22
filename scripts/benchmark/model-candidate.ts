@@ -477,7 +477,7 @@ const reportPath = join(outputRoot, "timings.json");
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
 console.log(
-  `Wrote ${caseReports.length} candidate-model outputs to ${outputRoot} with ${provider} and ${pipeline} pipelineing.`,
+  `Wrote ${caseReports.length} candidate-model outputs to ${outputRoot} with ${provider} and ${pipeline} processing.`,
 );
 
 console.log(`Timing report: ${reportPath}`);
