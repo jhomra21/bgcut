@@ -2,6 +2,13 @@ import { Schema } from "effect";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+import packageJson from "../../package.json";
+import {
+  MODEL_FILENAME,
+  MODEL_INPUT_SIZE,
+  MODEL_SHA256,
+  MODEL_SIZE_BYTES,
+} from "../../src/shared/model-config";
 import {
   createBgcut,
   type BgcutEngine,
@@ -91,6 +98,10 @@ const manifest = Schema.decodeUnknownSync(BenchmarkManifestSchema)(
   JSON.parse(await readFile(manifestPath, "utf8")),
 );
 
+if (manifest.cases.length === 0) {
+  throw new Error("Benchmark manifest must contain at least one case.");
+}
+
 await mkdir(outputRoot, { recursive: true });
 
 const bgcut = await createBgcut({ engine: requestedEngine });
@@ -131,7 +142,15 @@ try {
 const report = {
   schemaVersion: 1,
   tool: "bgcut",
+  version: packageJson.version,
   generatedAt: new Date().toISOString(),
+  model: {
+    filename: MODEL_FILENAME,
+    sizeBytes: MODEL_SIZE_BYTES,
+    sha256: MODEL_SHA256,
+    inputWidth: MODEL_INPUT_SIZE,
+    inputHeight: MODEL_INPUT_SIZE,
+  },
   runtime: {
     platform: process.platform,
     arch: process.arch,
