@@ -62,7 +62,9 @@
     "brand:prepare": "bun run scripts/brand/prepare-assets.ts",
     "package:prepare": "bun run scripts/package/prepare.ts",
     "prepack": "bun run package:prepare",
-    "site:prepare-routes": "bun run scripts/site/prepare-static-routes.ts"
+    "site:prepare-routes": "bun run scripts/site/prepare-static-routes.ts",
+    "benchmark:bgcut": "bun run scripts/benchmark/bgcut.ts",
+    "benchmark:score": "bun run scripts/benchmark/score.ts"
   },
   "dependencies": {
     "effect": "3.22.2",
