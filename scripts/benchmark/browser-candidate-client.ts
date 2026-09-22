@@ -244,7 +244,7 @@ const uploadModelInput = (
   inputBuffer: GPUBuffer,
   preprocess: PreprocessPipeline,
   inputSize: number,
-): void => {
+): GPUTexture => {
   const sourceTexture = device.createTexture({
     size: [bitmap.width, bitmap.height],
     format: "rgba8unorm",
@@ -293,8 +293,12 @@ const uploadModelInput = (
     pass.end();
 
     device.queue.submit([encoder.finish()]);
-  } finally {
+
+    return sourceTexture;
+  } catch (error) {
     sourceTexture.destroy();
+
+    throw error;
   }
 };
 
@@ -425,7 +429,7 @@ const runRemoval = async (
   try {
     stageStartedAt = performance.now();
 
-    uploadModelInput(
+    const sourceTexture = uploadModelInput(
       device,
       bitmap,
       io.inputBuffer,
@@ -474,6 +478,8 @@ const runRemoval = async (
 
     const blob = await canvasToPng(output);
     const exportMs = performance.now() - stageStartedAt;
+
+    sourceTexture.destroy();
 
     return {
       blob,
