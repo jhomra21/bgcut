@@ -3,6 +3,10 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { resolveBrowserEnginePreference } from "./engine-preference";
 import {
+  resolveDefaultWebGpuSessionStrategy,
+  type WebGpuSessionStrategy,
+} from "./webgpu-session-strategy";
+import {
   InferenceFailed,
   ModelDownloadFailed,
   ModelLoadFailed,
@@ -27,11 +31,6 @@ import {
 export { MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
-
-export type WebGpuSessionStrategy =
-  | "capture-reuse"
-  | "capture-recreate"
-  | "no-capture-reuse";
 
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
@@ -184,6 +183,7 @@ const runModel = (
   runtime: GpuRuntime,
   sourceBitmap: ImageBitmap,
   timings: RemovalTimingRecorder,
+  graphCapture: boolean,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
     const inputName = session.inputNames.at(0);
@@ -211,7 +211,9 @@ const runModel = (
               ),
             catch: (cause) =>
               new InferenceFailed({
-                message: `Optimized BiRefNet graph-capture inference failed on the WebGPU device. ${String(cause)}`,
+                message: graphCapture
+                  ? `Optimized BiRefNet graph-capture inference failed on the WebGPU device. ${String(cause)}`
+                  : `Optimized BiRefNet inference failed on the WebGPU device. ${String(cause)}`,
               }),
           });
 
@@ -267,6 +269,7 @@ export const removeBackgroundWebGpuWithStrategy = (
                   runtime,
                   bitmap,
                   timings,
+                  strategy !== "no-capture-reuse",
                 );
 
                 const stopMatte = timings.begin("matteMs");
@@ -300,7 +303,14 @@ export const removeBackgroundWebGpuWithStrategy = (
 export const removeBackgroundWebGpu = (
   file: File,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
-  removeBackgroundWebGpuWithStrategy(file, "capture-reuse");
+  removeBackgroundWebGpuWithStrategy(
+    file,
+    resolveDefaultWebGpuSessionStrategy(
+      typeof globalThis.navigator === "undefined"
+        ? ""
+        : globalThis.navigator.userAgent,
+    ),
+  );
 
 const removeBackgroundWithWasm = (
   file: File,
