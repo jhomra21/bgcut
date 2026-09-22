@@ -62,6 +62,7 @@ const findBrowser = async (): Promise<BrowserTarget> => {
   const configured =
     process.env.BGCUT_BROWSER_PATH ??
     process.env.BGCUT_CHROME_PATH;
+
   const candidates = [
     ...(configured === undefined
       ? []
