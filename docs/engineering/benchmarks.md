@@ -60,6 +60,19 @@ Use these as the first comparison set:
 
 Do not use published timing claims from another machine as a head-to-head result. They are useful for choosing what to measure, not for ranking tools.
 
+### Published reference numbers
+
+These numbers are context only. They were not collected on the same hardware or with the same model, input, output path, or timing boundaries.
+
+| Tool | Environment | Reported number | Boundary |
+| --- | --- | --- | --- |
+| bgcut | Apple M3 Pro, current accepted browser fast path | 422 ms warm median | Full browser removal from decoded source through source-resolution PNG export |
+| IMG.LY background-removal-js | Apple M3 Max, June 2024 WebGPU fp16 benchmark | about 100 ms on consecutive runs; about 300 ms for the first neural-network run | ONNX model initialization and neural-network execution, with model download discussed separately |
+
+The IMG.LY post is useful as a WebGPU reference, but it is not evidence that either tool is faster. bgcut's current WebGPU timing also records `session.run()` submission separately from the later output-buffer synchronization, so the small submit span is not a GPU execution measurement.
+
+Source: [IMG.LY's WebGPU benchmark](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/).
+
 ### Ideas worth testing
 
 The competitor review points to a small set of changes that fit bgcut:
