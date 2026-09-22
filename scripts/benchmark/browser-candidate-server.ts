@@ -34,6 +34,10 @@ const QualityReportSchema = Schema.Struct({
   cases: Schema.Array(QualityMetricSchema),
 });
 
+const BrowserFailureSchema = Schema.Struct({
+  message: Schema.String,
+});
+
 const usage =
   "Usage: bun run benchmark:browser-candidate -- <manifest.json> <output-dir> <model.onnx> <input-size> [warm-repeats] [port]";
 
@@ -299,6 +303,19 @@ const app = Bun.serve({
       );
 
       return new Response("saved");
+    }
+
+    if (request.method === "POST" && url.pathname === "/failure") {
+      const failure = Schema.decodeUnknownSync(BrowserFailureSchema)(
+        await request.json(),
+      );
+
+      await writeFile(
+        join(outputRoot, "browser-failure.json"),
+        `${JSON.stringify(failure, null, 2)}\n`,
+      );
+
+      return new Response("failure recorded");
     }
 
     if (request.method === "POST" && url.pathname === "/report") {
