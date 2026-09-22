@@ -183,6 +183,7 @@ const encodeOutput = async (
   postprocess: CandidatePostprocess,
 ): Promise<Buffer> => {
   const alpha = createMask(logits, postprocess);
+
   const resizedAlpha = await sharp(Buffer.from(alpha), {
     raw: {
       width: inputSize,
@@ -326,6 +327,7 @@ if (modelFingerprint === undefined) {
 await mkdir(outputRoot, { recursive: true });
 
 const provider = requestedEngine === "gpu" ? "webgpu" : "cpu";
+
 const setupStartedAt = performance.now();
 
 const session = await ort.InferenceSession.create(modelPath, {
@@ -334,6 +336,7 @@ const session = await ort.InferenceSession.create(modelPath, {
 });
 
 const setupMs = performance.now() - setupStartedAt;
+
 const caseReports: CaseReport[] = [];
 
 try {
@@ -341,6 +344,7 @@ try {
     const inputPath = resolve(manifestRoot, benchmarkCase.input);
     const outputName = `${benchmarkCase.id.replaceAll("/", "__").replaceAll("\\", "__")}.png`;
     const outputPath = join(outputRoot, outputName);
+
     const firstResult = await remove(
       session,
       inputPath,
