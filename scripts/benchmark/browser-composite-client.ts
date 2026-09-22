@@ -29,6 +29,7 @@ type CaseReport = {
   readonly id: string;
   readonly gpu: ModeReport;
   readonly cpu: ModeReport;
+  readonly postGpuCpuSentinel: RemovalTimings;
 };
 
 const status = document.querySelector<HTMLPreElement>("#status");
@@ -146,6 +147,14 @@ const main = async (): Promise<void> => {
 
     const source = await inputResponse.blob();
 
+    const cpuFirst = await runMode(
+      "cpu",
+      source,
+      benchmarkCase.id,
+    );
+
+    await uploadOutput("cpu", caseIndex, cpuFirst.blob);
+
     const gpuFirst = await runMode(
       "gpu",
       source,
@@ -154,13 +163,11 @@ const main = async (): Promise<void> => {
 
     await uploadOutput("gpu", caseIndex, gpuFirst.blob);
 
-    const cpuFirst = await runMode(
+    const postGpuCpuSentinel = await runMode(
       "cpu",
       source,
       benchmarkCase.id,
     );
-
-    await uploadOutput("cpu", caseIndex, cpuFirst.blob);
 
     const gpuWarmRuns: RemovalTimings[] = [];
     const cpuWarmRuns: RemovalTimings[] = [];
@@ -208,6 +215,7 @@ const main = async (): Promise<void> => {
         firstRun: cpuFirst.timings,
         warmRuns: cpuWarmRuns,
       } satisfies ModeReport,
+      postGpuCpuSentinel: postGpuCpuSentinel.timings,
     });
   }
 
