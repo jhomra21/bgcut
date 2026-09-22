@@ -625,7 +625,7 @@ const main = async (): Promise<void> => {
     session = await ort.InferenceSession.create(model, {
       executionProviders: [{ name: "webgpu", device }],
       enableGraphCapture: true,
-      graphOptimizationLevel: "all",
+      graphOptimizationLevel: "basic",
       preferredOutputLocation: "gpu-buffer",
       logSeverityLevel: 0,
       logVerbosityLevel: 1,
@@ -639,7 +639,7 @@ const main = async (): Promise<void> => {
       const diagnosticSession = await ort.InferenceSession.create(model, {
         executionProviders: [{ name: "webgpu", device }],
         enableGraphCapture: false,
-        graphOptimizationLevel: "all",
+        graphOptimizationLevel: "basic",
         preferredOutputLocation: "gpu-buffer",
         logSeverityLevel: 0,
         logVerbosityLevel: 1,
@@ -755,6 +755,7 @@ const main = async (): Promise<void> => {
     inputSize: config.inputSize,
     warmRepeats: config.warmRepeats,
     graphCapture: true,
+    graphOptimizationLevel: "basic",
     diagnosticLogs,
     persistentGpuInput: true,
     persistentGpuOutput: true,
