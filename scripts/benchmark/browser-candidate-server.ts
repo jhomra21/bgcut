@@ -36,6 +36,9 @@ const QualityReportSchema = Schema.Struct({
 
 const BrowserFailureSchema = Schema.Struct({
   message: Schema.String,
+  diagnosticSessionCreated: Schema.Boolean,
+  diagnosticSessionError: Schema.String,
+  logs: Schema.Array(Schema.String),
 });
 
 const usage =
