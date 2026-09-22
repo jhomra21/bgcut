@@ -12,6 +12,28 @@ const BenchmarkManifestSchema = Schema.Struct({
   cases: Schema.Array(BenchmarkCaseSchema),
 });
 
+const QualityMetricSchema = Schema.Struct({
+  id: Schema.String,
+  pixels: Schema.Number,
+  mae: Schema.Number,
+  mse: Schema.Number,
+  iou: Schema.Number,
+  f1: Schema.Number,
+});
+
+const QualityReportSchema = Schema.Struct({
+  schemaVersion: Schema.Number,
+  outputDirectory: Schema.String,
+  metrics: Schema.Struct({
+    mae: Schema.String,
+    mse: Schema.String,
+    iou: Schema.String,
+    f1: Schema.String,
+  }),
+  aggregate: QualityMetricSchema,
+  cases: Schema.Array(QualityMetricSchema),
+});
+
 const usage =
   "Usage: bun run benchmark:browser-candidate -- <manifest.json> <output-dir> <model.onnx> <input-size> [warm-repeats] [port]";
 
@@ -71,6 +93,7 @@ const clientEntry = join(
   import.meta.dir,
   "browser-candidate-client.ts",
 );
+
 const build = await Bun.build({
   entrypoints: [clientEntry],
   target: "browser",
@@ -93,10 +116,12 @@ if (clientOutput === undefined) {
 }
 
 const clientSource = await clientOutput.text();
+
 const runtimePath = resolve(
   import.meta.dir,
   "../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm",
 );
+
 const runtimeFile = Bun.file(runtimePath);
 
 if (!(await runtimeFile.exists())) {
@@ -149,8 +174,9 @@ const config = {
   })),
 };
 
-const scoreOutputs = async (): Promise<unknown> => {
+const scoreOutputs = async () => {
   const qualityPath = join(outputRoot, "quality.json");
+
   const process = Bun.spawn(
     [
       "bun",
@@ -167,6 +193,7 @@ const scoreOutputs = async (): Promise<unknown> => {
       stderr: "pipe",
     },
   );
+
   const stdout = await new Response(process.stdout).text();
   const stderr = await new Response(process.stderr).text();
   const exitCode = await process.exited;
@@ -177,7 +204,9 @@ const scoreOutputs = async (): Promise<unknown> => {
     );
   }
 
-  return JSON.parse(await readFile(qualityPath, "utf8")) as unknown;
+  return Schema.decodeUnknownSync(QualityReportSchema)(
+    JSON.parse(await readFile(qualityPath, "utf8")),
+  );
 };
 
 const app = Bun.serve({
@@ -297,7 +326,11 @@ const app = Bun.serve({
 });
 
 console.log("");
+
 console.log("Browser candidate benchmark is ready.");
+
 console.log(`Open http://${app.hostname}:${app.port}/ in Chrome.`);
+
 console.log(`Outputs: ${outputRoot}`);
+
 console.log("Keep this process running until the page reports completion.");
