@@ -649,6 +649,7 @@ const main = async (): Promise<void> => {
     );
 
     try {
+      const diagnosticLogStart = diagnosticLogs.length;
       const diagnosticSession = await ort.InferenceSession.create(model, {
         executionProviders: [webgpuProvider],
         enableGraphCapture: false,
@@ -658,9 +659,21 @@ const main = async (): Promise<void> => {
         logVerbosityLevel: 1,
       });
 
-      diagnosticSessionCreated = true;
+      try {
+        const providerConfirmedInt64 = diagnosticLogs
+          .slice(diagnosticLogStart)
+          .some((line) => line.includes("WebGPU EP enable int64: 1"));
 
-      await diagnosticSession.release();
+        if (!providerConfirmedInt64) {
+          throw new Error(
+            "Diagnostic WebGPU provider did not confirm int64 support. Expected verbose log: WebGPU EP enable int64: 1",
+          );
+        }
+
+        diagnosticSessionCreated = true;
+      } finally {
+        await diagnosticSession.release();
+      }
     } catch (diagnosticError) {
       const parsedDiagnosticError =
         diagnosticError instanceof Error
