@@ -56,7 +56,7 @@
     "test": "bun test",
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package/smoke.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-candidate:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
+    "check": "bun run lint && bun run typecheck && bun run model:rewrite-check && bun run test && bun run benchmark:browser-candidate:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
     "cloudflare:runtime:remote": "bun run scripts/cloudflare/upload-runtime.ts",
@@ -70,7 +70,9 @@
     "benchmark:browser-candidate:e2e": "bun run scripts/benchmark/browser-candidate-e2e.ts",
     "benchmark:model-equivalence": "bun run scripts/benchmark/model-equivalence.ts",
     "benchmark:score": "bun run scripts/benchmark/score.ts",
-    "benchmark:browser-candidate:bundle-check": "bun run scripts/benchmark/browser-candidate-bundle-check.ts"
+    "benchmark:browser-candidate:bundle-check": "bun run scripts/benchmark/browser-candidate-bundle-check.ts",
+    "model:rewrite-webgpu-shape-ops": "python3 scripts/model/rewrite-webgpu-shape-ops.py",
+    "model:rewrite-check": "python3 -m py_compile scripts/model/rewrite-webgpu-splits.py scripts/model/rewrite-webgpu-shape-ops.py"
   },
   "dependencies": {
     "effect": "3.22.2",
