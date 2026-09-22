@@ -263,6 +263,7 @@ try {
       outputRoot,
       "browser-strategies.json",
     );
+
     const comparisonPath = join(
       outputRoot,
       "pixel-comparison.json",
