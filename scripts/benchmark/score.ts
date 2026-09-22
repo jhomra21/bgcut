@@ -167,6 +167,10 @@ const manifest = Schema.decodeUnknownSync(BenchmarkManifestSchema)(
   JSON.parse(await readFile(manifestPath, "utf8")),
 );
 
+if (manifest.cases.length === 0) {
+  throw new Error("Benchmark manifest must contain at least one case.");
+}
+
 const aggregate = emptyTotals();
 
 const cases: CaseMetrics[] = [];
