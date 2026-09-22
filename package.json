@@ -64,7 +64,9 @@
     "prepack": "bun run package:prepare",
     "site:prepare-routes": "bun run scripts/site/prepare-static-routes.ts",
     "benchmark:bgcut": "bun run scripts/benchmark/bgcut.ts",
-    "benchmark:score": "bun run scripts/benchmark/score.ts"
+    "benchmark:score": "bun run scripts/benchmark/score.ts",
+    "benchmark:browser-replay": "bun run scripts/benchmark/browser-replay-server.ts",
+    "benchmark:browser-replay:e2e": "bun run scripts/benchmark/browser-replay-e2e.ts"
   },
   "dependencies": {
     "effect": "3.22.2",
