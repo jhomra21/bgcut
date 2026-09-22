@@ -130,6 +130,23 @@ ONNX Runtime printed a provider-placement notice for some shape-related nodes du
 
 These quality numbers use six binary segmentation masks. They do not measure soft fur or hair alpha, translucency, or edge-color cleanup. A quality-profile decision still needs visual inspection and a soft-alpha reference set.
 
+The next timing check is the browser graph-capture path. The local server bundles a browser client, serves the candidate model and manifest inputs from disk, and writes source-resolution PNGs plus `browser-timings.json` and `quality.json` to the requested output directory.
+
+```sh
+bun run benchmark:browser-candidate -- \
+  /path/to/manifest.json \
+  /path/to/browser-output \
+  /path/to/birefnet-general-lite-webgpu.onnx \
+  1024 \
+  5
+
+# Open the printed 127.0.0.1 URL in Chrome and keep the process running.
+```
+
+The browser runner enables ONNX Runtime Web graph capture and keeps the model input and output in fixed WebGPU buffers across runs. It repeats the browser pipeline for each image, including image decode, GPU preprocessing, output readback, matte construction, source-resolution compositing, and PNG export. Model fetch time and session creation are reported separately.
+
+This test is necessary because `onnxruntime-node` does not expose the JavaScript WebGPU graph-capture option used by bgcut's browser runtime. The native 6.7-second result is therefore not the expected browser latency for a possible quality profile.
+
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
