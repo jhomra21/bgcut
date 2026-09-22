@@ -676,6 +676,7 @@ void main().catch((error) => {
     error instanceof Error
       ? error
       : new Error(String(error));
+
   const message = `${parsedError.message}\n${parsedError.stack ?? ""}`;
 
   writeStatus("");
