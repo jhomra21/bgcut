@@ -7,7 +7,9 @@ const root = await mkdtemp(
 );
 
 const manifestPath = join(root, "manifest.json");
+
 const modelPath = join(root, "model.onnx");
+
 const outputRoot = join(root, "output");
 
 try {
