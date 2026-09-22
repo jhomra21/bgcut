@@ -255,6 +255,7 @@ const compareOutputs = async (): Promise<PixelComparison> => {
 
   for (const benchmarkCase of manifest.cases) {
     const name = safeOutputName(benchmarkCase.id);
+
     const [production, capture] = await Promise.all([
       sharp(
         join(
@@ -397,6 +398,7 @@ const app = Bun.serve({
         inputMatch[1],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(index);
 
@@ -432,10 +434,12 @@ const app = Bun.serve({
       outputMatch !== null
     ) {
       const mode = outputMatch[1];
+
       const index = Number.parseInt(
         outputMatch[2],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(index);
 
@@ -450,6 +454,7 @@ const app = Bun.serve({
         mode === "production-default"
           ? productionOutputRoot
           : captureOutputRoot;
+
       const targetPath = join(
         targetRoot,
         safeOutputName(benchmarkCase.id),
@@ -488,14 +493,17 @@ const app = Bun.serve({
       runMatch !== null
     ) {
       const mode = runMatch[1];
+
       const caseIndex = Number.parseInt(
         runMatch[2],
         10,
       );
+
       const runIndex = Number.parseInt(
         runMatch[3],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(caseIndex);
 
