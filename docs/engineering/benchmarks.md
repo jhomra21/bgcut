@@ -60,6 +60,34 @@ Use these as the first comparison set:
 
 Do not use published timing claims from another machine as a head-to-head result. They are useful for choosing what to measure, not for ranking tools.
 
+### Candidate-model isolation
+
+After a cross-tool run finds a promising model, test that exact ONNX file through bgcut before proposing a product profile. This separates model quality from the competitor's runtime and postprocessing.
+
+```sh
+bun run benchmark:model-candidate -- \
+  /path/to/manifest.json \
+  ./tmp/bench/general-lite-webgpu-rembg \
+  /path/to/birefnet-general-lite.onnx \
+  1024 \
+  gpu \
+  5 \
+  rembg
+
+bun run benchmark:score -- \
+  /path/to/manifest.json \
+  ./tmp/bench/general-lite-webgpu-rembg
+```
+
+The final argument chooses the mask path:
+
+- `rembg`: sigmoid, per-image min/max normalization, then Lanczos resize. This mirrors rembg's BiRefNet General-family output handling closely enough to isolate the runtime and model on the existing benchmark.
+- `bgcut`: direct sigmoid-to-alpha conversion and cubic resize, matching bgcut's native output path.
+
+Run both modes before changing the public API. If the raw candidate cannot create a WebGPU session, keep the failure output: it identifies the next model-rewrite experiment instead of silently falling back to CPU.
+
+For BiRefNet General Lite, use a 1024 input. rembg's current General-family session preprocesses with ImageNet mean/std at 1024x1024 and applies sigmoid plus min/max normalization before resizing the mask to the source image.
+
 ### Published reference numbers
 
 These numbers are context only. They were not collected on the same hardware or with the same model, input, output path, or timing boundaries.
