@@ -4,8 +4,14 @@ import argparse
 import re
 from pathlib import Path
 
-import onnx
-from onnx import TensorProto, helper, numpy_helper, shape_inference
+try:
+    import onnx
+    from onnx import TensorProto, helper, shape_inference
+except ModuleNotFoundError as error:
+    raise SystemExit(
+        "rewrite-webgpu-splits.py requires the Python package 'onnx'. "
+        "Install it in the disposable benchmark environment before running this command."
+    ) from error
 
 
 def parse_args() -> argparse.Namespace:
@@ -257,8 +263,10 @@ def main() -> None:
         replacements_by_index[node_index] = replacement
 
         _, _, axis, output_sizes = replacement
+        label = node.name or f"Split[{node_index}]"
+
         print(
-            f'Rewrite {node.name or f"Split[{node_index}]"}: '
+            f"Rewrite {label}: "
             f"{len(node.output)} outputs, {storage_buffers} storage buffers, "
             f"axis {axis}, split sizes {output_sizes}"
         )
