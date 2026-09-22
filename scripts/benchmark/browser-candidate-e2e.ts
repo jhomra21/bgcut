@@ -19,6 +19,16 @@ const chromeCandidates = (): readonly string[] => {
   ];
 };
 
+const readSubprocessPipe = (
+  pipe: number | ReadableStream<Uint8Array> | undefined,
+): Promise<string> => {
+  if (!(pipe instanceof ReadableStream)) {
+    return Promise.resolve("");
+  }
+
+  return new Response(pipe).text();
+};
+
 const findChrome = async (): Promise<string> => {
   for (const candidate of chromeCandidates()) {
     try {
@@ -163,9 +173,9 @@ const server = Bun.spawn(
   },
 );
 
-const serverStdout = new Response(server.stdout).text();
+const serverStdout = readSubprocessPipe(server.stdout);
 
-const serverStderr = new Response(server.stderr).text();
+const serverStderr = readSubprocessPipe(server.stderr);
 
 let browser: Bun.Subprocess | undefined;
 
@@ -203,8 +213,8 @@ try {
     },
   );
 
-  browserStdout = new Response(browser.stdout).text();
-  browserStderr = new Response(browser.stderr).text();
+  browserStdout = readSubprocessPipe(browser.stdout);
+  browserStderr = readSubprocessPipe(browser.stderr);
 
   await waitForArtifacts(outputRoot, browser, server);
 
