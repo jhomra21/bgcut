@@ -135,6 +135,7 @@ const ortProviderPatchPlugin = {
     build.onLoad(
       { filter: /onnxruntime-web\/lib\/wasm\/session-options\.ts$/u },
       async (args) => {
+
         const source = await readFile(args.path, "utf8");
 
         const anchor =
