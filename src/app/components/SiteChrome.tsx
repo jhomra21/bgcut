@@ -77,8 +77,8 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
 
     <div class="header-controls">
       <nav class="site-nav" aria-label="Main navigation" data-active={props.page}>
-      <span class="site-nav-indicator" aria-hidden="true" />
-      <a
+        <span class="site-nav-indicator" aria-hidden="true" />
+        <a
         class="site-nav-docs"
         href="/docs"
         aria-current={props.page === "docs" ? "page" : undefined}
@@ -92,8 +92,8 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         }}
       >
         Docs
-      </a>
-      <a
+        </a>
+        <a
         class="site-nav-changelog"
         href="/changelog"
         aria-current={props.page === "changelog" ? "page" : undefined}
@@ -107,15 +107,15 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         }}
       >
         Changelog
-      </a>
-      <a
+        </a>
+        <a
         class="site-nav-github"
         href="https://github.com/jhomra21/bgcut"
         target="_blank"
         rel="noreferrer"
       >
         GitHub
-      </a>
+        </a>
       </nav>
       <ThemeToggle />
     </div>
