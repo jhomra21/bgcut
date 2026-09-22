@@ -177,6 +177,56 @@ figure {
   text-decoration: none;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-toggle {
+  width: 37px;
+  height: 37px;
+  flex: 0 0 37px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  background: var(--background-nav);
+  color: var(--text-muted);
+  padding: 0;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.theme-toggle:hover {
+  background: var(--background-nav-hover);
+  color: var(--text-primary);
+}
+
+.theme-toggle-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-toggle-sun {
+  display: none;
+}
+
+.theme-toggle[data-theme="dark"] .theme-toggle-moon {
+  display: none;
+}
+
+.theme-toggle[data-theme="dark"] .theme-toggle-sun {
+  display: block;
+}
+
 .site-nav {
   --site-nav-docs-width: 48px;
   --site-nav-changelog-width: 76px;
@@ -1189,7 +1239,8 @@ figure {
 .site-footer-links a:focus-visible,
 .section-rail a:focus-visible,
 .link-list a:focus-visible,
-.brand-link:focus-visible {
+.brand-link:focus-visible,
+.theme-toggle:focus-visible {
   outline: 2px solid var(--text-primary);
   outline-offset: 3px;
 }
@@ -1214,14 +1265,24 @@ figure {
     font-size: 30px;
   }
 
+  .local-app-header {
+    align-items: center;
+    flex-direction: row;
+  }
+
   .brand-mark {
     width: 29px;
     height: 29px;
     flex-basis: 29px;
   }
 
+  .header-controls {
+    width: 100%;
+  }
+
   .site-nav {
     width: 100%;
+    flex: 1;
     max-width: 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
