@@ -23,7 +23,7 @@ const BenchmarkManifestSchema = Schema.Struct({
 
 type CandidateEngine = "gpu" | "cpu";
 
-type CandidatePostprocess = "bgcut" | "rembg";
+type CandidatePipeline = "bgcut" | "rembg";
 
 type PreparedImage = {
   readonly source: Buffer;
@@ -61,12 +61,12 @@ const parseEngine = (value: string): CandidateEngine => {
   throw new Error(`Unknown engine "${value}". Expected gpu or cpu.`);
 };
 
-const parsePostprocess = (value: string): CandidatePostprocess => {
+const parsePipeline = (value: string): CandidatePipeline => {
   if (value === "bgcut" || value === "rembg") {
     return value;
   }
 
-  throw new Error(`Unknown postprocess "${value}". Expected bgcut or rembg.`);
+  throw new Error(`Unknown pipeline "${value}". Expected bgcut or rembg.`);
 };
 
 const parsePositiveInteger = (value: string, label: string): number => {
@@ -99,9 +99,59 @@ const medianTimings = (
   encodeMs: median(runs.map((run) => run.encodeMs)),
 });
 
+const imageNetMean = [0.485, 0.456, 0.406] as const;
+
+const imageNetStd = [0.229, 0.224, 0.225] as const;
+
+const resizeRgbaLanczosToNchw = async (
+  source: Buffer,
+  sourceWidth: number,
+  sourceHeight: number,
+  inputSize: number,
+): Promise<Float32Array> => {
+  const resized = await sharp(source, {
+    raw: {
+      width: sourceWidth,
+      height: sourceHeight,
+      channels: 4,
+    },
+  })
+    .removeAlpha()
+    .resize(inputSize, inputSize, {
+      fit: "fill",
+      kernel: sharp.kernel.lanczos3,
+      fastShrinkOnLoad: false,
+    })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let maximum = 1e-6;
+
+  for (const value of resized.data) {
+    maximum = Math.max(maximum, value);
+  }
+
+  const pixelCount = inputSize * inputSize;
+  const tensor = new Float32Array(pixelCount * 3);
+
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    const rgbIndex = pixel * 3;
+
+    for (let channel = 0; channel < 3; channel += 1) {
+      const normalized = resized.data[rgbIndex + channel] / maximum;
+
+      tensor[channel * pixelCount + pixel] =
+        (normalized - imageNetMean[channel]) / imageNetStd[channel];
+    }
+  }
+
+  return tensor;
+};
+
 const prepareImage = async (
   path: string,
   inputSize: number,
+  pipeline: CandidatePipeline,
 ): Promise<PreparedImage> => {
   const source = await sharp(path)
     .rotate()
@@ -114,17 +164,27 @@ const prepareImage = async (
     throw new Error(`${path} decoded to ${source.info.channels} channels instead of RGBA.`);
   }
 
+  const modelInput =
+    pipeline === "rembg"
+      ? await resizeRgbaLanczosToNchw(
+          source.data,
+          source.info.width,
+          source.info.height,
+          inputSize,
+        )
+      : resizeRgbaLinearToNchw(
+          source.data,
+          source.info.width,
+          source.info.height,
+          inputSize,
+          inputSize,
+        );
+
   return {
     source: source.data,
     width: source.info.width,
     height: source.info.height,
-    modelInput: resizeRgbaLinearToNchw(
-      source.data,
-      source.info.width,
-      source.info.height,
-      inputSize,
-      inputSize,
-    ),
+    modelInput,
   };
 };
 
@@ -170,9 +230,9 @@ const createRembgMask = (logits: Float32Array): Uint8Array => {
 
 const createMask = (
   logits: Float32Array,
-  postprocess: CandidatePostprocess,
+  pipeline: CandidatePipeline,
 ): Uint8Array =>
-  postprocess === "rembg"
+  pipeline === "rembg"
     ? createRembgMask(logits)
     : createBgcutMask(logits);
 
@@ -180,9 +240,9 @@ const encodeOutput = async (
   prepared: PreparedImage,
   logits: Float32Array,
   inputSize: number,
-  postprocess: CandidatePostprocess,
+  pipeline: CandidatePipeline,
 ): Promise<Buffer> => {
-  const alpha = createMask(logits, postprocess);
+  const alpha = createMask(logits, pipeline);
 
   const resizedAlpha = await sharp(Buffer.from(alpha), {
     raw: {
@@ -193,7 +253,7 @@ const encodeOutput = async (
   })
     .resize(prepared.width, prepared.height, {
       fit: "fill",
-      kernel: postprocess === "rembg" ? sharp.kernel.lanczos3 : sharp.kernel.cubic,
+      kernel: pipeline === "rembg" ? sharp.kernel.lanczos3 : sharp.kernel.cubic,
       fastShrinkOnLoad: false,
     })
     .raw()
@@ -218,12 +278,12 @@ const remove = async (
   session: ort.InferenceSession,
   inputPath: string,
   inputSize: number,
-  postprocess: CandidatePostprocess,
+  pipeline: CandidatePipeline,
 ): Promise<RemovalResult> => {
   const totalStartedAt = performance.now();
   let stageStartedAt = performance.now();
 
-  const prepared = await prepareImage(inputPath, inputSize);
+  const prepared = await prepareImage(inputPath, inputSize, pipeline);
   const prepareMs = performance.now() - stageStartedAt;
   const inputName = session.inputNames.at(0);
   const outputName = session.outputNames.at(0);
@@ -259,7 +319,7 @@ const remove = async (
 
   stageStartedAt = performance.now();
 
-  const data = await encodeOutput(prepared, output.data, inputSize, postprocess);
+  const data = await encodeOutput(prepared, output.data, inputSize, pipeline);
   const encodeMs = performance.now() - stageStartedAt;
 
   return {
@@ -282,7 +342,7 @@ const [
   inputSizeArgument,
   engineArgument = "gpu",
   repeatsArgument = "5",
-  postprocessArgument = "rembg",
+  pipelineArgument = "rembg",
 ] = process.argv.slice(2);
 
 if (
@@ -308,7 +368,7 @@ const requestedEngine = parseEngine(engineArgument);
 
 const warmRepeats = parsePositiveInteger(repeatsArgument, "Warm repeats");
 
-const postprocess = parsePostprocess(postprocessArgument);
+const pipeline = parsePipeline(pipelineArgument);
 
 const manifest = Schema.decodeUnknownSync(BenchmarkManifestSchema)(
   JSON.parse(await readFile(manifestPath, "utf8")),
@@ -349,7 +409,7 @@ try {
       session,
       inputPath,
       inputSize,
-      postprocess,
+      pipeline,
     );
 
     await writeFile(outputPath, firstResult.data);
@@ -361,7 +421,7 @@ try {
         session,
         inputPath,
         inputSize,
-        postprocess,
+        pipeline,
       );
 
       warmRuns.push(warmResult.timings);
@@ -402,7 +462,7 @@ const report = {
   },
   requestedEngine,
   provider,
-  postprocess,
+  pipeline,
   setupMs,
   warmRepeats,
   session: {
@@ -417,7 +477,7 @@ const reportPath = join(outputRoot, "timings.json");
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
 console.log(
-  `Wrote ${caseReports.length} candidate-model outputs to ${outputRoot} with ${provider} and ${postprocess} postprocessing.`,
+  `Wrote ${caseReports.length} candidate-model outputs to ${outputRoot} with ${provider} and ${pipeline} pipelineing.`,
 );
 
 console.log(`Timing report: ${reportPath}`);
