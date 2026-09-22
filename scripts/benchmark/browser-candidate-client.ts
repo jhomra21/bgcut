@@ -11,6 +11,7 @@ const BenchmarkCaseSchema = Schema.Struct({
 const BenchmarkConfigSchema = Schema.Struct({
   modelUrl: Schema.String,
   runtimeUrl: Schema.String,
+  runtimeModuleUrl: Schema.String,
   inputSize: Schema.Number,
   warmRepeats: Schema.Number,
   cases: Schema.Array(BenchmarkCaseSchema),
@@ -595,6 +596,7 @@ const main = async (): Promise<void> => {
   );
 
   ort.env.wasm.wasmPaths = {
+    mjs: new URL(config.runtimeModuleUrl, globalThis.location.href).href,
     wasm: new URL(config.runtimeUrl, globalThis.location.href).href,
   };
 
@@ -623,14 +625,19 @@ const main = async (): Promise<void> => {
   const sessionStartedAt = performance.now();
   let session: ort.InferenceSession;
 
+  const webgpuProvider = {
+    name: "webgpu",
+    device,
+    enableInt64: true,
+  } as ort.InferenceSession.WebGpuExecutionProviderOption & {
+    readonly enableInt64: boolean;
+  };
+
   try {
     session = await ort.InferenceSession.create(model, {
-      executionProviders: [{ name: "webgpu", device }],
+      executionProviders: [webgpuProvider],
       enableGraphCapture: true,
       graphOptimizationLevel: "basic",
-      extra: {
-        "ep.webgpuexecutionprovider.enableInt64": "1",
-      },
       preferredOutputLocation: "gpu-buffer",
       logSeverityLevel: 0,
       logVerbosityLevel: 1,
@@ -642,12 +649,9 @@ const main = async (): Promise<void> => {
 
     try {
       const diagnosticSession = await ort.InferenceSession.create(model, {
-        executionProviders: [{ name: "webgpu", device }],
+        executionProviders: [webgpuProvider],
         enableGraphCapture: false,
         graphOptimizationLevel: "basic",
-        extra: {
-          "ep.webgpuexecutionprovider.enableInt64": "1",
-        },
         preferredOutputLocation: "gpu-buffer",
         logSeverityLevel: 0,
         logVerbosityLevel: 1,
