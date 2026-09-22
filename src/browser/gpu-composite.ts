@@ -15,6 +15,41 @@ type CompositePipeline = {
 
 let cachedPipeline: CompositePipeline | undefined;
 
+type PersistentCompositeLogits = {
+  readonly device: GPUDevice;
+  readonly buffer: GPUBuffer;
+};
+
+let persistentCompositeLogits: PersistentCompositeLogits | undefined;
+
+const MODEL_OUTPUT_BYTE_LENGTH =
+  MODEL_INPUT_SIZE *
+  MODEL_INPUT_SIZE *
+  Float32Array.BYTES_PER_ELEMENT;
+
+const getCompositeLogitsBuffer = (
+  runtime: GpuRuntime,
+): GPUBuffer => {
+  if (persistentCompositeLogits?.device === runtime.device) {
+    return persistentCompositeLogits.buffer;
+  }
+
+  persistentCompositeLogits?.buffer.destroy();
+
+  const buffer = runtime.device.createBuffer({
+    label: "bgcut GPU composite logits",
+    size: MODEL_OUTPUT_BYTE_LENGTH,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+  });
+
+  persistentCompositeLogits = {
+    device: runtime.device,
+    buffer,
+  };
+
+  return buffer;
+};
+
 const shaderSource = `
   struct VertexOutput {
     @builtin(position) position: vec4f,
@@ -179,6 +214,8 @@ export const createGpuSourceComposite = (
           [bitmap.width, bitmap.height],
         );
 
+        const compositeLogits = getCompositeLogitsBuffer(runtime);
+
         const bindGroup = runtime.device.createBindGroup({
           layout: composite.pipeline.getBindGroupLayout(0),
           entries: [
@@ -193,7 +230,9 @@ export const createGpuSourceComposite = (
             {
               binding: 2,
               resource: {
-                buffer: modelOutput.buffer,
+                buffer: compositeLogits,
+                offset: 0,
+                size: MODEL_OUTPUT_BYTE_LENGTH,
               },
             },
           ],
@@ -202,6 +241,14 @@ export const createGpuSourceComposite = (
         const encoder = runtime.device.createCommandEncoder({
           label: "bgcut GPU composite encoder",
         });
+
+        encoder.copyBufferToBuffer(
+          modelOutput.buffer,
+          0,
+          compositeLogits,
+          0,
+          MODEL_OUTPUT_BYTE_LENGTH,
+        );
 
         const pass = encoder.beginRenderPass({
           label: "bgcut GPU composite pass",
