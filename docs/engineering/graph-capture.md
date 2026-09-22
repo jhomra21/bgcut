@@ -42,6 +42,8 @@ The v2 graph has:
 - deterministic max sigmoid difference: `0.0`
 - ONNX Runtime `ENABLE_ALL` optimization check: `Sum = 0`
 
+PR #93 added `scripts/model/rewrite-webgpu-shape-ops.py` so this exact guarded transformation is reproducible for compatible model candidates. The command requires 40 matching int64 one-element axis-3 `Slice` nodes and 20 matching four-input `Sum` nodes by default, and refuses to write a model when the pattern differs.
+
 ## Accepted browser benchmark
 
 The same 1600x1598 cat fixture was used for one cold run and five warm reruns without reloading.
