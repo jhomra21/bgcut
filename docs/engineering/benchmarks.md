@@ -141,9 +141,13 @@ bun run benchmark:browser-candidate:e2e -- \
   5
 ```
 
-The E2E run writes source-resolution PNGs, `browser-timings.json`, `quality.json`, and Chrome/server stdout and stderr logs to the output directory. It removes any stale timing, quality, or failure report before starting. If the page fails, it writes `browser-failure.json` and the command exits with that failure instead of waiting for a manual tab.
+The E2E run writes source-resolution PNGs, `browser-timings.json`, `quality.json`, and browser/server stdout and stderr logs to the output directory. It removes any stale timing, quality, or failure report before starting. If the page fails, it writes `browser-failure.json` and the command exits with that failure instead of waiting for a manual tab.
 
-Chrome is discovered from common macOS and Linux locations. Set `BGCUT_CHROME_PATH` to an explicit executable when needed. Set `BGCUT_BROWSER_BENCHMARK_TIMEOUT_MS` to change the default 15-minute timeout.
+Chromium-family browsers are preferred and launched with an isolated profile. The launcher checks Chrome, Edge, Brave, Chromium, Arc, Vivaldi, and Opera in common macOS and Linux locations. Set `BGCUT_BROWSER_PATH` to an explicit Chromium executable when needed; `BGCUT_CHROME_PATH` remains accepted for compatibility.
+
+On macOS, Safari Technology Preview and then Safari are experimental fallbacks when no Chromium-family browser is installed. They are launched through macOS `open`, so the harness cannot manage a disposable Safari profile or track the browser process itself. The page still reports runtime failures back to `browser-failure.json`, and the server remains the completion boundary.
+
+Set `BGCUT_BROWSER_BENCHMARK_TIMEOUT_MS` to change the default 15-minute timeout.
 
 The manual server remains available for debugging:
 
