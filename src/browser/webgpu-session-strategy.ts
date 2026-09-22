@@ -1,4 +1,7 @@
-import type { WebGpuSessionStrategy } from "./inference";
+export type WebGpuSessionStrategy =
+  | "capture-reuse"
+  | "capture-recreate"
+  | "no-capture-reuse";
 
 const SAFARI_TOKEN = /Safari\//u;
 const SAFARI_VERSION_TOKEN = /Version\//u;
