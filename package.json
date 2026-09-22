@@ -55,7 +55,7 @@
     "test": "bun test",
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package/smoke.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run build && bun run package:dry-run && bun run package:smoke",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-composite:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
     "cloudflare:runtime:remote": "bun run scripts/cloudflare/upload-runtime.ts",
@@ -64,7 +64,10 @@
     "prepack": "bun run package:prepare",
     "site:prepare-routes": "bun run scripts/site/prepare-static-routes.ts",
     "benchmark:bgcut": "bun run scripts/benchmark/bgcut.ts",
-    "benchmark:score": "bun run scripts/benchmark/score.ts"
+    "benchmark:score": "bun run scripts/benchmark/score.ts",
+    "benchmark:browser-composite": "bun run scripts/benchmark/browser-composite-server.ts",
+    "benchmark:browser-composite:e2e": "bun run scripts/benchmark/browser-composite-e2e.ts",
+    "benchmark:browser-composite:bundle-check": "bun run scripts/benchmark/browser-composite-bundle-check.ts"
   },
   "dependencies": {
     "effect": "3.22.2",
