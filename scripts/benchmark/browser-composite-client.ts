@@ -25,6 +25,12 @@ type ModeReport = {
   readonly warmRuns: readonly RemovalTimings[];
 };
 
+type CaseReport = {
+  readonly id: string;
+  readonly gpu: ModeReport;
+  readonly cpu: ModeReport;
+};
+
 const status = document.querySelector<HTMLPreElement>("#status");
 
 if (status === null) {
@@ -68,6 +74,7 @@ const runMode = async (
       type: source.type || "image/png",
     },
   );
+
   const outcome = await removeBrowserBackground(file);
 
   if (!outcome.ok) {
@@ -114,7 +121,8 @@ const main = async (): Promise<void> => {
   const config = Schema.decodeUnknownSync(BenchmarkConfigSchema)(
     await configResponse.json(),
   );
-  const cases = [];
+
+  const cases: CaseReport[] = [];
 
   for (
     let caseIndex = 0;
@@ -137,6 +145,7 @@ const main = async (): Promise<void> => {
     }
 
     const source = await inputResponse.blob();
+
     const gpuFirst = await runMode(
       "gpu",
       source,
@@ -180,6 +189,7 @@ const main = async (): Promise<void> => {
     const gpuWarmMedianMs = median(
       gpuWarmRuns.map((run) => run.totalMs),
     );
+
     const cpuWarmMedianMs = median(
       cpuWarmRuns.map((run) => run.totalMs),
     );
@@ -208,6 +218,7 @@ const main = async (): Promise<void> => {
       ),
     )
   );
+
   const cpuCaseMedians = cases.map((benchmarkCase) =>
     median(
       benchmarkCase.cpu.warmRuns.map(
@@ -238,6 +249,7 @@ const main = async (): Promise<void> => {
     },
     body: JSON.stringify(report),
   });
+
   const result = await response.text();
 
   if (!response.ok) {
@@ -254,6 +266,7 @@ void main().catch((error) => {
     error instanceof Error
       ? error
       : new Error(String(error));
+
   const message =
     `${parsed.message}\n${parsed.stack ?? ""}`;
 
