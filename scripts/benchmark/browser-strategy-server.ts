@@ -17,18 +17,27 @@ import {
 } from "../../src/shared/model-config";
 import { ORT_WEBGPU_WASM_PUBLIC_PATH } from "../../src/shared/ort-assets";
 
-const ManifestCaseSchema = Schema.Struct({
+const BenchmarkCaseSchema = Schema.Struct({
   id: Schema.String,
   input: Schema.String,
   mask: Schema.String,
 });
 
-const ManifestSchema = Schema.Struct({
-  cases: Schema.Array(ManifestCaseSchema),
+const BenchmarkManifestSchema = Schema.Struct({
+  cases: Schema.Array(BenchmarkCaseSchema),
 });
 
+type PixelComparison = {
+  readonly schemaVersion: 1;
+  readonly values: number;
+  readonly meanAbsoluteByteDifference: number;
+  readonly maxAbsoluteByteDifference: number;
+  readonly differingValues: number;
+  readonly differingValueFraction: number;
+};
+
 const usage =
-  "Usage: bun run benchmark:browser-strategy -- <manifest.json> <output-dir> <model.onnx> [runs-per-strategy] [port]";
+  "Usage: bun run benchmark:browser-strategy -- <manifest.json> <output-dir> <model.onnx> [runs-per-case] [port]";
 
 const [
   manifestArgument,
@@ -52,19 +61,29 @@ const manifestRoot = dirname(manifestPath);
 
 const outputRoot = resolve(outputArgument);
 
+const productionOutputRoot = join(
+  outputRoot,
+  "production-default",
+);
+
+const captureOutputRoot = join(
+  outputRoot,
+  "capture-reference",
+);
+
 const modelPath = resolve(modelArgument);
 
-const runsPerStrategy = Number.parseInt(
+const runsPerCase = Number.parseInt(
   runsArgument,
   10,
 );
 
 if (
-  !Number.isInteger(runsPerStrategy) ||
-  runsPerStrategy < 1
+  !Number.isInteger(runsPerCase) ||
+  runsPerCase < 1
 ) {
   throw new Error(
-    `Runs per strategy must be a positive integer, received "${runsArgument}".`,
+    `Runs per case must be a positive integer, received "${runsArgument}".`,
   );
 }
 
@@ -76,17 +95,17 @@ if (!Number.isInteger(port) || port < 1) {
   );
 }
 
-const manifest = Schema.decodeUnknownSync(ManifestSchema)(
+const manifest = Schema.decodeUnknownSync(
+  BenchmarkManifestSchema,
+)(
   JSON.parse(
     await readFile(manifestPath, "utf8"),
   ),
 );
 
-const benchmarkCase = manifest.cases.at(0);
-
-if (benchmarkCase === undefined) {
+if (manifest.cases.length === 0) {
   throw new Error(
-    "Strategy manifest must contain at least one case.",
+    "Safari validation manifest must contain at least one case.",
   );
 }
 
@@ -98,19 +117,10 @@ if (!(await modelFile.exists())) {
   );
 }
 
-const strategies = [
-  "no-capture-reuse",
-  "capture-recreate",
-] as const;
-
 await Promise.all([
   mkdir(outputRoot, { recursive: true }),
-  ...strategies.map((strategy) =>
-    mkdir(
-      join(outputRoot, strategy),
-      { recursive: true },
-    )
-  ),
+  mkdir(productionOutputRoot, { recursive: true }),
+  mkdir(captureOutputRoot, { recursive: true }),
 ]);
 
 const build = await Bun.build({
@@ -128,7 +138,7 @@ const build = await Bun.build({
 
 if (!build.success) {
   throw new Error(
-    `Could not build strategy client.\n${build.logs
+    `Could not build Safari validation client.\n${build.logs
       .map((log) => log.message)
       .join("\n")}`,
   );
@@ -138,7 +148,7 @@ const clientOutput = build.outputs.at(0);
 
 if (clientOutput === undefined) {
   throw new Error(
-    "Strategy client produced no bundle.",
+    "Safari validation client produced no bundle.",
   );
 }
 
@@ -167,6 +177,11 @@ if (
   process.exit(0);
 }
 
+const safeOutputName = (id: string): string =>
+  `${id
+    .replaceAll("/", "__")
+    .replaceAll("\\", "__")}.png`;
+
 const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -175,7 +190,7 @@ const html = `<!doctype html>
       name="viewport"
       content="width=device-width, initial-scale=1.0"
     />
-    <title>bgcut Safari WebGPU strategy benchmark</title>
+    <title>bgcut Safari production validation</title>
   </head>
   <body>
     <pre id="status"></pre>
@@ -184,79 +199,127 @@ const html = `<!doctype html>
 </html>
 `;
 
-type PixelComparison = {
-  readonly schemaVersion: 1;
-  readonly values: number;
-  readonly meanAbsoluteByteDifference: number;
-  readonly maxAbsoluteByteDifference: number;
-  readonly differingValues: number;
-  readonly differingValueFraction: number;
+const config = {
+  runsPerCase,
+  cases: manifest.cases.map(
+    (benchmarkCase, index) => ({
+      id: benchmarkCase.id,
+      inputUrl: `/input/${index}`,
+    }),
+  ),
+};
+
+const runScore = async (
+  outputDirectory: string,
+): Promise<void> => {
+  const process = Bun.spawn(
+    [
+      "bun",
+      "run",
+      "benchmark:score",
+      "--",
+      manifestPath,
+      outputDirectory,
+      join(
+        outputDirectory,
+        "quality.json",
+      ),
+    ],
+    {
+      cwd: resolve(import.meta.dir, "../.."),
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+
+  const stdout =
+    await new Response(process.stdout).text();
+
+  const stderr =
+    await new Response(process.stderr).text();
+
+  const exitCode = await process.exited;
+
+  if (exitCode !== 0) {
+    throw new Error(
+      `Quality scorer exited with code ${exitCode}.\n${stderr || stdout}`,
+    );
+  }
 };
 
 const compareOutputs = async (): Promise<PixelComparison> => {
-  const left = await sharp(
-    join(
-      outputRoot,
-      "no-capture-reuse",
-      "run-1.png",
-    ),
-  )
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const right = await sharp(
-    join(
-      outputRoot,
-      "capture-recreate",
-      "run-1.png",
-    ),
-  )
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  if (
-    left.info.width !== right.info.width ||
-    left.info.height !== right.info.height ||
-    left.info.channels !== 4 ||
-    right.info.channels !== 4
-  ) {
-    throw new Error(
-      "Strategy output dimensions differ.",
-    );
-  }
-
   let absolute = 0;
   let maximum = 0;
   let differing = 0;
+  let values = 0;
 
-  for (
-    let index = 0;
-    index < left.data.length;
-    index += 1
-  ) {
-    const difference = Math.abs(
-      left.data[index] - right.data[index],
-    );
+  for (const benchmarkCase of manifest.cases) {
+    const name = safeOutputName(benchmarkCase.id);
+    const [production, capture] = await Promise.all([
+      sharp(
+        join(
+          productionOutputRoot,
+          name,
+        ),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true }),
+      sharp(
+        join(
+          captureOutputRoot,
+          name,
+        ),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true }),
+    ]);
 
-    absolute += difference;
-    maximum = Math.max(maximum, difference);
-
-    if (difference !== 0) {
-      differing += 1;
+    if (
+      production.info.width !== capture.info.width ||
+      production.info.height !== capture.info.height ||
+      production.info.channels !== 4 ||
+      capture.info.channels !== 4
+    ) {
+      throw new Error(
+        `Production/capture dimensions differ for ${benchmarkCase.id}.`,
+      );
     }
+
+    for (
+      let index = 0;
+      index < production.data.length;
+      index += 1
+    ) {
+      const difference = Math.abs(
+        production.data[index] -
+        capture.data[index],
+      );
+
+      absolute += difference;
+      maximum = Math.max(
+        maximum,
+        difference,
+      );
+
+      if (difference !== 0) {
+        differing += 1;
+      }
+    }
+
+    values += production.data.length;
   }
 
   return {
     schemaVersion: 1,
-    values: left.data.length,
+    values,
     meanAbsoluteByteDifference:
-      absolute / left.data.length,
+      absolute / values,
     maxAbsoluteByteDifference: maximum,
     differingValues: differing,
     differingValueFraction:
-      differing / left.data.length,
+      differing / values,
   };
 };
 
@@ -294,30 +357,7 @@ const app = Bun.serve({
       request.method === "GET" &&
       url.pathname === "/config.json"
     ) {
-      return Response.json({
-        id: benchmarkCase.id,
-        inputUrl: "/input",
-        runsPerStrategy,
-      });
-    }
-
-    if (
-      request.method === "GET" &&
-      url.pathname === "/input"
-    ) {
-      return new Response(
-        Bun.file(
-          resolve(
-            manifestRoot,
-            benchmarkCase.input,
-          ),
-        ),
-        {
-          headers: {
-            "cache-control": "no-store",
-          },
-        },
-      );
+      return Response.json(config);
     }
 
     if (
@@ -346,26 +386,73 @@ const app = Bun.serve({
       });
     }
 
+    const inputMatch =
+      url.pathname.match(/^\/input\/(\d+)$/u);
+
+    if (
+      request.method === "GET" &&
+      inputMatch !== null
+    ) {
+      const index = Number.parseInt(
+        inputMatch[1],
+        10,
+      );
+      const benchmarkCase =
+        manifest.cases.at(index);
+
+      if (benchmarkCase === undefined) {
+        return new Response(
+          "Unknown benchmark input.",
+          { status: 404 },
+        );
+      }
+
+      return new Response(
+        Bun.file(
+          resolve(
+            manifestRoot,
+            benchmarkCase.input,
+          ),
+        ),
+        {
+          headers: {
+            "cache-control": "no-store",
+          },
+        },
+      );
+    }
+
     const outputMatch =
       url.pathname.match(
-        /^\/output\/(no-capture-reuse|capture-recreate)\/(\d+)$/u,
+        /^\/output\/(production-default|capture-reference)\/(\d+)$/u,
       );
 
     if (
       request.method === "POST" &&
       outputMatch !== null
     ) {
-      const strategy = outputMatch[1];
-
+      const mode = outputMatch[1];
       const index = Number.parseInt(
         outputMatch[2],
         10,
       );
+      const benchmarkCase =
+        manifest.cases.at(index);
 
+      if (benchmarkCase === undefined) {
+        return new Response(
+          "Unknown benchmark output.",
+          { status: 404 },
+        );
+      }
+
+      const targetRoot =
+        mode === "production-default"
+          ? productionOutputRoot
+          : captureOutputRoot;
       const targetPath = join(
-        outputRoot,
-        strategy,
-        `run-${index + 1}.png`,
+        targetRoot,
+        safeOutputName(benchmarkCase.id),
       );
 
       await writeFile(
@@ -383,7 +470,7 @@ const app = Bun.serve({
 
       if (alpha === undefined || alpha.max === 0) {
         return new Response(
-          `${strategy} run ${index + 1} output is fully transparent.`,
+          `${mode} output for ${benchmarkCase.id} is fully transparent.`,
           { status: 422 },
         );
       }
@@ -393,25 +480,49 @@ const app = Bun.serve({
 
     const runMatch =
       url.pathname.match(
-        /^\/run\/(no-capture-reuse|capture-recreate)\/(\d+)$/u,
+        /^\/run\/(production-default|capture-reference)\/(\d+)\/(\d+)$/u,
       );
 
     if (
       request.method === "POST" &&
       runMatch !== null
     ) {
-      const strategy = runMatch[1];
-
-      const index = Number.parseInt(
+      const mode = runMatch[1];
+      const caseIndex = Number.parseInt(
         runMatch[2],
         10,
+      );
+      const runIndex = Number.parseInt(
+        runMatch[3],
+        10,
+      );
+      const benchmarkCase =
+        manifest.cases.at(caseIndex);
+
+      if (benchmarkCase === undefined) {
+        return new Response(
+          "Unknown timing case.",
+          { status: 404 },
+        );
+      }
+
+      const timingRoot = join(
+        outputRoot,
+        "runs",
+        mode,
+      );
+
+      await mkdir(
+        timingRoot,
+        { recursive: true },
       );
 
       await writeFile(
         join(
-          outputRoot,
-          strategy,
-          `run-${index + 1}.json`,
+          timingRoot,
+          `${safeOutputName(
+            benchmarkCase.id,
+          ).replace(/\.png$/u, "")}-run-${runIndex + 1}.json`,
         ),
         `${JSON.stringify(
           await request.json(),
@@ -446,19 +557,20 @@ const app = Bun.serve({
       request.method === "POST" &&
       url.pathname === "/report"
     ) {
-      const report = await request.json();
-
       await writeFile(
         join(
           outputRoot,
           "browser-strategies.json",
         ),
         `${JSON.stringify(
-          report,
+          await request.json(),
           null,
           2,
         )}\n`,
       );
+
+      await runScore(productionOutputRoot);
+      await runScore(captureOutputRoot);
 
       const comparison =
         await compareOutputs();
@@ -475,16 +587,7 @@ const app = Bun.serve({
         )}\n`,
       );
 
-      return Response.json({
-        report: join(
-          outputRoot,
-          "browser-strategies.json",
-        ),
-        comparison: join(
-          outputRoot,
-          "pixel-comparison.json",
-        ),
-      });
+      return new Response("saved");
     }
 
     return new Response(
@@ -495,5 +598,5 @@ const app = Bun.serve({
 });
 
 console.log(
-  `Browser strategy benchmark ready at http://${app.hostname}:${app.port}/`,
+  `Safari production validation ready at http://${app.hostname}:${app.port}/`,
 );
