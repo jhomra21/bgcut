@@ -136,6 +136,7 @@ const ortProviderPatchPlugin = {
       { filter: /onnxruntime-web\/lib\/wasm\/session-options\.ts$/u },
       async (args) => {
         const source = await readFile(args.path, "utf8");
+
         const anchor =
           "            // set graph capture option from session options\n";
 
