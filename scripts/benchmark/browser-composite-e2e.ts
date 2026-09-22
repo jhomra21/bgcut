@@ -280,8 +280,10 @@ try {
       "900000",
     10,
   );
+
   const completionDeadline =
     Date.now() + timeoutMs;
+
   let completed = false;
 
   while (Date.now() < completionDeadline) {
