@@ -69,7 +69,7 @@ html[data-theme="dark"] {
   --background-key-inverse: #deded8;
   --background-inverse: #f2f2ee;
   --background-inverse-hover: #ffffff;
-  --background-inverse-active: #ddddD7;
+  --background-inverse-active: #ddddd7;
   --background-error: #2a1715;
   --background-nav: rgba(31, 31, 28, 0.82);
   --background-nav-hover: rgba(255, 255, 255, 0.06);
