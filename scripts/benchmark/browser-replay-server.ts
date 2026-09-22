@@ -56,6 +56,7 @@ const modelPath = resolve(modelArgument);
 const manifest = Schema.decodeUnknownSync(ManifestSchema)(
   JSON.parse(await readFile(manifestPath, "utf8")),
 );
+
 const benchmarkCase = manifest.cases.at(0);
 
 if (benchmarkCase === undefined) {
@@ -226,6 +227,7 @@ const app = Bun.serve({
       outputMatch !== null
     ) {
       const index = Number.parseInt(outputMatch[1], 10);
+
       const targetPath = join(
         outputRoot,
         `run-${index + 1}.png`,
@@ -239,6 +241,7 @@ const app = Bun.serve({
       const stats = await sharp(targetPath)
         .ensureAlpha()
         .stats();
+
       const alpha = stats.channels.at(3);
 
       if (alpha === undefined || alpha.max === 0) {
