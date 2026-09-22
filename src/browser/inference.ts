@@ -46,6 +46,8 @@ let cachedSession: SessionCache | undefined;
 
 let ortWebGpuRuntimeConfigured = false;
 
+const WEBGPU_GRAPH_ANNOTATION_ID = "1";
+
 const configureOrtWebGpuRuntime = (): void => {
   if (ortWebGpuRuntimeConfigured) {
     return;
@@ -137,6 +139,11 @@ const runModel = (
               session.run(
                 { [inputName]: input.tensor },
                 { [outputName]: outputTarget.tensor },
+                {
+                  extra: {
+                    gpu_graph_id: WEBGPU_GRAPH_ANNOTATION_ID,
+                  },
+                },
               ),
             catch: (cause) =>
               new InferenceFailed({
