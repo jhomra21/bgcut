@@ -107,12 +107,88 @@ const clientEntry = join(
   "browser-candidate-client.ts",
 );
 
+const ortSourceEntry = resolve(
+  import.meta.dir,
+  "../../node_modules/onnxruntime-web/lib/index.ts",
+);
+
+const ortSessionOptionsPath = resolve(
+  import.meta.dir,
+  "../../node_modules/onnxruntime-web/lib/wasm/session-options.ts",
+);
+
+const ortProviderPatchPlugin = {
+  name: "bgcut-ort-webgpu-provider-options",
+  setup(build: {
+    onResolve(
+      options: { filter: RegExp },
+      callback: (args: { path: string }) => { path: string } | undefined,
+    ): void;
+    onLoad(
+      options: { filter: RegExp },
+      callback: (args: { path: string }) => Promise<{
+        contents: string;
+        loader: "ts";
+      }>,
+    ): void;
+  }): void {
+    build.onResolve(
+      { filter: /^onnxruntime-web\/webgpu$/u },
+      () => ({ path: ortSourceEntry }),
+    );
+
+    build.onLoad(
+      { filter: /onnxruntime-web\/lib\/wasm\/session-options\.ts$/u },
+      async (args) => {
+        const source = await readFile(args.path, "utf8");
+        const anchor =
+          "            // set graph capture option from session options\n";
+
+        if (!source.includes(anchor)) {
+          throw new Error(
+            `Could not locate ONNX Runtime WebGPU provider-option anchor in ${args.path}.`,
+          );
+        }
+
+        const patch = [
+          "            const enableInt64 =",
+          "              (webgpuOptions as { readonly enableInt64?: boolean }).enableInt64;",
+          "",
+          "            if (typeof enableInt64 === 'boolean') {",
+          "              appendEpOption(epOptions, 'enableInt64', enableInt64 ? '1' : '0', allocs);",
+          "            }",
+          "",
+        ].join("\n");
+
+        return {
+          contents: source.replace(anchor, patch + anchor),
+          loader: "ts",
+        };
+      },
+    );
+  },
+};
+
 const build = await Bun.build({
   entrypoints: [clientEntry],
   target: "browser",
   format: "esm",
   minify: false,
   sourcemap: "inline",
+  plugins: [ortProviderPatchPlugin],
+  define: {
+    "BUILD_DEFS.DISABLE_WEBGL": "true",
+    "BUILD_DEFS.DISABLE_JSEP": "true",
+    "BUILD_DEFS.DISABLE_WEBGPU": "false",
+    "BUILD_DEFS.DISABLE_WEBNN": "true",
+    "BUILD_DEFS.DISABLE_WASM": "false",
+    "BUILD_DEFS.DISABLE_WASM_PROXY": "true",
+    "BUILD_DEFS.ENABLE_JSPI": "false",
+    "BUILD_DEFS.ENABLE_BUNDLE_WASM_JS": "false",
+    "BUILD_DEFS.IS_ESM": "true",
+    "BUILD_DEFS.ESM_IMPORT_META_URL": "undefined",
+    "BUILD_DEFS.BUNDLE_FILENAME": "\"client.js\"",
+  },
 });
 
 if (!build.success) {
@@ -134,10 +210,23 @@ const runtimePath = resolve(
   "../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm",
 );
 
+const runtimeModulePath = resolve(
+  import.meta.dir,
+  "../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs",
+);
+
 const runtimeFile = Bun.file(runtimePath);
+
+const runtimeModuleFile = Bun.file(runtimeModulePath);
 
 if (!(await runtimeFile.exists())) {
   throw new Error(`ONNX Runtime WebGPU runtime is missing at ${runtimePath}.`);
+}
+
+if (!(await runtimeModuleFile.exists())) {
+  throw new Error(
+    `ONNX Runtime WebGPU runtime module is missing at ${runtimeModulePath}.`,
+  );
 }
 
 const safeOutputName = (id: string): string =>
@@ -178,6 +267,7 @@ const html = `<!doctype html>
 const config = {
   modelUrl: "/model.onnx",
   runtimeUrl: "/runtime/ort-wasm-simd-threaded.asyncify.wasm",
+  runtimeModuleUrl: "/runtime/ort-wasm-simd-threaded.asyncify.mjs",
   inputSize,
   warmRepeats,
   cases: manifest.cases.map((benchmarkCase, index) => ({
@@ -263,6 +353,18 @@ const app = Bun.serve({
       return new Response(runtimeFile, {
         headers: {
           "content-type": "application/wasm",
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/runtime/ort-wasm-simd-threaded.asyncify.mjs"
+    ) {
+      return new Response(runtimeModuleFile, {
+        headers: {
+          "content-type": "text/javascript; charset=utf-8",
           "cache-control": "no-store",
         },
       });
