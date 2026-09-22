@@ -78,6 +78,7 @@ const readPrediction = async (path: string): Promise<Raster> => {
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
+
   const values = new Uint8Array(raw.info.width * raw.info.height);
   const alphaChannel = raw.info.channels - 1;
 
@@ -133,6 +134,7 @@ const metricsFromTotals = (
   totals: MetricTotals,
 ): CaseMetrics => {
   const union = totals.truePositive + totals.falsePositive + totals.falseNegative;
+
   const f1Denominator =
     2 * totals.truePositive + totals.falsePositive + totals.falseNegative;
 
@@ -153,8 +155,11 @@ if (manifestArgument === undefined || outputArgument === undefined) {
 }
 
 const manifestPath = resolve(manifestArgument);
+
 const manifestRoot = dirname(manifestPath);
+
 const outputRoot = resolve(outputArgument);
+
 const reportPath =
   reportArgument === undefined ? join(outputRoot, "quality.json") : resolve(reportArgument);
 
@@ -163,6 +168,7 @@ const manifest = Schema.decodeUnknownSync(BenchmarkManifestSchema)(
 );
 
 const aggregate = emptyTotals();
+
 const cases: CaseMetrics[] = [];
 
 for (const benchmarkCase of manifest.cases) {
@@ -198,4 +204,5 @@ const report = {
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
 console.log(JSON.stringify(report.aggregate, null, 2));
+
 console.log(`Quality report: ${reportPath}`);
