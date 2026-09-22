@@ -79,10 +79,12 @@ bun run benchmark:score -- \
   ./tmp/bench/general-lite-webgpu-rembg
 ```
 
-The final argument chooses the mask path:
+The final argument chooses the preprocessing and mask pipeline:
 
-- `rembg`: sigmoid, per-image min/max normalization, then Lanczos resize. This mirrors rembg's BiRefNet General-family output handling closely enough to isolate the runtime and model on the existing benchmark.
-- `bgcut`: direct sigmoid-to-alpha conversion and cubic resize, matching bgcut's native output path.
+- `rembg`: Lanczos model-input resize, rembg's max-value normalization followed by ImageNet mean/std, sigmoid, per-image min/max mask normalization, then Lanczos mask resize.
+- `bgcut`: bgcut's linear model-input resize with ImageNet normalization, direct sigmoid-to-alpha conversion, then cubic mask resize.
+
+The `rembg` mode mirrors the algorithmic choices in rembg's General-family session. Sharp and Pillow have separate Lanczos implementations, so it is not expected to be byte-identical to rembg.
 
 Run both modes before changing the public API. If the raw candidate cannot create a WebGPU session, keep the failure output: it identifies the next model-rewrite experiment instead of silently falling back to CPU.
 
