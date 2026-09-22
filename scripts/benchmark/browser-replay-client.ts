@@ -29,6 +29,7 @@ const main = async (): Promise<void> => {
   const config = Schema.decodeUnknownSync(ConfigSchema)(
     await configResponse.json(),
   );
+
   const inputResponse = await fetch(
     config.inputUrl,
     { cache: "no-store" },
@@ -53,6 +54,7 @@ const main = async (): Promise<void> => {
         type: source.type || "image/png",
       },
     );
+
     const outcome = await removeBrowserBackground(file);
 
     if (!outcome.ok) {
@@ -85,6 +87,7 @@ const main = async (): Promise<void> => {
     id: config.id,
     runs,
   };
+
   const response = await fetch("/report", {
     method: "POST",
     headers: {
@@ -105,6 +108,7 @@ void main().catch((error) => {
     error instanceof Error
       ? error
       : new Error(String(error));
+
   const message =
     `${parsed.message}\n${parsed.stack ?? ""}`;
 
