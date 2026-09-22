@@ -193,12 +193,14 @@ export const removeBackgroundWebGpu = (
           stopRuntime();
 
           const session = yield* getSession(runtime, timings);
+
           const modelOutput = yield* runModel(
             session,
             runtime,
             bitmap,
             timings,
           );
+
           const compositeMode = resolveWebGpuCompositeMode(
             typeof globalThis.location === "undefined"
               ? ""
