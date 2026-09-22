@@ -184,7 +184,16 @@ const html = `<!doctype html>
 </html>
 `;
 
-const compareOutputs = async (): Promise<unknown> => {
+type PixelComparison = {
+  readonly schemaVersion: 1;
+  readonly values: number;
+  readonly meanAbsoluteByteDifference: number;
+  readonly maxAbsoluteByteDifference: number;
+  readonly differingValues: number;
+  readonly differingValueFraction: number;
+};
+
+const compareOutputs = async (): Promise<PixelComparison> => {
   const left = await sharp(
     join(
       outputRoot,
@@ -195,6 +204,7 @@ const compareOutputs = async (): Promise<unknown> => {
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
+
   const right = await sharp(
     join(
       outputRoot,
@@ -346,10 +356,12 @@ const app = Bun.serve({
       outputMatch !== null
     ) {
       const strategy = outputMatch[1];
+
       const index = Number.parseInt(
         outputMatch[2],
         10,
       );
+
       const targetPath = join(
         outputRoot,
         strategy,
@@ -389,6 +401,7 @@ const app = Bun.serve({
       runMatch !== null
     ) {
       const strategy = runMatch[1];
+
       const index = Number.parseInt(
         runMatch[2],
         10,
