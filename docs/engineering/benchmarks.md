@@ -170,11 +170,13 @@ ONNX Runtime 1.30 already allows CPU shape-only nodes during WebGPU graph captur
 
 The browser harness now captures verbose ORT session logs. When graph-capture creation fails, it automatically creates a second no-capture diagnostic session, records ORT's `Node placements` output, releases that session, and includes the captured log lines plus diagnostic-session status in `browser-failure.json`. This diagnostic session is not used as a benchmark fallback.
 
-The placement diagnostic exposed 320 CPU nodes and 5,145 WebGPU nodes. The CPU islands repeat across five ASPP regions and include 20 `Split` nodes produced by ORT's `GatherSliceToSplitFusion`.
+The first placement diagnostic exposed 320 CPU nodes and 5,145 WebGPU nodes. The CPU islands repeat across five ASPP regions and include 20 `Split` nodes produced by ORT's `GatherSliceToSplitFusion`.
 
-In ONNX Runtime 1.30, `GatherSliceToSplitFusion` is a Level 2 graph transformer registered only for CPU and CUDA execution providers. The browser candidate had been using `graphOptimizationLevel: "all"`, which enabled that transformer and created CPU-only `Split` nodes inside otherwise WebGPU-oriented regions. The browser candidate now uses `graphOptimizationLevel: "basic"` for both the capture attempt and the no-capture placement diagnostic. This skips Level 2 so the original Gather/Slice form remains available to WebGPU partitioning.
+That count needs two corrections before it is treated as the capture-session partition. First, `GatherSliceToSplitFusion` is a Level 2 graph transformer registered only for CPU and CUDA execution providers in ONNX Runtime 1.30. The browser candidate had been using `graphOptimizationLevel: "all"`, which enabled that transformer. The browser candidate now uses `graphOptimizationLevel: "basic"` for both the capture attempt and diagnostic session, so the original Gather/Slice form remains available to WebGPU partitioning.
 
-This change is preferable to rewriting the 320-node CPU regions by hand. If basic optimization removes the CPU compute islands, the existing Split-to-Slice model rewrite remains the only candidate-model graph rewrite needed.
+Second, ONNX Runtime 1.30 forces WebGPU int64 kernels on when graph capture is enabled, while the original no-capture diagnostic used the default `enableInt64=false`. Several of the CPU operator families in the ASPP regions have int64 WebGPU kernels gated by that option. The diagnostic session now sets `ep.webgpuexecutionprovider.enableInt64=1` explicitly so its kernel surface matches the capture session.
+
+The next placement result therefore tests the relevant combination: basic graph optimization plus WebGPU int64 enabled. This is preferable to rewriting the 320-node regions by hand before confirming that they are genuine model compatibility gaps.
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
