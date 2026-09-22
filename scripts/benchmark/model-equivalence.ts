@@ -43,6 +43,7 @@ const runModel = async (
 
   try {
     const inputName = session.inputNames.at(0);
+
     const outputName = session.outputNames.at(0);
 
     if (inputName === undefined || outputName === undefined) {
@@ -55,10 +56,13 @@ const runModel = async (
       inputSize,
       inputSize,
     ]);
+
     const runStartedAt = performance.now();
 
     const outputs = await session.run({ [inputName]: tensor });
+
     const runMs = performance.now() - runStartedAt;
+
     const output = outputs[outputName];
 
     if (output === undefined || !(output.data instanceof Float32Array)) {
@@ -86,7 +90,9 @@ const compare = (
   }
 
   let maxAbsoluteDifference = 0;
+
   let sumAbsoluteDifference = 0;
+
   let differingValues = 0;
 
   for (let index = 0; index < original.length; index += 1) {
