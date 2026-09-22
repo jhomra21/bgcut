@@ -174,9 +174,13 @@ The first placement diagnostic exposed 320 CPU nodes and 5,145 WebGPU nodes. The
 
 That count needs two corrections before it is treated as the capture-session partition. First, `GatherSliceToSplitFusion` is a Level 2 graph transformer registered only for CPU and CUDA execution providers in ONNX Runtime 1.30. The browser candidate had been using `graphOptimizationLevel: "all"`, which enabled that transformer. The browser candidate now uses `graphOptimizationLevel: "basic"` for both the capture attempt and diagnostic session, so the original Gather/Slice form remains available to WebGPU partitioning.
 
-Second, ONNX Runtime 1.30 forces WebGPU int64 kernels on when graph capture is enabled, while the original no-capture diagnostic used the default `enableInt64=false`. Several of the CPU operator families in the ASPP regions have int64 WebGPU kernels gated by that option. The diagnostic session now sets `ep.webgpuexecutionprovider.enableInt64=1` explicitly so its kernel surface matches the capture session.
+Second, ONNX Runtime 1.30 forces the effective WebGPU int64 kernel registry on when graph capture is enabled, but the first no-capture diagnostic still used the provider default with int64 off. Passing `ep.webgpuexecutionprovider.enableInt64=1` through the public JavaScript session `extra` object did not fix that mismatch: the session-options dump contained the key, while the WebGPU provider startup log still reported `enable int64: 0`.
 
-The next placement result therefore tests the relevant combination: basic graph optimization plus WebGPU int64 enabled. This is preferable to rewriting the 320-node regions by hand before confirming that they are genuine model compatibility gaps.
+The published 1.30 Web wrapper explains why. `sessionOptions.extra` is serialized as general session configuration, while the WebGPU provider is constructed from a separate fixed provider-option list. That list does not expose `enableInt64`.
+
+The benchmark bundle now resolves `onnxruntime-web/webgpu` to the package's included TypeScript source and patches only `session-options.ts` in memory during `Bun.build`. The patch serializes a benchmark-only `enableInt64: true` field through the actual WebGPU provider-option channel. It does not modify `node_modules`, the lockfile, or bgcut's production runtime.
+
+The diagnostic session now refuses to count as valid unless its own verbose logs contain `WebGPU EP enable int64: 1`. Together with `graphOptimizationLevel: "basic"`, the next placement result should finally match the relevant WebGPU kernel surface before any further model rewrite is considered.
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
