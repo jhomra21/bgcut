@@ -625,6 +625,7 @@ const main = async (): Promise<void> => {
   const sessionStartedAt = performance.now();
   let session: ort.InferenceSession;
 
+  // SAFETY: The benchmark bundler patches ORT 1.30's WebGPU provider serializer to accept this boolean option.
   const webgpuProvider = {
     name: "webgpu",
     device,
