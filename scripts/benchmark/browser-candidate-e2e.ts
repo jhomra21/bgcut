@@ -312,6 +312,7 @@ const launchMacosApp = async (
   const stderr = readSubprocessPipe(process.stderr);
 
   const exitCode = await process.exited;
+
   const [capturedStdout, capturedStderr] = await Promise.all([
     stdout,
     stderr,
