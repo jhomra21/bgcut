@@ -628,6 +628,9 @@ const main = async (): Promise<void> => {
       executionProviders: [{ name: "webgpu", device }],
       enableGraphCapture: true,
       graphOptimizationLevel: "basic",
+      extra: {
+        "ep.webgpuexecutionprovider.enableInt64": "1",
+      },
       preferredOutputLocation: "gpu-buffer",
       logSeverityLevel: 0,
       logVerbosityLevel: 1,
@@ -642,6 +645,9 @@ const main = async (): Promise<void> => {
         executionProviders: [{ name: "webgpu", device }],
         enableGraphCapture: false,
         graphOptimizationLevel: "basic",
+        extra: {
+          "ep.webgpuexecutionprovider.enableInt64": "1",
+        },
         preferredOutputLocation: "gpu-buffer",
         logSeverityLevel: 0,
         logVerbosityLevel: 1,
