@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -134,8 +134,9 @@ await Promise.all([
 ]);
 
 const chromePath = await findChrome();
-const profileRoot = await Bun.$`mktemp -d ${join(tmpdir(), "bgcut-browser-benchmark.XXXXXX")}`.text();
-const profileDirectory = profileRoot.trim();
+const profileDirectory = await mkdtemp(
+  join(tmpdir(), "bgcut-browser-benchmark-"),
+);
 
 const server = Bun.spawn(
   [
