@@ -104,6 +104,25 @@ const createSession = (
     return session;
   });
 
+const releaseSessionSilently = (
+  session: ort.InferenceSession,
+): Effect.Effect<void> =>
+  Effect.tryPromise(() => session.release()).pipe(
+    Effect.catchAll(() => Effect.void),
+  );
+
+const clearCachedSession = (): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    if (cachedSession === undefined) {
+      return;
+    }
+
+    const session = cachedSession.session;
+    cachedSession = undefined;
+
+    yield* releaseSessionSilently(session);
+  });
+
 const getSessionLease = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
@@ -111,6 +130,8 @@ const getSessionLease = (
 ): Effect.Effect<SessionLease, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     if (strategy === "capture-recreate") {
+      yield* clearCachedSession();
+
       return {
         session: yield* createSession(runtime, timings, true),
         releaseAfterUse: true,
@@ -131,7 +152,7 @@ const getSessionLease = (
       };
     }
 
-    cachedSession = undefined;
+    yield* clearCachedSession();
 
     const session = yield* createSession(
       runtime,
@@ -155,9 +176,7 @@ const releaseSessionLease = (
   lease: SessionLease,
 ): Effect.Effect<void> =>
   lease.releaseAfterUse
-    ? Effect.tryPromise(() => lease.session.release()).pipe(
-        Effect.catchAll(() => Effect.void),
-      )
+    ? releaseSessionSilently(lease.session)
     : Effect.void;
 
 const runModel = (
