@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
 
 import { logitToAlphaByte } from "../../src/shared/matte";
@@ -7,13 +8,20 @@ type BenchmarkCase = {
   readonly inputUrl: string;
 };
 
-type BenchmarkConfig = {
-  readonly modelUrl: string;
-  readonly runtimeUrl: string;
-  readonly inputSize: number;
-  readonly warmRepeats: number;
-  readonly cases: readonly BenchmarkCase[];
-};
+const BenchmarkCaseSchema = Schema.Struct({
+  id: Schema.String,
+  inputUrl: Schema.String,
+});
+
+const BenchmarkConfigSchema = Schema.Struct({
+  modelUrl: Schema.String,
+  runtimeUrl: Schema.String,
+  inputSize: Schema.Number,
+  warmRepeats: Schema.Number,
+  cases: Schema.Array(BenchmarkCaseSchema),
+});
+
+type BenchmarkConfig = typeof BenchmarkConfigSchema.Type;
 
 type RunTimings = {
   readonly totalMs: number;
@@ -101,6 +109,7 @@ const requestDevice = async (): Promise<{ readonly adapter: GPUAdapter; readonly
     return true;
   };
 
+  // SAFETY: Chromium exposes this exact feature string through GPUAdapter.features when supported.
   const chromiumTimestampQuery =
     "chromium-experimental-timestamp-query-inside-passes" as GPUFeatureName;
 
@@ -133,6 +142,7 @@ const createPreprocessPipeline = (
   inputSize: number,
 ): PreprocessPipeline => {
   const pixelCount = inputSize * inputSize;
+
   const module = device.createShaderModule({
     code: `
       @group(0) @binding(0) var sourceTexture: texture_2d<f32>;
@@ -155,6 +165,7 @@ const createPreprocessPipeline = (
       }
     `,
   });
+
   const layout = device.createBindGroupLayout({
     entries: [
       {
@@ -174,9 +185,11 @@ const createPreprocessPipeline = (
       },
     ],
   });
+
   const pipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [layout],
   });
+
   const pipeline = device.createComputePipeline({
     layout: pipelineLayout,
     compute: {
@@ -184,6 +197,7 @@ const createPreprocessPipeline = (
       entryPoint: "main",
     },
   });
+
   const sampler = device.createSampler({
     magFilter: "linear",
     minFilter: "linear",
@@ -202,18 +216,22 @@ const createPersistentIo = (
 ): PersistentIo => {
   const inputElements = inputSize * inputSize * 3;
   const outputElements = inputSize * inputSize;
+
   const inputBuffer = device.createBuffer({
     size: inputElements * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
   });
+
   const outputBuffer = device.createBuffer({
     size: outputElements * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
   });
+
   const inputTensor = ort.Tensor.fromGpuBuffer(inputBuffer, {
     dataType: "float32",
     dims: [1, 3, inputSize, inputSize],
   });
+
   const outputTensor = ort.Tensor.fromGpuBuffer(outputBuffer, {
     dataType: "float32",
     dims: [1, 1, inputSize, inputSize],
@@ -269,6 +287,7 @@ const uploadModelInput = (
         },
       ],
     });
+
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
 
@@ -295,6 +314,7 @@ const readOutput = async (
     inputSize *
     inputSize *
     Float32Array.BYTES_PER_ELEMENT;
+
   const staging = device.createBuffer({
     size: byteLength,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
@@ -444,6 +464,7 @@ const runRemoval = async (
       io.outputBuffer,
       inputSize,
     );
+
     const outputReadbackMs = performance.now() - stageStartedAt;
 
     stageStartedAt = performance.now();
@@ -502,7 +523,9 @@ const main = async (): Promise<void> => {
     throw new Error(`Could not load benchmark config: HTTP ${configResponse.status}.`);
   }
 
-  const config = await configResponse.json() as BenchmarkConfig;
+  const config = Schema.decodeUnknownSync(BenchmarkConfigSchema)(
+    await configResponse.json(),
+  );
 
   ort.env.wasm.wasmPaths = {
     wasm: new URL(config.runtimeUrl, globalThis.location.href).href,
@@ -529,12 +552,14 @@ const main = async (): Promise<void> => {
   writeStatus(`Model loaded in ${modelMs.toFixed(1)} ms. Creating graph-capture session.`);
 
   const sessionStartedAt = performance.now();
+
   const session = await ort.InferenceSession.create(model, {
     executionProviders: [{ name: "webgpu", device }],
     enableGraphCapture: true,
     graphOptimizationLevel: "all",
     preferredOutputLocation: "gpu-buffer",
   });
+
   const sessionMs = performance.now() - sessionStartedAt;
   const reports: CaseReport[] = [];
 
@@ -557,6 +582,7 @@ const main = async (): Promise<void> => {
       }
 
       const source = await inputResponse.blob();
+
       const first = await runRemoval(
         device,
         session,
@@ -652,11 +678,12 @@ const main = async (): Promise<void> => {
   writeStatus(result);
 };
 
-void main().catch((error: unknown) => {
-  const message =
+void main().catch((error) => {
+  const parsedError =
     error instanceof Error
-      ? `${error.message}\n${error.stack ?? ""}`
-      : String(error);
+      ? error
+      : new Error(String(error));
+  const message = `${parsedError.message}\n${parsedError.stack ?? ""}`;
 
   writeStatus("");
   writeStatus("BENCHMARK FAILED");
