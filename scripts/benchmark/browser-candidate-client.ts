@@ -649,6 +649,7 @@ const main = async (): Promise<void> => {
     );
 
     try {
+
       const diagnosticLogStart = diagnosticLogs.length;
 
       const diagnosticSession = await ort.InferenceSession.create(model, {
