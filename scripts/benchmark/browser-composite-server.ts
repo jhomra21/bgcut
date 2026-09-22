@@ -527,15 +527,31 @@ const app = Bun.serve({
           ? cpuOutputRoot
           : gpuOutputRoot;
 
+      const targetPath = join(
+        targetRoot,
+        safeOutputName(benchmarkCase.id),
+      );
+
       await writeFile(
-        join(
-          targetRoot,
-          safeOutputName(benchmarkCase.id),
-        ),
+        targetPath,
         new Uint8Array(
           await request.arrayBuffer(),
         ),
       );
+
+      if (mode === "gpu") {
+        const stats = await sharp(targetPath)
+          .ensureAlpha()
+          .stats();
+        const alpha = stats.channels.at(3);
+
+        if (alpha === undefined || alpha.max === 0) {
+          return new Response(
+            "GPU composite output is fully transparent.",
+            { status: 422 },
+          );
+        }
+      }
 
       return new Response("saved");
     }
