@@ -67,6 +67,7 @@
     "benchmark:bgcut": "bun run scripts/benchmark/bgcut.ts",
     "benchmark:model-candidate": "bun run scripts/benchmark/model-candidate.ts",
     "benchmark:browser-candidate": "bun run scripts/benchmark/browser-candidate-server.ts",
+    "benchmark:browser-candidate:e2e": "bun run scripts/benchmark/browser-candidate-e2e.ts",
     "benchmark:model-equivalence": "bun run scripts/benchmark/model-equivalence.ts",
     "benchmark:score": "bun run scripts/benchmark/score.ts"
   },
