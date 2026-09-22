@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
+import packageJson from "../../package.json";
 import { compositeAlphaMask } from "../../src/native/alpha-mask";
 import { inspectModelFile } from "../../src/shared/model-file";
 import { logitToAlphaByte } from "../../src/shared/matte";
@@ -386,7 +387,7 @@ const report = {
     arch: process.arch,
     bun: process.versions.bun ?? null,
     node: process.versions.node,
-    onnxRuntime: ort.env.versions?.common ?? null,
+    onnxRuntime: packageJson.dependencies["onnxruntime-node"],
   },
   model: {
     filename: basename(modelPath),
