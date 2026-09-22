@@ -180,7 +180,35 @@ The published 1.30 Web wrapper explains why. `sessionOptions.extra` is serialize
 
 The benchmark bundle now resolves `onnxruntime-web/webgpu` to the package's included TypeScript source and patches only `session-options.ts` in memory during `Bun.build`. The patch serializes a benchmark-only `enableInt64: true` field through the actual WebGPU provider-option channel. It does not modify `node_modules`, the lockfile, or bgcut's production runtime.
 
-The diagnostic session now refuses to count as valid unless its own verbose logs contain `WebGPU EP enable int64: 1`. Together with `graphOptimizationLevel: "basic"`, the next placement result should finally match the relevant WebGPU kernel surface before any further model rewrite is considered.
+The diagnostic session now refuses to count as valid unless its own verbose logs contain `WebGPU EP enable int64: 1`.
+
+The authoritative basic-optimization, int64-enabled diagnostic leaves 60 CPU nodes and 5,544 WebGPU nodes. All 60 CPU nodes are the same three-node pattern repeated across 20 ASPP branches: two `Slice` nodes followed by one `Sum`. ORT reports that no WebGPU kernel is registered for those exact nodes.
+
+This is the same graph pattern that blocked capture for bgcut's accepted 512 model. In that model, 40 one-element axis-3 `Slice` nodes carrying int64 data were replaced by equivalent `Gather` nodes, and 20 four-input `Sum` nodes were replaced by three chained `Add` nodes. The deterministic CPU output remained exact.
+
+PR #93 now exposes the same guarded rewrite for General Lite. It only accepts ASPP `Slice` / `Slice_1` nodes whose data is int64, whose slice is one element on axis 3 with step 1, and four-input ASPP `Sum` nodes with matching input/output shapes. It requires exactly 40 Slice rewrites and 20 Sum rewrites by default.
+
+Starting from the original General Lite model, the full candidate rewrite is:
+
+```sh
+bun run model:rewrite-webgpu-splits -- \
+  /path/to/birefnet-general-lite.onnx \
+  /path/to/birefnet-general-lite-split.onnx \
+  --max-storage-buffers-per-stage 10
+
+bun run model:rewrite-webgpu-shape-ops -- \
+  /path/to/birefnet-general-lite-split.onnx \
+  /path/to/birefnet-general-lite-webgpu-capture.onnx
+
+bun run benchmark:model-equivalence -- \
+  /path/to/birefnet-general-lite.onnx \
+  /path/to/birefnet-general-lite-webgpu-capture.onnx \
+  1024 \
+  ./tmp/general-lite-capture-equivalence.json
+```
+
+Do not retry the browser benchmark unless the equivalence report is exact. If it is exact, run the browser candidate against the fully rewritten model. If graph capture still fails after this rewrite, stop modifying this General Lite candidate and treat the remaining incompatibility as a reason to evaluate a different quality model.
+
 The rewrite command and deterministic equivalence gate remain available for future model candidates:
 
 ```sh
