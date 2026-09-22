@@ -202,6 +202,7 @@ export const createGpuSourceComposite = (
         const encoder = runtime.device.createCommandEncoder({
           label: "bgcut GPU composite encoder",
         });
+
         const pass = encoder.beginRenderPass({
           label: "bgcut GPU composite pass",
           colorAttachments: [
