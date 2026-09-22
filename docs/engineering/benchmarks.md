@@ -130,7 +130,22 @@ ONNX Runtime printed a provider-placement notice for some shape-related nodes du
 
 These quality numbers use six binary segmentation masks. They do not measure soft fur or hair alpha, translucency, or edge-color cleanup. A quality-profile decision still needs visual inspection and a soft-alpha reference set.
 
-The next timing check is the browser graph-capture path. The local server bundles a browser client, serves the candidate model and manifest inputs from disk, and writes source-resolution PNGs plus `browser-timings.json` and `quality.json` to the requested output directory.
+The next timing check is the browser graph-capture path. The preferred command is the E2E runner, which starts the local server, launches a fresh Chrome profile itself, waits for the page to finish, saves logs, and shuts everything down. It does not require browser-panel automation.
+
+```sh
+bun run benchmark:browser-candidate:e2e -- \
+  /path/to/manifest.json \
+  /path/to/browser-output \
+  /path/to/birefnet-general-lite-webgpu.onnx \
+  1024 \
+  5
+```
+
+The E2E run writes source-resolution PNGs, `browser-timings.json`, `quality.json`, and Chrome/server stdout and stderr logs to the output directory. It removes any stale timing, quality, or failure report before starting. If the page fails, it writes `browser-failure.json` and the command exits with that failure instead of waiting for a manual tab.
+
+Chrome is discovered from common macOS and Linux locations. Set `BGCUT_CHROME_PATH` to an explicit executable when needed. Set `BGCUT_BROWSER_BENCHMARK_TIMEOUT_MS` to change the default 15-minute timeout.
+
+The manual server remains available for debugging:
 
 ```sh
 bun run benchmark:browser-candidate -- \
@@ -139,8 +154,6 @@ bun run benchmark:browser-candidate -- \
   /path/to/birefnet-general-lite-webgpu.onnx \
   1024 \
   5
-
-# Open the printed 127.0.0.1 URL in Chrome and keep the process running.
 ```
 
 The browser runner enables ONNX Runtime Web graph capture and keeps the model input and output in fixed WebGPU buffers across runs. It repeats the browser pipeline for each image, including image decode, GPU preprocessing, output readback, matte construction, source-resolution compositing, and PNG export. Model fetch time and session creation are reported separately.
