@@ -64,6 +64,7 @@
     "prepack": "bun run package:prepare",
     "site:prepare-routes": "bun run scripts/site/prepare-static-routes.ts",
     "benchmark:bgcut": "bun run scripts/benchmark/bgcut.ts",
+    "benchmark:model-candidate": "bun run scripts/benchmark/model-candidate.ts",
     "benchmark:score": "bun run scripts/benchmark/score.ts"
   },
   "dependencies": {
