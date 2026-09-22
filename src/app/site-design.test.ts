@@ -48,10 +48,25 @@ describe("site design contract", () => {
     expect(styles).toContain("scrollbar-gutter: stable");
   });
 
+  test("uses semantic color tokens for light and dark themes", () => {
+    expect(styles).toContain("--text-primary: #171717");
+    expect(styles).toContain("--background-primary: #fbfbfa");
+    expect(styles).toContain('--theme-control: #efefe8');
+    expect(styles).toContain('html[data-theme="dark"]');
+    expect(styles).toContain("--text-primary: #f4f4f0");
+    expect(styles).toContain("--background-primary: #11110f");
+    expect(styles).toContain("color: var(--text-primary)");
+    expect(styles).toContain("background: var(--background-primary)");
+    expect(styles).not.toContain("var(--ink)");
+    expect(styles).not.toContain("var(--canvas)");
+    expect(styles).not.toContain("var(--surface)");
+    expect(styles).not.toContain("var(--line)");
+  });
+
   test("keeps the reference title permanently in the left reading rail", () => {
     expect(styles).toContain(".site-header-shell-sticky");
     expect(styles).toContain("position: sticky");
-    expect(styles).toContain("background: rgba(251, 251, 250, 0.94)");
+    expect(styles).toContain("background: var(--background-header)");
     expect(styles).toContain(".section-rail-page-title");
     expect(styles).toContain("font-size: 18px");
     expect(styles).toContain("font-weight: 760");
