@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
 
+import { resolveWebGpuCompositeMode } from "./composite-mode";
 import { resolveBrowserEnginePreference } from "./engine-preference";
 import {
   InferenceFailed,
@@ -10,8 +11,13 @@ import {
 } from "./errors";
 import { shouldFallbackToWasm } from "./fallback-policy";
 import type { GpuRuntime } from "./gpu";
+import { createGpuSourceComposite } from "./gpu-composite";
 import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
-import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
+import {
+  getGpuModelOutput,
+  readGpuModelOutput,
+  type GpuModelOutput,
+} from "./gpu-output";
 import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
@@ -113,7 +119,7 @@ const runModel = (
   runtime: GpuRuntime,
   sourceBitmap: ImageBitmap,
   timings: RemovalTimingRecorder,
-): Effect.Effect<Float32Array, InferenceFailed> =>
+): Effect.Effect<GpuModelOutput, InferenceFailed> =>
   Effect.gen(function* () {
     const inputName = session.inputNames.at(0);
     const outputName = session.outputNames.at(0);
@@ -160,7 +166,7 @@ const runModel = (
             });
           }
 
-          return yield* readGpuModelOutput(runtime, outputTarget, timings);
+          return outputTarget;
         }),
       (input) => Effect.sync(() => releaseGpuModelInput(input)),
     );
@@ -187,15 +193,42 @@ export const removeBackgroundWebGpu = (
           stopRuntime();
 
           const session = yield* getSession(runtime, timings);
-          const logits = yield* runModel(session, runtime, bitmap, timings);
+          const modelOutput = yield* runModel(
+            session,
+            runtime,
+            bitmap,
+            timings,
+          );
+          const compositeMode = resolveWebGpuCompositeMode(
+            typeof globalThis.location === "undefined"
+              ? ""
+              : globalThis.location.search,
+          );
 
-          const stopMatte = timings.begin("matteMs");
-          const matte = yield* createMatteCanvas(logits);
-          stopMatte();
+          let output: HTMLCanvasElement;
 
-          const stopComposite = timings.begin("compositeMs");
-          const output = yield* createSourceComposite(bitmap, matte);
-          stopComposite();
+          if (compositeMode === "gpu") {
+            output = yield* createGpuSourceComposite(
+              runtime,
+              bitmap,
+              modelOutput,
+              timings,
+            );
+          } else {
+            const logits = yield* readGpuModelOutput(
+              runtime,
+              modelOutput,
+              timings,
+            );
+
+            const stopMatte = timings.begin("matteMs");
+            const matte = yield* createMatteCanvas(logits);
+            stopMatte();
+
+            const stopComposite = timings.begin("compositeMs");
+            output = yield* createSourceComposite(bitmap, matte);
+            stopComposite();
+          }
 
           const stopExport = timings.begin("exportMs");
           const blob = yield* canvasToPng(output);
