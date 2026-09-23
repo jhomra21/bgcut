@@ -510,6 +510,11 @@ const main =
 
             await Promise.all([
               uploadBytes(
+                `/artifact/${run}/source-draw`,
+                diagnostics
+                  .sourceRgba,
+              ),
+              uploadBytes(
                 `/artifact/${run}/matte`,
                 diagnostics
                   .matteRgba,
