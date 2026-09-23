@@ -29,6 +29,11 @@ const BenchmarkManifestSchema = Schema.Struct({
   ),
 });
 
+const OutputLocationSchema = Schema.Literal(
+  "gpu-buffer",
+  "cpu",
+);
+
 const DiagnosticStageSchema = Schema.Literal(
   "session-ready",
   "inference-start",
@@ -64,12 +69,14 @@ const RemovalTimingsSchema = Schema.Struct({
 const AttemptStartSchema = Schema.Struct({
   label: Schema.String,
   caseId: Schema.String,
+  outputLocation: OutputLocationSchema,
   expectReuse: Schema.Boolean,
   startedAt: Schema.String,
 });
 
 const ProgressSchema = Schema.Struct({
   label: Schema.String,
+  outputLocation: OutputLocationSchema,
   stage: DiagnosticStageSchema,
   elapsedMs: Schema.Number,
   recordedAt: Schema.String,
@@ -77,6 +84,7 @@ const ProgressSchema = Schema.Struct({
 
 const RunRecordSchema = Schema.Struct({
   label: Schema.String,
+  outputLocation: OutputLocationSchema,
   lastStage: LastStageSchema,
   elapsedMs: Schema.Number,
   timings: RemovalTimingsSchema,
@@ -85,6 +93,7 @@ const RunRecordSchema = Schema.Struct({
 const FailureRecordSchema = Schema.Struct({
   label: Schema.String,
   caseId: Schema.String,
+  outputLocation: OutputLocationSchema,
   lastStage: LastStageSchema,
   elapsedMs: Schema.Number,
   message: Schema.String,
@@ -96,8 +105,8 @@ const DiagnosticReportSchema = Schema.Struct({
   generatedAt: Schema.String,
   userAgent: Schema.String,
   caseId: Schema.String,
-  outputLocation: Schema.Literal(
-    "cpu",
+  outputLocations: Schema.Array(
+    OutputLocationSchema,
   ),
   strategy: Schema.Literal(
     "no-capture-reuse",
@@ -106,6 +115,18 @@ const DiagnosticReportSchema = Schema.Struct({
   attempts: Schema.Array(
     RunRecordSchema,
   ),
+});
+
+const PixelComparisonSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  values: Schema.Number,
+  meanAbsoluteByteDifference:
+    Schema.Number,
+  maxAbsoluteByteDifference:
+    Schema.Number,
+  differingValues: Schema.Number,
+  differingValueFraction:
+    Schema.Number,
 });
 
 type PersistedDiagnostic =
@@ -123,6 +144,9 @@ type PersistedDiagnostic =
     >
   | Schema.Schema.Type<
       typeof DiagnosticReportSchema
+    >
+  | Schema.Schema.Type<
+      typeof PixelComparisonSchema
     >;
 
 const usage =
@@ -398,7 +422,7 @@ const html = `<!doctype html>
       name="viewport"
       content="width=device-width, initial-scale=1.0"
     />
-    <title>bgcut Safari CPU-output diagnostic</title>
+    <title>bgcut Safari output-location diagnostic</title>
   </head>
   <body>
     <pre id="status"></pre>
@@ -414,6 +438,10 @@ const config = {
     "/input",
   measuredRuns,
   timeoutMs,
+  outputLocations: [
+    "gpu-buffer",
+    "cpu",
+  ],
 };
 
 let progressIndex = 0;
@@ -431,6 +459,102 @@ const writeJson = async (
     )}\n`,
   );
 };
+
+const compareOutputs =
+  async (): Promise<
+    Schema.Schema.Type<
+      typeof PixelComparisonSchema
+    >
+  > => {
+    const [
+      gpuBuffer,
+      cpu,
+    ] = await Promise.all([
+      sharp(
+        join(
+          outputDirectory,
+          "gpu-buffer-run-1.png",
+        ),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({
+          resolveWithObject: true,
+        }),
+      sharp(
+        join(
+          outputDirectory,
+          "cpu-run-1.png",
+        ),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({
+          resolveWithObject: true,
+        }),
+    ]);
+
+    if (
+      gpuBuffer.info.width !==
+        cpu.info.width ||
+      gpuBuffer.info.height !==
+        cpu.info.height ||
+      gpuBuffer.info.channels !== 4 ||
+      cpu.info.channels !== 4
+    ) {
+      throw new Error(
+        "GPU-buffer and CPU output dimensions differ.",
+      );
+    }
+
+    let absolute = 0;
+    let maximum = 0;
+    let differing = 0;
+
+    for (
+      let index = 0;
+      index <
+      gpuBuffer.data.length;
+      index += 1
+    ) {
+      const difference =
+        Math.abs(
+          gpuBuffer.data[index] -
+            cpu.data[index],
+        );
+
+      absolute +=
+        difference;
+
+      maximum =
+        Math.max(
+          maximum,
+          difference,
+        );
+
+      if (
+        difference !== 0
+      ) {
+        differing += 1;
+      }
+    }
+
+    const values =
+      gpuBuffer.data.length;
+
+    return {
+      schemaVersion: 1,
+      values,
+      meanAbsoluteByteDifference:
+        absolute / values,
+      maxAbsoluteByteDifference:
+        maximum,
+      differingValues:
+        differing,
+      differingValueFraction:
+        differing / values,
+    };
+  };
 
 const app =
   Bun.serve({
@@ -762,6 +886,29 @@ const app =
           report,
         );
 
+        const comparison =
+          await compareOutputs();
+
+        await writeJson(
+          join(
+            outputRoot,
+            "pixel-comparison.json",
+          ),
+          comparison,
+        );
+
+        if (
+          comparison.differingValues !==
+          0
+        ) {
+          return new Response(
+            `CPU and GPU-buffer outputs differ at ${comparison.differingValues} RGBA values.`,
+            {
+              status: 422,
+            },
+          );
+        }
+
         return new Response(
           "saved",
         );
@@ -777,5 +924,5 @@ const app =
   });
 
 console.log(
-  `Safari CPU-output diagnostic ready at http://${app.hostname}:${app.port}/ for ${benchmarkCase.id}.`,
+  `Safari output-location diagnostic ready at http://${app.hostname}:${app.port}/ for ${benchmarkCase.id}.`,
 );
