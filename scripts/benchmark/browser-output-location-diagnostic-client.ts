@@ -25,6 +25,41 @@ type AttemptRecord = {
   readonly timings: RemovalTimings;
 };
 
+type AttemptStart = {
+  readonly label: string;
+  readonly caseId: string;
+  readonly expectReuse: boolean;
+  readonly startedAt: string;
+};
+
+type FailureRecord = {
+  readonly label: string;
+  readonly caseId: string;
+  readonly lastStage:
+    | WebGpuDiagnosticStage
+    | "attempt-start";
+  readonly elapsedMs: number;
+  readonly message: string;
+  readonly stack: string;
+};
+
+type DiagnosticReport = {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly userAgent: string;
+  readonly caseId: string;
+  readonly outputLocation: "cpu";
+  readonly strategy: "no-capture-reuse";
+  readonly timeoutMs: number;
+  readonly attempts: readonly AttemptRecord[];
+};
+
+type DiagnosticRequestBody =
+  | AttemptStart
+  | AttemptRecord
+  | FailureRecord
+  | DiagnosticReport;
+
 const status =
   document.querySelector<HTMLPreElement>(
     "#status",
@@ -45,7 +80,7 @@ const writeStatus = (
 
 const postJson = async (
   path: string,
-  value: unknown,
+  value: DiagnosticRequestBody,
 ): Promise<void> => {
   const response = await fetch(
     path,
@@ -410,24 +445,26 @@ const main =
       );
     }
 
+    const report: DiagnosticReport = {
+      schemaVersion: 1,
+      generatedAt:
+        new Date().toISOString(),
+      userAgent:
+        navigator.userAgent,
+      caseId:
+        config.caseId,
+      outputLocation:
+        "cpu",
+      strategy:
+        "no-capture-reuse",
+      timeoutMs:
+        config.timeoutMs,
+      attempts,
+    };
+
     await postJson(
       "/report",
-      {
-        schemaVersion: 1,
-        generatedAt:
-          new Date().toISOString(),
-        userAgent:
-          navigator.userAgent,
-        caseId:
-          config.caseId,
-        outputLocation:
-          "cpu",
-        strategy:
-          "no-capture-reuse",
-        timeoutMs:
-          config.timeoutMs,
-        attempts,
-      },
+      report,
     );
 
     writeStatus("");
