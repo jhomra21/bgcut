@@ -641,18 +641,16 @@ const finalize =
 
     const comparisons =
       await Promise.all(
-        modes
-          .filter(
-            (mode) =>
-              mode !==
-              "default",
-          )
-          .map(
-            (mode) =>
-              compareOutputs(
-                mode,
-              ),
-          ),
+        modes.flatMap(
+          (mode) =>
+            mode === "default"
+              ? []
+              : [
+                  compareOutputs(
+                    mode,
+                  ),
+                ],
+        ),
       );
 
     await Promise.all([
