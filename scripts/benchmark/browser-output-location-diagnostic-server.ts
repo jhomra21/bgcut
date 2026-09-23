@@ -29,12 +29,101 @@ const BenchmarkManifestSchema = Schema.Struct({
   ),
 });
 
+const DiagnosticStageSchema = Schema.Literal(
+  "session-ready",
+  "inference-start",
+  "inference-complete",
+  "matte-complete",
+  "composite-complete",
+  "export-complete",
+);
+
+const LastStageSchema = Schema.Union(
+  DiagnosticStageSchema,
+  Schema.Literal(
+    "attempt-start",
+  ),
+);
+
+const RemovalTimingsSchema = Schema.Struct({
+  decodeMs: Schema.Number,
+  runtimeMs: Schema.Number,
+  modelDownloadMs: Schema.Number,
+  sessionInitMs: Schema.Number,
+  preprocessMs: Schema.Number,
+  inputUploadMs: Schema.Number,
+  inferenceMs: Schema.Number,
+  outputReadbackMs: Schema.Number,
+  matteMs: Schema.Number,
+  compositeMs: Schema.Number,
+  exportMs: Schema.Number,
+  totalMs: Schema.Number,
+  sessionReused: Schema.Boolean,
+});
+
+const AttemptStartSchema = Schema.Struct({
+  label: Schema.String,
+  caseId: Schema.String,
+  expectReuse: Schema.Boolean,
+  startedAt: Schema.String,
+});
+
 const ProgressSchema = Schema.Struct({
   label: Schema.String,
-  stage: Schema.String,
+  stage: DiagnosticStageSchema,
   elapsedMs: Schema.Number,
   recordedAt: Schema.String,
 });
+
+const RunRecordSchema = Schema.Struct({
+  label: Schema.String,
+  lastStage: LastStageSchema,
+  elapsedMs: Schema.Number,
+  timings: RemovalTimingsSchema,
+});
+
+const FailureRecordSchema = Schema.Struct({
+  label: Schema.String,
+  caseId: Schema.String,
+  lastStage: LastStageSchema,
+  elapsedMs: Schema.Number,
+  message: Schema.String,
+  stack: Schema.String,
+});
+
+const DiagnosticReportSchema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  generatedAt: Schema.String,
+  userAgent: Schema.String,
+  caseId: Schema.String,
+  outputLocation: Schema.Literal(
+    "cpu",
+  ),
+  strategy: Schema.Literal(
+    "no-capture-reuse",
+  ),
+  timeoutMs: Schema.Number,
+  attempts: Schema.Array(
+    RunRecordSchema,
+  ),
+});
+
+type PersistedDiagnostic =
+  | Schema.Schema.Type<
+      typeof AttemptStartSchema
+    >
+  | Schema.Schema.Type<
+      typeof ProgressSchema
+    >
+  | Schema.Schema.Type<
+      typeof RunRecordSchema
+    >
+  | Schema.Schema.Type<
+      typeof FailureRecordSchema
+    >
+  | Schema.Schema.Type<
+      typeof DiagnosticReportSchema
+    >;
 
 const usage =
   "Usage: bun run benchmark:browser-output-location:diagnostic -- <manifest.json> <output-dir> <model.onnx> [measured-runs] [timeout-ms] [port] [case-id]";
@@ -331,7 +420,7 @@ let progressIndex = 0;
 
 const writeJson = async (
   path: string,
-  value: unknown,
+  value: PersistedDiagnostic,
 ): Promise<void> => {
   await writeFile(
     path,
@@ -467,14 +556,15 @@ const app =
           "/attempt"
       ) {
         const value =
-          await request.json();
+          Schema.decodeUnknownSync(
+            AttemptStartSchema,
+          )(
+            await request.json(),
+          );
 
         const label =
           safeLabel(
-            String(
-              value.label ??
-                "unknown",
-            ),
+            value.label,
           );
 
         await writeJson(
@@ -546,14 +636,15 @@ const app =
           "/run"
       ) {
         const value =
-          await request.json();
+          Schema.decodeUnknownSync(
+            RunRecordSchema,
+          )(
+            await request.json(),
+          );
 
         const label =
           safeLabel(
-            String(
-              value.label ??
-                "unknown",
-            ),
+            value.label,
           );
 
         await writeJson(
@@ -630,12 +721,19 @@ const app =
         url.pathname ===
           "/failure"
       ) {
+        const failure =
+          Schema.decodeUnknownSync(
+            FailureRecordSchema,
+          )(
+            await request.json(),
+          );
+
         await writeJson(
           join(
             outputRoot,
             "browser-failure.json",
           ),
-          await request.json(),
+          failure,
         );
 
         return new Response(
@@ -649,12 +747,19 @@ const app =
         url.pathname ===
           "/report"
       ) {
+        const report =
+          Schema.decodeUnknownSync(
+            DiagnosticReportSchema,
+          )(
+            await request.json(),
+          );
+
         await writeJson(
           join(
             outputRoot,
             "browser-output-location-diagnostic.json",
           ),
-          await request.json(),
+          report,
         );
 
         return new Response(
