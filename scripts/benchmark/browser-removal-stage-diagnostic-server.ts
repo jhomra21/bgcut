@@ -609,6 +609,7 @@ const compareBytes = (
 const stageComparisons =
   async (
     stage:
+      | "source-draw"
       | "matte"
       | "composite"
       | "exported-rgba"
