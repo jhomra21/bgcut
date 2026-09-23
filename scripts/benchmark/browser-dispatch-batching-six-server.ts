@@ -85,6 +85,8 @@ const ModeReportSchema = Schema.Struct({
   strategy: Schema.Literal(
     "no-capture-reuse",
   ),
+  sourceSnapshotBeforeInference:
+    Schema.Literal(true),
   mode: ModeSchema,
   runsPerCase: Schema.Number,
   prime: PrimeRecordSchema,
@@ -136,6 +138,7 @@ type FinalReport = {
   readonly schemaVersion: 1;
   readonly generatedAt: string;
   readonly strategy: "no-capture-reuse";
+  readonly sourceSnapshotBeforeInference: true;
   readonly runsPerCase: number;
   readonly cases: number;
   readonly summary: {
@@ -920,6 +923,8 @@ const finalize =
           new Date().toISOString(),
         strategy:
           "no-capture-reuse",
+        sourceSnapshotBeforeInference:
+          true,
         runsPerCase,
         cases:
           manifest.cases.length,
