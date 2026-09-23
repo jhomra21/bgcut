@@ -3,6 +3,10 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { resolveBrowserEnginePreference } from "./engine-preference";
 import {
+  resolveDefaultWebGpuSessionStrategy,
+  type WebGpuSessionStrategy,
+} from "./webgpu-session-strategy";
+import {
   InferenceFailed,
   ModelDownloadFailed,
   ModelLoadFailed,
@@ -39,7 +43,13 @@ export type BackgroundRemovalResult = {
 
 type SessionCache = {
   readonly device: GPUDevice;
+  readonly graphCapture: boolean;
   readonly session: ort.InferenceSession;
+};
+
+type SessionLease = {
+  readonly session: ort.InferenceSession;
+  readonly releaseAfterUse: boolean;
 };
 
 let cachedSession: SessionCache | undefined;
@@ -61,6 +71,7 @@ const configureOrtWebGpuRuntime = (): void => {
 const createSession = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
+  graphCapture: boolean,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
@@ -75,13 +86,15 @@ const createSession = (
       try: () =>
         ort.InferenceSession.create(model, {
           executionProviders: [{ name: "webgpu", device: runtime.device }],
-          enableGraphCapture: true,
+          enableGraphCapture: graphCapture,
           graphOptimizationLevel: "all",
           preferredOutputLocation: "gpu-buffer",
         }),
       catch: (cause) =>
         new ModelLoadFailed({
-          message: `The optimized BiRefNet graph downloaded, but ONNX Runtime could not create the WebGPU graph-capture session. ${String(cause)}`,
+          message: graphCapture
+            ? `The optimized BiRefNet graph downloaded, but ONNX Runtime could not create the WebGPU graph-capture session. ${String(cause)}`
+            : `The optimized BiRefNet graph downloaded, but ONNX Runtime could not create the WebGPU session. ${String(cause)}`,
         }),
     });
 
@@ -90,29 +103,87 @@ const createSession = (
     return session;
   });
 
-const getSession = (
-  runtime: GpuRuntime,
-  timings: RemovalTimingRecorder,
-): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
-  Effect.gen(function* () {
-    if (cachedSession?.device === runtime.device) {
-      timings.markSessionReused();
+const releaseSessionSilently = (
+  session: ort.InferenceSession,
+): Effect.Effect<void> =>
+  Effect.tryPromise(() => session.release()).pipe(
+    Effect.catchAll(() => Effect.void),
+  );
 
-      return cachedSession.session;
+const clearCachedSession = (): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    if (cachedSession === undefined) {
+      return;
     }
 
+    const session = cachedSession.session;
     cachedSession = undefined;
-    const session = yield* createSession(runtime, timings);
-    cachedSession = { device: runtime.device, session };
 
-    return session;
+    yield* releaseSessionSilently(session);
   });
+
+const getSessionLease = (
+  runtime: GpuRuntime,
+  timings: RemovalTimingRecorder,
+  strategy: WebGpuSessionStrategy,
+): Effect.Effect<SessionLease, ModelDownloadFailed | ModelLoadFailed> =>
+  Effect.gen(function* () {
+    if (strategy === "capture-recreate") {
+      yield* clearCachedSession();
+
+      return {
+        session: yield* createSession(runtime, timings, true),
+        releaseAfterUse: true,
+      };
+    }
+
+    const graphCapture = strategy === "capture-reuse";
+
+    if (
+      cachedSession?.device === runtime.device &&
+      cachedSession.graphCapture === graphCapture
+    ) {
+      timings.markSessionReused();
+
+      return {
+        session: cachedSession.session,
+        releaseAfterUse: false,
+      };
+    }
+
+    yield* clearCachedSession();
+
+    const session = yield* createSession(
+      runtime,
+      timings,
+      graphCapture,
+    );
+
+    cachedSession = {
+      device: runtime.device,
+      graphCapture,
+      session,
+    };
+
+    return {
+      session,
+      releaseAfterUse: false,
+    };
+  });
+
+const releaseSessionLease = (
+  lease: SessionLease,
+): Effect.Effect<void> =>
+  lease.releaseAfterUse
+    ? releaseSessionSilently(lease.session)
+    : Effect.void;
 
 const runModel = (
   session: ort.InferenceSession,
   runtime: GpuRuntime,
   sourceBitmap: ImageBitmap,
   timings: RemovalTimingRecorder,
+  graphCapture: boolean,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
     const inputName = session.inputNames.at(0);
@@ -140,7 +211,9 @@ const runModel = (
               ),
             catch: (cause) =>
               new InferenceFailed({
-                message: `Optimized BiRefNet graph-capture inference failed on the WebGPU device. ${String(cause)}`,
+                message: graphCapture
+                  ? `Optimized BiRefNet graph-capture inference failed on the WebGPU device. ${String(cause)}`
+                  : `Optimized BiRefNet inference failed on the WebGPU device. ${String(cause)}`,
               }),
           });
 
@@ -166,8 +239,9 @@ const runModel = (
     );
   });
 
-export const removeBackgroundWebGpu = (
+export const removeBackgroundWebGpuWithStrategy = (
   file: File,
+  strategy: WebGpuSessionStrategy,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -186,33 +260,57 @@ export const removeBackgroundWebGpu = (
           const runtime = yield* getGpuRuntime;
           stopRuntime();
 
-          const session = yield* getSession(runtime, timings);
-          const logits = yield* runModel(session, runtime, bitmap, timings);
+          return yield* Effect.acquireUseRelease(
+            getSessionLease(runtime, timings, strategy),
+            (lease) =>
+              Effect.gen(function* () {
+                const logits = yield* runModel(
+                  lease.session,
+                  runtime,
+                  bitmap,
+                  timings,
+                  strategy !== "no-capture-reuse",
+                );
 
-          const stopMatte = timings.begin("matteMs");
-          const matte = yield* createMatteCanvas(logits);
-          stopMatte();
+                const stopMatte = timings.begin("matteMs");
+                const matte = yield* createMatteCanvas(logits);
+                stopMatte();
 
-          const stopComposite = timings.begin("compositeMs");
-          const output = yield* createSourceComposite(bitmap, matte);
-          stopComposite();
+                const stopComposite = timings.begin("compositeMs");
+                const output = yield* createSourceComposite(bitmap, matte);
+                stopComposite();
 
-          const stopExport = timings.begin("exportMs");
-          const blob = yield* canvasToPng(output);
-          stopExport();
+                const stopExport = timings.begin("exportMs");
+                const blob = yield* canvasToPng(output);
+                stopExport();
 
-          return {
-            blob,
-            width: bitmap.width,
-            height: bitmap.height,
-            modelRevision: MODEL_REVISION,
-            engine: "webgpu" as const,
-            timings: timings.finish(),
-          };
+                return {
+                  blob,
+                  width: bitmap.width,
+                  height: bitmap.height,
+                  modelRevision: MODEL_REVISION,
+                  engine: "webgpu" as const,
+                  timings: timings.finish(),
+                };
+              }),
+            releaseSessionLease,
+          );
         }),
       (bitmap) => Effect.sync(() => bitmap.close()),
     );
   });
+
+export const removeBackgroundWebGpu = (
+  file: File,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  removeBackgroundWebGpuWithStrategy(
+    file,
+    resolveDefaultWebGpuSessionStrategy(
+      typeof globalThis.navigator === "undefined"
+        ? ""
+        : globalThis.navigator.userAgent,
+    ),
+  );
 
 const removeBackgroundWithWasm = (
   file: File,
