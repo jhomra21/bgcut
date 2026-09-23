@@ -259,15 +259,8 @@ const recordFailure = async (
     | number
     | "prime",
   startedAt: number,
-  error: unknown,
+  error: Error,
 ): Promise<never> => {
-  const parsed =
-    error instanceof Error
-      ? error
-      : new Error(
-          String(error),
-        );
-
   const failure:
     FailureRecord = {
       schemaVersion: 1,
@@ -277,9 +270,9 @@ const recordFailure = async (
         performance.now() -
         startedAt,
       message:
-        parsed.message,
+        error.message,
       stack:
-        parsed.stack ?? "",
+        error.stack ?? "",
     };
 
   await postJson(
@@ -287,7 +280,7 @@ const recordFailure = async (
     failure,
   );
 
-  throw parsed;
+  throw error;
 };
 
 const main =
@@ -412,11 +405,18 @@ const main =
         )} ms.`,
       );
     } catch (error) {
+      const parsed =
+        error instanceof Error
+          ? error
+          : new Error(
+              String(error),
+            );
+
       await recordFailure(
         primeCase.id,
         "prime",
         primeStartedAt,
-        error,
+        parsed,
       );
     }
 
