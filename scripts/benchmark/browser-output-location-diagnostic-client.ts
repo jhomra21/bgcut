@@ -5,19 +5,29 @@ import {
   removeBackgroundWebGpuWithStrategy,
   type WebGpuDiagnosticObserver,
   type WebGpuDiagnosticStage,
+  type WebGpuOutputLocation,
 } from "../../src/browser/inference";
 import type { RemovalTimings } from "../../src/browser/timing";
 import { resolveDefaultWebGpuSessionStrategy } from "../../src/browser/webgpu-session-strategy";
+
+const OutputLocationSchema = Schema.Literal(
+  "gpu-buffer",
+  "cpu",
+);
 
 const ConfigSchema = Schema.Struct({
   caseId: Schema.String,
   inputUrl: Schema.String,
   measuredRuns: Schema.Number,
   timeoutMs: Schema.Number,
+  outputLocations: Schema.Array(
+    OutputLocationSchema,
+  ),
 });
 
 type AttemptRecord = {
   readonly label: string;
+  readonly outputLocation: WebGpuOutputLocation;
   readonly lastStage:
     | WebGpuDiagnosticStage
     | "attempt-start";
@@ -28,6 +38,7 @@ type AttemptRecord = {
 type AttemptStart = {
   readonly label: string;
   readonly caseId: string;
+  readonly outputLocation: WebGpuOutputLocation;
   readonly expectReuse: boolean;
   readonly startedAt: string;
 };
@@ -35,6 +46,7 @@ type AttemptStart = {
 type FailureRecord = {
   readonly label: string;
   readonly caseId: string;
+  readonly outputLocation: WebGpuOutputLocation;
   readonly lastStage:
     | WebGpuDiagnosticStage
     | "attempt-start";
@@ -48,7 +60,8 @@ type DiagnosticReport = {
   readonly generatedAt: string;
   readonly userAgent: string;
   readonly caseId: string;
-  readonly outputLocation: "cpu";
+  readonly outputLocations:
+    readonly WebGpuOutputLocation[];
   readonly strategy: "no-capture-reuse";
   readonly timeoutMs: number;
   readonly attempts: readonly AttemptRecord[];
@@ -67,7 +80,7 @@ const status =
 
 if (status === null) {
   throw new Error(
-    "CPU-output diagnostic status element is missing.",
+    "Output-location diagnostic status element is missing.",
   );
 }
 
@@ -103,6 +116,7 @@ const postJson = async (
 
 const sendProgress = (
   label: string,
+  outputLocation: WebGpuOutputLocation,
   stage: WebGpuDiagnosticStage,
   elapsedMs: number,
 ): void => {
@@ -113,6 +127,7 @@ const sendProgress = (
         [
           JSON.stringify({
             label,
+            outputLocation,
             stage,
             elapsedMs,
             recordedAt:
@@ -155,6 +170,7 @@ const uploadOutput = async (
 const runRemoval = async (
   source: Blob,
   caseId: string,
+  outputLocation: WebGpuOutputLocation,
   diagnosticObserver:
     WebGpuDiagnosticObserver,
 ) =>
@@ -170,7 +186,7 @@ const runRemoval = async (
         },
       ),
       "no-capture-reuse",
-      "cpu",
+      outputLocation,
       diagnosticObserver,
     ).pipe(
       Effect.match({
@@ -230,6 +246,7 @@ const withTimeout = async <T>(
 
 const runAttempt = async (
   label: string,
+  outputLocation: WebGpuOutputLocation,
   source: Blob,
   caseId: string,
   timeoutMs: number,
@@ -248,6 +265,7 @@ const runAttempt = async (
     {
       label,
       caseId,
+      outputLocation,
       expectReuse,
       startedAt:
         new Date().toISOString(),
@@ -266,6 +284,7 @@ const runAttempt = async (
 
       sendProgress(
         label,
+        outputLocation,
         stage,
         performance.now() -
           startedAt,
@@ -278,6 +297,7 @@ const runAttempt = async (
         runRemoval(
           source,
           caseId,
+          outputLocation,
           diagnosticObserver,
         ),
         timeoutMs,
@@ -316,6 +336,7 @@ const runAttempt = async (
 
     const record: AttemptRecord = {
       label,
+      outputLocation,
       lastStage,
       elapsedMs,
       timings:
@@ -347,6 +368,7 @@ const runAttempt = async (
       {
         label,
         caseId,
+        outputLocation,
         lastStage,
         elapsedMs:
           performance.now() -
@@ -373,7 +395,7 @@ const main =
       !configResponse.ok
     ) {
       throw new Error(
-        `Could not load CPU-output diagnostic config: HTTP ${configResponse.status}.`,
+        `Could not load output-location diagnostic config: HTTP ${configResponse.status}.`,
       );
     }
 
@@ -391,7 +413,7 @@ const main =
       "no-capture-reuse"
     ) {
       throw new Error(
-        "CPU-output diagnostic must run on the Safari no-capture path.",
+        "Output-location diagnostic must run on the Safari no-capture path.",
       );
     }
 
@@ -418,31 +440,38 @@ const main =
     const attempts:
       AttemptRecord[] = [];
 
-    attempts.push(
-      await runAttempt(
-        "prime",
-        source,
-        config.caseId,
-        config.timeoutMs,
-        false,
-      ),
-    );
-
     for (
-      let runIndex = 0;
-      runIndex <
-      config.measuredRuns;
-      runIndex += 1
+      const outputLocation of
+        config.outputLocations
     ) {
       attempts.push(
         await runAttempt(
-          `run-${runIndex + 1}`,
+          `${outputLocation}-prime`,
+          outputLocation,
           source,
           config.caseId,
           config.timeoutMs,
-          true,
+          false,
         ),
       );
+
+      for (
+        let runIndex = 0;
+        runIndex <
+        config.measuredRuns;
+        runIndex += 1
+      ) {
+        attempts.push(
+          await runAttempt(
+            `${outputLocation}-run-${runIndex + 1}`,
+            outputLocation,
+            source,
+            config.caseId,
+            config.timeoutMs,
+            true,
+          ),
+        );
+      }
     }
 
     const report: DiagnosticReport = {
@@ -453,8 +482,8 @@ const main =
         navigator.userAgent,
       caseId:
         config.caseId,
-      outputLocation:
-        "cpu",
+      outputLocations:
+        config.outputLocations,
       strategy:
         "no-capture-reuse",
       timeoutMs:
@@ -469,7 +498,7 @@ const main =
 
     writeStatus("");
     writeStatus(
-      "CPU-output diagnostic passed.",
+      "Output-location diagnostic passed.",
     );
   };
 
@@ -484,7 +513,7 @@ void main().catch(
 
     writeStatus("");
     writeStatus(
-      "CPU-OUTPUT DIAGNOSTIC FAILED",
+      "OUTPUT-LOCATION DIAGNOSTIC FAILED",
     );
     writeStatus(
       parsed.message,
