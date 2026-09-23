@@ -32,6 +32,13 @@ export { MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
 
+export type WebGpuProviderTuning = {
+  readonly validationMode?:
+    | "wgpuOnly";
+  readonly storageBufferCacheMode?:
+    | "simple";
+};
+
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
   readonly width: number;
@@ -44,6 +51,7 @@ export type BackgroundRemovalResult = {
 type SessionCache = {
   readonly device: GPUDevice;
   readonly graphCapture: boolean;
+  readonly providerTuningKey: string;
   readonly session: ort.InferenceSession;
 };
 
@@ -72,6 +80,7 @@ const createSession = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   graphCapture: boolean,
+  providerTuning: WebGpuProviderTuning,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
@@ -82,10 +91,22 @@ const createSession = (
 
     const stopSessionInit = timings.begin("sessionInitMs");
 
+    const executionProvider:
+      ort.InferenceSession.WebGpuExecutionProviderOption = {
+        name: "webgpu",
+        device: runtime.device,
+        validationMode:
+          providerTuning.validationMode,
+        storageBufferCacheMode:
+          providerTuning.storageBufferCacheMode,
+      };
+
     const session = yield* Effect.tryPromise({
       try: () =>
         ort.InferenceSession.create(model, {
-          executionProviders: [{ name: "webgpu", device: runtime.device }],
+          executionProviders: [
+            executionProvider,
+          ],
           enableGraphCapture: graphCapture,
           graphOptimizationLevel: "all",
           preferredOutputLocation: "gpu-buffer",
@@ -126,13 +147,24 @@ const getSessionLease = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   strategy: WebGpuSessionStrategy,
+  providerTuning: WebGpuProviderTuning,
 ): Effect.Effect<SessionLease, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
+    const providerTuningKey =
+      JSON.stringify(
+        providerTuning,
+      );
+
     if (strategy === "capture-recreate") {
       yield* clearCachedSession();
 
       return {
-        session: yield* createSession(runtime, timings, true),
+        session: yield* createSession(
+          runtime,
+          timings,
+          true,
+          providerTuning,
+        ),
         releaseAfterUse: true,
       };
     }
@@ -141,7 +173,8 @@ const getSessionLease = (
 
     if (
       cachedSession?.device === runtime.device &&
-      cachedSession.graphCapture === graphCapture
+      cachedSession.graphCapture === graphCapture &&
+      cachedSession.providerTuningKey === providerTuningKey
     ) {
       timings.markSessionReused();
 
@@ -157,11 +190,13 @@ const getSessionLease = (
       runtime,
       timings,
       graphCapture,
+      providerTuning,
     );
 
     cachedSession = {
       device: runtime.device,
       graphCapture,
+      providerTuningKey,
       session,
     };
 
@@ -242,6 +277,7 @@ const runModel = (
 export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
+  providerTuning: WebGpuProviderTuning = {},
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -261,7 +297,12 @@ export const removeBackgroundWebGpuWithStrategy = (
           stopRuntime();
 
           return yield* Effect.acquireUseRelease(
-            getSessionLease(runtime, timings, strategy),
+            getSessionLease(
+              runtime,
+              timings,
+              strategy,
+              providerTuning,
+            ),
             (lease) =>
               Effect.gen(function* () {
                 const logits = yield* runModel(
