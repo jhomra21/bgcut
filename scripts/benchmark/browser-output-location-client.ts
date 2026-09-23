@@ -274,6 +274,7 @@ const main = async (): Promise<void> => {
     let gpuBuffer:
       | readonly RunRecord[]
       | undefined;
+
     let cpu:
       | readonly RunRecord[]
       | undefined;
