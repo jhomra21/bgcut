@@ -1,5 +1,4 @@
 import {
-  access,
   mkdir,
   readFile,
   rm,
