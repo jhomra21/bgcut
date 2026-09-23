@@ -265,15 +265,25 @@ try {
         comparisonPath,
       ).exists()
     ) {
-      const comparison =
+      const comparison: unknown =
         JSON.parse(
           await readFile(
             comparisonPath,
             "utf8",
           ),
-        ) as {
-          readonly differingValues?: unknown;
-        };
+        );
+
+      if (
+        typeof comparison !== "object" ||
+        comparison === null ||
+        !("differingValues" in comparison) ||
+        typeof comparison.differingValues !==
+          "number"
+      ) {
+        throw new Error(
+          "Output-location comparison has an invalid shape.",
+        );
+      }
 
       if (
         comparison.differingValues !==
