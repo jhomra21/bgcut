@@ -70,6 +70,7 @@ type ModeReport = {
   readonly generatedAt: string;
   readonly userAgent: string;
   readonly strategy: "no-capture-reuse";
+  readonly sourceSnapshotBeforeInference: true;
   readonly mode: Mode;
   readonly runsPerCase: number;
   readonly prime: PrimeRecord;
@@ -228,6 +229,8 @@ const remove = async (
       ),
       "no-capture-reuse",
       mode,
+      false,
+      true,
     ).pipe(
       Effect.match({
         onFailure: (error) => ({
@@ -625,6 +628,8 @@ const main =
           navigator.userAgent,
         strategy:
           "no-capture-reuse",
+        sourceSnapshotBeforeInference:
+          true,
         mode,
         runsPerCase:
           config.runsPerCase,
