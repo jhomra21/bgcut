@@ -179,7 +179,11 @@ for (const benchmarkCase of manifest.cases) {
   }
 }
 
-const missingCaptureCases = [];
+const missingCaptureCases: Array<{
+  readonly id: string;
+  readonly inputUrl: string;
+  readonly caseIndex: number;
+}> = [];
 
 for (
   let caseIndex = 0;
@@ -187,6 +191,7 @@ for (
   caseIndex += 1
 ) {
   const benchmarkCase = manifest.cases[caseIndex];
+
   const capturePath = join(
     captureOutputRoot,
     safeOutputName(benchmarkCase.id),
@@ -294,6 +299,7 @@ const compareOutputs = async (): Promise<PixelComparison> => {
 
   for (const benchmarkCase of manifest.cases) {
     const name = safeOutputName(benchmarkCase.id);
+
     const [production, capture] = await Promise.all([
       sharp(
         join(
@@ -438,6 +444,7 @@ const app = Bun.serve({
         inputMatch[1],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(caseIndex);
 
@@ -474,6 +481,7 @@ const app = Bun.serve({
         outputMatch[1],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(caseIndex);
 
@@ -508,6 +516,7 @@ const app = Bun.serve({
         runMatch[1],
         10,
       );
+
       const benchmarkCase =
         manifest.cases.at(caseIndex);
 
@@ -634,6 +643,7 @@ const app = Bun.serve({
 console.log(
   `Safari reference resume ready at http://${app.hostname}:${app.port}/`,
 );
+
 console.log(
   `Missing captured references: ${missingCaptureCases.length}`,
 );
