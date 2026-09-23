@@ -16,7 +16,7 @@ import { shouldFallbackToWasm } from "./fallback-policy";
 import type { GpuRuntime } from "./gpu";
 import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
 import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
-import { loadImageBitmap } from "./image";
+import { loadImageBitmap, MODEL_INPUT_SIZE } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
 import { MODEL_REVISION } from "../shared/model-config";
@@ -32,6 +32,8 @@ export { MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
 
+export type WebGpuOutputLocation = "gpu-buffer" | "cpu";
+
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
   readonly width: number;
@@ -44,6 +46,7 @@ export type BackgroundRemovalResult = {
 type SessionCache = {
   readonly device: GPUDevice;
   readonly graphCapture: boolean;
+  readonly outputLocation: WebGpuOutputLocation;
   readonly session: ort.InferenceSession;
 };
 
@@ -72,6 +75,7 @@ const createSession = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   graphCapture: boolean,
+  outputLocation: WebGpuOutputLocation,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
@@ -88,7 +92,7 @@ const createSession = (
           executionProviders: [{ name: "webgpu", device: runtime.device }],
           enableGraphCapture: graphCapture,
           graphOptimizationLevel: "all",
-          preferredOutputLocation: "gpu-buffer",
+          preferredOutputLocation: outputLocation,
         }),
       catch: (cause) =>
         new ModelLoadFailed({
@@ -126,13 +130,19 @@ const getSessionLease = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   strategy: WebGpuSessionStrategy,
+  outputLocation: WebGpuOutputLocation,
 ): Effect.Effect<SessionLease, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     if (strategy === "capture-recreate") {
       yield* clearCachedSession();
 
       return {
-        session: yield* createSession(runtime, timings, true),
+        session: yield* createSession(
+          runtime,
+          timings,
+          true,
+          "gpu-buffer",
+        ),
         releaseAfterUse: true,
       };
     }
@@ -141,7 +151,8 @@ const getSessionLease = (
 
     if (
       cachedSession?.device === runtime.device &&
-      cachedSession.graphCapture === graphCapture
+      cachedSession.graphCapture === graphCapture &&
+      cachedSession.outputLocation === outputLocation
     ) {
       timings.markSessionReused();
 
@@ -157,11 +168,13 @@ const getSessionLease = (
       runtime,
       timings,
       graphCapture,
+      outputLocation,
     );
 
     cachedSession = {
       device: runtime.device,
       graphCapture,
+      outputLocation,
       session,
     };
 
@@ -184,6 +197,7 @@ const runModel = (
   sourceBitmap: ImageBitmap,
   timings: RemovalTimingRecorder,
   graphCapture: boolean,
+  outputLocation: WebGpuOutputLocation,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
     const inputName = session.inputNames.at(0);
@@ -195,7 +209,10 @@ const runModel = (
       });
     }
 
-    const outputTarget = getGpuModelOutput(runtime);
+    const outputTarget =
+      outputLocation === "gpu-buffer"
+        ? getGpuModelOutput(runtime)
+        : undefined;
 
     return yield* Effect.acquireUseRelease(
       createGpuModelInput(runtime, sourceBitmap, timings),
@@ -205,10 +222,17 @@ const runModel = (
 
           const outputs = yield* Effect.tryPromise({
             try: () =>
-              session.run(
-                { [inputName]: input.tensor },
-                { [outputName]: outputTarget.tensor },
-              ),
+              outputTarget === undefined
+                ? session.run({
+                    [inputName]: input.tensor,
+                  })
+                : session.run(
+                    { [inputName]: input.tensor },
+                    {
+                      [outputName]:
+                        outputTarget.tensor,
+                    },
+                  ),
             catch: (cause) =>
               new InferenceFailed({
                 message: graphCapture
@@ -227,13 +251,42 @@ const runModel = (
             });
           }
 
-          if (output.location !== "gpu-buffer") {
+          if (outputLocation === "gpu-buffer") {
+            if (
+              output.location !== "gpu-buffer" ||
+              outputTarget === undefined
+            ) {
+              return yield* new InferenceFailed({
+                message: `BiRefNet returned its matte at ${output.location} instead of the persistent WebGPU output buffer.`,
+              });
+            }
+
+            return yield* readGpuModelOutput(
+              runtime,
+              outputTarget,
+              timings,
+            );
+          }
+
+          if (output.location !== "cpu") {
             return yield* new InferenceFailed({
-              message: `BiRefNet returned its matte at ${output.location} instead of the persistent WebGPU output buffer.`,
+              message: `BiRefNet returned its matte at ${output.location} instead of CPU memory.`,
             });
           }
 
-          return yield* readGpuModelOutput(runtime, outputTarget, timings);
+          const data = output.data;
+
+          if (
+            !(data instanceof Float32Array) ||
+            data.length !==
+              MODEL_INPUT_SIZE * MODEL_INPUT_SIZE
+          ) {
+            return yield* new InferenceFailed({
+              message: "BiRefNet returned a CPU matte with unexpected data or dimensions.",
+            });
+          }
+
+          return data;
         }),
       (input) => Effect.sync(() => releaseGpuModelInput(input)),
     );
@@ -242,6 +295,7 @@ const runModel = (
 export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
+  outputLocation: WebGpuOutputLocation = "gpu-buffer",
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -261,7 +315,12 @@ export const removeBackgroundWebGpuWithStrategy = (
           stopRuntime();
 
           return yield* Effect.acquireUseRelease(
-            getSessionLease(runtime, timings, strategy),
+            getSessionLease(
+              runtime,
+              timings,
+              strategy,
+              outputLocation,
+            ),
             (lease) =>
               Effect.gen(function* () {
                 const logits = yield* runModel(
@@ -270,6 +329,7 @@ export const removeBackgroundWebGpuWithStrategy = (
                   bitmap,
                   timings,
                   strategy !== "no-capture-reuse",
+                  outputLocation,
                 );
 
                 const stopMatte = timings.begin("matteMs");
