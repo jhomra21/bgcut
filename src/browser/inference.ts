@@ -99,7 +99,8 @@ const createSession = (
               : {
                   ep: {
                     webgpuexecutionprovider: {
-                      maxNumPendingDispatches,
+                      maxNumPendingDispatches:
+                        maxPendingDispatches,
                     },
                   },
                 },
