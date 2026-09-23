@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import {
   mkdir,
   readFile,
@@ -8,6 +9,10 @@ import {
   join,
   resolve,
 } from "node:path";
+
+const PixelComparisonSchema = Schema.Struct({
+  differingValues: Schema.Number,
+});
 
 const usage =
   "Usage: bun run benchmark:browser-output-location:diagnostic:e2e -- <manifest.json> <output-dir> <model.onnx> [measured-runs] [timeout-ms] [port] [case-id]";
@@ -26,7 +31,7 @@ if (
   "darwin"
 ) {
   throw new Error(
-    "The Safari CPU-output diagnostic requires macOS.",
+    "The Safari output-location diagnostic requires macOS.",
   );
 }
 
@@ -134,6 +139,7 @@ for (
     "browser-output-location-diagnostic.json",
     "browser-failure.json",
     "latest-progress.json",
+    "pixel-comparison.json",
   ]
 ) {
   await rm(
@@ -211,7 +217,7 @@ while (
     null
   ) {
     throw new Error(
-      `CPU-output diagnostic server exited with code ${server.exitCode}.`,
+      `Output-location diagnostic server exited with code ${server.exitCode}.`,
     );
   }
 
@@ -224,7 +230,7 @@ if (!serverReady) {
   server.kill();
 
   throw new Error(
-    "CPU-output diagnostic server did not become ready.",
+    "Output-location diagnostic server did not become ready.",
   );
 }
 
@@ -279,7 +285,8 @@ try {
   const deadline =
     Date.now() +
     timeoutMs *
-      (measuredRuns + 1) +
+      (measuredRuns + 1) *
+      2 +
     60_000;
 
   let completed =
@@ -301,7 +308,7 @@ try {
       ).exists()
     ) {
       throw new Error(
-        `CPU-output diagnostic failed.\n${await readFile(
+        `Output-location diagnostic failed.\n${await readFile(
           failurePath,
           "utf8",
         )}`,
@@ -314,16 +321,46 @@ try {
         "browser-output-location-diagnostic.json",
       );
 
+    const comparisonPath =
+      join(
+        outputRoot,
+        "pixel-comparison.json",
+      );
+
     if (
       await Bun.file(
         reportPath,
+      ).exists() &&
+      await Bun.file(
+        comparisonPath,
       ).exists()
     ) {
+      const comparison =
+        Schema.decodeUnknownSync(
+          PixelComparisonSchema,
+        )(
+          JSON.parse(
+            await readFile(
+              comparisonPath,
+              "utf8",
+            ),
+          ),
+        );
+
+      if (
+        comparison.differingValues !==
+        0
+      ) {
+        throw new Error(
+          `Output-location parity failed with ${comparison.differingValues} differing RGBA values.`,
+        );
+      }
+
       completed =
         true;
 
       console.log(
-        "CPU-output diagnostic passed.",
+        "Output-location diagnostic passed.",
       );
 
       break;
@@ -352,7 +389,7 @@ try {
         : "No progress marker was persisted.";
 
     throw new Error(
-      `CPU-output diagnostic exceeded its launcher deadline. Last progress:\n${progress}`,
+      `Output-location diagnostic exceeded its launcher deadline. Last progress:\n${progress}`,
     );
   }
 } finally {
