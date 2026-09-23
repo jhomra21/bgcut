@@ -70,7 +70,8 @@
     "benchmark:browser-strategy:bundle-check": "bun run scripts/benchmark/browser-strategy-bundle-check.ts",
     "benchmark:browser-reference-resume": "bun run scripts/benchmark/browser-reference-resume-server.ts",
     "benchmark:browser-reference-resume:e2e": "bun run scripts/benchmark/browser-reference-resume-e2e.ts",
-    "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts"
+    "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts",
+    "benchmark:matte-refinement": "bun run scripts/benchmark/matte-refinement.ts"
   },
   "dependencies": {
     "effect": "3.22.2",
