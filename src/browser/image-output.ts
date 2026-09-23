@@ -65,9 +65,8 @@ export type SourceDrawObserver = (
   pixels: Uint8ClampedArray,
 ) => void;
 
-export const createSourceComposite = (
+export const createSourceCanvas = (
   bitmap: ImageBitmap,
-  matte: HTMLCanvasElement,
   onSourceDrawn?: SourceDrawObserver,
 ): Effect.Effect<HTMLCanvasElement, ImageProcessingFailed> =>
   Effect.try({
@@ -92,18 +91,49 @@ export const createSourceComposite = (
         );
       }
 
+      return output;
+    },
+    catch: () =>
+      new ImageProcessingFailed({
+        message: "The source image could not be drawn at its output resolution.",
+      }),
+  });
+
+export const applyMatteToSourceCanvas = (
+  source: HTMLCanvasElement,
+  matte: HTMLCanvasElement,
+): Effect.Effect<HTMLCanvasElement, ImageProcessingFailed> =>
+  Effect.try({
+    try: () => {
+      const context = source.getContext("2d");
+
+      if (context === null) {
+        throw new Error("2D canvas is unavailable.");
+      }
+
       context.globalCompositeOperation = "destination-in";
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
-      context.drawImage(matte, 0, 0, bitmap.width, bitmap.height);
+      context.drawImage(matte, 0, 0, source.width, source.height);
       context.globalCompositeOperation = "source-over";
 
-      return output;
+      return source;
     },
     catch: () =>
       new ImageProcessingFailed({
         message: "The foreground matte could not be applied at the source image resolution.",
       }),
+  });
+
+export const createSourceComposite = (
+  bitmap: ImageBitmap,
+  matte: HTMLCanvasElement,
+  onSourceDrawn?: SourceDrawObserver,
+): Effect.Effect<HTMLCanvasElement, ImageProcessingFailed> =>
+  Effect.gen(function* () {
+    const source = yield* createSourceCanvas(bitmap, onSourceDrawn);
+
+    return yield* applyMatteToSourceCanvas(source, matte);
   });
 
 export const canvasToPng = (canvas: HTMLCanvasElement): Effect.Effect<Blob, ExportFailed> =>
