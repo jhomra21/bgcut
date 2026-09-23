@@ -1,10 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import { formatBackgroundRemovalError } from "../../src/browser/errors";
-import {
-  removeBackgroundWebGpuWithStrategy,
-  type WebGpuPendingDispatches,
-} from "../../src/browser/inference";
+import { removeBackgroundWebGpuWithStrategy } from "../../src/browser/inference";
 import type { RemovalTimings } from "../../src/browser/timing";
 import { resolveDefaultWebGpuSessionStrategy } from "../../src/browser/webgpu-session-strategy";
 
@@ -230,7 +227,7 @@ const remove = async (
         caseId,
       ),
       "no-capture-reuse",
-      mode as WebGpuPendingDispatches,
+      mode,
     ).pipe(
       Effect.match({
         onFailure: (error) => ({
