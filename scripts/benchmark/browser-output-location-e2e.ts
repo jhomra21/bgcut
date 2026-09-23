@@ -265,6 +265,27 @@ try {
         comparisonPath,
       ).exists()
     ) {
+      const comparison =
+        JSON.parse(
+          await readFile(
+            comparisonPath,
+            "utf8",
+          ),
+        ) as {
+          readonly differingValues?: unknown;
+        };
+
+      if (
+        comparison.differingValues !==
+        0
+      ) {
+        throw new Error(
+          `Output-location parity failed with ${String(
+            comparison.differingValues,
+          )} differing RGBA values.`,
+        );
+      }
+
       completed = true;
 
       console.log(
