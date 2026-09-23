@@ -170,14 +170,20 @@ const compare = (
     [0, 0, 0, 0];
 
   let absolute = 0;
+
   let maximum = 0;
+
   let differing = 0;
+
   let pixelsWithAnyDifference =
     0;
+
   let pixelsWithAlphaDifference =
     0;
+
   let pixelsWithRgbDifferenceAndEqualAlpha =
     0;
+
   let pixelsWithRgbDifferenceAtZeroAlpha =
     0;
 
@@ -194,6 +200,7 @@ const compare = (
 
     let pixelDiffers =
       false;
+
     let rgbDiffers =
       false;
 
