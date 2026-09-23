@@ -99,12 +99,21 @@ const uploadBytes = async (
     | Uint8Array
     | Uint8ClampedArray,
 ): Promise<void> => {
+  const body =
+    bytes instanceof Blob
+      ? bytes
+      : new Blob([
+          new Uint8Array(
+            bytes,
+          ),
+        ]);
+
   const response =
     await fetch(
       path,
       {
         method: "POST",
-        body: bytes,
+        body,
       },
     );
 
