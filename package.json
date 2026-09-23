@@ -74,6 +74,7 @@
     "benchmark:browser-dispatch-batching:six": "bun run scripts/benchmark/browser-dispatch-batching-six-server.ts",
     "benchmark:browser-dispatch-batching:six:e2e": "bun run scripts/benchmark/browser-dispatch-batching-six-e2e.ts",
     "benchmark:browser-dispatch-batching:six:bundle-check": "bun run scripts/benchmark/browser-dispatch-batching-six-bundle-check.ts",
+    "benchmark:dispatch-parity-diagnostic": "bun run scripts/benchmark/dispatch-parity-diagnostic.ts",
     "benchmark:browser-reference-resume": "bun run scripts/benchmark/browser-reference-resume-server.ts",
     "benchmark:browser-reference-resume:e2e": "bun run scripts/benchmark/browser-reference-resume-e2e.ts",
     "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts"
