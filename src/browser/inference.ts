@@ -32,6 +32,8 @@ export { MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
 
+export type WebGpuPreferredLayout = "default" | "NCHW";
+
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
   readonly width: number;
@@ -44,6 +46,7 @@ export type BackgroundRemovalResult = {
 type SessionCache = {
   readonly device: GPUDevice;
   readonly graphCapture: boolean;
+  readonly preferredLayout: WebGpuPreferredLayout;
   readonly session: ort.InferenceSession;
 };
 
@@ -72,6 +75,7 @@ const createSession = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   graphCapture: boolean,
+  preferredLayout: WebGpuPreferredLayout,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
@@ -85,7 +89,18 @@ const createSession = (
     const session = yield* Effect.tryPromise({
       try: () =>
         ort.InferenceSession.create(model, {
-          executionProviders: [{ name: "webgpu", device: runtime.device }],
+          executionProviders: [
+            preferredLayout === "default"
+              ? {
+                  name: "webgpu",
+                  device: runtime.device,
+                }
+              : {
+                  name: "webgpu",
+                  device: runtime.device,
+                  preferredLayout,
+                },
+          ],
           enableGraphCapture: graphCapture,
           graphOptimizationLevel: "all",
           preferredOutputLocation: "gpu-buffer",
@@ -126,13 +141,19 @@ const getSessionLease = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   strategy: WebGpuSessionStrategy,
+  preferredLayout: WebGpuPreferredLayout,
 ): Effect.Effect<SessionLease, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     if (strategy === "capture-recreate") {
       yield* clearCachedSession();
 
       return {
-        session: yield* createSession(runtime, timings, true),
+        session: yield* createSession(
+          runtime,
+          timings,
+          true,
+          preferredLayout,
+        ),
         releaseAfterUse: true,
       };
     }
@@ -141,7 +162,8 @@ const getSessionLease = (
 
     if (
       cachedSession?.device === runtime.device &&
-      cachedSession.graphCapture === graphCapture
+      cachedSession.graphCapture === graphCapture &&
+      cachedSession.preferredLayout === preferredLayout
     ) {
       timings.markSessionReused();
 
@@ -157,11 +179,13 @@ const getSessionLease = (
       runtime,
       timings,
       graphCapture,
+      preferredLayout,
     );
 
     cachedSession = {
       device: runtime.device,
       graphCapture,
+      preferredLayout,
       session,
     };
 
@@ -242,6 +266,7 @@ const runModel = (
 export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
+  preferredLayout: WebGpuPreferredLayout = "default",
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -261,7 +286,12 @@ export const removeBackgroundWebGpuWithStrategy = (
           stopRuntime();
 
           return yield* Effect.acquireUseRelease(
-            getSessionLease(runtime, timings, strategy),
+            getSessionLease(
+              runtime,
+              timings,
+              strategy,
+              preferredLayout,
+            ),
             (lease) =>
               Effect.gen(function* () {
                 const logits = yield* runModel(
