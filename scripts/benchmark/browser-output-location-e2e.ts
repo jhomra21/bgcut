@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import {
   mkdir,
   readFile,
@@ -5,6 +6,10 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
+const PixelComparisonSchema = Schema.Struct({
+  differingValues: Schema.Number,
+});
 
 const usage =
   "Usage: bun run benchmark:browser-output-location:e2e -- <manifest.json> <output-dir> <model.onnx> [warm-runs-per-mode] [port]";
@@ -265,25 +270,17 @@ try {
         comparisonPath,
       ).exists()
     ) {
-      const comparison: unknown =
-        JSON.parse(
-          await readFile(
-            comparisonPath,
-            "utf8",
+      const comparison =
+        Schema.decodeUnknownSync(
+          PixelComparisonSchema,
+        )(
+          JSON.parse(
+            await readFile(
+              comparisonPath,
+              "utf8",
+            ),
           ),
         );
-
-      if (
-        typeof comparison !== "object" ||
-        comparison === null ||
-        !("differingValues" in comparison) ||
-        typeof comparison.differingValues !==
-          "number"
-      ) {
-        throw new Error(
-          "Output-location comparison has an invalid shape.",
-        );
-      }
 
       if (
         comparison.differingValues !==
