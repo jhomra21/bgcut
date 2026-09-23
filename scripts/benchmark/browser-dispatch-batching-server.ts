@@ -96,6 +96,43 @@ type PendingDispatches =
     typeof PendingDispatchesSchema
   >;
 
+type SummaryRecord = {
+  readonly mode: PendingDispatches;
+  readonly inferenceMedianMs: number;
+  readonly totalMedianMs: number;
+  readonly outputReadbackMedianMs: number;
+};
+
+type ComparisonRecord = {
+  readonly mode: Exclude<
+    PendingDispatches,
+    "default"
+  >;
+  readonly values: number;
+  readonly meanAbsoluteByteDifference: number;
+  readonly maxAbsoluteByteDifference: number;
+  readonly differingValues: number;
+  readonly differingValueFraction: number;
+};
+
+type FinalReport = {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly caseId: string;
+  readonly strategy: "no-capture-reuse";
+  readonly measuredRuns: number;
+  readonly timeoutMs: number;
+  readonly modes: readonly PendingDispatches[];
+  readonly summary: readonly SummaryRecord[];
+  readonly reports: readonly ModeReport[];
+};
+
+type PixelComparisonReport = {
+  readonly schemaVersion: 1;
+  readonly baseline: "default";
+  readonly comparisons: readonly ComparisonRecord[];
+};
+
 type PersistedRecord =
   | ModeReport
   | Schema.Schema.Type<
@@ -103,7 +140,9 @@ type PersistedRecord =
     >
   | Schema.Schema.Type<
       typeof FailureRecordSchema
-    >;
+    >
+  | FinalReport
+  | PixelComparisonReport;
 
 const usage =
   "Usage: bun run benchmark:browser-dispatch-batching -- <manifest.json> <output-dir> <model.onnx> [measured-runs] [timeout-ms] [port] [case-id]";
@@ -375,7 +414,7 @@ const safeLabel = (
 
 const writeJson = async (
   path: string,
-  value: unknown,
+  value: PersistedRecord,
 ): Promise<void> => {
   await writeFile(
     path,
@@ -427,8 +466,11 @@ const reports =
 const compareOutputs =
   async (
     candidate:
-      PendingDispatches,
-  ) => {
+      Exclude<
+        PendingDispatches,
+        "default"
+      >,
+  ): Promise<ComparisonRecord> => {
     const [
       baseline,
       candidateOutput,
@@ -633,7 +675,7 @@ const finalize =
           summary,
           reports:
             orderedReports,
-        },
+        } satisfies FinalReport,
       ),
       writeJson(
         join(
@@ -645,7 +687,7 @@ const finalize =
           baseline:
             "default",
           comparisons,
-        },
+        } satisfies PixelComparisonReport,
       ),
     ]);
   };
