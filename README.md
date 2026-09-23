@@ -162,13 +162,11 @@ image
 
 ## Node API
 
-Install the 0.4 beta while validating the simplified Node API:
+Install bgcut:
 
 ```sh
-npm install bgcut@beta
+npm install bgcut
 ```
-
-Stable installs remain on `bgcut@latest` until this beta is accepted.
 
 For one image, use `removeBackground()`. It creates the runtime, removes the background, and closes the runtime before returning:
 
@@ -281,8 +279,6 @@ See [deployment guide](docs/operations/deploying.md) for the exact local checks,
 ## Releases
 
 Releases run through `.github/workflows/release.yml` and npm Trusted Publishing.
-
-Stable versions publish to npm `latest` and create normal GitHub releases. Prerelease versions publish to their matching prerelease tag, such as `beta`.
 
 See [release guide](docs/operations/releasing.md) for the release process. Release history is published from the same [`CHANGELOG.md`](CHANGELOG.md) source at [bgcut.dev/changelog](https://bgcut.dev/changelog), so the website and GitHub release notes use the same wording.
 
