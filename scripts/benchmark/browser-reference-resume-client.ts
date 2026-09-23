@@ -89,6 +89,7 @@ const main = async (): Promise<void> => {
     }
 
     const source = await inputResponse.blob();
+
     const file = new File(
       [source],
       `${benchmarkCase.id}.png`,
@@ -96,6 +97,7 @@ const main = async (): Promise<void> => {
         type: source.type || "image/png",
       },
     );
+
     const outcome = await removeCaptureReference(file);
 
     if (!outcome.ok) {
