@@ -1,6 +1,5 @@
 import {
   mkdir,
-  readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
