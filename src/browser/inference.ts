@@ -18,8 +18,10 @@ import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
 import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { loadImageBitmap } from "./image";
 import {
+  applyMatteToSourceCanvas,
   canvasToPng,
   createMatteCanvas,
+  createSourceCanvas,
   createSourceComposite,
   readCanvasRgba,
 } from "./image-output";
@@ -280,6 +282,7 @@ export const removeBackgroundWebGpuWithStrategy = (
   strategy: WebGpuSessionStrategy,
   maxPendingDispatches: WebGpuPendingDispatches = "default",
   collectDiagnostics = false,
+  snapshotSourceBeforeInference = false,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -294,6 +297,31 @@ export const removeBackgroundWebGpuWithStrategy = (
       }),
       (bitmap) =>
         Effect.gen(function* () {
+          let sourceRgba:
+            | Uint8ClampedArray
+            | undefined;
+
+          const earlySourceCanvas =
+            snapshotSourceBeforeInference
+              ? yield* Effect.gen(function* () {
+                  const stopComposite = timings.begin("compositeMs");
+
+                  const source = yield* createSourceCanvas(
+                    bitmap,
+                    collectDiagnostics
+                      ? (pixels) => {
+                          sourceRgba =
+                            pixels;
+                        }
+                      : undefined,
+                  );
+
+                  stopComposite();
+
+                  return source;
+                })
+              : undefined;
+
           const stopRuntime = timings.begin("runtimeMs");
           const runtime = yield* getGpuRuntime;
           stopRuntime();
@@ -323,22 +351,24 @@ export const removeBackgroundWebGpuWithStrategy = (
                   ? yield* readCanvasRgba(matte)
                   : undefined;
 
-                let sourceRgba:
-                  | Uint8ClampedArray
-                  | undefined;
-
                 const stopComposite = timings.begin("compositeMs");
 
-                const output = yield* createSourceComposite(
-                  bitmap,
-                  matte,
-                  collectDiagnostics
-                    ? (pixels) => {
-                        sourceRgba =
-                          pixels;
-                      }
-                    : undefined,
-                );
+                const output =
+                  earlySourceCanvas === undefined
+                    ? yield* createSourceComposite(
+                        bitmap,
+                        matte,
+                        collectDiagnostics
+                          ? (pixels) => {
+                              sourceRgba =
+                                pixels;
+                            }
+                          : undefined,
+                      )
+                    : yield* applyMatteToSourceCanvas(
+                        earlySourceCanvas,
+                        matte,
+                      );
 
                 stopComposite();
 
