@@ -17,7 +17,12 @@ import type { GpuRuntime } from "./gpu";
 import { createGpuModelInput, releaseGpuModelInput } from "./gpu-input";
 import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { loadImageBitmap } from "./image";
-import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
+import {
+  canvasToPng,
+  createMatteCanvas,
+  createSourceComposite,
+  readCanvasRgba,
+} from "./image-output";
 import { fetchModelBytes } from "./model-loader";
 import { MODEL_REVISION } from "../shared/model-config";
 import { resolveOrtWebGpuWasmUrl } from "./ort-webgpu-runtime";
@@ -34,6 +39,11 @@ export type BrowserInferenceEngine = "webgpu" | "wasm";
 
 export type WebGpuPendingDispatches = "default" | 8 | 32 | 64;
 
+export type BackgroundRemovalDiagnostics = {
+  readonly matteRgba: Uint8ClampedArray;
+  readonly compositeRgba: Uint8ClampedArray;
+};
+
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
   readonly width: number;
@@ -41,6 +51,7 @@ export type BackgroundRemovalResult = {
   readonly modelRevision: string;
   readonly engine: BrowserInferenceEngine;
   readonly timings: RemovalTimings;
+  readonly diagnostics?: BackgroundRemovalDiagnostics;
 };
 
 type SessionCache = {
@@ -267,6 +278,7 @@ export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
   maxPendingDispatches: WebGpuPendingDispatches = "default",
+  collectDiagnostics = false,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -306,9 +318,17 @@ export const removeBackgroundWebGpuWithStrategy = (
                 const matte = yield* createMatteCanvas(logits);
                 stopMatte();
 
+                const matteRgba = collectDiagnostics
+                  ? yield* readCanvasRgba(matte)
+                  : undefined;
+
                 const stopComposite = timings.begin("compositeMs");
                 const output = yield* createSourceComposite(bitmap, matte);
                 stopComposite();
+
+                const compositeRgba = collectDiagnostics
+                  ? yield* readCanvasRgba(output)
+                  : undefined;
 
                 const stopExport = timings.begin("exportMs");
                 const blob = yield* canvasToPng(output);
@@ -321,6 +341,13 @@ export const removeBackgroundWebGpuWithStrategy = (
                   modelRevision: MODEL_REVISION,
                   engine: "webgpu" as const,
                   timings: timings.finish(),
+                  diagnostics:
+                    matteRgba === undefined || compositeRgba === undefined
+                      ? undefined
+                      : {
+                          matteRgba,
+                          compositeRgba,
+                        },
                 };
               }),
             releaseSessionLease,
