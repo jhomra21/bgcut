@@ -55,7 +55,7 @@
     "test": "bun test",
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package/smoke.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-strategy:bundle-check && bun run benchmark:browser-reference-resume:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-strategy:bundle-check && bun run benchmark:browser-dispatch-batching:bundle-check && bun run benchmark:browser-reference-resume:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
     "cloudflare:runtime:remote": "bun run scripts/cloudflare/upload-runtime.ts",
@@ -68,6 +68,9 @@
     "benchmark:browser-strategy": "bun run scripts/benchmark/browser-strategy-server.ts",
     "benchmark:browser-strategy:e2e": "bun run scripts/benchmark/browser-strategy-e2e.ts",
     "benchmark:browser-strategy:bundle-check": "bun run scripts/benchmark/browser-strategy-bundle-check.ts",
+    "benchmark:browser-dispatch-batching": "bun run scripts/benchmark/browser-dispatch-batching-server.ts",
+    "benchmark:browser-dispatch-batching:e2e": "bun run scripts/benchmark/browser-dispatch-batching-e2e.ts",
+    "benchmark:browser-dispatch-batching:bundle-check": "bun run scripts/benchmark/browser-dispatch-batching-bundle-check.ts",
     "benchmark:browser-reference-resume": "bun run scripts/benchmark/browser-reference-resume-server.ts",
     "benchmark:browser-reference-resume:e2e": "bun run scripts/benchmark/browser-reference-resume-e2e.ts",
     "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts"
