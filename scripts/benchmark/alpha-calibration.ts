@@ -150,10 +150,12 @@ const calibrateAlphaByte = (
   }
 
   const probability = alpha / 255;
+
   const logit = Math.log(
     probability /
     (1 - probability),
   );
+
   const calibrated = sigmoid(
     preset.scale * logit +
     preset.bias,
@@ -286,10 +288,12 @@ for (const preset of presets) {
   for (const benchmarkCase of manifest.cases) {
     const outputName =
       safeOutputName(benchmarkCase.id);
+
     const baselinePath = join(
       baselineRoot,
       outputName,
     );
+
     const raster = await sharp(
       baselinePath,
     )
@@ -308,6 +312,7 @@ for (const preset of presets) {
     const calibrated = Buffer.from(
       raster.data,
     );
+
     let changedPixels = 0;
     let absoluteAlphaChange = 0;
     let maxAbsoluteAlphaByteChange = 0;
@@ -323,8 +328,10 @@ for (const preset of presets) {
     ) {
       const alphaIndex =
         pixel * 4 + 3;
+
       const alpha =
         raster.data[alphaIndex];
+
       const nextAlpha =
         calibrateAlphaByte(
           alpha,
