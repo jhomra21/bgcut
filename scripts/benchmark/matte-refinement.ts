@@ -49,6 +49,12 @@ type RefinementCaseTiming = {
   readonly refinedPixels: number;
 };
 
+type RefinementResult = {
+  readonly output: Buffer;
+  readonly uncertainPixels: number;
+  readonly refinedPixels: number;
+};
+
 const presets: readonly RefinementPreset[] = [
   {
     id: "source-snap-r2-b25",
@@ -123,13 +129,17 @@ const colorDistanceSquared = (
   rightIndex: number,
 ): number => {
   const leftOffset = leftIndex * 4;
+
   const rightOffset = rightIndex * 4;
+
   const red =
     source[leftOffset] -
     source[rightOffset];
+
   const green =
     source[leftOffset + 1] -
     source[rightOffset + 1];
+
   const blue =
     source[leftOffset + 2] -
     source[rightOffset + 2];
@@ -147,11 +157,7 @@ const refineAlpha = (
   width: number,
   height: number,
   preset: RefinementPreset,
-): {
-  readonly output: Buffer;
-  readonly uncertainPixels: number;
-  readonly refinedPixels: number;
-} => {
+): RefinementResult => {
   const output = Buffer.from(baseline);
   let uncertainPixels = 0;
   let refinedPixels = 0;
@@ -178,14 +184,17 @@ const refineAlpha = (
         0,
         y - preset.radius,
       );
+
       const endY = Math.min(
         height - 1,
         y + preset.radius,
       );
+
       const startX = Math.max(
         0,
         x - preset.radius,
       );
+
       const endX = Math.min(
         width - 1,
         x + preset.radius,
@@ -203,6 +212,7 @@ const refineAlpha = (
         ) {
           const neighborIndex =
             neighborY * width + neighborX;
+
           const neighborAlpha =
             baseline[neighborIndex * 4 + 3];
 
@@ -254,12 +264,15 @@ const refineAlpha = (
         255 *
         backgroundDistance /
         distanceTotal;
+
       const ambiguity =
         1 -
         Math.abs(alpha - 127.5) /
         127.5;
+
       const effectiveBlend =
         preset.blend * ambiguity;
+
       const refinedAlpha = Math.round(
         alpha * (1 - effectiveBlend) +
         sourceAlpha * effectiveBlend,
@@ -336,6 +349,7 @@ const median = (
   const sorted = [...values].sort(
     (left, right) => left - right,
   );
+
   const middle = Math.floor(
     sorted.length / 2,
   );
@@ -383,10 +397,12 @@ for (const preset of presets) {
   for (const benchmarkCase of manifest.cases) {
     const outputName =
       safeOutputName(benchmarkCase.id);
+
     const baselinePath = join(
       baselineRoot,
       outputName,
     );
+
     const sourcePath = resolve(
       manifestRoot,
       benchmarkCase.input,
@@ -422,6 +438,7 @@ for (const preset of presets) {
     }
 
     const started = performance.now();
+
     const refined = refineAlpha(
       sourceRaster.data,
       baselineRaster.data,
@@ -429,6 +446,7 @@ for (const preset of presets) {
       baselineRaster.info.height,
       preset,
     );
+
     const milliseconds =
       performance.now() - started;
 
@@ -464,10 +482,12 @@ for (const preset of presets) {
     variantRoot,
     "quality.json",
   );
+
   const quality = await scoreOutput(
     variantRoot,
     qualityPath,
   );
+
   const totalMilliseconds = timings.reduce(
     (total, timing) =>
       total + timing.milliseconds,
