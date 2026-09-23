@@ -67,6 +67,7 @@ const FailureRecordSchema = Schema.Struct({
 });
 
 const ArtifactStageSchema = Schema.Literal(
+  "source-draw",
   "matte",
   "composite",
   "exported-rgba",
@@ -112,6 +113,7 @@ type Comparison = {
 
 type StageSummary = {
   readonly stage:
+    | "source-draw"
     | "matte"
     | "composite"
     | "exported-rgba"
@@ -429,6 +431,7 @@ const artifactPath = (
 const readRaw = async (
   run: number,
   stage:
+    | "source-draw"
     | "matte"
     | "composite"
     | "exported-rgba",
@@ -692,6 +695,7 @@ const finalize =
 
     for (
       const stage of [
+        "source-draw",
         "matte",
         "composite",
         "exported-rgba",
@@ -978,7 +982,7 @@ const app =
 
       const artifactMatch =
         url.pathname.match(
-          /^\/artifact\/(\d+)\/(matte|composite|exported-rgba|output-png)$/u,
+          /^\/artifact\/(\d+)\/(source-draw|matte|composite|exported-rgba|output-png)$/u,
         );
 
       if (
