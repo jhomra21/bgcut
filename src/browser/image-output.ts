@@ -61,9 +61,14 @@ export const readCanvasRgba = (
       }),
   });
 
+export type SourceDrawObserver = (
+  pixels: Uint8ClampedArray,
+) => void;
+
 export const createSourceComposite = (
   bitmap: ImageBitmap,
   matte: HTMLCanvasElement,
+  onSourceDrawn?: SourceDrawObserver,
 ): Effect.Effect<HTMLCanvasElement, ImageProcessingFailed> =>
   Effect.try({
     try: () => {
@@ -78,6 +83,15 @@ export const createSourceComposite = (
       }
 
       context.drawImage(bitmap, 0, 0);
+
+      if (onSourceDrawn !== undefined) {
+        onSourceDrawn(
+          new Uint8ClampedArray(
+            context.getImageData(0, 0, output.width, output.height).data,
+          ),
+        );
+      }
+
       context.globalCompositeOperation = "destination-in";
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
