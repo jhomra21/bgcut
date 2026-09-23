@@ -40,6 +40,27 @@ export const createMatteCanvas = (
       }),
   });
 
+export const readCanvasRgba = (
+  canvas: HTMLCanvasElement,
+): Effect.Effect<Uint8ClampedArray, ImageProcessingFailed> =>
+  Effect.try({
+    try: () => {
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+
+      if (context === null) {
+        throw new Error("2D canvas is unavailable.");
+      }
+
+      return new Uint8ClampedArray(
+        context.getImageData(0, 0, canvas.width, canvas.height).data,
+      );
+    },
+    catch: () =>
+      new ImageProcessingFailed({
+        message: "Canvas pixels could not be read for diagnostics.",
+      }),
+  });
+
 export const createSourceComposite = (
   bitmap: ImageBitmap,
   matte: HTMLCanvasElement,
