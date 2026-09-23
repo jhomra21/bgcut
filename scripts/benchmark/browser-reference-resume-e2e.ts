@@ -263,10 +263,12 @@ try {
       outputRoot,
       "browser-reference-resume.json",
     );
+
     const comparisonPath = join(
       outputRoot,
       "pixel-comparison.json",
     );
+
     const qualityPath = join(
       outputRoot,
       "capture-reference",
