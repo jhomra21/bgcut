@@ -547,11 +547,18 @@ const main =
             )} ms.`,
           );
         } catch (error) {
+          const parsed =
+            error instanceof Error
+              ? error
+              : new Error(
+                  String(error),
+                );
+
           await recordFailure(
             benchmarkCase.id,
             run,
             startedAt,
-            error,
+            parsed,
           );
         }
       }
