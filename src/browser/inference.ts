@@ -34,6 +34,18 @@ export type BrowserInferenceEngine = "webgpu" | "wasm";
 
 export type WebGpuOutputLocation = "gpu-buffer" | "cpu";
 
+export type WebGpuDiagnosticStage =
+  | "session-ready"
+  | "inference-start"
+  | "inference-complete"
+  | "matte-complete"
+  | "composite-complete"
+  | "export-complete";
+
+export type WebGpuDiagnosticObserver = (
+  stage: WebGpuDiagnosticStage,
+) => void;
+
 export type BackgroundRemovalResult = {
   readonly blob: Blob;
   readonly width: number;
@@ -198,6 +210,7 @@ const runModel = (
   timings: RemovalTimingRecorder,
   graphCapture: boolean,
   outputLocation: WebGpuOutputLocation,
+  diagnosticObserver?: WebGpuDiagnosticObserver,
 ): Effect.Effect<Float32Array, InferenceFailed> =>
   Effect.gen(function* () {
     const inputName = session.inputNames.at(0);
@@ -218,6 +231,8 @@ const runModel = (
       createGpuModelInput(runtime, sourceBitmap, timings),
       (input) =>
         Effect.gen(function* () {
+          diagnosticObserver?.("inference-start");
+
           const stopInference = timings.begin("inferenceMs");
 
           const outputs = yield* Effect.tryPromise({
@@ -242,6 +257,7 @@ const runModel = (
           });
 
           stopInference();
+          diagnosticObserver?.("inference-complete");
 
           const output = outputs[outputName];
 
@@ -296,6 +312,7 @@ export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
   outputLocation: WebGpuOutputLocation = "gpu-buffer",
+  diagnosticObserver?: WebGpuDiagnosticObserver,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -323,6 +340,8 @@ export const removeBackgroundWebGpuWithStrategy = (
             ),
             (lease) =>
               Effect.gen(function* () {
+                diagnosticObserver?.("session-ready");
+
                 const logits = yield* runModel(
                   lease.session,
                   runtime,
@@ -330,19 +349,23 @@ export const removeBackgroundWebGpuWithStrategy = (
                   timings,
                   strategy !== "no-capture-reuse",
                   outputLocation,
+                  diagnosticObserver,
                 );
 
                 const stopMatte = timings.begin("matteMs");
                 const matte = yield* createMatteCanvas(logits);
                 stopMatte();
+                diagnosticObserver?.("matte-complete");
 
                 const stopComposite = timings.begin("compositeMs");
                 const output = yield* createSourceComposite(bitmap, matte);
                 stopComposite();
+                diagnosticObserver?.("composite-complete");
 
                 const stopExport = timings.begin("exportMs");
                 const blob = yield* canvasToPng(output);
                 stopExport();
+                diagnosticObserver?.("export-complete");
 
                 return {
                   blob,
