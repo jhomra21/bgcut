@@ -20,6 +20,11 @@ type Strategy =
     typeof StrategySchema
   >;
 
+type SrgbCanvas = {
+  readonly canvas: HTMLCanvasElement;
+  readonly context: CanvasRenderingContext2D;
+};
+
 type RunRecord = {
   readonly schemaVersion: 1;
   readonly strategy: Strategy;
@@ -61,10 +66,7 @@ const writeStatus = (
 const createSrgbCanvas = (
   width: number,
   height: number,
-): {
-  readonly canvas: HTMLCanvasElement;
-  readonly context: CanvasRenderingContext2D;
-} => {
+): SrgbCanvas => {
   const canvas =
     document.createElement(
       "canvas",
