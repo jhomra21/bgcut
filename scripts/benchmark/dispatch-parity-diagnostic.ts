@@ -160,14 +160,6 @@ const compare = (
     );
   }
 
-  const channelNames:
-    readonly Channel[] = [
-      "r",
-      "g",
-      "b",
-      "a",
-    ];
-
   const channelAbsolute =
     [0, 0, 0, 0];
 
@@ -303,35 +295,39 @@ const compare = (
     }
   }
 
-  const channels =
-    Object.fromEntries(
-      channelNames.map(
-        (
-          name,
-          index,
-        ) => [
-          name,
-          {
-            differingValues:
-              channelDiffering[
-                index
-              ],
-            meanAbsoluteByteDifference:
-              channelAbsolute[
-                index
-              ] /
-              pixels,
-            maxAbsoluteByteDifference:
-              channelMaximum[
-                index
-              ],
-          } satisfies ChannelStats,
-        ],
-      ),
-    ) as Record<
+  const channelStats = (
+    index: number,
+  ): ChannelStats => ({
+    differingValues:
+      channelDiffering[
+        index
+      ],
+    meanAbsoluteByteDifference:
+      channelAbsolute[
+        index
+      ] /
+      pixels,
+    maxAbsoluteByteDifference:
+      channelMaximum[
+        index
+      ],
+  });
+
+  const channels: Readonly<
+    Record<
       Channel,
       ChannelStats
-    >;
+    >
+  > = {
+    r:
+      channelStats(0),
+    g:
+      channelStats(1),
+    b:
+      channelStats(2),
+    a:
+      channelStats(3),
+  };
 
   return {
     left:
