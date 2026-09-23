@@ -368,7 +368,8 @@ const main =
       performance.now();
 
     let primeRecord:
-      PrimeRecord;
+      | PrimeRecord
+      | undefined;
 
     try {
       const prime =
@@ -429,6 +430,15 @@ const main =
         "prime",
         primeStartedAt,
         parsed,
+      );
+    }
+
+    if (
+      primeRecord ===
+      undefined
+    ) {
+      throw new Error(
+        "Provider-tuning prime did not produce a record.",
       );
     }
 
