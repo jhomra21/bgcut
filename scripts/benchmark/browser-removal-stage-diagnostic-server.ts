@@ -66,6 +66,13 @@ const FailureRecordSchema = Schema.Struct({
   stack: Schema.String,
 });
 
+const ArtifactStageSchema = Schema.Literal(
+  "matte",
+  "composite",
+  "exported-rgba",
+  "output-png",
+);
+
 type RunRecord =
   Schema.Schema.Type<
     typeof RunRecordSchema
@@ -74,6 +81,11 @@ type RunRecord =
 type FailureRecord =
   Schema.Schema.Type<
     typeof FailureRecordSchema
+  >;
+
+type ArtifactStage =
+  Schema.Schema.Type<
+    typeof ArtifactStageSchema
   >;
 
 type ChannelStats = {
@@ -403,11 +415,7 @@ const writeJson = async (
 
 const artifactPath = (
   run: number,
-  stage:
-    | "matte"
-    | "composite"
-    | "exported-rgba"
-    | "output-png",
+  stage: ArtifactStage,
 ): string =>
   join(
     artifactRoot,
@@ -985,11 +993,11 @@ const app =
           );
 
         const stage =
-          artifactMatch[2] as
-            | "matte"
-            | "composite"
-            | "exported-rgba"
-            | "output-png";
+          Schema.decodeUnknownSync(
+            ArtifactStageSchema,
+          )(
+            artifactMatch[2],
+          );
 
         if (
           run < 1 ||
