@@ -328,6 +328,7 @@ export const removeBackgroundWebGpuWithStrategy = (
                   | undefined;
 
                 const stopComposite = timings.begin("compositeMs");
+
                 const output = yield* createSourceComposite(
                   bitmap,
                   matte,
@@ -338,6 +339,7 @@ export const removeBackgroundWebGpuWithStrategy = (
                       }
                     : undefined,
                 );
+
                 stopComposite();
 
                 const compositeRgba = collectDiagnostics
