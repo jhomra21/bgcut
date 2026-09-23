@@ -40,6 +40,7 @@ export type BrowserInferenceEngine = "webgpu" | "wasm";
 export type WebGpuPendingDispatches = "default" | 8 | 32 | 64;
 
 export type BackgroundRemovalDiagnostics = {
+  readonly sourceRgba: Uint8ClampedArray;
   readonly matteRgba: Uint8ClampedArray;
   readonly compositeRgba: Uint8ClampedArray;
 };
@@ -322,8 +323,21 @@ export const removeBackgroundWebGpuWithStrategy = (
                   ? yield* readCanvasRgba(matte)
                   : undefined;
 
+                let sourceRgba:
+                  | Uint8ClampedArray
+                  | undefined;
+
                 const stopComposite = timings.begin("compositeMs");
-                const output = yield* createSourceComposite(bitmap, matte);
+                const output = yield* createSourceComposite(
+                  bitmap,
+                  matte,
+                  collectDiagnostics
+                    ? (pixels) => {
+                        sourceRgba =
+                          pixels;
+                      }
+                    : undefined,
+                );
                 stopComposite();
 
                 const compositeRgba = collectDiagnostics
@@ -342,9 +356,12 @@ export const removeBackgroundWebGpuWithStrategy = (
                   engine: "webgpu" as const,
                   timings: timings.finish(),
                   diagnostics:
-                    matteRgba === undefined || compositeRgba === undefined
+                    sourceRgba === undefined ||
+                    matteRgba === undefined ||
+                    compositeRgba === undefined
                       ? undefined
                       : {
+                          sourceRgba,
                           matteRgba,
                           compositeRgba,
                         },
