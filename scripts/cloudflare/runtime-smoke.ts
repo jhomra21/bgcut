@@ -279,7 +279,9 @@ const verifySecurityHeaders = async (): Promise<void> => {
 };
 
 await rm(smokeState, { recursive: true, force: true });
+
 await mkdir(resolve(repositoryRoot, ".wrangler"), { recursive: true });
+
 await writeFile(modelFixture, new Uint8Array([0x08, 0x09, 0x0a, 0x0b]));
 
 try {
