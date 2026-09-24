@@ -116,6 +116,7 @@ type ServerHandle = {
     Promise<string>;
   readonly stderr:
     Promise<string>;
+  readonly sessionToken: string;
 };
 
 type BrowserLaunch = {
@@ -580,6 +581,9 @@ const startServer =
     serverOutputRoot:
       string,
   ): Promise<ServerHandle> => {
+    const sessionToken =
+      crypto.randomUUID();
+
     const child =
       Bun.spawn(
         [
@@ -597,6 +601,7 @@ const startServer =
             timeoutMs,
           ),
           port,
+          sessionToken,
         ],
         {
           cwd: resolve(
@@ -623,6 +628,7 @@ const startServer =
           readPipe(
             child.stderr,
           ),
+      sessionToken,
       };
 
     const deadline =
@@ -772,6 +778,8 @@ const runIsolatedPage =
   async (
     serverOutputRoot:
       string,
+    sessionToken:
+      string,
     block:
       number,
     query:
@@ -802,7 +810,9 @@ const runIsolatedPage =
 
     const launch =
       await launchIsolatedBrowser(
-        `${baseUrl}?${query}`,
+        `${baseUrl}session/${encodeURIComponent(
+          sessionToken,
+        )}?${query}`,
       );
 
     try {
@@ -890,6 +900,7 @@ try {
     const launch =
       await runIsolatedPage(
         prewarmRoot,
+        prewarmServer.sessionToken,
         block,
         `block=${block}&primeOnly=1`,
         primePath,
@@ -961,6 +972,7 @@ try {
     const launch =
       await runIsolatedPage(
         outputRoot,
+        measuredServer.sessionToken,
         block,
         `block=${block}`,
         expectedPath,
