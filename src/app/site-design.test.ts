@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 const styles = await Bun.file(new URL("./styles.css", import.meta.url)).text();
+
 const themeSource = await Bun.file(new URL("./theme.ts", import.meta.url)).text();
+
 const indexHtml = await Bun.file(new URL("../../index.html", import.meta.url)).text();
 
 const appSourceFiles: string[] = [];
