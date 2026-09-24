@@ -11,6 +11,7 @@ import onnx
 import onnxruntime as ort
 from onnx import TensorProto
 from onnxruntime.transformers.float16 import convert_float_to_float16
+from onnxruntime.transformers.onnx_model import OnnxModel
 
 SOURCE_SHA256 = "4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c"
 SOURCE_SIZE_BYTES = 195_872_736
@@ -104,6 +105,10 @@ def main() -> None:
         keep_io_types=True,
         disable_shape_infer=False,
     )
+
+    converted_model = OnnxModel(converted)
+    converted_model.topological_sort(is_deterministic=True)
+    converted = converted_model.model
 
     onnx.checker.check_model(converted)
 
