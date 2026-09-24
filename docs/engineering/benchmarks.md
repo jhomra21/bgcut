@@ -111,8 +111,8 @@ The FP16 candidate converts the 410 floating-point initializers in the validated
 | Aggregate | 1101 / 1309 ms | 627.5 / 873.5 ms | -43.0% | -33.3% |
 | FP32 first | 1070.5 / 1207 ms | 627 / 831.5 ms | -41.4% | -31.1% |
 | FP16 first | 1118.5 / 1329 ms | 633.5 / 895 ms | -43.4% | -32.7% |
-| Forward | 1073.5 / 1265.5 ms | 691.5 / 956.5 ms | -35.6% | -24.4% |
-| Reverse | 1114 / 1352.5 ms | 607 / 781.5 ms | -45.5% | -42.2% |
+| Forward | 1073.5 / 1265.5 ms | 691.5 / 957 ms | -35.6% | -24.4% |
+| Reverse | 1114 / 1352.5 ms | 607 / 782 ms | -45.5% | -42.2% |
 | First position | 1070.5 / 1207 ms | 633.5 / 895 ms | -40.8% | -25.8% |
 | Second position | 1118.5 / 1329 ms | 627 / 831.5 ms | -43.9% | -37.4% |
 
