@@ -71,6 +71,13 @@ const BlockSchema = Schema.Struct({
   ),
 });
 
+const ActivationSchema = Schema.Struct({
+  launchToken: Schema.String,
+  blockIndex: Schema.Number,
+  primeOnly: Schema.Boolean,
+});
+
+
 const RemovalTimingsSchema = Schema.Struct({
   decodeMs: Schema.Number,
   runtimeMs: Schema.Number,
@@ -819,6 +826,14 @@ const reports =
     number,
     BlockReport
   >();
+
+let activeLaunch:
+  | {
+      readonly token: string;
+      readonly blockIndex: number;
+      readonly primeOnly: boolean;
+    }
+  | undefined;
 
 const safeOutputName = (
   id: string,
@@ -2206,11 +2221,119 @@ const app =
           request.url,
         );
 
-      const mutationAuthorized =
+      const sessionAuthorized =
         request.headers.get(
           "x-bgcut-benchmark-session",
         ) ===
         sessionToken;
+
+      const requestedBlock =
+        Number.parseInt(
+          url.searchParams.get(
+            "block",
+          ) ??
+            "",
+          10,
+        );
+
+      const queryLaunchAuthorized =
+        activeLaunch !==
+          undefined &&
+        url.searchParams.get(
+          "launch",
+        ) ===
+          activeLaunch.token &&
+        requestedBlock ===
+          activeLaunch.blockIndex;
+
+      if (
+        request.method ===
+          "POST" &&
+        url.pathname ===
+          "/activate"
+      ) {
+        if (
+          !sessionAuthorized
+        ) {
+          return new Response(
+            "Unauthorized benchmark session.",
+            {
+              status: 403,
+            },
+          );
+        }
+
+        if (
+          activeLaunch !==
+          undefined
+        ) {
+          return new Response(
+            `Benchmark launch for block ${activeLaunch.blockIndex} is still active.`,
+            {
+              status: 409,
+            },
+          );
+        }
+
+        const activation =
+          Schema.decodeUnknownSync(
+            ActivationSchema,
+          )(
+            await request.json(),
+          );
+
+        if (
+          activation.launchToken.length <
+          8
+        ) {
+          return new Response(
+            "Benchmark launch token is too short.",
+            {
+              status: 422,
+            },
+          );
+        }
+
+        if (
+          blocks.at(
+            activation.blockIndex,
+          ) ===
+            undefined
+        ) {
+          return new Response(
+            `Unknown benchmark block ${activation.blockIndex}.`,
+            {
+              status: 422,
+            },
+          );
+        }
+
+        activeLaunch = {
+          token:
+            activation.launchToken,
+          blockIndex:
+            activation.blockIndex,
+          primeOnly:
+            activation.primeOnly,
+        };
+
+        console.log(
+          `Activated ${activation.primeOnly ? "prewarm" : "measured"} block ${activation.blockIndex}.`,
+        );
+
+        return new Response(
+          "activated",
+        );
+      }
+
+      const mutationAuthorized =
+        sessionAuthorized &&
+        activeLaunch !==
+          undefined &&
+        request.headers.get(
+          "x-bgcut-benchmark-launch",
+        ) ===
+          activeLaunch.token;
 
       if (
         request.method ===
@@ -2222,7 +2345,7 @@ const app =
         );
 
         return new Response(
-          "Unauthorized benchmark session.",
+          "Unauthorized benchmark launch.",
           {
             status: 403,
           },
@@ -2252,7 +2375,8 @@ const app =
         request.method ===
           "GET" &&
         url.pathname ===
-          sessionPath
+          sessionPath &&
+        queryLaunchAuthorized
       ) {
         return new Response(
           html,
@@ -2275,7 +2399,8 @@ const app =
         url.searchParams.get(
           "session",
         ) ===
-          sessionToken
+          sessionToken &&
+        queryLaunchAuthorized
       ) {
         return new Response(
           clientSource,
@@ -2470,6 +2595,8 @@ const app =
             undefined ||
           benchmarkCase ===
             undefined ||
+          activeLaunch?.blockIndex !==
+            blockIndex ||
           run <
             1 ||
           run >
@@ -2541,6 +2668,18 @@ const app =
             await request.json(),
           );
 
+        if (
+          record.blockIndex !==
+          activeLaunch?.blockIndex
+        ) {
+          return new Response(
+            "Run record does not match the active benchmark block.",
+            {
+              status: 409,
+            },
+          );
+        }
+
         const directory =
           join(
             runsRoot,
@@ -2582,6 +2721,21 @@ const app =
             await request.json(),
           );
 
+        if (
+          record.blockIndex !==
+          activeLaunch?.blockIndex
+        ) {
+          return new Response(
+            "Prime record does not match the active benchmark block.",
+            {
+              status: 409,
+            },
+          );
+        }
+
+        const primeOnly =
+          activeLaunch.primeOnly;
+
         const directory =
           join(
             runsRoot,
@@ -2603,6 +2757,13 @@ const app =
           record,
         );
 
+        if (
+          primeOnly
+        ) {
+          activeLaunch =
+            undefined;
+        }
+
         return new Response(
           "saved",
         );
@@ -2621,6 +2782,18 @@ const app =
             await request.json(),
           );
 
+        if (
+          record.blockIndex !==
+          activeLaunch?.blockIndex
+        ) {
+          return new Response(
+            "Failure record does not match the active benchmark block.",
+            {
+              status: 409,
+            },
+          );
+        }
+
         await writeJson(
           join(
             outputRoot,
@@ -2628,6 +2801,9 @@ const app =
           ),
           record,
         );
+
+        activeLaunch =
+          undefined;
 
         return new Response(
           "failure recorded",
@@ -2646,6 +2822,18 @@ const app =
           )(
             await request.json(),
           );
+
+        if (
+          report.block.index !==
+          activeLaunch?.blockIndex
+        ) {
+          return new Response(
+            "Block report does not match the active benchmark block.",
+            {
+              status: 409,
+            },
+          );
+        }
 
         const expectedRuns =
           manifest.cases.length *
@@ -2690,6 +2878,9 @@ const app =
           ),
           report,
         );
+
+        activeLaunch =
+          undefined;
 
         const done =
           reports.size ===
