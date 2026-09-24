@@ -132,11 +132,17 @@ if (args.length < 4) {
 }
 
 const manifestPath = resolve(args[0]);
+
 const outputRoot = resolve(args[1]);
+
 const fp32ModelPath = resolve(args[2]);
+
 const fp16ModelPath = resolve(args[3]);
+
 const timeoutMs = Number.parseInt(args[4] ?? "60000", 10);
+
 const port = Number.parseInt(args[5] ?? "4184", 10);
+
 const caseId = args[6] ?? "cat-in-sink";
 
 if (!Number.isInteger(timeoutMs) || timeoutMs < 1) {
@@ -202,9 +208,13 @@ await mkdir(outputRoot, {
 });
 
 const sessionToken = crypto.randomUUID();
+
 const sessionPath = `/session/${encodeURIComponent(sessionToken)}`;
+
 const baseUrl = `http://127.0.0.1:${port}/`;
+
 const modelRequests: string[] = [];
+
 let completed = false;
 
 const html = `<!doctype html>
@@ -282,6 +292,7 @@ const server = Bun.serve({
   port,
   async fetch(request) {
     const url = new URL(request.url);
+
     const authorized =
       request.headers.get("x-bgcut-benchmark-session") === sessionToken;
 
