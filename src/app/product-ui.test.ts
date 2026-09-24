@@ -291,6 +291,12 @@ describe("browser product UI", () => {
     expect(appSource).toContain("bgcut serve --json");
     expect(appSource).toContain('class="code-block-copy"');
     expect(appSource).toContain("navigator.clipboard.writeText(props.code)");
+    expect(appSource).toContain('data-copy-state={copyState()}');
+    expect(appSource).toContain('copyState() === "copied"');
+    expect(appSource).toContain('class="code-block-copy-check"');
+    expect(appSource).toContain('d="m3 8.4 3.1 3.1L13 4.6"');
+    expect(stylesSource).toContain(".code-block-copy[data-copy-state=\"copied\"]");
+    expect(stylesSource).toContain("color: var(--text-success)");
     expect(stylesSource).toContain(".code-token-keyword");
     expect(appSource).toContain('language="shell"');
     expect(appSource).toContain('language="typescript"');
