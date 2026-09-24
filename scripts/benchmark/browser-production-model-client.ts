@@ -2,7 +2,6 @@ import { Effect, Schema } from "effect";
 
 import { formatBackgroundRemovalError } from "../../src/browser/errors";
 import { removeBackgroundWebGpu } from "../../src/browser/inference";
-import type { RemovalTimings } from "../../src/browser/timing";
 import { resolveDefaultWebGpuSessionStrategy } from "../../src/browser/webgpu-session-strategy";
 
 const ConfigSchema = Schema.Struct({
