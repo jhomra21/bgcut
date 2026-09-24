@@ -1,7 +1,9 @@
 import { For, createSignal, onCleanup } from "solid-js";
 
 type CodeLanguage = "shell" | "typescript" | "text";
+
 type CopyState = "idle" | "copied" | "error";
+
 type TokenKind =
   | "comment"
   | "command"
