@@ -577,6 +577,127 @@ const outputPath = (
   );
 };
 
+const hydrateSavedReports =
+  async (): Promise<void> => {
+    for (
+      const block of
+      blocks
+    ) {
+      const reportPath =
+        join(
+          blocksRoot,
+          `block-${block.index}.json`,
+        );
+
+      if (
+        !(await Bun.file(
+          reportPath,
+        ).exists())
+      ) {
+        continue;
+      }
+
+      const report =
+        Schema.decodeUnknownSync(
+          BlockReportSchema,
+        )(
+          JSON.parse(
+            await readFile(
+              reportPath,
+              "utf8",
+            ),
+          ),
+        );
+
+      if (
+        report.block.index !==
+          block.index ||
+        report.block.sequence !==
+          block.sequence ||
+        report.block.direction !==
+          block.direction ||
+        report.block.mode !==
+          block.mode ||
+        report.block.caseIndexes.length !==
+          block.caseIndexes.length ||
+        report.block.caseIndexes.some(
+          (caseIndex, index) =>
+            caseIndex !==
+            block.caseIndexes[
+              index
+            ],
+        )
+      ) {
+        throw new Error(
+          `Saved block ${block.index} does not match the current benchmark plan.`,
+        );
+      }
+
+      const expectedRuns =
+        manifest.cases.length *
+        runsPerCase;
+
+      if (
+        report.runs.length !==
+        expectedRuns
+      ) {
+        throw new Error(
+          `Saved block ${block.index} has ${report.runs.length} runs; expected ${expectedRuns}.`,
+        );
+      }
+
+      if (
+        report.runs.some(
+          (record) =>
+            !record.timings
+              .sessionReused,
+        )
+      ) {
+        throw new Error(
+          `Saved block ${block.index} contains a measured run that did not reuse its session.`,
+        );
+      }
+
+      for (
+        let caseIndex = 0;
+        caseIndex <
+        manifest.cases.length;
+        caseIndex += 1
+      ) {
+        for (
+          let run = 1;
+          run <=
+          runsPerCase;
+          run += 1
+        ) {
+          const path =
+            outputPath(
+              block.index,
+              caseIndex,
+              run,
+            );
+
+          if (
+            !(await Bun.file(
+              path,
+            ).exists())
+          ) {
+            throw new Error(
+              `Saved block ${block.index} is missing output for case ${caseIndex}, run ${run}.`,
+            );
+          }
+        }
+      }
+
+      reports.set(
+        block.index,
+        report,
+      );
+    }
+  };
+
+await hydrateSavedReports();
+
 const writeJson = async (
   path: string,
   value: PersistedRecord,
