@@ -164,6 +164,7 @@ try {
   })();
 
   const cachedModelPath = join(modelCacheRoot, "models", MODEL_FILENAME);
+
   const cachedWebGpuModelPath = join(
     modelCacheRoot,
     "models",
