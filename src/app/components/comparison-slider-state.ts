@@ -5,5 +5,7 @@ export const chevronOpacity = (side: ChevronSide, highlightedSide: ChevronSide |
 };
 
 export const chevronColor = (side: ChevronSide, highlightedSide: ChevronSide | undefined): string => {
-  return highlightedSide === undefined || side === highlightedSide ? "#efefe8" : "#b8b8b0";
+  return highlightedSide === undefined || side === highlightedSide
+    ? "var(--comparison-control)"
+    : "var(--comparison-control-muted)";
 };
