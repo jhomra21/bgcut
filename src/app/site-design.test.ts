@@ -2,6 +2,22 @@ import { describe, expect, test } from "bun:test";
 
 const styles = await Bun.file(new URL("./styles.css", import.meta.url)).text();
 
+const themeSource = await Bun.file(new URL("./theme.ts", import.meta.url)).text();
+
+const indexHtml = await Bun.file(new URL("../../index.html", import.meta.url)).text();
+
+const appSourceFiles: string[] = [];
+
+for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
+  if (path.endsWith(".test.ts") || path.endsWith(".test.tsx")) {
+    continue;
+  }
+
+  appSourceFiles.push(await Bun.file(`${import.meta.dir}/${path}`).text());
+}
+
+const appSources = appSourceFiles.join("\n");
+
 describe("site design contract", () => {
   test("uses shared interaction easing and avoids broad transitions", () => {
     expect(styles).toContain("--ease-out: cubic-bezier(0.23, 1, 0.32, 1)");
@@ -53,6 +69,7 @@ describe("site design contract", () => {
     expect(styles).toContain("--background-primary: #fbfbfa");
     expect(styles).toContain("--text-success: #2f6f44");
     expect(styles).toContain('--comparison-control: #efefe8');
+    expect(styles).toContain('--comparison-control-muted: #b8b8b0');
     expect(styles).toContain('html[data-theme="dark"]');
     expect(styles).toContain("--text-primary: #f4f4f0");
     expect(styles).toContain("--background-primary: #11110f");
@@ -63,6 +80,16 @@ describe("site design contract", () => {
     expect(styles).not.toContain("var(--canvas)");
     expect(styles).not.toContain("var(--surface)");
     expect(styles).not.toContain("var(--line)");
+  });
+
+  test("keeps raw color values inside the CSS theme layer", () => {
+    expect(appSources).not.toMatch(/#[0-9a-f]{3,8}\b|(?:rgb|hsl)a?\s*\(/iu);
+    expect(themeSource).toContain('.getPropertyValue("--background-primary")');
+    expect(themeSource).not.toContain("LIGHT_THEME_COLOR");
+    expect(themeSource).not.toContain("DARK_THEME_COLOR");
+    expect(indexHtml).toContain('<meta name="theme-color" content="" />');
+    expect(indexHtml).not.toMatch(/theme-color" content="#[0-9a-f]{3,8}/iu);
+    expect(indexHtml).not.toContain('storedTheme === "dark" ?');
   });
 
   test("keeps the reference title permanently in the left reading rail", () => {

@@ -4,29 +4,30 @@ export type SiteTheme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "bgcut-theme";
 
-const LIGHT_THEME_COLOR = "#fbfbfa";
-
-const DARK_THEME_COLOR = "#11110f";
-
 const initialTheme: SiteTheme =
   document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 
 const [theme, setTheme] = createSignal<SiteTheme>(initialTheme);
 
-const applyThemeColor = (nextTheme: SiteTheme) => {
+export const syncThemeColor = () => {
   const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 
-  themeColor?.setAttribute(
-    "content",
-    nextTheme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR,
-  );
+  if (themeColor === null) {
+    return;
+  }
+
+  const resolvedBackground = getComputedStyle(document.documentElement)
+    .getPropertyValue("--background-primary")
+    .trim();
+
+  themeColor.setAttribute("content", resolvedBackground);
 };
 
 export const toggleTheme = () => {
   const nextTheme: SiteTheme = theme() === "dark" ? "light" : "dark";
 
   document.documentElement.dataset.theme = nextTheme;
-  applyThemeColor(nextTheme);
+  syncThemeColor();
 
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);

@@ -46,6 +46,7 @@
   --border-high-contrast: #909089;
   --border-floating: rgba(255, 255, 255, 0.72);
   --comparison-control: #efefe8;
+  --comparison-control-muted: #b8b8b0;
   --shadow-nav: rgba(23, 23, 23, 0.06);
   --shadow-floating: rgba(23, 23, 23, 0.1);
   --syntax-comment: #777771;
@@ -115,6 +116,7 @@ html[data-theme="dark"] {
   --border-high-contrast: #7b7b73;
   --border-floating: rgba(255, 255, 255, 0.14);
   --comparison-control: #efefe8;
+  --comparison-control-muted: #b8b8b0;
   --shadow-nav: rgba(0, 0, 0, 0.28);
   --shadow-floating: rgba(0, 0, 0, 0.36);
   --syntax-comment: #8d8d86;
