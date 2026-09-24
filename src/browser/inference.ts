@@ -80,9 +80,11 @@ const createSession = (
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
+
     const model = yield* fetchModelBytes(
       modelPath,
     );
+
     stopModelDownload();
 
     configureOrtWebGpuRuntime();
