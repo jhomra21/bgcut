@@ -165,6 +165,27 @@ const sessionTokenFromLocation =
     );
   };
 
+const launchTokenFromLocation =
+  (): string => {
+    const value =
+      new URL(
+        globalThis.location.href,
+      ).searchParams.get(
+        "launch",
+      );
+
+    if (
+      value === null ||
+      value.length === 0
+    ) {
+      throw new Error(
+        "FP16 six-image benchmark launch token is missing.",
+      );
+    }
+
+    return value;
+  };
+
 const blockIndexFromLocation =
   (): number => {
     const raw =
@@ -290,6 +311,7 @@ const postJson = async (
     | FailureRecord
     | BlockReport,
   sessionToken: string,
+  launchToken: string,
 ): Promise<Response> => {
   const response =
     await fetch(
@@ -301,6 +323,8 @@ const postJson = async (
             "application/json",
           "x-bgcut-benchmark-session":
             sessionToken,
+          "x-bgcut-benchmark-launch":
+            launchToken,
         },
         body:
           JSON.stringify(
@@ -326,6 +350,7 @@ const uploadOutput = async (
   run: number,
   blob: Blob,
   sessionToken: string,
+  launchToken: string,
 ): Promise<void> => {
   const response =
     await fetch(
@@ -335,6 +360,8 @@ const uploadOutput = async (
         headers: {
           "x-bgcut-benchmark-session":
             sessionToken,
+          "x-bgcut-benchmark-launch":
+            launchToken,
         },
         body: blob,
       },
@@ -382,6 +409,7 @@ const recordFailure = async (
   startedAt: number,
   error: Error,
   sessionToken: string,
+  launchToken: string,
 ): Promise<never> => {
   const failure:
     FailureRecord = {
@@ -409,6 +437,7 @@ const recordFailure = async (
     "/failure",
     failure,
     sessionToken,
+    launchToken,
   );
 
   throw error;
@@ -419,11 +448,19 @@ const main =
     const sessionToken =
       sessionTokenFromLocation();
 
+    const launchToken =
+      launchTokenFromLocation();
+
+    const blockIndex =
+      blockIndexFromLocation();
+
     const configResponse =
       await fetch(
         `/config.json?session=${encodeURIComponent(
           sessionToken,
-        )}`,
+        )}&launch=${encodeURIComponent(
+          launchToken,
+        )}&block=${blockIndex}`,
         {
           cache:
             "no-store",
@@ -444,9 +481,6 @@ const main =
       )(
         await configResponse.json(),
       );
-
-    const blockIndex =
-      blockIndexFromLocation();
 
     const block =
       config.blocks.find(
@@ -568,6 +602,7 @@ const main =
         "/prime",
         primeRecord,
         sessionToken,
+        launchToken,
       );
 
       writeStatus(
@@ -602,6 +637,7 @@ const main =
         primeStartedAt,
         parsed,
         sessionToken,
+        launchToken,
       );
     }
 
@@ -688,6 +724,7 @@ const main =
             run,
             outcome.result.blob,
             sessionToken,
+            launchToken,
           );
 
           const record:
@@ -717,6 +754,7 @@ const main =
             "/run",
             record,
             sessionToken,
+            launchToken,
           );
 
           writeStatus(
@@ -741,6 +779,7 @@ const main =
             startedAt,
             parsed,
             sessionToken,
+            launchToken,
           );
         }
       }
@@ -765,6 +804,7 @@ const main =
         "/block-report",
         report,
         sessionToken,
+        launchToken,
       );
 
     const completion =
