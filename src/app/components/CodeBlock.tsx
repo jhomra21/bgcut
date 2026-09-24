@@ -216,15 +216,13 @@ export const CodeBlock = (props: {
           <span aria-live="polite">{copyLabel()}</span>
         </button>
       </div>
-      <pre><code>
-        <For each={tokenize(props.code, props.language)}>
-          {(token) =>
-            token.kind === undefined
-              ? token.text
-              : <span class={`code-token code-token-${token.kind}`}>{token.text}</span>
-          }
-        </For>
-      </code></pre>
+      <pre><code><For each={tokenize(props.code, props.language)}>
+        {(token) =>
+          token.kind === undefined
+            ? token.text
+            : <span class={`code-token code-token-${token.kind}`}>{token.text}</span>
+        }
+      </For></code></pre>
     </div>
   );
 };
