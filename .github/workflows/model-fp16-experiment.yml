@@ -1,4 +1,4 @@
-name: fp16 model experiment
+name: fp16 webgpu model
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -42,6 +42,11 @@ jobs:
             artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx \
             artifacts/fp16-model-report.json
 
+      - name: Verify production candidate fingerprint
+        run: |
+          test "$(stat -c %s artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx)" = "98572669"
+          echo "37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33  artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx" | sha256sum --check -
+
       - name: Upload FP16 candidate
         uses: actions/upload-artifact@v4
         with:
@@ -51,3 +56,20 @@ jobs:
             artifacts/fp16-model-report.json
           compression-level: 0
           if-no-files-found: error
+
+      - name: Publish production model release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="model-birefnet-lite-512-ort-basic-webgpu-v2-fp16"
+          model="artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx"
+          report="artifacts/fp16-model-report.json"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --target "$GITHUB_SHA" \
+              --title "BiRefNet Lite 512 WebGPU FP16" \
+              --notes "Validated bgcut WebGPU model with FP16 internal weights and FP32 public I/O."
+          fi
+
+          gh release upload "$tag" "$model" "$report" --clobber
