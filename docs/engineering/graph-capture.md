@@ -1,6 +1,6 @@
 # WebGPU graph capture
 
-This document records the graph-capture experiment behind the current fastest accepted browser result. The numbers are observations from one exact commit and test setup. They are not general product claims.
+This document records the earlier graph-capture experiment that established the Chromium-family browser path. The numbers are observations from one exact commit and test setup. They are not general product claims. Safari now uses the no-capture session path; its FP16 acceptance results are recorded in [benchmarks](./benchmarks.md).
 
 ## Accepted candidate
 
