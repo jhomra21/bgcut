@@ -16,7 +16,9 @@ export const syncThemeColor = () => {
     return;
   }
 
-  const resolvedBackground = getComputedStyle(document.documentElement).backgroundColor;
+  const resolvedBackground = getComputedStyle(document.documentElement)
+    .getPropertyValue("--background-primary")
+    .trim();
 
   themeColor.setAttribute("content", resolvedBackground);
 };
