@@ -318,7 +318,7 @@ type AlphaRaster = {
 };
 
 const usage =
-  "Usage: bun run benchmark:browser-fp16-model:six -- <manifest.json> <output-dir> <fp32-model.onnx> <fp16-model.onnx> [runs-per-case] [timeout-ms] [port]";
+  "Usage: bun run benchmark:browser-fp16-model:six -- <manifest.json> <output-dir> <fp32-model.onnx> <fp16-model.onnx> [runs-per-case] [timeout-ms] [port] [session-token]";
 
 const [
   manifestArgument,
@@ -328,6 +328,7 @@ const [
   runsArgument = "3",
   timeoutArgument = "60000",
   portArgument = "4184",
+  sessionArgument,
 ] = process.argv.slice(
   2,
 );
@@ -443,6 +444,27 @@ if (
     `Port must be a positive integer, received "${portArgument}".`,
   );
 }
+
+const sessionToken =
+  sessionArgument ??
+  `manual-${crypto.randomUUID()}`;
+
+if (
+  sessionToken.length <
+  8
+) {
+  throw new Error(
+    "FP16 six-image benchmark session token is too short.",
+  );
+}
+
+const encodedSessionToken =
+  encodeURIComponent(
+    sessionToken,
+  );
+
+const sessionPath =
+  `/session/${encodedSessionToken}`;
 
 const manifest =
   Schema.decodeUnknownSync(
@@ -2150,7 +2172,7 @@ const html = `<!doctype html>
   </head>
   <body>
     <pre id="status"></pre>
-    <script type="module" src="/client.js"></script>
+    <script type="module" src="/client.js?session=${encodedSessionToken}"></script>
   </body>
 </html>
 `;
@@ -2184,11 +2206,53 @@ const app =
           request.url,
         );
 
+      const mutationAuthorized =
+        request.headers.get(
+          "x-bgcut-benchmark-session",
+        ) ===
+        sessionToken;
+
+      if (
+        request.method ===
+          "POST" &&
+        !mutationAuthorized
+      ) {
+        console.warn(
+          `Rejected stale benchmark write: ${url.pathname}`,
+        );
+
+        return new Response(
+          "Unauthorized benchmark session.",
+          {
+            status: 403,
+          },
+        );
+      }
+
       if (
         request.method ===
           "GET" &&
         url.pathname ===
           "/"
+      ) {
+        return new Response(
+          "bgcut FP16 six-image benchmark server ready.",
+          {
+            headers: {
+              "content-type":
+                "text/plain; charset=utf-8",
+              "cache-control":
+                "no-store",
+            },
+          },
+        );
+      }
+
+      if (
+        request.method ===
+          "GET" &&
+        url.pathname ===
+          sessionPath
       ) {
         return new Response(
           html,
@@ -2207,7 +2271,11 @@ const app =
         request.method ===
           "GET" &&
         url.pathname ===
-          "/client.js"
+          "/client.js" &&
+        url.searchParams.get(
+          "session",
+        ) ===
+          sessionToken
       ) {
         return new Response(
           clientSource,
@@ -2226,7 +2294,11 @@ const app =
         request.method ===
           "GET" &&
         url.pathname ===
-          "/config.json"
+          "/config.json" &&
+        url.searchParams.get(
+          "session",
+        ) ===
+          sessionToken
       ) {
         return Response.json(
           config,
@@ -2657,5 +2729,5 @@ const app =
   });
 
 console.log(
-  `Safari FP16 six-image gate ready at http://${app.hostname}:${app.port}/ across ${manifest.cases.length} cases.`,
+  `Safari FP16 six-image gate ready at http://${app.hostname}:${app.port}${sessionPath} across ${manifest.cases.length} cases.`,
 );
