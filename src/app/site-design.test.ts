@@ -77,7 +77,7 @@ describe("site design contract", () => {
 
   test("keeps raw color values inside the CSS theme layer", () => {
     expect(appSources).not.toMatch(/#[0-9a-f]{3,8}\b|(?:rgb|hsl)a?\s*\(/iu);
-    expect(themeSource).toContain("getComputedStyle(document.documentElement).backgroundColor");
+    expect(themeSource).toContain('.getPropertyValue("--background-primary")');
     expect(themeSource).not.toContain("LIGHT_THEME_COLOR");
     expect(themeSource).not.toContain("DARK_THEME_COLOR");
     expect(indexHtml).toContain('<meta name="theme-color" content="" />');
