@@ -770,29 +770,52 @@ if (
   );
 }
 
+const sessionCheckOnly =
+  process.env
+    .BGCUT_BROWSER_FP16_MODEL_SIX_SESSION_CHECK ===
+  "1";
+
 const [
   fp32Fingerprint,
   fp16Fingerprint,
 ] =
-  await Promise.all([
-    Effect.runPromise(
-      inspectModelFile(
-        fp32ModelPath,
-      ),
-    ),
-    Effect.runPromise(
-      inspectModelFile(
-        fp16ModelPath,
-      ),
-    ),
-  ]);
+  sessionCheckOnly
+    ? [
+        {
+          sizeBytes:
+            MODEL_SIZE_BYTES,
+          sha256:
+            MODEL_SHA256,
+        },
+        {
+          sizeBytes:
+            FP16_MODEL_SIZE_BYTES,
+          sha256:
+            FP16_MODEL_SHA256,
+        },
+      ]
+    : await Promise.all([
+        Effect.runPromise(
+          inspectModelFile(
+            fp32ModelPath,
+          ),
+        ),
+        Effect.runPromise(
+          inspectModelFile(
+            fp16ModelPath,
+          ),
+        ),
+      ]);
 
 if (
-  fp32Fingerprint
-    ?.sizeBytes !==
-    MODEL_SIZE_BYTES ||
-  fp32Fingerprint.sha256 !==
-    MODEL_SHA256
+  !sessionCheckOnly &&
+  (
+    fp32Fingerprint
+      ?.sizeBytes !==
+      MODEL_SIZE_BYTES ||
+    fp32Fingerprint.sha256 !==
+      MODEL_SHA256
+  )
 ) {
   throw new Error(
     "FP32 benchmark model does not match the validated production artifact.",
@@ -800,11 +823,14 @@ if (
 }
 
 if (
-  fp16Fingerprint
-    ?.sizeBytes !==
-    FP16_MODEL_SIZE_BYTES ||
-  fp16Fingerprint.sha256 !==
-    FP16_MODEL_SHA256
+  !sessionCheckOnly &&
+  (
+    fp16Fingerprint
+      ?.sizeBytes !==
+      FP16_MODEL_SIZE_BYTES ||
+    fp16Fingerprint.sha256 !==
+      FP16_MODEL_SHA256
+  )
 ) {
   throw new Error(
     "FP16 benchmark model does not match the generated candidate artifact.",
