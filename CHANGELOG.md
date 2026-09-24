@@ -6,7 +6,7 @@ Stable bgcut releases use the npm `latest` tag and normal GitHub releases. Prere
 
 ## Unreleased
 
-- Added a separate internal-FP16 BiRefNet artifact for Safari WebGPU. Chromium-family WebGPU, browser WebAssembly, and native Node/CLI continue to use the FP32 artifact.
+- Added a separate internal-FP16 BiRefNet artifact for Safari WebGPU adapters that expose `shader-f16`. Safari adapters without that feature, Chromium-family WebGPU, browser WebAssembly, and native Node/CLI continue to use the FP32 artifact.
 - On Apple M3 Pro with Safari 26.3, the six-image process-isolated acceptance run lowered the pooled warm inference median by 43.0% and total median by 33.3%. Aggregate MAE and MSE decreased slightly while IoU and F1 increased slightly. These numbers describe that acceptance run, not a general hardware performance claim.
 - Added persistent light and dark site themes backed by semantic color tokens, with the existing palette preserved as the light theme.
 - Added repeatable cross-tool benchmark commands for bgcut timing and output-quality scoring, plus a documented comparison protocol.

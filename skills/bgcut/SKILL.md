@@ -197,9 +197,9 @@ Node API failures are `BgcutError` instances. Use `error.code` for programmatic 
 
 ## Model cache
 
-Native CLI and Node runs use the validated FP32 BiRefNet Lite 512 model, about 187 MiB. The packaged local browser app uses the same operating-system cache directory. Safari WebGPU may also download the validated internal-FP16 model, about 94 MiB, under a separate filename.
+Native CLI and Node runs use the validated FP32 BiRefNet Lite 512 model, about 187 MiB. The packaged local browser app uses the same operating-system cache directory. Safari WebGPU on adapters that expose `shader-f16` may also download the validated internal-FP16 model, about 94 MiB, under a separate filename.
 
-bgcut verifies each model's expected size and SHA-256 before use. Valid cached artifacts are reused on later runs. Chromium-family browser WebGPU and the browser WebAssembly fallback continue to use the FP32 artifact.
+bgcut verifies each model's expected size and SHA-256 before use. Valid cached artifacts are reused on later runs. Safari adapters without `shader-f16`, Chromium-family browser WebGPU, and the browser WebAssembly fallback continue to use the FP32 artifact.
 
 ## Agent procedure
 

@@ -134,7 +134,7 @@ curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.mjs
 
 Both WASM routes must return `content-type: application/wasm`. The module loader must return JavaScript rather than SPA HTML. Both model routes must return `application/octet-stream` rather than SPA HTML.
 
-Then open the local site in Safari and run the normal WebGPU path. Open it in a Chromium-family browser and run normal WebGPU plus explicit WebAssembly. The Safari request should use the FP16 filename; Chromium WebGPU and WebAssembly should use the FP32 filename.
+Then open the local site in Safari on a WebGPU adapter that exposes `shader-f16` and run the normal WebGPU path. Open it in a Chromium-family browser and run normal WebGPU plus explicit WebAssembly. The capable Safari request should use the FP16 filename; Chromium WebGPU and WebAssembly should use the FP32 filename.
 
 ## Remote R2 bootstrap or payload update
 
@@ -236,7 +236,7 @@ curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.wasm
 curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.mjs
 ```
 
-Run a real removal in Safari and confirm that the request uses the FP16 model path. Run Chromium WebGPU and browser WebAssembly checks and confirm that they still use the FP32 model path before treating the production change as accepted.
+Run a real removal in Safari on a WebGPU adapter that exposes `shader-f16` and confirm that the request uses the FP16 model path. Run Chromium WebGPU and browser WebAssembly checks and confirm that they still use the FP32 model path before treating the production change as accepted.
 
 ## CI gate
 

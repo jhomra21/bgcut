@@ -260,10 +260,10 @@ const runModel = (
     );
   });
 
-export const removeBackgroundWebGpuWithStrategy = (
+const removeBackgroundWebGpuWithModelResolver = (
   file: File,
   strategy: WebGpuSessionStrategy,
-  modelPath: string = MODEL_PUBLIC_PATH,
+  resolveModelPath: (runtime: GpuRuntime) => string,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -281,6 +281,8 @@ export const removeBackgroundWebGpuWithStrategy = (
           const stopRuntime = timings.begin("runtimeMs");
           const runtime = yield* getGpuRuntime;
           stopRuntime();
+
+          const modelPath = resolveModelPath(runtime);
 
           return yield* Effect.acquireUseRelease(
             getSessionLease(
@@ -330,6 +332,17 @@ export const removeBackgroundWebGpuWithStrategy = (
     );
   });
 
+export const removeBackgroundWebGpuWithStrategy = (
+  file: File,
+  strategy: WebGpuSessionStrategy,
+  modelPath: string = MODEL_PUBLIC_PATH,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  removeBackgroundWebGpuWithModelResolver(
+    file,
+    strategy,
+    () => modelPath,
+  );
+
 export const removeBackgroundWebGpu = (
   file: File,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> => {
@@ -338,12 +351,14 @@ export const removeBackgroundWebGpu = (
       ? ""
       : globalThis.navigator.userAgent;
 
-  return removeBackgroundWebGpuWithStrategy(
+  return removeBackgroundWebGpuWithModelResolver(
     file,
     resolveDefaultWebGpuSessionStrategy(userAgent),
-    isSafariUserAgent(userAgent)
-      ? WEBGPU_MODEL_PUBLIC_PATH
-      : MODEL_PUBLIC_PATH,
+    (runtime) =>
+      isSafariUserAgent(userAgent) &&
+      runtime.device.features.has("shader-f16")
+        ? WEBGPU_MODEL_PUBLIC_PATH
+        : MODEL_PUBLIC_PATH,
   );
 };
 

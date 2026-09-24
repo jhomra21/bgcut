@@ -140,7 +140,7 @@ Yoda Kitten and Blind Dog had very small per-image metric regressions. Molly imp
 
 Same-model alpha was exact across the gate. Blind Dog retained the previously observed RGB-only variation in 16 of 144 within-block comparisons, with no alpha differences. All 108 same-model cross-context comparisons were byte-identical.
 
-This gate supports selecting the FP16 artifact for Safari WebGPU. It does not establish a Chromium-family, browser WebAssembly, or native Node/CLI speedup, so those paths keep the FP32 artifact.
+This gate supports selecting the FP16 artifact for Safari WebGPU adapters that expose `shader-f16`. Safari adapters without that feature, Chromium-family WebGPU, browser WebAssembly, and native Node/CLI keep the FP32 artifact.
 
 ### Production selector smoke
 

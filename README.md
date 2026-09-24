@@ -133,7 +133,7 @@ The `-gpu` and `-cpu` aliases also work. Explicit GPU mode never switches to CPU
 
 ### Model cache
 
-Native CLI and Node runs use the validated FP32 BiRefNet Lite 512 model, about 187 MiB. The packaged local browser app uses the same operating-system cache directory. Safari WebGPU may also download the validated internal-FP16 model, about 94 MiB, under its own filename. bgcut verifies each artifact before use and reuses valid cached copies.
+Native CLI and Node runs use the validated FP32 BiRefNet Lite 512 model, about 187 MiB. The packaged local browser app uses the same operating-system cache directory. Safari WebGPU on adapters that expose `shader-f16` may also download the validated internal-FP16 model, about 94 MiB, under its own filename. bgcut verifies each artifact before use and reuses valid cached copies.
 
 Model downloads send model data to the machine. They do not send source images away from the machine.
 
@@ -141,7 +141,7 @@ Model downloads send model data to the machine. They do not send source images a
 
 The production domain is [`bgcut.dev`](https://bgcut.dev).
 
-The browser keeps inference local. Safari WebGPU uses the validated internal-FP16 model with FP32 public tensor input and output. Chromium-family WebGPU and the WebAssembly fallback continue to use the validated FP32 model. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
+The browser keeps inference local. Safari WebGPU uses the validated internal-FP16 model with FP32 public tensor input and output when the adapter exposes `shader-f16`; otherwise it keeps the validated FP32 model. Chromium-family WebGPU and the WebAssembly fallback also continue to use the FP32 model. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
 
 Choose, drag, or paste an image in the browser. bgcut removes the background locally, then lets you compare the original with the result, copy or download the PNG, rerun removal, or choose another image. The normal UI does not show internal runtime checks, model metadata, timing tables, or acceptance controls.
 
@@ -292,7 +292,7 @@ The FP32 artifact remains the native Node/CLI model, the Chromium-family WebGPU 
 - Size: `195,872,736` bytes
 - SHA-256: `4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c`
 
-Safari WebGPU uses an internal-FP16 conversion with FP32 public tensor input and output:
+Safari WebGPU adapters that expose `shader-f16` use an internal-FP16 conversion with FP32 public tensor input and output:
 
 - File: `birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx`
 - Size: `98,572,669` bytes
