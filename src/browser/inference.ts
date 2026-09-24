@@ -3,6 +3,7 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { resolveBrowserEnginePreference } from "./engine-preference";
 import {
+  isSafariUserAgent,
   resolveDefaultWebGpuSessionStrategy,
   type WebGpuSessionStrategy,
 } from "./webgpu-session-strategy";
@@ -20,6 +21,7 @@ import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
 import {
+  MODEL_PUBLIC_PATH,
   MODEL_REVISION,
   WEBGPU_MODEL_PUBLIC_PATH,
   WEBGPU_MODEL_REVISION,
@@ -261,7 +263,7 @@ const runModel = (
 export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
-  modelPath: string = WEBGPU_MODEL_PUBLIC_PATH,
+  modelPath: string = MODEL_PUBLIC_PATH,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -330,15 +332,20 @@ export const removeBackgroundWebGpuWithStrategy = (
 
 export const removeBackgroundWebGpu = (
   file: File,
-): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
-  removeBackgroundWebGpuWithStrategy(
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> => {
+  const userAgent =
+    typeof globalThis.navigator === "undefined"
+      ? ""
+      : globalThis.navigator.userAgent;
+
+  return removeBackgroundWebGpuWithStrategy(
     file,
-    resolveDefaultWebGpuSessionStrategy(
-      typeof globalThis.navigator === "undefined"
-        ? ""
-        : globalThis.navigator.userAgent,
-    ),
+    resolveDefaultWebGpuSessionStrategy(userAgent),
+    isSafariUserAgent(userAgent)
+      ? WEBGPU_MODEL_PUBLIC_PATH
+      : MODEL_PUBLIC_PATH,
   );
+};
 
 const removeBackgroundWithWasm = (
   file: File,
