@@ -11,4 +11,5 @@ if (root === null) {
 }
 
 syncThemeColor();
+
 render(() => <App />, root);
