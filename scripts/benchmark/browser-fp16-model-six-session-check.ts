@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import {
   mkdtemp,
   readFile,
@@ -15,6 +16,10 @@ const port =
 
 const baseUrl =
   `http://127.0.0.1:${port}/`;
+
+const PersistedPrimeSchema = Schema.Struct({
+  blockIndex: Schema.Number,
+});
 
 const root =
   await mkdtemp(
@@ -453,24 +458,20 @@ try {
   }
 
   const persistedPrime =
-    JSON.parse(
-      await readFile(
-        primePath,
-        "utf8",
+    Schema.decodeUnknownSync(
+      PersistedPrimeSchema,
+    )(
+      JSON.parse(
+        await readFile(
+          primePath,
+          "utf8",
+        ),
       ),
     );
 
   if (
-    typeof persistedPrime !==
-      "object" ||
-    persistedPrime ===
-      null ||
-    !(
-      "blockIndex" in
-      persistedPrime
-    ) ||
     persistedPrime.blockIndex !==
-      0
+    0
   ) {
     throw new Error(
       "Persisted prewarm prime belongs to the wrong block.",
