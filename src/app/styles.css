@@ -1638,7 +1638,11 @@ figure {
     gap: 12px;
   }
 
-  .architecture-grid,
+  .architecture-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
   .resource-grid {
     grid-template-columns: 1fr;
     gap: 10px;
