@@ -1300,28 +1300,43 @@ const finalize =
       );
 
     const fp32Blocks =
-      blocks
-        .filter(
-          (block) =>
-            block.mode ===
-            "fp32",
-        )
-        .map(
-          (block) =>
-            block.index,
-        );
+      [
+        0,
+        3,
+        5,
+        6,
+      ] as const;
 
     const fp16Blocks =
-      blocks
-        .filter(
-          (block) =>
-            block.mode ===
-            "fp16",
-        )
-        .map(
-          (block) =>
-            block.index,
-        );
+      [
+        1,
+        2,
+        4,
+        7,
+      ] as const;
+
+    const sequenceBlocks = {
+      "fp32-first": {
+        fp32: [
+          0,
+          6,
+        ],
+        fp16: [
+          1,
+          7,
+        ],
+      },
+      "fp16-first": {
+        fp32: [
+          3,
+          5,
+        ],
+        fp16: [
+          2,
+          4,
+        ],
+      },
+    } as const;
 
     const fp32Runs =
       runsForBlocks(
@@ -1336,88 +1351,40 @@ const finalize =
     const summarizeSequence = (
       sequence: Sequence,
     ): ModeComparison => {
-      const sequenceBlocks =
-        blocks.filter(
-          (block) =>
-            block.sequence ===
-            sequence,
-        );
+      const selected =
+        sequenceBlocks[
+          sequence
+        ];
 
       return compareTimings(
         runsForBlocks(
-          sequenceBlocks
-            .filter(
-              (block) =>
-                block.mode ===
-                "fp32",
-            )
-            .map(
-              (block) =>
-                block.index,
-            ),
+          selected.fp32,
         ),
         runsForBlocks(
-          sequenceBlocks
-            .filter(
-              (block) =>
-                block.mode ===
-                "fp16",
-            )
-            .map(
-              (block) =>
-                block.index,
-            ),
+          selected.fp16,
         ),
       );
     };
 
     const firstFp32Blocks =
-      trials
-        .filter(
-          (trial) =>
-            trial.sequence ===
-            "fp32-first",
-        )
-        .map(
-          (trial) =>
-            trial.fp32Block,
-        );
+      sequenceBlocks[
+        "fp32-first"
+      ].fp32;
 
     const firstFp16Blocks =
-      trials
-        .filter(
-          (trial) =>
-            trial.sequence ===
-            "fp16-first",
-        )
-        .map(
-          (trial) =>
-            trial.fp16Block,
-        );
+      sequenceBlocks[
+        "fp16-first"
+      ].fp16;
 
     const secondFp32Blocks =
-      trials
-        .filter(
-          (trial) =>
-            trial.sequence ===
-            "fp16-first",
-        )
-        .map(
-          (trial) =>
-            trial.fp32Block,
-        );
+      sequenceBlocks[
+        "fp16-first"
+      ].fp32;
 
     const secondFp16Blocks =
-      trials
-        .filter(
-          (trial) =>
-            trial.sequence ===
-            "fp32-first",
-        )
-        .map(
-          (trial) =>
-            trial.fp16Block,
-        );
+      sequenceBlocks[
+        "fp32-first"
+      ].fp16;
 
     const fp32Quality:
       QualityMetrics[] = [];
