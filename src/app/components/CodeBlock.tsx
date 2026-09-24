@@ -208,13 +208,20 @@ export const CodeBlock = (props: {
         <button
           class="code-block-copy"
           type="button"
+          data-copy-state={copyState()}
           aria-label={`Copy ${LANGUAGE_LABELS[props.language]} code`}
           onClick={copy}
         >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <rect x="5.25" y="5.25" width="7.5" height="7.5" rx="1.5" />
-            <path d="M3.75 10.75h-.5A1.5 1.5 0 0 1 1.75 9.25v-6A1.5 1.5 0 0 1 3.25 1.75h6a1.5 1.5 0 0 1 1.5 1.5v.5" />
-          </svg>
+          {copyState() === "copied" ? (
+            <svg class="code-block-copy-check" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m3 8.4 3.1 3.1L13 4.6" />
+            </svg>
+          ) : (
+            <svg class="code-block-copy-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="5.25" y="5.25" width="7.5" height="7.5" rx="1.5" />
+              <path d="M3.75 10.75h-.5A1.5 1.5 0 0 1 1.75 9.25v-6A1.5 1.5 0 0 1 3.25 1.75h6a1.5 1.5 0 0 1 1.5 1.5v.5" />
+            </svg>
+          )}
           <span aria-live="polite">{copyLabel()}</span>
         </button>
       </div>
