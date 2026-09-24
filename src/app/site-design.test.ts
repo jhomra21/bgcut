@@ -7,6 +7,10 @@ const indexHtml = await Bun.file(new URL("../../index.html", import.meta.url)).t
 const appSourceFiles: string[] = [];
 
 for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
+  if (path.endsWith(".test.ts") || path.endsWith(".test.tsx")) {
+    continue;
+  }
+
   appSourceFiles.push(await Bun.file(`${import.meta.dir}/${path}`).text());
 }
 
