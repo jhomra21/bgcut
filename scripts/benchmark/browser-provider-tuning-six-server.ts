@@ -31,12 +31,12 @@ const BenchmarkManifestSchema = Schema.Struct({
 
 const ModeSchema = Schema.Literal(
   "default",
-  "combined",
+  "wgpu-only",
 );
 
 const SequenceSchema = Schema.Literal(
   "default-first",
-  "combined-first",
+  "wgpu-first",
 );
 
 const DirectionSchema = Schema.Literal(
@@ -177,7 +177,7 @@ type PixelComparison = {
 
 type ModeComparison = {
   readonly default: TimingSummary;
-  readonly combined: TimingSummary;
+  readonly wgpuOnly: TimingSummary;
   readonly inferenceChangePercent: number;
   readonly totalChangePercent: number;
 };
@@ -218,7 +218,7 @@ type PersistedRecord =
   | FinalReport;
 
 const usage =
-  "Usage: bun run benchmark:browser-provider-tuning:six -- <manifest.json> <output-dir> <model.onnx> [runs-per-case] [timeout-ms] [port]";
+  "Usage: bun run benchmark:browser-validation-mode:six -- <manifest.json> <output-dir> <model.onnx> [runs-per-case] [timeout-ms] [port]";
 
 const [
   manifestArgument,
@@ -342,7 +342,7 @@ if (
   manifest.cases.length === 0
 ) {
   throw new Error(
-    "Provider-tuning manifest must contain at least one case.",
+    "Validation-mode manifest must contain at least one case.",
   );
 }
 
@@ -388,25 +388,25 @@ const blocks:
       direction:
         "forward",
       mode:
-        "combined",
+        "wgpu-only",
       caseIndexes:
         forwardIndexes,
     },
     {
       index: 2,
       sequence:
-        "combined-first",
+        "wgpu-first",
       direction:
         "reverse",
       mode:
-        "combined",
+        "wgpu-only",
       caseIndexes:
         reverseIndexes,
     },
     {
       index: 3,
       sequence:
-        "combined-first",
+        "wgpu-first",
       direction:
         "reverse",
       mode:
@@ -460,7 +460,7 @@ const build =
     entrypoints: [
       join(
         import.meta.dir,
-        "browser-provider-tuning-six-client.ts",
+        "browser-validation-mode-six-client.ts",
       ),
     ],
     target:
@@ -477,7 +477,7 @@ if (
   !build.success
 ) {
   throw new Error(
-    `Could not build provider-tuning six-image client.\n${build.logs
+    `Could not build validation-mode six-image client.\n${build.logs
       .map(
         (log) =>
           log.message,
@@ -493,7 +493,7 @@ if (
   clientOutput === undefined
 ) {
   throw new Error(
-    "Provider-tuning six-image client produced no bundle.",
+    "Validation-mode six-image client produced no bundle.",
   );
 }
 
@@ -525,7 +525,7 @@ if (
   "1"
 ) {
   console.log(
-    "Browser provider-tuning six-image bundle check passed.",
+    "Browser validation-mode six-image bundle check passed.",
   );
 
   process.exit(0);
@@ -795,7 +795,7 @@ const compareModes = (
   return {
     default:
       defaultSummary,
-    combined:
+    wgpuOnly:
       combinedSummary,
     inferenceChangePercent:
       (
@@ -1076,7 +1076,7 @@ const comparePaired =
     for (
       const sequence of [
         "default-first",
-        "combined-first",
+        "wgpu-first",
       ] as const
     ) {
       const defaultBlock =
@@ -1088,7 +1088,7 @@ const comparePaired =
       const combinedBlock =
         findBlock(
           sequence,
-          "combined",
+          "wgpu-only",
         );
 
       for (
@@ -1178,7 +1178,7 @@ const compareCrossContext =
     for (
       const mode of [
         "default",
-        "combined",
+        "wgpu-only",
       ] as const
     ) {
       const first =
@@ -1264,7 +1264,7 @@ const finalize =
       allRuns.filter(
         (record) =>
           record.mode ===
-          "combined",
+          "wgpu-only",
       );
 
     const summarizeSequence = (
@@ -1282,7 +1282,7 @@ const finalize =
         getReport(
           findBlock(
             sequence,
-            "combined",
+            "wgpu-only",
           ).index,
         );
 
@@ -1302,9 +1302,9 @@ const finalize =
         summarizeSequence(
           "default-first",
         ),
-      "combined-first":
+      "wgpu-first":
         summarizeSequence(
-          "combined-first",
+          "wgpu-first",
         ),
     };
 
@@ -1383,7 +1383,7 @@ const finalize =
     await writeJson(
       join(
         outputRoot,
-        "browser-provider-tuning-six.json",
+        "browser-validation-mode-six.json",
       ),
       report,
     );
@@ -1626,7 +1626,7 @@ const app =
             runsPerCase
         ) {
           return new Response(
-            "Unknown provider-tuning output.",
+            "Unknown validation-mode output.",
             {
               status: 404,
             },
@@ -1855,5 +1855,5 @@ const app =
   });
 
 console.log(
-  `Safari counterbalanced provider-tuning benchmark ready at http://${app.hostname}:${app.port}/ across ${manifest.cases.length} cases.`,
+  `Safari counterbalanced validation-mode benchmark ready at http://${app.hostname}:${app.port}/ across ${manifest.cases.length} cases.`,
 );
