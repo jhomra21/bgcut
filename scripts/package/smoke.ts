@@ -420,7 +420,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model route, public Node API errors, reusable Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model routes, public Node API errors, reusable Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
