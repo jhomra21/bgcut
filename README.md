@@ -300,7 +300,7 @@ Safari WebGPU uses an internal-FP16 conversion with FP32 public tensor input and
 
 ## Project notes
 
-[benchmark notes](docs/engineering/benchmarks.md) records measured runtime results. [graph-capture notes](docs/engineering/graph-capture.md) records the graph-capture work behind the current browser fast path. [roadmap](docs/roadmap.md) tracks planned engine and editor work. [deployment guide](docs/operations/deploying.md) covers the Cloudflare web deployment.
+[benchmark notes](docs/engineering/benchmarks.md) records measured runtime results, including the Safari FP16 acceptance gate. [graph-capture notes](docs/engineering/graph-capture.md) records the earlier graph-capture work used by the Chromium-family browser path. [roadmap](docs/roadmap.md) tracks planned engine and editor work. [deployment guide](docs/operations/deploying.md) covers the Cloudflare web deployment.
 
 ## Privacy
 
