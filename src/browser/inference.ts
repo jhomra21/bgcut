@@ -20,7 +20,6 @@ import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
 import {
-  MODEL_PUBLIC_PATH,
   MODEL_REVISION,
   WEBGPU_MODEL_PUBLIC_PATH,
   WEBGPU_MODEL_REVISION,
