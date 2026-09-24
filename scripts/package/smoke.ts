@@ -413,7 +413,7 @@ try {
     !skill.includes("bgcut serve --json") ||
     !skill.includes('import { removeBackground } from "bgcut"') ||
     !skill.includes('import { createBgcut } from "bgcut"') ||
-    !skill.includes("share the same validated model cache") ||
+    !skill.includes("same operating-system cache directory") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
     throw new Error(`Installed bgcut agent skill is missing its current package contract: ${skillPath}`);
