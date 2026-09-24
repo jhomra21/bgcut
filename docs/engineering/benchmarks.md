@@ -142,6 +142,18 @@ Same-model alpha was exact across the gate. Blind Dog retained the previously ob
 
 This gate supports selecting the FP16 artifact for Safari WebGPU. It does not establish a Chromium-family, browser WebAssembly, or native Node/CLI speedup, so those paths keep the FP32 artifact.
 
+### Production selector smoke
+
+Production integration head:
+
+`3be6079f109d5b220109bb8b5342359ab07f5938`
+
+A fresh Safari 26.3 process called the normal `removeBackgroundWebGpu()` selector on Cat in Sink. The server recorded one request for `/models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx` and zero requests for the FP32 model. The returned model revision matched `37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33`.
+
+The prime completed in 3,214 ms and did not reuse a session. The warm removal reused the session, measured 511 ms inference and 771 ms total, and produced a nonblank 2592×1944 PNG with alpha spanning 0 through 255.
+
+This smoke verifies the production selector and delivery path. It is not a replacement for the balanced six-image benchmark above.
+
 ## Earlier accepted graph-capture path
 
 Exact SHA:
