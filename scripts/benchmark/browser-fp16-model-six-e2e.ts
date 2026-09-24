@@ -628,7 +628,7 @@ const startServer =
           readPipe(
             child.stderr,
           ),
-      sessionToken,
+        sessionToken,
       };
 
     const deadline =
@@ -720,6 +720,50 @@ const stopServer =
     ]);
   };
 
+const activateLaunch =
+  async (
+    server:
+      ServerHandle,
+    block:
+      number,
+    primeOnly:
+      boolean,
+  ): Promise<string> => {
+    const launchToken =
+      crypto.randomUUID();
+
+    const response =
+      await fetch(
+        `${baseUrl}activate`,
+        {
+          method: "POST",
+          headers: {
+            "content-type":
+              "application/json",
+            "x-bgcut-benchmark-session":
+              server.sessionToken,
+          },
+          body:
+            JSON.stringify({
+              launchToken,
+              blockIndex:
+                block,
+              primeOnly,
+            }),
+        },
+      );
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        `Could not activate block ${block}: ${await response.text()}`,
+      );
+    }
+
+    return launchToken;
+  };
+
 const waitForArtifact =
   async (
     serverOutputRoot:
@@ -778,12 +822,12 @@ const runIsolatedPage =
   async (
     serverOutputRoot:
       string,
-    sessionToken:
-      string,
+    server:
+      ServerHandle,
     block:
       number,
-    query:
-      string,
+    primeOnly:
+      boolean,
     expectedPath:
       string,
     timeout:
@@ -808,11 +852,37 @@ const runIsolatedPage =
       },
     );
 
+    const launchToken =
+      await activateLaunch(
+        server,
+        block,
+        primeOnly,
+      );
+
+    const query =
+      new URLSearchParams({
+        block:
+          String(
+            block,
+          ),
+        launch:
+          launchToken,
+      });
+
+    if (
+      primeOnly
+    ) {
+      query.set(
+        "primeOnly",
+        "1",
+      );
+    }
+
     const launch =
       await launchIsolatedBrowser(
         `${baseUrl}session/${encodeURIComponent(
-          sessionToken,
-        )}?${query}`,
+          server.sessionToken,
+        )}?${query.toString()}`,
       );
 
     try {
@@ -900,9 +970,9 @@ try {
     const launch =
       await runIsolatedPage(
         prewarmRoot,
-        prewarmServer.sessionToken,
+        prewarmServer,
         block,
-        `block=${block}&primeOnly=1`,
+        true,
         primePath,
         timeoutMs +
           30_000,
@@ -972,9 +1042,9 @@ try {
     const launch =
       await runIsolatedPage(
         outputRoot,
-        measuredServer.sessionToken,
+        measuredServer,
         block,
-        `block=${block}`,
+        false,
         expectedPath,
         timeoutMs *
           (
