@@ -56,6 +56,7 @@
   --syntax-option: #8b572a;
   --syntax-string: #39705e;
   --syntax-type: #80523c;
+  --text-success: #2f6f44;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
@@ -124,6 +125,7 @@ html[data-theme="dark"] {
   --syntax-option: #d4a176;
   --syntax-string: #7fc2aa;
   --syntax-type: #d1a186;
+  --text-success: #79c88f;
   color-scheme: dark;
 }
 
@@ -1007,6 +1009,16 @@ figure {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.25;
+}
+
+.code-block-copy[data-copy-state="copied"] {
+  color: var(--text-success);
+}
+
+.code-block-copy-check {
+  stroke-width: 1.8 !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .code-block pre {

@@ -51,10 +51,12 @@ describe("site design contract", () => {
   test("uses semantic color tokens for light and dark themes", () => {
     expect(styles).toContain("--text-primary: #171717");
     expect(styles).toContain("--background-primary: #fbfbfa");
+    expect(styles).toContain("--text-success: #2f6f44");
     expect(styles).toContain('--comparison-control: #efefe8');
     expect(styles).toContain('html[data-theme="dark"]');
     expect(styles).toContain("--text-primary: #f4f4f0");
     expect(styles).toContain("--background-primary: #11110f");
+    expect(styles).toContain("--text-success: #79c88f");
     expect(styles).toContain("color: var(--text-primary)");
     expect(styles).toContain("background: var(--background-primary)");
     expect(styles).not.toContain("var(--ink)");
