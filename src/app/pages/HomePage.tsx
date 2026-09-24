@@ -388,13 +388,12 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
   return (
     <main class="page-content home-shell">
       <Show when={props.showIntro}>
-        <header class="home-intro">
-          <h1>Remove image backgrounds locally</h1>
+        <div class="home-intro">
           <p>
             Free, private background remover for PNG, JPEG, WebP, and AVIF. Processing runs in
             your browser with WebGPU when available, and your images stay on your device.
           </p>
-        </header>
+        </div>
       </Show>
 
       <section
