@@ -66,10 +66,10 @@ These numbers are context only. They were not collected on the same hardware or 
 
 | Tool | Environment | Reported number | Boundary |
 | --- | --- | --- | --- |
-| bgcut | Apple M3 Pro, current accepted browser fast path | 422 ms warm median | Full browser removal from decoded source through source-resolution PNG export |
+| bgcut | Apple M3 Pro, earlier graph-capture path at `fa9f11bf` | 422 ms warm median | Full browser removal from decoded source through source-resolution PNG export |
 | IMG.LY background-removal-js | Apple M3 Max, June 2024 WebGPU fp16 benchmark | about 100 ms on consecutive runs; about 300 ms for the first neural-network run | ONNX model initialization and neural-network execution, with model download discussed separately |
 
-The IMG.LY post is useful as a WebGPU reference, but it is not evidence that either tool is faster. bgcut's current WebGPU timing also records `session.run()` submission separately from the later output-buffer synchronization, so the small submit span is not a GPU execution measurement.
+The IMG.LY post is useful as a WebGPU reference, but it is not evidence that either tool is faster. The earlier bgcut graph-capture timing records `session.run()` submission separately from later output-buffer synchronization, so the small submit span is not a GPU execution measurement.
 
 Source: [IMG.LY's WebGPU benchmark](https://img.ly/blog/browser-background-removal-using-onnx-runtime-webgpu/).
 
@@ -86,7 +86,75 @@ The competitor review points to a small set of changes that fit bgcut:
 
 These are benchmark candidates, not accepted product features. Each one needs a quality result, a speed cost, and a clear API contract before it ships.
 
-## Current accepted browser fast path
+## Safari FP16 WebGPU acceptance
+
+Accepted benchmark head:
+
+`902ef8d44bcc7480e939091f2ab8fa22224c0592`
+
+Environment:
+
+- Apple M3 Pro
+- Safari 26.3
+- ONNX Runtime Web `1.30.0`
+- eight separately launched Safari processes
+- balanced `FP32, FP16, FP16, FP32, FP16, FP32, FP32, FP16` block order
+- six reference images per block
+- three warm removals per image
+- 144 measured warm removals total
+- every measured removal reused its session
+
+The FP16 candidate converts the 410 floating-point initializers in the validated FP32 model to FP16 while keeping FP32 public tensor input and output. The FP16 artifact is `98,572,669` bytes with SHA-256 `37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33`.
+
+| Slice | FP32 inference / total median | FP16 inference / total median | Inference change | Total change |
+| --- | ---: | ---: | ---: | ---: |
+| Aggregate | 1101 / 1309 ms | 627.5 / 873.5 ms | -43.0% | -33.3% |
+| FP32 first | 1070.5 / 1207 ms | 627 / 831.5 ms | -41.4% | -31.1% |
+| FP16 first | 1118.5 / 1329 ms | 633.5 / 895 ms | -43.4% | -32.7% |
+| Forward | 1073.5 / 1265.5 ms | 691.5 / 957 ms | -35.6% | -24.4% |
+| Reverse | 1114 / 1352.5 ms | 607 / 782 ms | -45.5% | -42.2% |
+| First position | 1070.5 / 1207 ms | 633.5 / 895 ms | -40.8% | -25.8% |
+| Second position | 1118.5 / 1329 ms | 627 / 831.5 ms | -43.9% | -37.4% |
+
+All four paired trials favored FP16. Inference improvements ranged from 21.6% to 50.6%, and total-latency improvements ranged from 5.3% to 46.0%.
+
+| Image | FP32 total median | FP16 total median | Total change |
+| --- | ---: | ---: | ---: |
+| cat-amelia | 1339 ms | 973 ms | -27.3% |
+| cat-yoda-kitten | 1412.5 ms | 746.5 ms | -47.2% |
+| cat-in-sink | 1488 ms | 874.5 ms | -41.2% |
+| dog-teya | 1613 ms | 1099.5 ms | -31.8% |
+| dog-blind-dog | 984.5 ms | 790.5 ms | -19.7% |
+| dog-molly | 1033.5 ms | 772 ms | -25.3% |
+
+Aggregate reference-mask metrics improved slightly:
+
+| Metric | FP32 | FP16 | FP16 delta |
+| --- | ---: | ---: | ---: |
+| MAE | 0.02255466 | 0.02200792 | -0.00054674 |
+| MSE | 0.01933876 | 0.01876192 | -0.00057684 |
+| IoU | 0.96425259 | 0.96511045 | +0.00085786 |
+| F1 | 0.98180101 | 0.98224550 | +0.00044449 |
+
+Yoda Kitten and Blind Dog had very small per-image metric regressions. Molly improved materially. The six binary-mask references are a regression sample, not a broad quality guarantee.
+
+Same-model alpha was exact across the gate. Blind Dog retained the previously observed RGB-only variation in 16 of 144 within-block comparisons, with no alpha differences. All 108 same-model cross-context comparisons were byte-identical.
+
+This gate supports selecting the FP16 artifact for Safari WebGPU adapters that expose `shader-f16`. Safari adapters without that feature, Chromium-family WebGPU, browser WebAssembly, and native Node/CLI keep the FP32 artifact.
+
+### Production selector smoke
+
+Production integration head:
+
+`3be6079f109d5b220109bb8b5342359ab07f5938`
+
+A fresh Safari 26.3 process called the normal `removeBackgroundWebGpu()` selector on Cat in Sink. The server recorded one request for `/models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx` and zero requests for the FP32 model. The returned model revision matched `37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33`.
+
+The prime completed in 3,214 ms and did not reuse a session. The warm removal reused the session, measured 511 ms inference and 771 ms total, and produced a nonblank 2592×1944 PNG with alpha spanning 0 through 255.
+
+This smoke verifies the production selector and delivery path. It is not a replacement for the balanced six-image benchmark above.
+
+## Earlier accepted graph-capture path
 
 Exact SHA:
 

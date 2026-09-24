@@ -5,7 +5,7 @@ description: Remove image backgrounds locally with the bgcut local app, CLI, or 
 
 # bgcut
 
-Use `bgcut` for local background removal. Source images stay on the user's machine. The package may download the pinned model on first use, but it does not upload source images to an application inference backend.
+Use `bgcut` for local background removal. Source images stay on the user's machine. The package may download validated model artifacts on first use, but it does not upload source images to an application inference backend.
 
 ## Install
 
@@ -32,13 +32,11 @@ bgcut
 
 The published executable is built for Node. npm and npx users do not need Bun installed.
 
-For the 0.4 beta Node API:
+Install the package for Node API use:
 
 ```sh
-npm install bgcut@beta
+npm install bgcut
 ```
-
-Use `bgcut@latest` for the current stable package until the beta is accepted.
 
 ## Choose how to run bgcut
 
@@ -74,7 +72,7 @@ bgcut serve --json
 
 `serve --json` does not open a browser. It prints one JSON object containing the resolved URL, host, port, and PID. Without `--port`, the operating system chooses an available port.
 
-The local server binds to `127.0.0.1`. Its UI is the remover only; hosted Docs, Changelog, GitHub navigation, Privacy, and Terms are not part of the local app. Non-root app routes redirect to `/`. The server also serves the validated cached model, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
+The local server binds to `127.0.0.1`. Its UI is the remover only; hosted Docs, Changelog, GitHub navigation, Privacy, and Terms are not part of the local app. Non-root app routes redirect to `/`. The server also serves the validated cached model artifacts, installed ONNX Runtime browser assets, and a small health endpoint. Image processing still happens locally in the browser.
 
 The browser UI supports these shortcuts:
 
@@ -199,9 +197,9 @@ Node API failures are `BgcutError` instances. Use `error.code` for programmatic 
 
 ## Model cache
 
-The first native run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating-system user cache and verifies its expected size and SHA-256 before use.
+Native CLI and Node runs use the validated FP32 BiRefNet Lite 512 model, about 187 MiB. The packaged local browser app uses the same operating-system cache directory. Safari WebGPU on adapters that expose `shader-f16` may also download the validated internal-FP16 model, about 94 MiB, under a separate filename.
 
-The CLI, packaged local app, and Node API share the same validated model cache. A valid cached model is reused on later runs.
+bgcut verifies each model's expected size and SHA-256 before use. Valid cached artifacts are reused on later runs. Safari adapters without `shader-f16`, Chromium-family browser WebGPU, and the browser WebAssembly fallback continue to use the FP32 artifact.
 
 ## Agent procedure
 
@@ -262,4 +260,4 @@ bgcut serve --json
 - Performance depends on the machine and provider.
 - Browser warm-run timings are not CLI one-shot timings.
 - Browser and native paths use different decoders and runtime providers.
-- The large model is not bundled inside the npm tarball.
+- The model artifacts are not bundled inside the npm tarball.

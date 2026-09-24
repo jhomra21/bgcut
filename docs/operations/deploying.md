@@ -51,7 +51,7 @@ Non-production branch deploy command: bun run cloudflare:preview
 
 The Cloudflare-specific build is pinned in `wrangler.jsonc` through `build.command = "bun run build:cloudflare"`. Wrangler runs that custom build automatically before `deploy` and `versions upload`, so the deployment behavior stays in source control.
 
-Do not configure Workers Builds to run the normal `bun run build` as its build command. The normal build intentionally places the 187 MiB model in `dist/`, which exceeds the Workers Static Assets 25 MiB per-file limit. The Wrangler custom build strips the R2-backed model and discrete ONNX Runtime payloads from `dist/` before assets are scanned.
+Do not configure Workers Builds to run the normal `bun run build` as its build command. The normal build prepares both model artifacts in `dist/`, and each exceeds the Workers Static Assets 25 MiB per-file limit. The Wrangler custom build strips R2-backed models and discrete ONNX Runtime payloads from `dist/` before assets are scanned.
 
 Set this build variable:
 
@@ -69,14 +69,15 @@ The default build watch path can remain `*`. Narrow it only if deploys from docu
 
 The R2 bucket stores:
 
-- the pinned BiRefNet Lite ONNX model at `/models/...`
+- the FP32 BiRefNet Lite artifact at `/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx`
+- the Safari WebGPU internal-FP16 artifact at `/models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx`
 - ONNX Runtime's WebGPU asyncify WASM binary at `/runtime/ort-wasm-simd-threaded.asyncify.wasm`
 - ONNX Runtime's standard WASM fallback binary at `/runtime/ort-wasm-simd-threaded.wasm`
 - ONNX Runtime's module loader at `/runtime/ort-wasm-simd-threaded.mjs`
 
-The model is about 187 MiB, the WebGPU asyncify WASM binary is about 26.8 MiB, and the standard WASM fallback binary is about 14.2 MiB. These files stay in R2 rather than Workers Static Assets.
+The FP32 model is about 187 MiB and the FP16 model is about 94 MiB. The WebGPU asyncify WASM binary is about 26.8 MiB, and the standard WASM fallback binary is about 14.2 MiB. These files stay in R2 rather than Workers Static Assets.
 
-The model and runtime objects are immutable, version-pinned deployment inputs. The model is bootstrapped separately and is not re-uploaded on ordinary site deploys. Before a production deploy, bgcut checks the three ONNX Runtime objects through the existing `/runtime/*` HEAD routes. Matching objects are left in place. Missing or changed objects are uploaded to R2 with bounded retries before the Worker deploy continues. This keeps normal site deploys independent of unnecessary R2 writes while still preventing a fresh or repaired environment from publishing broken runtime routes.
+These objects are immutable, version-pinned deployment inputs. The FP32 model remains the existing bootstrap object. Before production and preview deploys, bgcut prepares the exact released FP16 artifact and checks its live `/models/*` HEAD route. A matching object is left in place. A missing or changed FP16 object is uploaded to R2 with bounded retries. The deploy performs the same check-and-upload flow for the three ONNX Runtime files.
 
 The Worker reads them through the `MODELS` R2 binding, so the Worker itself does not contain R2 credentials. Cloudflare Workers Builds supplies the deployment credential; its default token includes Workers R2 Storage edit access.
 
@@ -88,7 +89,7 @@ Install dependencies:
 bun install --frozen-lockfile
 ```
 
-Seed Wrangler's local R2 storage with the model and ONNX Runtime files:
+Seed Wrangler's local R2 storage with both models and the ONNX Runtime files:
 
 ```sh
 bun run cloudflare:r2:local
@@ -120,23 +121,26 @@ bun run cloudflare:dev
 
 Use the local URL printed by Wrangler, normally `http://localhost:8787`.
 
-Check the page, model route, and runtime routes:
+Check the page, model routes, and runtime routes:
 
 ```sh
 curl -I http://localhost:8787/
 curl -I http://localhost:8787/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx
+curl -I http://localhost:8787/models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx
 curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.asyncify.wasm
 curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.wasm
 curl -I http://localhost:8787/runtime/ort-wasm-simd-threaded.mjs
 ```
 
-Both WASM routes must return `content-type: application/wasm`. The module loader must return JavaScript rather than SPA HTML. The model route must return the model object rather than SPA HTML.
+Both WASM routes must return `content-type: application/wasm`. The module loader must return JavaScript rather than SPA HTML. Both model routes must return `application/octet-stream` rather than SPA HTML.
 
-Then open the local site in a Chromium browser and run normal, explicit WebGPU, and explicit WebAssembly through the local Cloudflare Worker and R2 path with a clean console and correct output.
+Then open the local site in Safari on a WebGPU adapter that exposes `shader-f16` and run the normal WebGPU path. Open it in a Chromium-family browser and run normal WebGPU plus explicit WebAssembly. The capable Safari request should use the FP16 filename; Chromium WebGPU and WebAssembly should use the FP32 filename.
 
 ## Remote R2 bootstrap or payload update
 
-The three ONNX Runtime files are validated automatically by `bun run cloudflare:deploy`. Existing objects are skipped when their size, content type, and ETag match the pinned local files. Changed or missing objects are uploaded automatically with retry/backoff. The model remains an operator bootstrap/update because it is much larger and changes independently.
+`bun run cloudflare:deploy` and `bun run cloudflare:preview` prepare and validate the released FP16 model before checking R2. They skip the remote object when its size, content type, and ETag match. A changed or missing FP16 object is uploaded with retry/backoff. The three ONNX Runtime files use the same check-and-upload pattern.
+
+The FP32 model remains an operator bootstrap object for a new R2 bucket. Existing installations keep using the validated object already stored under its pinned filename.
 
 Authenticate Wrangler on an operator machine:
 
@@ -150,13 +154,13 @@ Create the bucket only if it does not already exist:
 bunx wrangler@4.135.0 r2 bucket create bgcut-models
 ```
 
-Prepare the exact validated model:
+Prepare the exact validated models:
 
 ```sh
 bun run model:prepare
 ```
 
-Upload the model:
+Bootstrap the FP32 model only when the bucket does not already contain the validated object:
 
 ```sh
 bunx wrangler@4.135.0 r2 object put \
@@ -165,6 +169,12 @@ bunx wrangler@4.135.0 r2 object put \
   --content-type application/octet-stream \
   --cache-control 'public, max-age=31536000, immutable' \
   --remote
+```
+
+Ensure the Safari FP16 model is current with the same command used by deploys:
+
+```sh
+bun run cloudflare:model:remote
 ```
 
 Upload the pinned ONNX Runtime files:
@@ -192,19 +202,25 @@ bunx wrangler@4.135.0 r2 object put \
   --remote
 ```
 
-Verify the model:
+Verify both models:
 
 ```sh
 bunx wrangler@4.135.0 r2 object get \
   bgcut-models/birefnet-lite-512-ort-basic-webgpu-v2.onnx \
   --remote \
   --pipe | shasum -a 256
+
+bunx wrangler@4.135.0 r2 object get \
+  bgcut-models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx \
+  --remote \
+  --pipe | shasum -a 256
 ```
 
-Expected SHA-256:
+Expected SHA-256 values:
 
 ```text
 4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c
+37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33
 ```
 
 ## Production verification
@@ -214,12 +230,13 @@ After a successful Cloudflare production build:
 ```sh
 curl -I https://bgcut.dev/
 curl -I https://bgcut.dev/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx
+curl -I https://bgcut.dev/models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx
 curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.asyncify.wasm
 curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.wasm
 curl -I https://bgcut.dev/runtime/ort-wasm-simd-threaded.mjs
 ```
 
-Run a real WebGPU browser removal on `https://bgcut.dev` before treating a production change as accepted.
+Run a real removal in Safari on a WebGPU adapter that exposes `shader-f16` and confirm that the request uses the FP16 model path. Run Chromium WebGPU and browser WebAssembly checks and confirm that they still use the FP32 model path before treating the production change as accepted.
 
 ## CI gate
 

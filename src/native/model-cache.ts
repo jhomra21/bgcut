@@ -8,6 +8,10 @@ import {
   MODEL_RELEASE_URL,
   MODEL_SHA256,
   MODEL_SIZE_BYTES,
+  WEBGPU_MODEL_FILENAME,
+  WEBGPU_MODEL_RELEASE_URL,
+  WEBGPU_MODEL_SHA256,
+  WEBGPU_MODEL_SIZE_BYTES,
 } from "../shared/model-config";
 import { inspectModelFile, type ModelFileFingerprint } from "../shared/model-file";
 
@@ -15,6 +19,14 @@ export class ModelCacheError extends Data.TaggedError("ModelCacheError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
+
+type CachedModel = {
+  readonly filename: string;
+  readonly releaseUrl: string;
+  readonly sha256: string;
+  readonly sizeBytes: number;
+  readonly previousPaths?: () => readonly string[];
+};
 
 const cacheRoot = (appName: string): string => {
   if (process.platform === "darwin") {
@@ -30,36 +42,67 @@ const cacheRoot = (appName: string): string => {
   return join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), appName);
 };
 
-export const cachedModelPath = (): string => join(cacheRoot("bgcut"), "models", MODEL_FILENAME);
+const cachedPath = (filename: string): string =>
+  join(cacheRoot("bgcut"), "models", filename);
 
-const previousCachedModelPaths = (): readonly string[] => [
-  join(cacheRoot("bgremove"), "models", MODEL_FILENAME),
-  join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME),
-];
+export const cachedModelPath = (): string => cachedPath(MODEL_FILENAME);
 
-const isExpectedModel = (fingerprint: ModelFileFingerprint | undefined): boolean =>
-  fingerprint?.sizeBytes === MODEL_SIZE_BYTES && fingerprint.sha256 === MODEL_SHA256;
+export const cachedWebGpuModelPath = (): string =>
+  cachedPath(WEBGPU_MODEL_FILENAME);
 
-const inspectCachedModel = (path: string): Effect.Effect<ModelFileFingerprint | undefined, ModelCacheError> =>
+const fp32Model: CachedModel = {
+  filename: MODEL_FILENAME,
+  releaseUrl: MODEL_RELEASE_URL,
+  sha256: MODEL_SHA256,
+  sizeBytes: MODEL_SIZE_BYTES,
+  previousPaths: () => [
+    join(cacheRoot("bgremove"), "models", MODEL_FILENAME),
+    join(cacheRoot("removebg-webgpu"), "models", MODEL_FILENAME),
+  ],
+};
+
+const webGpuModel: CachedModel = {
+  filename: WEBGPU_MODEL_FILENAME,
+  releaseUrl: WEBGPU_MODEL_RELEASE_URL,
+  sha256: WEBGPU_MODEL_SHA256,
+  sizeBytes: WEBGPU_MODEL_SIZE_BYTES,
+};
+
+const isExpectedModel = (
+  model: CachedModel,
+  fingerprint: ModelFileFingerprint | undefined,
+): boolean =>
+  fingerprint?.sizeBytes === model.sizeBytes &&
+  fingerprint.sha256 === model.sha256;
+
+const inspectCachedModel = (
+  path: string,
+): Effect.Effect<ModelFileFingerprint | undefined, ModelCacheError> =>
   inspectModelFile(path).pipe(
-    Effect.mapError((cause) =>
-      new ModelCacheError({ message: `Could not inspect the cached model at ${path}.`, cause }),
+    Effect.mapError(
+      (cause) =>
+        new ModelCacheError({
+          message: `Could not inspect the cached model at ${path}.`,
+          cause,
+        }),
     ),
   );
 
-export const ensureCachedModel = (): Effect.Effect<string, ModelCacheError> =>
+const ensureCachedArtifact = (
+  model: CachedModel,
+): Effect.Effect<string, ModelCacheError> =>
   Effect.gen(function* () {
-    const modelPath = cachedModelPath();
+    const modelPath = cachedPath(model.filename);
     const existing = yield* inspectCachedModel(modelPath);
 
-    if (isExpectedModel(existing)) {
+    if (isExpectedModel(model, existing)) {
       return modelPath;
     }
 
-    for (const previousModelPath of previousCachedModelPaths()) {
+    for (const previousModelPath of model.previousPaths?.() ?? []) {
       const previousExisting = yield* inspectCachedModel(previousModelPath);
 
-      if (isExpectedModel(previousExisting)) {
+      if (isExpectedModel(model, previousExisting)) {
         return previousModelPath;
       }
     }
@@ -68,18 +111,29 @@ export const ensureCachedModel = (): Effect.Effect<string, ModelCacheError> =>
 
     yield* Effect.tryPromise({
       try: () => mkdir(dirname(modelPath), { recursive: true }),
-      catch: (cause) => new ModelCacheError({ message: `Could not create ${dirname(modelPath)}.`, cause }),
+      catch: (cause) =>
+        new ModelCacheError({
+          message: `Could not create ${dirname(modelPath)}.`,
+          cause,
+        }),
     });
 
     yield* Effect.tryPromise({
       try: () => rm(temporaryPath, { force: true }),
-      catch: (cause) => new ModelCacheError({ message: `Could not clear ${temporaryPath}.`, cause }),
+      catch: (cause) =>
+        new ModelCacheError({
+          message: `Could not clear ${temporaryPath}.`,
+          cause,
+        }),
     });
 
     const response = yield* Effect.tryPromise({
-      try: () => fetch(MODEL_RELEASE_URL),
+      try: () => fetch(model.releaseUrl),
       catch: (cause) =>
-        new ModelCacheError({ message: "Could not download the validated BiRefNet model.", cause }),
+        new ModelCacheError({
+          message: "Could not download the validated BiRefNet model.",
+          cause,
+        }),
     });
 
     if (!response.ok) {
@@ -93,23 +147,35 @@ export const ensureCachedModel = (): Effect.Effect<string, ModelCacheError> =>
         const bytes = Buffer.from(await response.arrayBuffer());
         await writeFile(temporaryPath, bytes);
       },
-      catch: (cause) => new ModelCacheError({ message: `Could not write ${temporaryPath}.`, cause }),
+      catch: (cause) =>
+        new ModelCacheError({
+          message: `Could not write ${temporaryPath}.`,
+          cause,
+        }),
     });
 
     const downloaded = yield* inspectModelFile(temporaryPath).pipe(
-      Effect.mapError((cause) =>
-        new ModelCacheError({ message: `Could not verify ${temporaryPath}.`, cause }),
+      Effect.mapError(
+        (cause) =>
+          new ModelCacheError({
+            message: `Could not verify ${temporaryPath}.`,
+            cause,
+          }),
       ),
     );
 
-    if (!isExpectedModel(downloaded)) {
+    if (!isExpectedModel(model, downloaded)) {
       yield* Effect.tryPromise({
         try: () => rm(temporaryPath, { force: true }),
-        catch: (cause) => new ModelCacheError({ message: `Could not remove invalid ${temporaryPath}.`, cause }),
+        catch: (cause) =>
+          new ModelCacheError({
+            message: `Could not remove invalid ${temporaryPath}.`,
+            cause,
+          }),
       });
 
       return yield* new ModelCacheError({
-        message: `Downloaded model did not match the expected ${MODEL_SIZE_BYTES}-byte artifact with SHA-256 ${MODEL_SHA256}.`,
+        message: `Downloaded model did not match the expected ${model.sizeBytes}-byte artifact with SHA-256 ${model.sha256}.`,
       });
     }
 
@@ -118,8 +184,18 @@ export const ensureCachedModel = (): Effect.Effect<string, ModelCacheError> =>
         await rm(modelPath, { force: true });
         await rename(temporaryPath, modelPath);
       },
-      catch: (cause) => new ModelCacheError({ message: `Could not install the model at ${modelPath}.`, cause }),
+      catch: (cause) =>
+        new ModelCacheError({
+          message: `Could not install the model at ${modelPath}.`,
+          cause,
+        }),
     });
 
     return modelPath;
   });
+
+export const ensureCachedModel = (): Effect.Effect<string, ModelCacheError> =>
+  ensureCachedArtifact(fp32Model);
+
+export const ensureCachedWebGpuModel = (): Effect.Effect<string, ModelCacheError> =>
+  ensureCachedArtifact(webGpuModel);

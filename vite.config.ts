@@ -4,9 +4,13 @@ import { defineConfig } from "vite";
 import {
   MODEL_PUBLIC_PATH,
   MODEL_RELEASE_URL,
+  WEBGPU_MODEL_PUBLIC_PATH,
+  WEBGPU_MODEL_RELEASE_URL,
 } from "./src/shared/model-config.ts";
 
 const releaseModelUrl = new URL(MODEL_RELEASE_URL);
+
+const releaseWebGpuModelUrl = new URL(WEBGPU_MODEL_RELEASE_URL);
 
 export default defineConfig(({ mode }) => {
   const externalAssetHost = mode === "cloudflare" || mode === "package";
@@ -27,6 +31,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           followRedirects: true,
           rewrite: () => releaseModelUrl.pathname,
+        },
+        [WEBGPU_MODEL_PUBLIC_PATH]: {
+          target: releaseWebGpuModelUrl.origin,
+          changeOrigin: true,
+          followRedirects: true,
+          rewrite: () => releaseWebGpuModelUrl.pathname,
         },
       },
     },

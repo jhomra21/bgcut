@@ -66,7 +66,7 @@ bgcut serve --no-open
 bgcut serve --json
 ```
 
-The local server only binds to the loopback interface. Its UI contains the bgcut remover only; the hosted Docs, GitHub navigation, Privacy, and Terms links stay on `bgcut.dev`. The server exposes the cached validated model at `/models/...`, the installed ONNX Runtime files at `/runtime/...`, and a small `/health` endpoint. Non-root app routes redirect to `/`. Source images remain in the browser.
+The local server only binds to the loopback interface. Its UI contains the bgcut remover only; the hosted Docs, GitHub navigation, Privacy, and Terms links stay on `bgcut.dev`. The server exposes the validated model artifacts at `/models/...`, the installed ONNX Runtime files at `/runtime/...`, and a small `/health` endpoint. Non-root app routes redirect to `/`. Source images remain in the browser.
 
 ## CLI
 
@@ -133,15 +133,15 @@ The `-gpu` and `-cpu` aliases also work. Explicit GPU mode never switches to CPU
 
 ### Model cache
 
-The first native run may download the pinned BiRefNet Lite 512 ONNX model, about 187 MiB. bgcut stores it in the operating system user cache and verifies the expected artifact before use. The CLI, packaged local app, and Node API share that validated cache, so later runs reuse a valid copy.
+Native CLI and Node runs use the validated FP32 BiRefNet Lite 512 model, about 187 MiB. The packaged local browser app uses the same operating-system cache directory. Safari WebGPU on adapters that expose `shader-f16` may also download the validated internal-FP16 model, about 94 MiB, under its own filename. bgcut verifies each artifact before use and reuses valid cached copies.
 
-The model download sends model data to the machine. It does not send source images away from the machine.
+Model downloads send model data to the machine. They do not send source images away from the machine.
 
 ## Browser app
 
 The production domain is [`bgcut.dev`](https://bgcut.dev).
 
-The browser uses the same pinned model and keeps inference local. WebGPU is the primary path. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
+The browser keeps inference local. Safari WebGPU uses the validated internal-FP16 model with FP32 public tensor input and output when the adapter exposes `shader-f16`; otherwise it keeps the validated FP32 model. Chromium-family WebGPU and the WebAssembly fallback also continue to use the FP32 model. If WebGPU inference cannot run, the browser can use ONNX Runtime WebAssembly instead.
 
 Choose, drag, or paste an image in the browser. bgcut removes the background locally, then lets you compare the original with the result, copy or download the PNG, rerun removal, or choose another image. The normal UI does not show internal runtime checks, model metadata, timing tables, or acceptance controls.
 
@@ -263,7 +263,7 @@ bun run check
 
 ### Cloudflare preview
 
-The production web target uses Cloudflare Workers Static Assets for the app shell and private R2 for the ONNX model plus all discrete ONNX Runtime files: the WebGPU WASM binary, fallback WASM binary, and runtime module loader. The Worker keeps `/models/...` and `/runtime/...` same-origin at `bgcut.dev`. Cloudflare Static Assets do not carry the model or discrete ONNX Runtime payloads.
+The production web target uses Cloudflare Workers Static Assets for the app shell and private R2 for the pinned ONNX model artifacts plus the discrete ONNX Runtime files. The Worker keeps `/models/...` and `/runtime/...` same-origin at `bgcut.dev`. Cloudflare Static Assets do not carry either model or the discrete ONNX Runtime payloads.
 
 Run the local Cloudflare path without deploying anything:
 
@@ -284,21 +284,27 @@ See [release guide](docs/operations/releasing.md) for the release process. Relea
 
 ## Model
 
-- Model: `studioludens/birefnet-lite-512`
-- Revision: `4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7`
-- Runtime artifact: `birefnet-lite-512-ort-basic-webgpu-v2.onnx`
-- Artifact size: `195,872,736` bytes
+Both runtime artifacts derive from `studioludens/birefnet-lite-512` revision `4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7`. Inference uses a 512x512 model input and exports at the original source dimensions.
+
+The FP32 artifact remains the native Node/CLI model, the Chromium-family WebGPU model, and the browser WebAssembly fallback:
+
+- File: `birefnet-lite-512-ort-basic-webgpu-v2.onnx`
+- Size: `195,872,736` bytes
 - SHA-256: `4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c`
-- Inference size: 512x512
-- Export size: original source dimensions
+
+Safari WebGPU adapters that expose `shader-f16` use an internal-FP16 conversion with FP32 public tensor input and output:
+
+- File: `birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx`
+- Size: `98,572,669` bytes
+- SHA-256: `37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33`
 
 ## Project notes
 
-[benchmark notes](docs/engineering/benchmarks.md) records measured runtime results. [graph-capture notes](docs/engineering/graph-capture.md) records the graph-capture work behind the current browser fast path. [roadmap](docs/roadmap.md) tracks planned engine and editor work. [deployment guide](docs/operations/deploying.md) covers the Cloudflare web deployment.
+[benchmark notes](docs/engineering/benchmarks.md) records measured runtime results, including the Safari FP16 acceptance gate. [graph-capture notes](docs/engineering/graph-capture.md) records the earlier graph-capture work used by the Chromium-family browser path. [roadmap](docs/roadmap.md) tracks planned engine and editor work. [deployment guide](docs/operations/deploying.md) covers the Cloudflare web deployment.
 
 ## Privacy
 
-Source images, decoded pixels, masks, and generated outputs stay on the user's machine. Cloudflare Workers serves the hosted app, model, and ONNX Runtime files. bgcut.dev does not receive source images or run image inference for the user.
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. Cloudflare Workers serves the hosted app, model artifacts, and ONNX Runtime files. bgcut.dev does not receive source images or run image inference for the user.
 
 
 ## License

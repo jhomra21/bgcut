@@ -1,4 +1,7 @@
-import { MODEL_FILENAME } from "../shared/model-config.ts";
+import {
+  MODEL_FILENAME,
+  WEBGPU_MODEL_FILENAME,
+} from "../shared/model-config.ts";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
@@ -7,6 +10,8 @@ import {
 import type { AssetFetcher, R2BucketBinding, R2ObjectMetadata } from "./types.ts";
 
 const MODEL_PATH = `/models/${MODEL_FILENAME}`;
+
+const WEBGPU_MODEL_PATH = `/models/${WEBGPU_MODEL_FILENAME}`;
 
 const ORT_WEBGPU_WASM_PATH = `/runtime/${ORT_WEBGPU_WASM_FILENAME}`;
 
@@ -25,6 +30,13 @@ const resolveR2Asset = (pathname: string): R2Asset | undefined => {
   if (pathname === MODEL_PATH) {
     return {
       key: MODEL_FILENAME,
+      contentType: "application/octet-stream",
+    };
+  }
+
+  if (pathname === WEBGPU_MODEL_PATH) {
+    return {
+      key: WEBGPU_MODEL_FILENAME,
       contentType: "application/octet-stream",
     };
   }

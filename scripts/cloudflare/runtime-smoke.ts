@@ -1,6 +1,10 @@
-import { rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import {
+  WEBGPU_MODEL_FILENAME,
+  WEBGPU_MODEL_PUBLIC_PATH,
+} from "../../src/shared/model-config";
 import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
@@ -19,6 +23,8 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
 const repositoryRoot = resolve(import.meta.dir, "../..");
 
 const smokeState = resolve(repositoryRoot, ".wrangler/smoke-state");
+
+const modelFixture = resolve(repositoryRoot, ".wrangler/fp16-model-smoke.bin");
 
 const runtimeDirectory = resolve(
   repositoryRoot,
@@ -58,6 +64,25 @@ const seedRuntime = async (filename: string, contentType: string): Promise<void>
     smokeState,
   ]);
 
+const seedModel = async (): Promise<void> =>
+  run([
+    "bunx",
+    `wrangler@${WRANGLER_VERSION}`,
+    "r2",
+    "object",
+    "put",
+    `bgcut-models/${WEBGPU_MODEL_FILENAME}`,
+    "--file",
+    modelFixture,
+    "--content-type",
+    "application/octet-stream",
+    "--cache-control",
+    "public, max-age=31536000, immutable",
+    "--local",
+    "--persist-to",
+    smokeState,
+  ]);
+
 const waitForWorker = async (): Promise<void> => {
   let lastError = new Error("Worker has not responded yet.");
 
@@ -80,6 +105,37 @@ const waitForWorker = async (): Promise<void> => {
   throw new Error("Wrangler did not become ready for the runtime smoke test.", {
     cause: lastError,
   });
+};
+
+const verifyModelResponse = async (): Promise<void> => {
+  const response = await fetch(`${ORIGIN}${WEBGPU_MODEL_PUBLIC_PATH}`);
+
+  if (!response.ok) {
+    throw new Error(`FP16 model route returned HTTP ${response.status}.`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  const contentLength = response.headers.get("content-length");
+
+  if (
+    contentType === null ||
+    !contentType.startsWith("application/octet-stream") ||
+    contentLength !== "4"
+  ) {
+    throw new Error("FP16 model route returned unexpected headers.");
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  if (
+    bytes.length !== 4 ||
+    bytes[0] !== 0x08 ||
+    bytes[1] !== 0x09 ||
+    bytes[2] !== 0x0a ||
+    bytes[3] !== 0x0b
+  ) {
+    throw new Error("FP16 model route returned unexpected bytes.");
+  }
 };
 
 const verifyWasmResponse = async (label: string, publicPath: string): Promise<void> => {
@@ -224,7 +280,12 @@ const verifySecurityHeaders = async (): Promise<void> => {
 
 await rm(smokeState, { recursive: true, force: true });
 
+await mkdir(resolve(repositoryRoot, ".wrangler"), { recursive: true });
+
+await writeFile(modelFixture, new Uint8Array([0x08, 0x09, 0x0a, 0x0b]));
+
 try {
+  await seedModel();
   await seedRuntime(ORT_WEBGPU_WASM_FILENAME, "application/wasm");
   await seedRuntime(ORT_WASM_FILENAME, "application/wasm");
   await seedRuntime(ORT_WASM_MODULE_FILENAME, "text/javascript");
@@ -249,6 +310,7 @@ try {
 
   try {
     await waitForWorker();
+    await verifyModelResponse();
     await verifyWasmResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
     await verifyWasmResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
     await verifyModuleResponse();
@@ -272,11 +334,16 @@ try {
     );
     await verifyDiscoveryFiles();
     await verifySecurityHeaders();
-    console.log("Cloudflare runtime, search-surface, and security-header smoke passed.");
+    console.log(
+      "Cloudflare FP16 model, runtime, search-surface, and security-header smoke passed.",
+    );
   } finally {
     worker.kill();
     await worker.exited;
   }
 } finally {
-  await rm(smokeState, { recursive: true, force: true });
+  await Promise.all([
+    rm(smokeState, { recursive: true, force: true }),
+    rm(modelFixture, { force: true }),
+  ]);
 }

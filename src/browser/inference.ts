@@ -3,6 +3,7 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { resolveBrowserEnginePreference } from "./engine-preference";
 import {
+  isSafariUserAgent,
   resolveDefaultWebGpuSessionStrategy,
   type WebGpuSessionStrategy,
 } from "./webgpu-session-strategy";
@@ -19,7 +20,12 @@ import { getGpuModelOutput, readGpuModelOutput } from "./gpu-output";
 import { loadImageBitmap } from "./image";
 import { canvasToPng, createMatteCanvas, createSourceComposite } from "./image-output";
 import { fetchModelBytes } from "./model-loader";
-import { MODEL_REVISION } from "../shared/model-config";
+import {
+  MODEL_PUBLIC_PATH,
+  MODEL_REVISION,
+  WEBGPU_MODEL_PUBLIC_PATH,
+  WEBGPU_MODEL_REVISION,
+} from "../shared/model-config";
 import { resolveOrtWebGpuWasmUrl } from "./ort-webgpu-runtime";
 import { getGpuRuntime } from "./runtime";
 import {
@@ -28,7 +34,7 @@ import {
   type RemovalTimings,
 } from "./timing";
 
-export { MODEL_REVISION };
+export { MODEL_REVISION, WEBGPU_MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
 
@@ -44,6 +50,7 @@ export type BackgroundRemovalResult = {
 type SessionCache = {
   readonly device: GPUDevice;
   readonly graphCapture: boolean;
+  readonly modelPath: string;
   readonly session: ort.InferenceSession;
 };
 
@@ -72,10 +79,15 @@ const createSession = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   graphCapture: boolean,
+  modelPath: string,
 ): Effect.Effect<ort.InferenceSession, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     const stopModelDownload = timings.begin("modelDownloadMs");
-    const model = yield* fetchModelBytes();
+
+    const model = yield* fetchModelBytes(
+      modelPath,
+    );
+
     stopModelDownload();
 
     configureOrtWebGpuRuntime();
@@ -126,13 +138,19 @@ const getSessionLease = (
   runtime: GpuRuntime,
   timings: RemovalTimingRecorder,
   strategy: WebGpuSessionStrategy,
+  modelPath: string,
 ): Effect.Effect<SessionLease, ModelDownloadFailed | ModelLoadFailed> =>
   Effect.gen(function* () {
     if (strategy === "capture-recreate") {
       yield* clearCachedSession();
 
       return {
-        session: yield* createSession(runtime, timings, true),
+        session: yield* createSession(
+          runtime,
+          timings,
+          true,
+          modelPath,
+        ),
         releaseAfterUse: true,
       };
     }
@@ -141,7 +159,8 @@ const getSessionLease = (
 
     if (
       cachedSession?.device === runtime.device &&
-      cachedSession.graphCapture === graphCapture
+      cachedSession.graphCapture === graphCapture &&
+      cachedSession.modelPath === modelPath
     ) {
       timings.markSessionReused();
 
@@ -157,11 +176,13 @@ const getSessionLease = (
       runtime,
       timings,
       graphCapture,
+      modelPath,
     );
 
     cachedSession = {
       device: runtime.device,
       graphCapture,
+      modelPath,
       session,
     };
 
@@ -239,9 +260,10 @@ const runModel = (
     );
   });
 
-export const removeBackgroundWebGpuWithStrategy = (
+const removeBackgroundWebGpuWithModelResolver = (
   file: File,
   strategy: WebGpuSessionStrategy,
+  resolveModelPath: (runtime: GpuRuntime) => string,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -260,8 +282,15 @@ export const removeBackgroundWebGpuWithStrategy = (
           const runtime = yield* getGpuRuntime;
           stopRuntime();
 
+          const modelPath = resolveModelPath(runtime);
+
           return yield* Effect.acquireUseRelease(
-            getSessionLease(runtime, timings, strategy),
+            getSessionLease(
+              runtime,
+              timings,
+              strategy,
+              modelPath,
+            ),
             (lease) =>
               Effect.gen(function* () {
                 const logits = yield* runModel(
@@ -288,7 +317,10 @@ export const removeBackgroundWebGpuWithStrategy = (
                   blob,
                   width: bitmap.width,
                   height: bitmap.height,
-                  modelRevision: MODEL_REVISION,
+                  modelRevision:
+                    modelPath === WEBGPU_MODEL_PUBLIC_PATH
+                      ? WEBGPU_MODEL_REVISION
+                      : MODEL_REVISION,
                   engine: "webgpu" as const,
                   timings: timings.finish(),
                 };
@@ -300,17 +332,35 @@ export const removeBackgroundWebGpuWithStrategy = (
     );
   });
 
+export const removeBackgroundWebGpuWithStrategy = (
+  file: File,
+  strategy: WebGpuSessionStrategy,
+  modelPath: string = MODEL_PUBLIC_PATH,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  removeBackgroundWebGpuWithModelResolver(
+    file,
+    strategy,
+    () => modelPath,
+  );
+
 export const removeBackgroundWebGpu = (
   file: File,
-): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
-  removeBackgroundWebGpuWithStrategy(
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> => {
+  const userAgent =
+    typeof globalThis.navigator === "undefined"
+      ? ""
+      : globalThis.navigator.userAgent;
+
+  return removeBackgroundWebGpuWithModelResolver(
     file,
-    resolveDefaultWebGpuSessionStrategy(
-      typeof globalThis.navigator === "undefined"
-        ? ""
-        : globalThis.navigator.userAgent,
-    ),
+    resolveDefaultWebGpuSessionStrategy(userAgent),
+    (runtime) =>
+      isSafariUserAgent(userAgent) &&
+      runtime.device.features.has("shader-f16")
+        ? WEBGPU_MODEL_PUBLIC_PATH
+        : MODEL_PUBLIC_PATH,
   );
+};
 
 const removeBackgroundWithWasm = (
   file: File,

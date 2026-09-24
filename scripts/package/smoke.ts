@@ -9,6 +9,9 @@ import {
   MODEL_FILENAME,
   MODEL_PUBLIC_PATH,
   MODEL_SIZE_BYTES,
+  WEBGPU_MODEL_FILENAME,
+  WEBGPU_MODEL_PUBLIC_PATH,
+  WEBGPU_MODEL_SIZE_BYTES,
 } from "../../src/shared/model-config";
 
 type RunOptions = {
@@ -162,11 +165,23 @@ try {
 
   const cachedModelPath = join(modelCacheRoot, "models", MODEL_FILENAME);
 
-  await mkdir(dirname(cachedModelPath), { recursive: true });
-  await copyFile(
-    join(root, "public", "models", MODEL_FILENAME),
-    cachedModelPath,
+  const cachedWebGpuModelPath = join(
+    modelCacheRoot,
+    "models",
+    WEBGPU_MODEL_FILENAME,
   );
+
+  await mkdir(dirname(cachedModelPath), { recursive: true });
+  await Promise.all([
+    copyFile(
+      join(root, "public", "models", MODEL_FILENAME),
+      cachedModelPath,
+    ),
+    copyFile(
+      join(root, "public", "models", WEBGPU_MODEL_FILENAME),
+      cachedWebGpuModelPath,
+    ),
+  ]);
 
   const smokeEnvironment = {
     ...process.env,
@@ -246,7 +261,24 @@ try {
       Number(model.headers.get("content-length")) !== MODEL_SIZE_BYTES
     ) {
       throw new Error(
-        `Packaged Node server could not inspect and serve the cached model at ${startup.url}.`,
+        `Packaged Node server could not inspect and serve the cached FP32 model at ${startup.url}.`,
+      );
+    }
+
+    const webGpuModel = await fetch(
+      new URL(WEBGPU_MODEL_PUBLIC_PATH, startup.url),
+      {
+        method: "HEAD",
+      },
+    );
+
+    if (
+      !webGpuModel.ok ||
+      Number(webGpuModel.headers.get("content-length")) !==
+        WEBGPU_MODEL_SIZE_BYTES
+    ) {
+      throw new Error(
+        `Packaged Node server could not inspect and serve the cached FP16 WebGPU model at ${startup.url}.`,
       );
     }
   } finally {
@@ -381,14 +413,14 @@ try {
     !skill.includes("bgcut serve --json") ||
     !skill.includes('import { removeBackground } from "bgcut"') ||
     !skill.includes('import { createBgcut } from "bgcut"') ||
-    !skill.includes("share the same validated model cache") ||
+    !skill.includes("same operating-system cache directory") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
     throw new Error(`Installed bgcut agent skill is missing its current package contract: ${skillPath}`);
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model route, public Node API errors, reusable Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model routes, public Node API errors, reusable Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
