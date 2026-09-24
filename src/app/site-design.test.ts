@@ -69,6 +69,7 @@ describe("site design contract", () => {
     expect(styles).toContain("--background-primary: #fbfbfa");
     expect(styles).toContain("--text-success: #2f6f44");
     expect(styles).toContain('--comparison-control: #efefe8');
+    expect(styles).toContain('--comparison-control-muted: #b8b8b0');
     expect(styles).toContain('html[data-theme="dark"]');
     expect(styles).toContain("--text-primary: #f4f4f0");
     expect(styles).toContain("--background-primary: #11110f");
