@@ -15,7 +15,7 @@ const ThemeToggle = () => (
       viewBox="0 0 20 20"
       aria-hidden="true"
     >
-      <path d="M15.7 14.4A6.7 6.7 0 0 1 7.1 5.8a6.7 6.7 0 1 0 8.6 8.6Z" />
+      <path d="M15.7 14.4A6.7 6.7 0 0 1 7.1 5.8a6.7 6.7 0 1 0 8.6 8.6Z" transform="translate(0.8 -2.3)" />
     </svg>
     <svg
       class="theme-toggle-icon theme-toggle-sun"
