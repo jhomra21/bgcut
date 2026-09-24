@@ -48,6 +48,14 @@
   --comparison-control: #efefe8;
   --shadow-nav: rgba(23, 23, 23, 0.06);
   --shadow-floating: rgba(23, 23, 23, 0.1);
+  --syntax-comment: #777771;
+  --syntax-command: #315f74;
+  --syntax-function: #7a4b73;
+  --syntax-keyword: #6551a3;
+  --syntax-number: #3c679e;
+  --syntax-option: #8b572a;
+  --syntax-string: #39705e;
+  --syntax-type: #80523c;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
@@ -108,6 +116,14 @@ html[data-theme="dark"] {
   --comparison-control: #efefe8;
   --shadow-nav: rgba(0, 0, 0, 0.28);
   --shadow-floating: rgba(0, 0, 0, 0.36);
+  --syntax-comment: #8d8d86;
+  --syntax-command: #82b7ce;
+  --syntax-function: #d2a1c7;
+  --syntax-keyword: #b7a7e8;
+  --syntax-number: #91b7e5;
+  --syntax-option: #d4a176;
+  --syntax-string: #7fc2aa;
+  --syntax-type: #d1a186;
   color-scheme: dark;
 }
 
@@ -934,11 +950,68 @@ figure {
 }
 
 .code-block {
-  overflow-x: auto;
+  overflow: hidden;
   margin: 16px 0;
   border: 1px solid var(--border-primary);
   border-radius: 8px;
   background: var(--background-code);
+}
+
+.code-block-toolbar {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 8px 0 14px;
+}
+
+.code-block-language {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+
+.code-block-copy {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 620;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.code-block-copy:hover {
+  background: var(--background-hover);
+  color: var(--text-primary);
+}
+
+.code-block-copy:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.code-block-copy svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+
+.code-block pre {
+  overflow-x: auto;
+  margin: 0;
   padding: 14px 15px;
   color: var(--text-code);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -946,6 +1019,44 @@ figure {
   line-height: 1.7;
   white-space: pre;
   tab-size: 2;
+}
+
+.code-block pre code {
+  font: inherit;
+}
+
+.code-token-comment {
+  color: var(--syntax-comment);
+}
+
+.code-token-command {
+  color: var(--syntax-command);
+  font-weight: 650;
+}
+
+.code-token-function {
+  color: var(--syntax-function);
+}
+
+.code-token-keyword {
+  color: var(--syntax-keyword);
+  font-weight: 620;
+}
+
+.code-token-number {
+  color: var(--syntax-number);
+}
+
+.code-token-option {
+  color: var(--syntax-option);
+}
+
+.code-token-string {
+  color: var(--syntax-string);
+}
+
+.code-token-type {
+  color: var(--syntax-type);
 }
 
 .docs-quickstart .code-block {
@@ -1130,6 +1241,56 @@ figure {
   color: var(--text-card);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 22px;
+}
+
+.resource-grid > a {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--background-surface);
+  padding: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.resource-grid > a:hover {
+  border-color: var(--border-strong);
+  background: var(--background-hover);
+}
+
+.resource-grid > a:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 3px;
+}
+
+.resource-grid strong {
+  color: var(--text-heading-secondary);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.resource-grid span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.resource-grid code {
+  overflow-wrap: anywhere;
+  color: var(--text-code-inline);
+  font-size: 10px;
 }
 
 .link-list {
@@ -1477,9 +1638,10 @@ figure {
     gap: 12px;
   }
 
-  .architecture-grid {
+  .architecture-grid,
+  .resource-grid {
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 10px;
   }
 
   .spec-row {

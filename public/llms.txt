@@ -1,9 +1,118 @@
 # bgcut
 
-bgcut is a free background remover that runs locally in the browser, from the command line, or through a Node.js API. The hosted browser app keeps source images on the user's device. Safari WebGPU uses the validated internal-FP16 model when the device exposes `shader-f16`; other browser and native paths use the validated FP32 model.
+bgcut removes image backgrounds locally through the hosted browser app, packaged local app, CLI, or Node.js API. Source images are not sent to a bgcut inference backend.
 
-- [Background remover](https://bgcut.dev/)
-- [Documentation](https://bgcut.dev/docs)
-- [Changelog](https://bgcut.dev/changelog)
-- [GitHub repository](https://github.com/jhomra21/bgcut)
-- [npm package](https://www.npmjs.com/package/bgcut)
+## Start here
+
+- Hosted app: https://bgcut.dev/
+- Human documentation: https://bgcut.dev/docs
+- Stable release history: https://bgcut.dev/changelog
+- npm package: https://www.npmjs.com/package/bgcut
+- GitHub: https://github.com/jhomra21/bgcut
+- Agent skill: https://github.com/jhomra21/bgcut/blob/main/skills/bgcut/SKILL.md
+- Node API types: https://github.com/jhomra21/bgcut/blob/main/src/node/index.d.ts
+
+## Choose an interface
+
+- Browser UI: interactive local removal and before/after inspection.
+- Local app: run `npx bgcut` or `bgcut` after a global install.
+- CLI: file-in/file-out automation.
+- Node API: application code and reusable sessions.
+
+## CLI quick reference
+
+Run one removal:
+
+```sh
+npx bgcut photo.jpg
+```
+
+After a global install:
+
+```sh
+bgcut photo.jpg
+bgcut photo.jpg -o portrait.png
+bgcut photo.jpg --webp
+bgcut photo.jpg --gpu
+bgcut photo.jpg --cpu
+```
+
+Supported input formats: JPEG, PNG, WebP, AVIF.
+
+Output formats:
+- PNG: default, transparent.
+- WebP: lossless, transparent.
+- JPG/JPEG: white background because JPEG has no alpha channel.
+
+Automatic native engine selection tries WebGPU first and uses CPU if WebGPU session creation fails. Explicit `--gpu` does not silently fall back to CPU.
+
+## Local app
+
+```sh
+npx bgcut
+bgcut serve
+bgcut serve --port 8787
+bgcut serve --no-open
+bgcut serve --json
+```
+
+The server binds to `127.0.0.1`. `serve --json` prints one JSON object with `url`, `host`, `port`, and `pid` and does not open a browser.
+
+## Node API
+
+Install:
+
+```sh
+npm install bgcut
+```
+
+One image:
+
+```ts
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg");
+```
+
+Several images:
+
+```ts
+import { createBgcut } from "bgcut";
+
+const bgcut = await createBgcut();
+
+try {
+  const first = await bgcut.remove("first.jpg");
+  const second = await bgcut.remove("second.jpg", { format: "webp" });
+} finally {
+  await bgcut.close();
+}
+```
+
+Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+
+Engine values:
+- `auto`: try native WebGPU, then CPU if session creation fails.
+- `gpu`: require native WebGPU.
+- `cpu`: require CPU.
+
+Public Node errors are `BgcutError`. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
+
+## Browser runtime
+
+The public model input is 512 x 512. bgcut restores the matte to the original source dimensions before export.
+
+- Safari WebGPU uses the validated internal-FP16 artifact only when the adapter exposes `shader-f16`.
+- Safari without `shader-f16`, Chromium-family WebGPU, browser WebAssembly, native CLI, and Node API use FP32.
+- The npm tarball does not include the model artifacts.
+- Cached models are verified by byte size and SHA-256 before reuse.
+
+## Privacy
+
+Source images, decoded pixels, masks, and generated outputs stay on the user's machine. The hosted site serves application, model, and ONNX Runtime files but does not receive the user's source image for inference.
+
+## Agent guidance
+
+For tool execution rules, provider constraints, supported formats, model caching, output handling, and failure behavior, use the packaged skill at `skills/bgcut/SKILL.md`. After installation it is available at `node_modules/bgcut/skills/bgcut/SKILL.md`.
+
+Do not infer support beyond the documented JPEG, PNG, WebP, and AVIF inputs. Preserve explicit GPU or CPU constraints instead of silently changing providers.

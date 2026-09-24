@@ -1,3 +1,4 @@
+import { CodeBlock } from "../components/CodeBlock";
 import { ReferencePage } from "../components/ReferencePage";
 import type { SectionRailGroup } from "../components/SectionRail";
 
@@ -40,7 +41,7 @@ export const DocsPage = () => (
         <section id="quickstart" class="reference-section doc-section docs-quickstart">
           <h3>Quickstart</h3>
           <p>Run the local web app from npm without installing bgcut globally:</p>
-          <pre class="code-block"><code>npx bgcut</code></pre>
+          <CodeBlock language="shell" code="npx bgcut" />
           <p class="docs-related">
             For headless removal, run <a href="#cli"><code>npx bgcut photo.jpg</code></a>.
             For application code, <a href="#node-api">install bgcut and use the Node API</a>.
@@ -77,7 +78,9 @@ export const DocsPage = () => (
             The local UI contains the bgcut brand and removal workflow only. Docs, Changelog, GitHub
             navigation, Privacy, Terms, and the site footer remain on bgcut.dev.
           </p>
-          <pre class="code-block"><code>{`npm install -g bgcut
+          <CodeBlock
+            language="shell"
+            code={`npm install -g bgcut
 bgcut
 
 # explicit form
@@ -90,7 +93,8 @@ bgcut serve --port 8787
 bgcut serve --no-open
 
 # machine-readable startup metadata
-bgcut serve --json`}</code></pre>
+bgcut serve --json`}
+          />
           <p>
             <code>serve --json</code> does not open a browser. It prints one JSON object with
             <code>url</code>, <code>host</code>, <code>port</code>, and <code>pid</code>.
@@ -109,7 +113,9 @@ bgcut serve --json`}</code></pre>
             <code>&lt;name&gt;-nobg.png</code> next to the input image. The explicit
             <code>remove</code> command does the same thing.
           </p>
-          <pre class="code-block"><code>{`bgcut photo.jpg
+          <CodeBlock
+            language="shell"
+            code={`bgcut photo.jpg
 bgcut remove photo.jpg
 bgcut photo.jpg -o portrait.png
 
@@ -120,7 +126,8 @@ bgcut photo.jpg --jpg
 
 # provider constraints
 bgcut photo.jpg --gpu
-bgcut photo.jpg --cpu`}</code></pre>
+bgcut photo.jpg --cpu`}
+          />
           <div class="spec-table" role="table" aria-label="CLI behavior">
             <div class="spec-row" role="row">
               <strong role="cell">Inputs</strong>
@@ -148,16 +155,20 @@ bgcut photo.jpg --cpu`}</code></pre>
 
         <section id="node-api" class="reference-section doc-section">
           <h3>Node API</h3>
+          <p>Install <code>bgcut</code> from npm:</p>
+          <CodeBlock language="shell" code="npm install bgcut" />
           <p>
-            Install <code>bgcut</code> from npm. For one image, use
-            <code>removeBackground()</code>. It owns setup and cleanup for the call and returns
-            only the image result fields most callers need.
+            For one image, use <code>removeBackground()</code>. It owns setup and cleanup for the
+            call and returns only the image result fields most callers need.
           </p>
-          <pre class="code-block"><code>{`import { writeFile } from "node:fs/promises";
+          <CodeBlock
+            language="typescript"
+            code={`import { writeFile } from "node:fs/promises";
 import { removeBackground } from "bgcut";
 
 const result = await removeBackground("photo.jpg");
-await writeFile("photo-nobg.png", result.data);`}</code></pre>
+await writeFile("photo-nobg.png", result.data);`}
+          />
 
           <h4>One-shot options and result</h4>
           <p>
@@ -166,7 +177,9 @@ await writeFile("photo-nobg.png", result.data);`}</code></pre>
             <code>ArrayBuffer</code>. Output formats are <code>png</code>, <code>webp</code>, and
             <code>jpg</code>.
           </p>
-          <pre class="code-block"><code>{`const result = await removeBackground("photo.jpg", {
+          <CodeBlock
+            language="typescript"
+            code={`const result = await removeBackground("photo.jpg", {
   format: "webp",
   engine: "cpu",
 });
@@ -176,14 +189,17 @@ type RemoveBackgroundResult = {
   width: number;
   height: number;
   format: "png" | "webp" | "jpg";
-};`}</code></pre>
+};`}
+          />
 
           <h4>Reusable session</h4>
           <p>
             When processing several images, create one bgcut instance so the ONNX Runtime session
             stays warm across removals.
           </p>
-          <pre class="code-block"><code>{`import { createBgcut } from "bgcut";
+          <CodeBlock
+            language="typescript"
+            code={`import { createBgcut } from "bgcut";
 
 const bgcut = await createBgcut();
 
@@ -192,7 +208,8 @@ try {
   const second = await bgcut.remove("second.jpg", { format: "webp" });
 } finally {
   await bgcut.close();
-}`}</code></pre>
+}`}
+          />
           <p>
             <code>createBgcut()</code> defaults to automatic engine selection. Use
             <code>engine: "gpu"</code> to require native WebGPU or <code>engine: "cpu"</code> to
@@ -205,7 +222,9 @@ try {
             Node API failures use one public error type. Handle <code>BgcutError.code</code>
             instead of depending on Effect or ONNX Runtime error classes.
           </p>
-          <pre class="code-block"><code>{`import { BgcutError, removeBackground } from "bgcut";
+          <CodeBlock
+            language="typescript"
+            code={`import { BgcutError, removeBackground } from "bgcut";
 
 try {
   await removeBackground("photo.jpg");
@@ -213,7 +232,8 @@ try {
   if (error instanceof BgcutError) {
     console.error(error.code, error.message);
   }
-}`}</code></pre>
+}`}
+          />
           <p>
             Error codes are <code>model</code>, <code>engine</code>, <code>input</code>,
             <code>inference</code>, <code>output</code>, and <code>closed</code>.
@@ -326,6 +346,35 @@ try {
 
         <section id="resources" class="reference-section doc-section">
           <h3>Resources</h3>
+          <p class="docs-section-summary">
+            Humans can use the docs and type declarations directly. Agents can start with the
+            plain-text index or the packaged skill.
+          </p>
+          <div class="resource-grid">
+            <a href="/llms.txt">
+              <strong>Agent index</strong>
+              <span>Concise public contract, commands, API entry points, and canonical links.</span>
+              <code>/llms.txt</code>
+            </a>
+            <a
+              href="https://github.com/jhomra21/bgcut/blob/main/skills/bgcut/SKILL.md"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <strong>Agent skill</strong>
+              <span>Operational guidance shipped inside the npm package.</span>
+              <code>skills/bgcut/SKILL.md</code>
+            </a>
+            <a
+              href="https://github.com/jhomra21/bgcut/blob/main/src/node/index.d.ts"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <strong>Node API types</strong>
+              <span>Published TypeScript declarations for the Node API.</span>
+              <code>src/node/index.d.ts</code>
+            </a>
+          </div>
           <div class="link-list">
             <a href="https://github.com/jhomra21/bgcut" target="_blank" rel="noreferrer">GitHub repository</a>
             <a href="https://www.npmjs.com/package/bgcut" target="_blank" rel="noreferrer">npm package</a>

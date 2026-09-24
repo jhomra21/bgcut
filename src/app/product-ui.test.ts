@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 const appSourcePaths = [
   "./App.tsx",
+  "./components/CodeBlock.tsx",
   "./components/ReferencePage.tsx",
   "./components/SectionRail.tsx",
   "./components/SiteChrome.tsx",
@@ -288,6 +289,11 @@ describe("browser product UI", () => {
 
   test("documents the shipped public interfaces", () => {
     expect(appSource).toContain("bgcut serve --json");
+    expect(appSource).toContain('class="code-block-copy"');
+    expect(appSource).toContain("navigator.clipboard.writeText(props.code)");
+    expect(appSource).toContain("code-token-keyword");
+    expect(appSource).toContain('language="shell"');
+    expect(appSource).toContain('language="typescript"');
     expect(appSource).toContain("bgcut photo.jpg --gpu");
     expect(appSource).toContain("bgcut photo.jpg --cpu");
     expect(appSource).toContain("RemoveBackgroundResult");
@@ -318,6 +324,10 @@ describe("browser product UI", () => {
     expect(appSource).toContain("Privacy, Terms, and the site footer remain on bgcut.dev");
     expect(appSource).toContain("Non-root app routes redirect to <code>/</code>");
     expect(appSource).toContain("without the hosted site's navigation");
+    expect(appSource).toContain('href="/llms.txt"');
+    expect(appSource).toContain("skills/bgcut/SKILL.md");
+    expect(appSource).toContain("src/node/index.d.ts");
+    expect(appSource).toContain('class="resource-grid"');
   });
 
   test("keeps website documentation aligned with the shipped runtime behavior", () => {
