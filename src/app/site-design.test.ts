@@ -32,7 +32,7 @@ describe("site design contract", () => {
     expect(styles).toContain("@keyframes route-fade-out");
     expect(styles).toContain("@keyframes route-fade-in");
     expect(styles).toContain(".section-rail");
-    expect(styles).toContain("top: 82px");
+    expect(styles).toContain("top: 102px");
   });
 
   test("uses a stable sliding top-navigation indicator", () => {
@@ -78,8 +78,8 @@ describe("site design contract", () => {
     expect(styles).not.toContain("view-transition-name: reference-page-title");
     expect(styles).not.toContain("::view-transition-group(reference-page-title)");
     expect(styles).not.toContain(".site-page-context");
-    expect(styles).toContain("top: 100px");
-    expect(styles).toContain("scroll-margin-top: 154px");
+    expect(styles).toContain("top: 110px");
+    expect(styles).toContain("scroll-margin-top: 164px");
   });
 
   test("shares one reference-page layout across docs and changelog", () => {
@@ -91,7 +91,7 @@ describe("site design contract", () => {
     expect(styles).toContain(".section-rail-group");
     expect(styles).toContain('.section-rail a[aria-current="location"]');
     expect(styles).toContain(".section-rail-label");
-    expect(styles).toContain("max-height: calc(100vh - 98px)");
+    expect(styles).toContain("max-height: calc(100vh - 118px)");
     expect(styles).not.toContain(".docs-page-header");
     expect(styles).not.toContain(".changelog-header");
     expect(styles).not.toContain(".changelog-page {\n  max-width");
