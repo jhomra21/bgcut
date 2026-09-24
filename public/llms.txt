@@ -1,6 +1,6 @@
 # bgcut
 
-bgcut is a free background remover that runs locally in the browser, from the command line, or through a Node.js API. The hosted browser app keeps source images on the user's device and uses WebGPU when available.
+bgcut is a free background remover that runs locally in the browser, from the command line, or through a Node.js API. The hosted browser app keeps source images on the user's device. Safari WebGPU uses the validated internal-FP16 model when the device exposes `shader-f16`; other browser and native paths use the validated FP32 model.
 
 - [Background remover](https://bgcut.dev/)
 - [Documentation](https://bgcut.dev/docs)

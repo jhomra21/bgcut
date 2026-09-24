@@ -149,8 +149,7 @@ bgcut photo.jpg --cpu`}</code></pre>
         <section id="node-api" class="reference-section doc-section">
           <h3>Node API</h3>
           <p>
-            During 0.4 beta validation, install <code>bgcut@beta</code>. Stable installs remain on
-            <code>bgcut@latest</code> until the beta is accepted. For one image, use
+            Install <code>bgcut</code> from npm. For one image, use
             <code>removeBackground()</code>. It owns setup and cleanup for the call and returns
             only the image result fields most callers need.
           </p>
@@ -228,8 +227,9 @@ try {
             export.
           </p>
           <p>
-            bgcut uses <code>studioludens/birefnet-lite-512</code> at one pinned source revision
-            and one verified ONNX artifact.
+            bgcut uses <code>studioludens/birefnet-lite-512</code> at one pinned source revision.
+            The runtime has validated FP32 and internal-FP16 artifacts with the same 512 x 512
+            public model input.
           </p>
           <div class="spec-table" role="table" aria-label="Model metadata">
             <div class="spec-row" role="row">
@@ -237,16 +237,28 @@ try {
               <span role="cell"><code>4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7</code></span>
             </div>
             <div class="spec-row" role="row">
-              <strong role="cell">Artifact</strong>
+              <strong role="cell">FP32 artifact</strong>
               <span role="cell"><code>birefnet-lite-512-ort-basic-webgpu-v2.onnx</code></span>
             </div>
             <div class="spec-row" role="row">
-              <strong role="cell">Artifact size</strong>
+              <strong role="cell">FP32 size</strong>
               <span role="cell">195,872,736 bytes</span>
             </div>
             <div class="spec-row" role="row">
-              <strong role="cell">SHA-256</strong>
+              <strong role="cell">FP32 SHA-256</strong>
               <span role="cell" class="breakable"><code>4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c</code></span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Safari FP16 artifact</strong>
+              <span role="cell"><code>birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx</code></span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Safari FP16 size</strong>
+              <span role="cell">98,572,669 bytes</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Safari FP16 SHA-256</strong>
+              <span role="cell" class="breakable"><code>37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33</code></span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Inference size</strong>
@@ -258,23 +270,26 @@ try {
             </div>
           </div>
           <p>
-            The npm package does not include the 195,872,736-byte model. The CLI, local app, and
-            Node API download the pinned artifact from the bgcut GitHub release when needed, verify
-            its byte size and SHA-256, and reuse the operating-system user cache.
+            The npm package does not include either model artifact. Native CLI and Node API runs
+            use FP32. The packaged local browser app can cache both artifacts in the operating-system
+            user cache. Safari WebGPU uses FP16 only when the device exposes <code>shader-f16</code>;
+            Safari without that feature, Chromium-family WebGPU, and browser WebAssembly use FP32.
+            bgcut verifies the byte size and SHA-256 before reusing a cached model.
           </p>
         </section>
 
         <section id="architecture" class="reference-section doc-section">
           <h3>Architecture</h3>
           <p class="docs-section-summary">
-            Both runtime paths use the same 512 x 512 model and composite the matte at the source
-            image size.
+            Browser and native paths use a 512 x 512 model input and composite the matte at the
+            source image size.
           </p>
           <div class="architecture-grid">
             <div class="architecture-card">
               <strong>Browser path</strong>
               <span>Browser decode</span>
               <span>Automatic mode tries WebGPU, then WebAssembly after supported failures</span>
+              <span>Safari WebGPU uses FP16 when the device exposes shader-f16; other browser paths use FP32</span>
               <span>WebGPU input uses TypeGPU resize and ImageNet normalization</span>
               <span>WebAssembly input uses canvas resize and the same normalization</span>
               <span>Matte compositing at source size</span>
@@ -284,15 +299,15 @@ try {
               <strong>Native Node path</strong>
               <span>Sharp/libvips decode and orientation</span>
               <span>Linear resize and ImageNet normalization</span>
-              <span>ONNX Runtime Node WebGPU or CPU</span>
+              <span>FP32 with ONNX Runtime Node WebGPU or CPU</span>
               <span>Matte compositing at source size</span>
               <span>PNG, lossless WebP, or JPG export</span>
             </div>
           </div>
           <p>
             Cloudflare Workers hosts bgcut.dev. Workers Static Assets serves the app files. Private
-            R2 stores the pinned model and ONNX Runtime browser files, and the Worker exposes them
-            through same-origin <code>/models/*</code> and <code>/runtime/*</code> routes.
+            R2 stores both pinned model artifacts and the ONNX Runtime browser files. The Worker
+            exposes them through same-origin <code>/models/*</code> and <code>/runtime/*</code> routes.
           </p>
         </section>
 
