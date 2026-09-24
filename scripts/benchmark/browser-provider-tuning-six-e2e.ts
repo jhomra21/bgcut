@@ -24,7 +24,7 @@ const GateReportSchema = Schema.Struct({
 });
 
 const usage =
-  "Usage: bun run benchmark:browser-provider-tuning:six:e2e -- <manifest.json> <output-dir> <model.onnx> [runs-per-case] [timeout-ms] [port]";
+  "Usage: bun run benchmark:browser-provider-tuning:six:e2e -- <manifest.json> <output-dir> <model.onnx> [runs-per-case] [timeout-ms] [port] [start-block]";
 
 const args =
   process.argv.slice(2);
@@ -52,8 +52,26 @@ const outputRoot =
 const port =
   args[5] ?? "4184";
 
+const startBlock =
+  Number.parseInt(
+    args[6] ?? "0",
+    10,
+  );
+
+if (
+  !Number.isInteger(
+    startBlock,
+  ) ||
+  startBlock < 0 ||
+  startBlock > 3
+) {
+  throw new Error(
+    `Start block must be an integer from 0 through 3, received "${args[6]}".`,
+  );
+}
+
 const url =
-  `http://127.0.0.1:${port}/?block=0`;
+  `http://127.0.0.1:${port}/?block=${startBlock}`;
 
 const readPipe = (
   pipe:
