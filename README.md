@@ -228,6 +228,8 @@ try {
 
 ## Agent skill
 
+For a concise machine-readable public reference, start with [`bgcut.dev/llms.txt`](https://bgcut.dev/llms.txt). It links the canonical docs, package, repository, type declarations, and agent skill.
+
 The npm package includes a self-contained Agent Skills file:
 
 ```text
