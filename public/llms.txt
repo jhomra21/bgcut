@@ -4,13 +4,13 @@ bgcut removes image backgrounds locally through the hosted browser app, packaged
 
 ## Start here
 
-- Hosted app: https://bgcut.dev/
-- Human documentation: https://bgcut.dev/docs
-- Stable release history: https://bgcut.dev/changelog
-- npm package: https://www.npmjs.com/package/bgcut
-- GitHub: https://github.com/jhomra21/bgcut
-- Agent skill: https://github.com/jhomra21/bgcut/blob/main/skills/bgcut/SKILL.md
-- Node API types: https://github.com/jhomra21/bgcut/blob/main/src/node/index.d.ts
+- [Background remover](https://bgcut.dev/)
+- [Documentation](https://bgcut.dev/docs)
+- [Changelog](https://bgcut.dev/changelog)
+- [npm package](https://www.npmjs.com/package/bgcut)
+- [GitHub repository](https://github.com/jhomra21/bgcut)
+- [Agent skill](https://github.com/jhomra21/bgcut/blob/main/skills/bgcut/SKILL.md)
+- [Node API types](https://github.com/jhomra21/bgcut/blob/main/src/node/index.d.ts)
 
 ## Choose an interface
 
