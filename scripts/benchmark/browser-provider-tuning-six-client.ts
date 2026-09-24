@@ -3,19 +3,19 @@ import { Effect, Schema } from "effect";
 import { formatBackgroundRemovalError } from "../../src/browser/errors";
 import {
   removeBackgroundWebGpuWithStrategy,
-  type WebGpuProviderTuning,
+  type WebGpuValidationMode,
 } from "../../src/browser/inference";
 import type { RemovalTimings } from "../../src/browser/timing";
 import { resolveDefaultWebGpuSessionStrategy } from "../../src/browser/webgpu-session-strategy";
 
 const ModeSchema = Schema.Literal(
   "default",
-  "combined",
+  "wgpu-only",
 );
 
 const SequenceSchema = Schema.Literal(
   "default-first",
-  "combined-first",
+  "wgpu-first",
 );
 
 const DirectionSchema = Schema.Literal(
@@ -130,7 +130,7 @@ if (
   status === null
 ) {
   throw new Error(
-    "Provider-tuning six-image status element is missing.",
+    "Validation-mode six-image status element is missing.",
   );
 }
 
@@ -163,24 +163,19 @@ const blockIndexFromLocation =
       value < 0
     ) {
       throw new Error(
-        `Invalid provider-tuning block "${raw}".`,
+        `Invalid validation-mode block "${raw}".`,
       );
     }
 
     return value;
   };
 
-const tuningForMode = (
+const validationModeForMode = (
   mode: Mode,
-): WebGpuProviderTuning =>
-  mode === "combined"
-    ? {
-        validationMode:
-          "wgpuOnly",
-        storageBufferCacheMode:
-          "simple",
-      }
-    : {};
+): WebGpuValidationMode =>
+  mode === "wgpu-only"
+    ? "wgpuOnly"
+    : "default";
 
 const withTimeout = async <T>(
   operation: Promise<T>,
@@ -252,7 +247,7 @@ const remove = async (
         caseId,
       ),
       "no-capture-reuse",
-      tuningForMode(
+      validationModeForMode(
         mode,
       ),
     ).pipe(
@@ -409,7 +404,7 @@ const main =
       !configResponse.ok
     ) {
       throw new Error(
-        `Could not load provider-tuning six-image config: HTTP ${configResponse.status}.`,
+        `Could not load validation-mode six-image config: HTTP ${configResponse.status}.`,
       );
     }
 
@@ -434,7 +429,7 @@ const main =
       block === undefined
     ) {
       throw new Error(
-        `Provider-tuning block ${blockIndex} is not configured.`,
+        `Validation-mode block ${blockIndex} is not configured.`,
       );
     }
 
@@ -445,7 +440,7 @@ const main =
       "no-capture-reuse"
     ) {
       throw new Error(
-        "Provider-tuning six-image benchmark must run on Safari's no-capture path.",
+        "Validation-mode six-image benchmark must run on Safari's no-capture path.",
       );
     }
 
@@ -563,7 +558,7 @@ const main =
       undefined
     ) {
       throw new Error(
-        "Provider-tuning six-image prime did not produce a record.",
+        "Validation-mode six-image prime did not produce a record.",
       );
     }
 
@@ -728,7 +723,7 @@ const main =
     ) {
       writeStatus("");
       writeStatus(
-        "Counterbalanced provider-tuning benchmark complete.",
+        "Counterbalanced validation-mode benchmark complete.",
       );
 
       return;
@@ -739,7 +734,7 @@ const main =
       undefined
     ) {
       throw new Error(
-        "Provider-tuning server did not return the next block.",
+        "Validation-mode server did not return the next block.",
       );
     }
 
@@ -759,7 +754,7 @@ void main().catch(
 
     writeStatus("");
     writeStatus(
-      "COUNTERBALANCED PROVIDER-TUNING BENCHMARK FAILED",
+      "COUNTERBALANCED VALIDATION-MODE BENCHMARK FAILED",
     );
     writeStatus(
       parsed.message,
