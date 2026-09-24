@@ -521,7 +521,7 @@ if (
 
 if (
   process.env
-    .BGCUT_BROWSER_PROVIDER_TUNING_SIX_BUILD_ONLY ===
+    .BGCUT_BROWSER_VALIDATION_MODE_SIX_BUILD_ONLY ===
   "1"
 ) {
   console.log(
