@@ -301,6 +301,13 @@ describe("browser product UI", () => {
     expect(appSource).toContain("The npm package does not include either model artifact");
     expect(appSource).toContain("Safari WebGPU uses FP16 only when the device exposes");
     expect(appSource).toContain("SHA-256");
+    expect(appSource).toContain('class="model-artifact-table"');
+    expect(appSource).toContain('<th scope="col">Artifact</th>');
+    expect(appSource).toContain('<th scope="col">Runtime</th>');
+    expect(appSource).toContain('<th scope="col">Size</th>');
+    expect(appSource).toContain('<th scope="col">SHA-256</th>');
+    expect(appSource).toContain("Native CLI, Node API, Chromium WebGPU, browser WebAssembly, Safari fallback");
+    expect(appSource).toContain("Safari WebGPU with <code>shader-f16</code>");
   });
 
 
