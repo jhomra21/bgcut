@@ -1,6 +1,6 @@
 # Repository documentation
 
-bgcut keeps user-facing package documentation in the root `README.md`. The files here cover repository operation, engineering records, and planned work.
+bgcut keeps user-facing package documentation in the root `README.md`. The hosted documentation lives at `bgcut.dev/docs`, and `bgcut.dev/llms.txt` provides a concise machine-readable public reference. The files here cover repository operation, engineering records, and planned work.
 
 ## Operations
 
