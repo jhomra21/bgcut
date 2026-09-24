@@ -6,7 +6,7 @@ bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing 
 
 Public package releases use normal `X.Y.Z` versions. npm publishes them to `latest`, and GitHub creates normal releases.
 
-`package.json` is the source of truth for the package version. `CHANGELOG.md` is the source of truth for public change history, GitHub release notes, and the hosted `/changelog` page. Dated changelog sections can record production web changes between package releases. Versioned sections provide the notes for npm and GitHub releases.
+`package.json` is the source of truth for the package version. `CHANGELOG.md` is the source of truth for release notes and GitHub release bodies. The hosted `/changelog` page reads that file but renders only full stable `X.Y.Z` release sections. Date-only notes and prerelease sections are not shown on the website.
 
 Validate the exact package candidate before publication. npm versions are immutable, so the release commit should contain only accepted code, current documentation, and final release metadata.
 
@@ -77,7 +77,7 @@ Before opening the release PR:
 
 1. Merge and accept the product changes first.
 2. Update `README.md`, the hosted `/docs` content, `skills/bgcut/SKILL.md`, privacy text, deployment notes, and engineering records when the behavior changed.
-3. Add a versioned section to `CHANGELOG.md` for the package release. If a dated section already records a web change, keep that dated record and copy only the package-facing notes that apply to the release.
+3. Add a full stable version section to `CHANGELOG.md` for the package release. Fold any accepted date-only notes that belong to the release into that version section before publication.
 4. Update `package.json` to the final `X.Y.Z` version.
 5. Verify the exact release head:
 

@@ -19,7 +19,7 @@ type ChangelogDocument = {
   readonly sections: readonly ChangelogSection[];
 };
 
-const releaseHeading = /^(?:\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/u;
+const releaseHeading = /^\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}$/u;
 
 const releaseId = (version: string): string =>
   `release-${version.replaceAll(".", "-")}`;
@@ -96,7 +96,7 @@ for (const section of document.sections) {
 
 const releaseGroups: readonly SectionRailGroup[] = [
   {
-    label: "History",
+    label: "Releases",
     items: releaseItems,
   },
 ];
@@ -110,7 +110,7 @@ export const ChangelogPage = () => (
   <ReferencePage
     title={document.title}
     pageClass="changelog-page"
-    railAriaLabel="Changelog history"
+    railAriaLabel="Changelog releases"
     railGroups={releaseGroups}
     initialSectionId={latestReleaseId}
     bottomSectionId={oldestReleaseId}

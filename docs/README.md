@@ -18,8 +18,9 @@ bgcut keeps user-facing package documentation in the root `README.md`. The files
 - [`roadmap.md`](roadmap.md): work outside the current public product contract.
 
 
-## Public change history
+## Public release history
 
-- [`../CHANGELOG.md`](../CHANGELOG.md) records dated production changes and stable package releases.
-- The hosted site renders those entries at [`bgcut.dev/changelog`](https://bgcut.dev/changelog).
-- GitHub release notes are extracted from the matching stable version section.
+- [`../CHANGELOG.md`](../CHANGELOG.md) is the release-notes source of truth.
+- The hosted site renders only full stable `X.Y.Z` release sections at [`bgcut.dev/changelog`](https://bgcut.dev/changelog).
+- Date-only notes and prerelease sections stay out of the website changelog.
+- GitHub release notes are extracted from the matching version section.
