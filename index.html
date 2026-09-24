@@ -11,7 +11,7 @@
     />
     <meta name="application-name" content="bgcut" />
     <meta name="apple-mobile-web-app-title" content="bgcut" />
-    <meta name="theme-color" content="#fbfbfa" />
+    <meta name="theme-color" content="" />
     <meta name="color-scheme" content="light dark" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <script>
@@ -24,9 +24,6 @@
           }
 
           document.documentElement.dataset.theme = storedTheme;
-          document
-            .querySelector('meta[name="theme-color"]')
-            ?.setAttribute("content", storedTheme === "dark" ? "#11110f" : "#fbfbfa");
         } catch {
           // The default light theme remains active when storage is unavailable.
         }
