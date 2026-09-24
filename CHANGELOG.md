@@ -2,15 +2,15 @@
 
 User-facing changes to bgcut are listed here.
 
-## 2026-09-24
+## 0.5.0 - 2026-09-24
 
-- Safari WebGPU now uses the validated internal-FP16 BiRefNet artifact when the WebGPU device exposes `shader-f16`. Safari devices without that feature, Chromium-family WebGPU, browser WebAssembly, and native Node/CLI keep the validated FP32 artifact.
+- Safari WebGPU now uses a reusable no-capture ONNX Runtime session and selects the validated internal-FP16 BiRefNet artifact when the WebGPU device exposes `shader-f16`. Safari without that feature, Chromium-family WebGPU, browser WebAssembly, and native Node/CLI keep FP32.
 - On an Apple M3 Pro with Safari 26.3, the process-isolated six-image gate moved the pooled warm inference median from 1,101 ms with FP32 to 627.5 ms with FP16, a 43.0% reduction. The pooled warm total median moved from 1,309 ms to 873.5 ms, a 33.3% reduction.
-- The Safari FP16 artifact is 98,572,669 bytes, compared with 195,872,736 bytes for the FP32 artifact. Public model input and output remain FP32.
-- In the same six-image gate, aggregate MAE changed from 0.02255466 to 0.02200792, MSE from 0.01933876 to 0.01876192, IoU from 0.96425259 to 0.96511045, and F1 from 0.98180101 to 0.98224550. These measurements describe that hardware and benchmark set.
-- Added persistent light and dark site themes backed by semantic color tokens, with the existing palette preserved as the light theme.
-- Added repeatable cross-tool benchmark commands for bgcut timing and output-quality scoring, plus a documented comparison protocol.
-- Simplified Documentation and Changelog to one permanent left-rail page title and removed the duplicate centered title.
+- The Safari FP16 artifact is 98,572,669 bytes, compared with 195,872,736 bytes for FP32. Public model input and output remain FP32.
+- In the same six-image gate, aggregate MAE moved from 0.02255466 to 0.02200792, MSE from 0.01933876 to 0.01876192, IoU from 0.96425259 to 0.96511045, and F1 from 0.98180101 to 0.98224550. These measurements are specific to that hardware and benchmark set.
+- Added persistent light and dark site themes backed by semantic color tokens.
+- Added repeatable benchmark commands for bgcut timing and output-quality scoring, with a documented comparison protocol.
+- Simplified the Documentation and Changelog layout around the permanent left rail. The hosted changelog now lists only full stable releases.
 
 ## 0.4.0 - 2026-09-21
 
