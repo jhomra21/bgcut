@@ -10,7 +10,7 @@ import {
 type ChangelogSection = {
   readonly id: string;
   readonly version: string;
-  readonly heading: string;
+  readonly date: string;
   readonly items: readonly string[];
 };
 
@@ -34,12 +34,13 @@ const parseChangelog = (source: string): ChangelogDocument => {
   const finishSection = () => {
     if (heading !== undefined && releaseHeading.test(heading)) {
       const separatorIndex = heading.indexOf(" - ");
-      const version = separatorIndex < 0 ? heading : heading.slice(0, separatorIndex);
+      const version = heading.slice(0, separatorIndex);
+      const date = heading.slice(separatorIndex + 3);
 
       sections.push({
         id: releaseId(version),
         version,
-        heading,
+        date,
         items,
       });
     }
@@ -119,7 +120,10 @@ export const ChangelogPage = () => (
         <For each={document.sections}>
           {(section) => (
             <section id={section.id} class="reference-section changelog-release">
-              <h3>{section.heading}</h3>
+              <h3 class="changelog-release-heading">
+                <span>{section.version}</span>
+                <time datetime={section.date}>{section.date}</time>
+              </h3>
               <Show when={section.items.length > 0}>
                 <ul>
                   <For each={section.items}>

@@ -23,6 +23,8 @@ const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url))
 
 const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
+const stylesSource = await Bun.file(new URL("./styles.css", import.meta.url)).text();
+
 const sourceInputBlock = (): string => {
   const start = appSource.indexOf('id="source-file-input"');
 
@@ -86,6 +88,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
     expect(appSource).not.toContain("Remove background");
+    expect(homeSource).not.toContain("Remove image backgrounds locally");
+    expect(homeSource).toContain("Free, private background remover for PNG, JPEG, WebP, and AVIF.");
   });
 
 
@@ -155,6 +159,9 @@ describe("browser product UI", () => {
     expect(appSource).toContain('sectionSelector=".reference-page > section[id]"');
     expect(appSource).toContain("bottomSectionId={oldestReleaseId}");
     expect(appSource).toContain('id={section.id} class="reference-section changelog-release"');
+    expect(appSource).toContain('class="changelog-release-heading"');
+    expect(appSource).toContain("<span>{section.version}</span>");
+    expect(appSource).toContain("<time datetime={section.date}>{section.date}</time>");
   });
 
   test("keeps top navigation geometry stable and moves selection immediately", () => {
@@ -169,6 +176,10 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("headerScrolled");
     expect(appSource).not.toContain("showPageContext");
     expect(appSource).not.toContain("site-page-context");
+    expect(stylesSource).toContain("padding-top: 34px;\n  padding-bottom: 18px;");
+    expect(stylesSource).toContain("padding-top: 20px;\n    padding-bottom: 12px;");
+    expect(stylesSource).not.toContain("padding-top: 18px;\n  padding-bottom: 14px;");
+    expect(stylesSource).not.toContain("padding-top: 12px;\n    padding-bottom: 10px;");
   });
 
   test("keeps the reference page title permanently in the reading rail", () => {
