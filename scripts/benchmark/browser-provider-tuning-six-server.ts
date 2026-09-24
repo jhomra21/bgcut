@@ -1146,46 +1146,46 @@ const finalize =
           "combined",
       );
 
-    const bySequence =
-      Object.fromEntries(
-        (
-          [
-            "default-first",
-            "combined-first",
-          ] as const
-        ).map(
-          (sequence) => {
-            const defaultReport =
-              getReport(
-                findBlock(
-                  sequence,
-                  "default",
-                ).index,
-              );
+    const summarizeSequence = (
+      sequence: Sequence,
+    ): ModeComparison => {
+      const defaultReport =
+        getReport(
+          findBlock(
+            sequence,
+            "default",
+          ).index,
+        );
 
-            const combinedReport =
-              getReport(
-                findBlock(
-                  sequence,
-                  "combined",
-                ).index,
-              );
+      const combinedReport =
+        getReport(
+          findBlock(
+            sequence,
+            "combined",
+          ).index,
+        );
 
-            return [
-              sequence,
-              compareModes(
-                defaultReport.runs,
-                combinedReport.runs,
-              ),
-            ];
-          },
+      return compareModes(
+        defaultReport.runs,
+        combinedReport.runs,
+      );
+    };
+
+    const bySequence: Readonly<
+      Record<
+        Sequence,
+        ModeComparison
+      >
+    > = {
+      "default-first":
+        summarizeSequence(
+          "default-first",
         ),
-      ) as Readonly<
-        Record<
-          Sequence,
-          ModeComparison
-        >
-      >;
+      "combined-first":
+        summarizeSequence(
+          "combined-first",
+        ),
+    };
 
     const perCase =
       manifest.cases.map(
