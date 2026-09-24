@@ -285,8 +285,10 @@ describe("browser product UI", () => {
     expect(appSource).toContain('engine: "cpu"');
     expect(appSource).toContain("195,872,736 bytes");
     expect(appSource).toContain("4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c");
-    expect(appSource).toContain("The CLI, local app, and");
-    expect(appSource).toContain("verify");
+    expect(appSource).toContain("98,572,669 bytes");
+    expect(appSource).toContain("37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33");
+    expect(appSource).toContain("The npm package does not include either model artifact");
+    expect(appSource).toContain("Safari WebGPU uses FP16 only when the device exposes");
     expect(appSource).toContain("SHA-256");
   });
 
@@ -307,8 +309,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain("WebAssembly input uses canvas resize and the same normalization");
     expect(appSource).toContain("Sharp/libvips decode and orientation");
     expect(appSource).toContain("Linear resize and ImageNet normalization");
-    expect(appSource).toContain("Last updated September 19, 2026");
-    expect(appSource.match(/Last updated September 19, 2026/gu)?.length).toBe(2);
+    expect(appSource.match(/Last updated September 24, 2026/gu)?.length).toBe(1);
+    expect(appSource.match(/Last updated September 19, 2026/gu)?.length).toBe(1);
     expect(appSource).not.toContain("The product UI is intentionally small");
     expect(appSource).not.toContain("Native surfaces");
   });
