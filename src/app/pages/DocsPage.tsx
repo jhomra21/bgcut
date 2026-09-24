@@ -233,32 +233,8 @@ try {
           </p>
           <div class="spec-table" role="table" aria-label="Model metadata">
             <div class="spec-row" role="row">
-              <strong role="cell">Revision</strong>
+              <strong role="cell">Source revision</strong>
               <span role="cell"><code>4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7</code></span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell">FP32 artifact</strong>
-              <span role="cell"><code>birefnet-lite-512-ort-basic-webgpu-v2.onnx</code></span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell">FP32 size</strong>
-              <span role="cell">195,872,736 bytes</span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell">FP32 SHA-256</strong>
-              <span role="cell" class="breakable"><code>4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c</code></span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell">Safari FP16 artifact</strong>
-              <span role="cell"><code>birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx</code></span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell">Safari FP16 size</strong>
-              <span role="cell">98,572,669 bytes</span>
-            </div>
-            <div class="spec-row" role="row">
-              <strong role="cell">Safari FP16 SHA-256</strong>
-              <span role="cell" class="breakable"><code>37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33</code></span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Inference size</strong>
@@ -268,6 +244,43 @@ try {
               <strong role="cell">Export size</strong>
               <span role="cell">Original source dimensions</span>
             </div>
+          </div>
+
+          <div class="model-artifact-table-wrap">
+            <table class="model-artifact-table">
+              <thead>
+                <tr>
+                  <th scope="col">Artifact</th>
+                  <th scope="col">Runtime</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">SHA-256</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="model-artifact-name">
+                    <strong>FP32</strong>
+                    <code>birefnet-lite-512-ort-basic-webgpu-v2.onnx</code>
+                  </td>
+                  <td>Native CLI, Node API, Chromium WebGPU, browser WebAssembly, Safari fallback</td>
+                  <td class="model-artifact-size">195,872,736 bytes</td>
+                  <td class="model-artifact-hash">
+                    <code>4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="model-artifact-name">
+                    <strong>FP16</strong>
+                    <code>birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx</code>
+                  </td>
+                  <td>Safari WebGPU with <code>shader-f16</code></td>
+                  <td class="model-artifact-size">98,572,669 bytes</td>
+                  <td class="model-artifact-hash">
+                    <code>37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <p>
             The npm package does not include either model artifact. Native CLI and Node API runs
