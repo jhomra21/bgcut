@@ -1,0 +1,84 @@
+name: fp16 model
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/model-fp16.yml"
+      - "scripts/model/convert-fp16.py"
+      - "src/shared/model-config.ts"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/model-fp16.yml"
+      - "scripts/model/convert-fp16.py"
+      - "src/shared/model-config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned ONNX tooling
+        run: python -m pip install --disable-pip-version-check --no-cache-dir onnx==1.19.0 onnxruntime==1.30.0
+
+      - name: Download validated FP32 model
+        run: |
+          mkdir -p artifacts
+          curl --fail --location --retry 3 \
+            --output artifacts/production.onnx \
+            "https://github.com/jhomra21/bgcut/releases/download/model-birefnet-lite-512-ort-basic-webgpu-v2/birefnet-lite-512-ort-basic-webgpu-v2.onnx"
+          test "$(stat -c %s artifacts/production.onnx)" = "195872736"
+          echo "4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c  artifacts/production.onnx" | sha256sum --check -
+
+      - name: Convert internal weights to FP16
+        run: |
+          python scripts/model/convert-fp16.py \
+            artifacts/production.onnx \
+            artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx \
+            artifacts/fp16-model-report.json
+
+      - name: Verify FP16 fingerprint
+        run: |
+          test "$(stat -c %s artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx)" = "98572669"
+          echo "37d4035765b97a0323729fdee787d16eb7238c39c467316e887c5292792f3e33  artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx" | sha256sum --check -
+
+      - name: Upload FP16 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bgcut-webgpu-v2-fp16
+          path: |
+            artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx
+            artifacts/fp16-model-report.json
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Publish model release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="model-birefnet-lite-512-ort-basic-webgpu-v2-fp16"
+          model="artifacts/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx"
+          report="artifacts/fp16-model-report.json"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --target "$GITHUB_SHA" \
+              --title "BiRefNet Lite 512 WebGPU FP16" \
+              --notes "Validated bgcut model with FP16 internal weights and FP32 public I/O."
+          fi
+
+          gh release upload "$tag" "$model" "$report" --clobber
