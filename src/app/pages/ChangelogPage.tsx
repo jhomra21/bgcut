@@ -19,7 +19,7 @@ type ChangelogDocument = {
   readonly sections: readonly ChangelogSection[];
 };
 
-const releaseHeading = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)? - \d{4}-\d{2}-\d{2}$/u;
+const releaseHeading = /^(?:\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/u;
 
 const releaseId = (version: string): string =>
   `release-${version.replaceAll(".", "-")}`;

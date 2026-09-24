@@ -3,7 +3,7 @@ export const PrivacyPage = () => (
     <article class="legal-page">
       <div class="eyebrow">Privacy</div>
       <h1>Your images stay on your device.</h1>
-      <p class="legal-updated">Last updated September 19, 2026</p>
+      <p class="legal-updated">Last updated September 24, 2026</p>
 
       <section>
         <h3>Image processing</h3>
@@ -19,11 +19,11 @@ export const PrivacyPage = () => (
       <section>
         <h3>Network requests</h3>
         <p>
-          The hosted app fetches its app files, ONNX Runtime files, and pinned model from bgcut.dev
-          through Cloudflare. The CLI, local app server, and Node API may download the pinned model
-          from a bgcut GitHub release when the local cache is missing or invalid. Cloudflare and
-          GitHub can receive request metadata such as IP address, user agent, requested URL, and
-          request time.
+          The hosted app fetches its app files, ONNX Runtime files, and selected model artifact
+          from bgcut.dev through Cloudflare. The local app server may download the validated FP32
+          and Safari FP16 model artifacts from bgcut GitHub releases when its cache is missing or
+          invalid. The CLI and Node API use the validated FP32 artifact. Cloudflare and GitHub can
+          receive request metadata such as IP address, user agent, requested URL, and request time.
         </p>
       </section>
 
@@ -39,7 +39,8 @@ export const PrivacyPage = () => (
         <h3>Third-party services</h3>
         <p>
           GitHub and npm links take you to third-party sites. Cloudflare delivers bgcut.dev, and
-          GitHub serves native model downloads. Their privacy policies apply to those requests.
+          GitHub serves model downloads used by the local and native paths. Their privacy policies
+          apply to those requests.
         </p>
       </section>
 

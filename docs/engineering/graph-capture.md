@@ -8,9 +8,7 @@ Exact SHA:
 
 `fa9f11bf9decc5e4a30a1011ba7fac757519ef1f`
 
-Draft PR at the time of acceptance:
-
-`#16`, branch `perf/graph-capture-sum-add-runtime`
+Accepted implementation: PR #16, branch `perf/graph-capture-sum-add-runtime`.
 
 Runtime and model:
 
@@ -86,16 +84,16 @@ The accepted head also passed these checks:
 
 The graph-capture experiment first used a development Vite proxy because GitHub Release assets were not suitable as a direct browser model origin.
 
-The current production path keeps the model same-origin while keeping inference local:
+The current production path keeps model delivery same-origin while inference stays local:
 
-- the app requests `/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx`
-- `MODEL_RELEASE_URL` points to the pinned v2 GitHub Release asset used by `bun run model:prepare`
-- model preparation verifies the exact byte count and SHA-256 before using the file
-- Cloudflare production does not ship the 196 MB model in Workers Static Assets
-- the validated model is stored in the private `bgcut-models` R2 bucket
-- the Worker serves `/models/*` from that R2 binding under the same `bgcut.dev` origin
-- the model stays out of Git history
+- Chromium-family WebGPU and browser WebAssembly request `/models/birefnet-lite-512-ort-basic-webgpu-v2.onnx`
+- Safari WebGPU requests `/models/birefnet-lite-512-ort-basic-webgpu-v2-fp16.onnx` when the device exposes `shader-f16`; other Safari devices keep the FP32 path
+- `MODEL_RELEASE_URL` and `WEBGPU_MODEL_RELEASE_URL` pin the two GitHub Release assets used by model preparation
+- model preparation verifies the exact byte count and SHA-256 for both artifacts
+- Cloudflare production keeps both model files out of Workers Static Assets
+- private R2 stores the validated model artifacts, and the Worker serves them through `/models/*` under the same `bgcut.dev` origin
+- model files stay out of Git history
 
-This changes model delivery only. Source images still stay on the user's machine and inference still runs locally.
+Source images stay on the user's machine, and inference runs locally.
 
 See [`../operations/deploying.md`](../operations/deploying.md) for the current R2 bootstrap and production deployment flow.

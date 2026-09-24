@@ -3,7 +3,7 @@
 ## Engineering defaults
 
 - Use Bun for dependency management, scripts, tests, and workspace operations.
-- Use Solid 2 for the UI and reactive application state. Keep the Solid 2 RC packages pinned while 2.0 is prerelease.
+- Use Solid 2 for the UI and reactive application state. Keep the pinned Solid 2 RC package versions until the repository intentionally updates that dependency set.
 - Use Effect at asynchronous and system boundaries such as GPU setup, device loss, model loading, model caching, image decoding, inference jobs, cancellation, retries, timeouts, persistence, and export.
 - Keep tight GPU and image-processing loops in plain TypeScript, TypeGPU, or raw WebGPU when that is clearer than Effect.
 - Prefer tagged domain errors over generic thrown errors.
@@ -59,7 +59,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - Keep model-specific behavior behind the inference boundary so the UI does not depend on ONNX details.
 - Keep public documentation focused on bgcut. Do not expose internal comparison-tool names or acceptance fixtures unless they become part of the public product contract.
 - Keep the normal browser UI limited to the user flow. Developer diagnostics and benchmark controls do not belong in the main product surface.
-- The hosted `/changelog` page must render published release sections from root `CHANGELOG.md`; do not duplicate release prose in app source. Never render the `Unreleased` section or changelog intro copy on the public page.
+- The hosted `/changelog` page must render dated product updates and stable release sections from root `CHANGELOG.md`; do not duplicate changelog prose in app source. Do not add placeholder release-state sections to the public changelog.
 
 ## Web deployment policy
 
@@ -82,8 +82,8 @@ Keep the repository as one package until a concrete second package needs an inde
 
 ## Release and package policy
 
-- Use prerelease semver and the npm `beta` tag for release candidates that still need published-package acceptance.
-- Stable versions have no prerelease suffix and publish to npm `latest` only after the corresponding published beta passes end-to-end consumer acceptance.
+- Publish public package releases with normal semantic versions through npm `latest`.
+- Validate the exact package candidate before publication with the repository release gate and clean consumer checks.
 - Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
 - Prepare each release in a dedicated PR after the product changes are merged and accepted.
