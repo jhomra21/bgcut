@@ -1,0 +1,763 @@
+import { Effect, Schema } from "effect";
+
+import { formatBackgroundRemovalError } from "../../src/browser/errors";
+import {
+  removeBackgroundWebGpuWithStrategy,
+  type WebGpuValidationMode,
+} from "../../src/browser/inference";
+import type { RemovalTimings } from "../../src/browser/timing";
+import { resolveDefaultWebGpuSessionStrategy } from "../../src/browser/webgpu-session-strategy";
+
+const ModeSchema = Schema.Literal(
+  "default",
+  "wgpu-only",
+);
+
+const SequenceSchema = Schema.Literal(
+  "default-first",
+  "wgpu-first",
+);
+
+const DirectionSchema = Schema.Literal(
+  "forward",
+  "reverse",
+);
+
+const BenchmarkCaseSchema = Schema.Struct({
+  id: Schema.String,
+  inputUrl: Schema.String,
+});
+
+const BlockSchema = Schema.Struct({
+  index: Schema.Number,
+  sequence: SequenceSchema,
+  direction: DirectionSchema,
+  mode: ModeSchema,
+  caseIndexes: Schema.Array(
+    Schema.Number,
+  ),
+});
+
+const ConfigSchema = Schema.Struct({
+  cases: Schema.Array(
+    BenchmarkCaseSchema,
+  ),
+  runsPerCase: Schema.Number,
+  timeoutMs: Schema.Number,
+  blocks: Schema.Array(
+    BlockSchema,
+  ),
+});
+
+const CompletionSchema = Schema.Struct({
+  done: Schema.Boolean,
+  nextBlock: Schema.optional(
+    Schema.Number,
+  ),
+});
+
+type Mode =
+  Schema.Schema.Type<
+    typeof ModeSchema
+  >;
+
+type Sequence =
+  Schema.Schema.Type<
+    typeof SequenceSchema
+  >;
+
+type Direction =
+  Schema.Schema.Type<
+    typeof DirectionSchema
+  >;
+
+type Block =
+  Schema.Schema.Type<
+    typeof BlockSchema
+  >;
+
+type RunRecord = {
+  readonly schemaVersion: 1;
+  readonly blockIndex: number;
+  readonly sequence: Sequence;
+  readonly direction: Direction;
+  readonly mode: Mode;
+  readonly caseId: string;
+  readonly run: number;
+  readonly timings: RemovalTimings;
+};
+
+type PrimeRecord = {
+  readonly schemaVersion: 1;
+  readonly blockIndex: number;
+  readonly sequence: Sequence;
+  readonly direction: Direction;
+  readonly mode: Mode;
+  readonly caseId: string;
+  readonly timings: RemovalTimings;
+};
+
+type FailureRecord = {
+  readonly schemaVersion: 1;
+  readonly blockIndex: number;
+  readonly sequence: Sequence;
+  readonly direction: Direction;
+  readonly mode: Mode;
+  readonly caseId: string;
+  readonly run:
+    | number
+    | "prime";
+  readonly elapsedMs: number;
+  readonly message: string;
+  readonly stack: string;
+};
+
+type BlockReport = {
+  readonly schemaVersion: 1;
+  readonly generatedAt: string;
+  readonly userAgent: string;
+  readonly block: Block;
+  readonly prime: PrimeRecord;
+  readonly runs: readonly RunRecord[];
+};
+
+const status =
+  document.querySelector<HTMLPreElement>(
+    "#status",
+  );
+
+if (
+  status === null
+) {
+  throw new Error(
+    "Validation-mode six-image status element is missing.",
+  );
+}
+
+const writeStatus = (
+  message: string,
+): void => {
+  status.textContent +=
+    `${message}\n`;
+};
+
+const blockIndexFromLocation =
+  (): number => {
+    const raw =
+      new URL(
+        globalThis.location.href,
+      ).searchParams.get(
+        "block",
+      );
+
+    const value =
+      Number.parseInt(
+        raw ?? "0",
+        10,
+      );
+
+    if (
+      !Number.isInteger(
+        value,
+      ) ||
+      value < 0
+    ) {
+      throw new Error(
+        `Invalid validation-mode block "${raw}".`,
+      );
+    }
+
+    return value;
+  };
+
+const validationModeForMode = (
+  mode: Mode,
+): WebGpuValidationMode =>
+  mode === "wgpu-only"
+    ? "wgpuOnly"
+    : "default";
+
+const withTimeout = async <T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> => {
+  let timeout:
+    | ReturnType<
+        typeof setTimeout
+      >
+    | undefined;
+
+  const timeoutPromise =
+    new Promise<T>(
+      (_, reject) => {
+        timeout =
+          setTimeout(
+            () => {
+              reject(
+                new Error(
+                  `${label} exceeded ${timeoutMs} ms.`,
+                ),
+              );
+            },
+            timeoutMs,
+          );
+      },
+    );
+
+  try {
+    return await Promise.race([
+      operation,
+      timeoutPromise,
+    ]);
+  } finally {
+    if (
+      timeout !== undefined
+    ) {
+      clearTimeout(
+        timeout,
+      );
+    }
+  }
+};
+
+const makeFile = (
+  source: Blob,
+  id: string,
+): File =>
+  new File(
+    [source],
+    `${id}.png`,
+    {
+      type:
+        source.type ||
+        "image/png",
+    },
+  );
+
+const remove = async (
+  source: Blob,
+  caseId: string,
+  mode: Mode,
+) =>
+  Effect.runPromise(
+    removeBackgroundWebGpuWithStrategy(
+      makeFile(
+        source,
+        caseId,
+      ),
+      "no-capture-reuse",
+      validationModeForMode(
+        mode,
+      ),
+    ).pipe(
+      Effect.match({
+        onFailure: (error) => ({
+          ok: false as const,
+          message:
+            formatBackgroundRemovalError(
+              error,
+            ),
+        }),
+        onSuccess: (result) => ({
+          ok: true as const,
+          result,
+        }),
+      }),
+    ),
+  );
+
+const postJson = async (
+  path: string,
+  value:
+    | RunRecord
+    | PrimeRecord
+    | FailureRecord
+    | BlockReport,
+): Promise<Response> => {
+  const response =
+    await fetch(
+      path,
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json",
+        },
+        body:
+          JSON.stringify(
+            value,
+          ),
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      await response.text(),
+    );
+  }
+
+  return response;
+};
+
+const uploadOutput = async (
+  blockIndex: number,
+  caseIndex: number,
+  run: number,
+  blob: Blob,
+): Promise<void> => {
+  const response =
+    await fetch(
+      `/output/${blockIndex}/${caseIndex}/${run}`,
+      {
+        method: "POST",
+        body: blob,
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      await response.text(),
+    );
+  }
+};
+
+const loadSource = async (
+  inputUrl: string,
+  caseId: string,
+): Promise<Blob> => {
+  const response =
+    await fetch(
+      inputUrl,
+      {
+        cache:
+          "no-store",
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `Could not load ${caseId}: HTTP ${response.status}.`,
+    );
+  }
+
+  return response.blob();
+};
+
+const recordFailure = async (
+  block: Block,
+  caseId: string,
+  run:
+    | number
+    | "prime",
+  startedAt: number,
+  error: Error,
+): Promise<never> => {
+  const failure:
+    FailureRecord = {
+      schemaVersion: 1,
+      blockIndex:
+        block.index,
+      sequence:
+        block.sequence,
+      direction:
+        block.direction,
+      mode:
+        block.mode,
+      caseId,
+      run,
+      elapsedMs:
+        performance.now() -
+        startedAt,
+      message:
+        error.message,
+      stack:
+        error.stack ?? "",
+    };
+
+  await postJson(
+    "/failure",
+    failure,
+  );
+
+  throw error;
+};
+
+const main =
+  async (): Promise<void> => {
+    const configResponse =
+      await fetch(
+        "/config.json",
+        {
+          cache:
+            "no-store",
+        },
+      );
+
+    if (
+      !configResponse.ok
+    ) {
+      throw new Error(
+        `Could not load validation-mode six-image config: HTTP ${configResponse.status}.`,
+      );
+    }
+
+    const config =
+      Schema.decodeUnknownSync(
+        ConfigSchema,
+      )(
+        await configResponse.json(),
+      );
+
+    const blockIndex =
+      blockIndexFromLocation();
+
+    const block =
+      config.blocks.find(
+        (candidate) =>
+          candidate.index ===
+          blockIndex,
+      );
+
+    if (
+      block === undefined
+    ) {
+      throw new Error(
+        `Validation-mode block ${blockIndex} is not configured.`,
+      );
+    }
+
+    if (
+      resolveDefaultWebGpuSessionStrategy(
+        navigator.userAgent,
+      ) !==
+      "no-capture-reuse"
+    ) {
+      throw new Error(
+        "Validation-mode six-image benchmark must run on Safari's no-capture path.",
+      );
+    }
+
+    const primeCaseIndex =
+      block.caseIndexes.at(0);
+
+    if (
+      primeCaseIndex ===
+      undefined
+    ) {
+      throw new Error(
+        `Block ${block.index} has no benchmark cases.`,
+      );
+    }
+
+    const primeCase =
+      config.cases.at(
+        primeCaseIndex,
+      );
+
+    if (
+      primeCase ===
+      undefined
+    ) {
+      throw new Error(
+        `Block ${block.index} references unknown prime case ${primeCaseIndex}.`,
+      );
+    }
+
+    writeStatus(
+      `Block ${block.index + 1}/${config.blocks.length}: ${block.sequence}, ${block.mode}, ${block.direction}.`,
+    );
+
+    const primeSource =
+      await loadSource(
+        primeCase.inputUrl,
+        primeCase.id,
+      );
+
+    const primeStartedAt =
+      performance.now();
+
+    let primeRecord:
+      | PrimeRecord
+      | undefined;
+
+    try {
+      const prime =
+        await withTimeout(
+          remove(
+            primeSource,
+            primeCase.id,
+            block.mode,
+          ),
+          config.timeoutMs,
+          `${block.sequence} ${block.mode} prime`,
+        );
+
+      if (
+        !prime.ok
+      ) {
+        throw new Error(
+          prime.message,
+        );
+      }
+
+      if (
+        prime.result.timings
+          .sessionReused
+      ) {
+        throw new Error(
+          `Block ${block.index} prime unexpectedly reused a session.`,
+        );
+      }
+
+      primeRecord = {
+        schemaVersion: 1,
+        blockIndex:
+          block.index,
+        sequence:
+          block.sequence,
+        direction:
+          block.direction,
+        mode:
+          block.mode,
+        caseId:
+          primeCase.id,
+        timings:
+          prime.result.timings,
+      };
+
+      await postJson(
+        "/prime",
+        primeRecord,
+      );
+    } catch (error) {
+      const parsed =
+        error instanceof Error
+          ? error
+          : new Error(
+              String(error),
+            );
+
+      await recordFailure(
+        block,
+        primeCase.id,
+        "prime",
+        primeStartedAt,
+        parsed,
+      );
+    }
+
+    if (
+      primeRecord ===
+      undefined
+    ) {
+      throw new Error(
+        "Validation-mode six-image prime did not produce a record.",
+      );
+    }
+
+    const records:
+      RunRecord[] = [];
+
+    for (
+      const caseIndex of
+      block.caseIndexes
+    ) {
+      const benchmarkCase =
+        config.cases.at(
+          caseIndex,
+        );
+
+      if (
+        benchmarkCase ===
+        undefined
+      ) {
+        throw new Error(
+          `Block ${block.index} references unknown case ${caseIndex}.`,
+        );
+      }
+
+      const source =
+        caseIndex ===
+          primeCaseIndex
+          ? primeSource
+          : await loadSource(
+              benchmarkCase.inputUrl,
+              benchmarkCase.id,
+            );
+
+      for (
+        let run = 1;
+        run <=
+        config.runsPerCase;
+        run += 1
+      ) {
+        const startedAt =
+          performance.now();
+
+        try {
+          const outcome =
+            await withTimeout(
+              remove(
+                source,
+                benchmarkCase.id,
+                block.mode,
+              ),
+              config.timeoutMs,
+              `${block.sequence} ${block.mode} ${benchmarkCase.id} run ${run}`,
+            );
+
+          if (
+            !outcome.ok
+          ) {
+            throw new Error(
+              outcome.message,
+            );
+          }
+
+          if (
+            !outcome.result.timings
+              .sessionReused
+          ) {
+            throw new Error(
+              `${block.sequence} ${block.mode} ${benchmarkCase.id} run ${run} did not reuse the primed session.`,
+            );
+          }
+
+          await uploadOutput(
+            block.index,
+            caseIndex,
+            run,
+            outcome.result.blob,
+          );
+
+          const record:
+            RunRecord = {
+              schemaVersion: 1,
+              blockIndex:
+                block.index,
+              sequence:
+                block.sequence,
+              direction:
+                block.direction,
+              mode:
+                block.mode,
+              caseId:
+                benchmarkCase.id,
+              run,
+              timings:
+                outcome.result
+                  .timings,
+            };
+
+          records.push(
+            record,
+          );
+
+          await postJson(
+            "/run",
+            record,
+          );
+
+          writeStatus(
+            `${benchmarkCase.id} run ${run}: inference ${record.timings.inferenceMs.toFixed(
+              1,
+            )} ms, total ${record.timings.totalMs.toFixed(
+              1,
+            )} ms.`,
+          );
+        } catch (error) {
+          const parsed =
+            error instanceof Error
+              ? error
+              : new Error(
+                  String(error),
+                );
+
+          await recordFailure(
+            block,
+            benchmarkCase.id,
+            run,
+            startedAt,
+            parsed,
+          );
+        }
+      }
+    }
+
+    const report:
+      BlockReport = {
+        schemaVersion: 1,
+        generatedAt:
+          new Date().toISOString(),
+        userAgent:
+          navigator.userAgent,
+        block,
+        prime:
+          primeRecord,
+        runs:
+          records,
+      };
+
+    const response =
+      await postJson(
+        "/block-report",
+        report,
+      );
+
+    const completion =
+      Schema.decodeUnknownSync(
+        CompletionSchema,
+      )(
+        await response.json(),
+      );
+
+    if (
+      completion.done
+    ) {
+      writeStatus("");
+      writeStatus(
+        "Counterbalanced validation-mode benchmark complete.",
+      );
+
+      return;
+    }
+
+    if (
+      completion.nextBlock ===
+      undefined
+    ) {
+      throw new Error(
+        "Validation-mode server did not return the next block.",
+      );
+    }
+
+    globalThis.location.replace(
+      `/?block=${completion.nextBlock}`,
+    );
+  };
+
+void main().catch(
+  (error) => {
+    const parsed =
+      error instanceof Error
+        ? error
+        : new Error(
+            String(error),
+          );
+
+    writeStatus("");
+    writeStatus(
+      "COUNTERBALANCED VALIDATION-MODE BENCHMARK FAILED",
+    );
+    writeStatus(
+      parsed.message,
+    );
+  },
+);
