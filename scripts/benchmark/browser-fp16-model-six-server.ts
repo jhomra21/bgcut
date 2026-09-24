@@ -2721,9 +2721,14 @@ const app =
             await request.json(),
           );
 
+        const launch =
+          activeLaunch;
+
         if (
+          launch ===
+            undefined ||
           record.blockIndex !==
-          activeLaunch?.blockIndex
+            launch.blockIndex
         ) {
           return new Response(
             "Prime record does not match the active benchmark block.",
@@ -2734,7 +2739,7 @@ const app =
         }
 
         const primeOnly =
-          activeLaunch.primeOnly;
+          launch.primeOnly;
 
         const directory =
           join(
