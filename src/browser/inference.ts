@@ -22,6 +22,8 @@ import { fetchModelBytes } from "./model-loader";
 import {
   MODEL_PUBLIC_PATH,
   MODEL_REVISION,
+  WEBGPU_MODEL_PUBLIC_PATH,
+  WEBGPU_MODEL_REVISION,
 } from "../shared/model-config";
 import { resolveOrtWebGpuWasmUrl } from "./ort-webgpu-runtime";
 import { getGpuRuntime } from "./runtime";
@@ -31,7 +33,7 @@ import {
   type RemovalTimings,
 } from "./timing";
 
-export { MODEL_REVISION };
+export { MODEL_REVISION, WEBGPU_MODEL_REVISION };
 
 export type BrowserInferenceEngine = "webgpu" | "wasm";
 
@@ -260,7 +262,7 @@ const runModel = (
 export const removeBackgroundWebGpuWithStrategy = (
   file: File,
   strategy: WebGpuSessionStrategy,
-  modelPath: string = MODEL_PUBLIC_PATH,
+  modelPath: string = WEBGPU_MODEL_PUBLIC_PATH,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   Effect.suspend(() => {
     const timings = createRemovalTimingRecorder();
@@ -312,7 +314,10 @@ export const removeBackgroundWebGpuWithStrategy = (
                   blob,
                   width: bitmap.width,
                   height: bitmap.height,
-                  modelRevision: MODEL_REVISION,
+                  modelRevision:
+                    modelPath === WEBGPU_MODEL_PUBLIC_PATH
+                      ? WEBGPU_MODEL_REVISION
+                      : MODEL_REVISION,
                   engine: "webgpu" as const,
                   timings: timings.finish(),
                 };
