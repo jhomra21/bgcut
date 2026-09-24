@@ -55,7 +55,7 @@
     "test": "bun test",
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package/smoke.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-strategy:bundle-check && bun run benchmark:browser-provider-tuning:bundle-check && bun run benchmark:browser-reference-resume:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-strategy:bundle-check && bun run benchmark:browser-provider-tuning:bundle-check && bun run benchmark:browser-provider-tuning:six:bundle-check && bun run benchmark:browser-reference-resume:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 versions upload",
     "cloudflare:runtime:remote": "bun run scripts/cloudflare/upload-runtime.ts",
@@ -71,6 +71,9 @@
     "benchmark:browser-provider-tuning": "bun run scripts/benchmark/browser-provider-tuning-server.ts",
     "benchmark:browser-provider-tuning:e2e": "bun run scripts/benchmark/browser-provider-tuning-e2e.ts",
     "benchmark:browser-provider-tuning:bundle-check": "bun run scripts/benchmark/browser-provider-tuning-bundle-check.ts",
+    "benchmark:browser-provider-tuning:six": "bun run scripts/benchmark/browser-provider-tuning-six-server.ts",
+    "benchmark:browser-provider-tuning:six:e2e": "bun run scripts/benchmark/browser-provider-tuning-six-e2e.ts",
+    "benchmark:browser-provider-tuning:six:bundle-check": "bun run scripts/benchmark/browser-provider-tuning-six-bundle-check.ts",
     "benchmark:browser-reference-resume": "bun run scripts/benchmark/browser-reference-resume-server.ts",
     "benchmark:browser-reference-resume:e2e": "bun run scripts/benchmark/browser-reference-resume-e2e.ts",
     "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts"
