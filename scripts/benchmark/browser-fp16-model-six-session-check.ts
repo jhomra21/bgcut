@@ -458,13 +458,19 @@ try {
         primePath,
         "utf8",
       ),
-    ) as {
-      readonly blockIndex?: number;
-    };
+    );
 
   if (
+    typeof persistedPrime !==
+      "object" ||
+    persistedPrime ===
+      null ||
+    !(
+      "blockIndex" in
+      persistedPrime
+    ) ||
     persistedPrime.blockIndex !==
-    0
+      0
   ) {
     throw new Error(
       "Persisted prewarm prime belongs to the wrong block.",
