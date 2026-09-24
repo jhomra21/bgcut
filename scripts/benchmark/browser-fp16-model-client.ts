@@ -114,6 +114,15 @@ const writeStatus = (
     `${message}\n`;
 };
 
+const queryFlag = (
+  name: string,
+): boolean =>
+  new URL(
+    globalThis.location.href,
+  ).searchParams.get(
+    name,
+  ) === "1";
+
 const blockIndexFromLocation =
   (): number => {
     const raw =
@@ -452,6 +461,18 @@ const main =
           1,
         )} ms.`,
       );
+
+      if (
+        queryFlag(
+          "primeOnly",
+        )
+      ) {
+        writeStatus(
+          "Prime-only prewarm complete.",
+        );
+
+        return;
+      }
     } catch (error) {
       const parsed =
         error instanceof Error
@@ -600,6 +621,19 @@ const main =
       )(
         await response.json(),
       );
+
+    if (
+      queryFlag(
+        "single",
+      )
+    ) {
+      writeStatus("");
+      writeStatus(
+        "Isolated block complete.",
+      );
+
+      return;
+    }
 
     if (
       completion.done
