@@ -197,6 +197,14 @@ type PixelComparison = {
   readonly maxAbsoluteAlphaByteDifference: number;
 };
 
+type TrialSummary = {
+  readonly trial: number;
+  readonly sequence: Sequence;
+  readonly fp32Block: number;
+  readonly fp16Block: number;
+  readonly comparison: ModeComparison;
+};
+
 type FinalReport = {
   readonly schemaVersion: 1;
   readonly generatedAt: string;
@@ -217,6 +225,11 @@ type FinalReport = {
       ModeComparison
     >
   >;
+  readonly byPosition: {
+    readonly first: ModeComparison;
+    readonly second: ModeComparison;
+  };
+  readonly trials: readonly TrialSummary[];
   readonly quality: Readonly<
     Record<
       Mode,
@@ -429,7 +442,74 @@ const blocks:
       modelPath:
         FP32_MODEL_PATH,
     },
+    {
+      index: 4,
+      sequence:
+        "fp16-first",
+      mode:
+        "fp16",
+      modelPath:
+        FP16_MODEL_PATH,
+    },
+    {
+      index: 5,
+      sequence:
+        "fp16-first",
+      mode:
+        "fp32",
+      modelPath:
+        FP32_MODEL_PATH,
+    },
+    {
+      index: 6,
+      sequence:
+        "fp32-first",
+      mode:
+        "fp32",
+      modelPath:
+        FP32_MODEL_PATH,
+    },
+    {
+      index: 7,
+      sequence:
+        "fp32-first",
+      mode:
+        "fp16",
+      modelPath:
+        FP16_MODEL_PATH,
+    },
   ];
+
+const trials = [
+  {
+    trial: 1,
+    sequence:
+      "fp32-first" as const,
+    fp32Block: 0,
+    fp16Block: 1,
+  },
+  {
+    trial: 2,
+    sequence:
+      "fp16-first" as const,
+    fp32Block: 3,
+    fp16Block: 2,
+  },
+  {
+    trial: 3,
+    sequence:
+      "fp16-first" as const,
+    fp32Block: 5,
+    fp16Block: 4,
+  },
+  {
+    trial: 4,
+    sequence:
+      "fp32-first" as const,
+    fp32Block: 6,
+    fp16Block: 7,
+  },
+] as const;
 
 await Promise.all([
   mkdir(
@@ -1195,63 +1275,149 @@ const finalize =
         },
       );
 
-    const fp32Runs =
-      allReports
+    const runsForBlocks = (
+      blockIndexes:
+        readonly number[],
+    ): readonly RunRecord[] =>
+      blockIndexes.flatMap(
+        (blockIndex) => {
+          const report =
+            reports.get(
+              blockIndex,
+            );
+
+          if (
+            report ===
+            undefined
+          ) {
+            throw new Error(
+              `Missing FP16 benchmark block ${blockIndex}.`,
+            );
+          }
+
+          return report.runs;
+        },
+      );
+
+    const fp32Blocks =
+      blocks
         .filter(
-          (report) =>
-            report.block.mode ===
+          (block) =>
+            block.mode ===
             "fp32",
         )
-        .flatMap(
-          (report) =>
-            report.runs,
+        .map(
+          (block) =>
+            block.index,
         );
 
-    const fp16Runs =
-      allReports
+    const fp16Blocks =
+      blocks
         .filter(
-          (report) =>
-            report.block.mode ===
+          (block) =>
+            block.mode ===
             "fp16",
         )
-        .flatMap(
-          (report) =>
-            report.runs,
+        .map(
+          (block) =>
+            block.index,
         );
+
+    const fp32Runs =
+      runsForBlocks(
+        fp32Blocks,
+      );
+
+    const fp16Runs =
+      runsForBlocks(
+        fp16Blocks,
+      );
 
     const summarizeSequence = (
       sequence: Sequence,
     ): ModeComparison => {
-      const sequenceReports =
-        allReports.filter(
-          (report) =>
-            report.block.sequence ===
+      const sequenceBlocks =
+        blocks.filter(
+          (block) =>
+            block.sequence ===
             sequence,
         );
 
       return compareTimings(
-        sequenceReports
-          .filter(
-            (report) =>
-              report.block.mode ===
-              "fp32",
-          )
-          .flatMap(
-            (report) =>
-              report.runs,
-          ),
-        sequenceReports
-          .filter(
-            (report) =>
-              report.block.mode ===
-              "fp16",
-          )
-          .flatMap(
-            (report) =>
-              report.runs,
-          ),
+        runsForBlocks(
+          sequenceBlocks
+            .filter(
+              (block) =>
+                block.mode ===
+                "fp32",
+            )
+            .map(
+              (block) =>
+                block.index,
+            ),
+        ),
+        runsForBlocks(
+          sequenceBlocks
+            .filter(
+              (block) =>
+                block.mode ===
+                "fp16",
+            )
+            .map(
+              (block) =>
+                block.index,
+            ),
+        ),
       );
     };
+
+    const firstFp32Blocks =
+      trials
+        .filter(
+          (trial) =>
+            trial.sequence ===
+            "fp32-first",
+        )
+        .map(
+          (trial) =>
+            trial.fp32Block,
+        );
+
+    const firstFp16Blocks =
+      trials
+        .filter(
+          (trial) =>
+            trial.sequence ===
+            "fp16-first",
+        )
+        .map(
+          (trial) =>
+            trial.fp16Block,
+        );
+
+    const secondFp32Blocks =
+      trials
+        .filter(
+          (trial) =>
+            trial.sequence ===
+            "fp16-first",
+        )
+        .map(
+          (trial) =>
+            trial.fp32Block,
+        );
+
+    const secondFp16Blocks =
+      trials
+        .filter(
+          (trial) =>
+            trial.sequence ===
+            "fp32-first",
+        )
+        .map(
+          (trial) =>
+            trial.fp16Block,
+        );
 
     const fp32Quality:
       QualityMetrics[] = [];
@@ -1290,37 +1456,89 @@ const finalize =
       }
     }
 
+    const paired =
+      (
+        await Promise.all(
+          trials.map(
+            (trial) =>
+              compareRunPairs(
+                trial.fp32Block,
+                trial.fp16Block,
+              ),
+          ),
+        )
+      ).flat();
+
+    const withinBlock =
+      (
+        await Promise.all(
+          blocks.map(
+            (block) =>
+              compareWithinBlock(
+                block.index,
+              ),
+          ),
+        )
+      ).flat();
+
     const [
-      pairedForward,
-      pairedReverse,
-      crossFp32,
-      crossFp16,
-      ...withinBlocks
+      fp32CrossOne,
+      fp32CrossTwo,
+      fp32CrossThree,
+      fp16CrossOne,
+      fp16CrossTwo,
+      fp16CrossThree,
     ] =
       await Promise.all([
         compareRunPairs(
-          0,
-          1,
+          fp32Blocks[0],
+          fp32Blocks[1],
         ),
         compareRunPairs(
-          3,
-          2,
+          fp32Blocks[0],
+          fp32Blocks[2],
         ),
         compareRunPairs(
-          0,
-          3,
+          fp32Blocks[0],
+          fp32Blocks[3],
         ),
         compareRunPairs(
-          1,
-          2,
+          fp16Blocks[0],
+          fp16Blocks[1],
         ),
-        ...blocks.map(
-          (block) =>
-            compareWithinBlock(
-              block.index,
-            ),
+        compareRunPairs(
+          fp16Blocks[0],
+          fp16Blocks[2],
+        ),
+        compareRunPairs(
+          fp16Blocks[0],
+          fp16Blocks[3],
         ),
       ]);
+
+    const trialSummaries:
+      TrialSummary[] =
+      trials.map(
+        (trial) => ({
+          trial:
+            trial.trial,
+          sequence:
+            trial.sequence,
+          fp32Block:
+            trial.fp32Block,
+          fp16Block:
+            trial.fp16Block,
+          comparison:
+            compareTimings(
+              runsForBlocks([
+                trial.fp32Block,
+              ]),
+              runsForBlocks([
+                trial.fp16Block,
+              ]),
+            ),
+        }),
+      );
 
     const report:
       FinalReport = {
@@ -1356,6 +1574,28 @@ const finalize =
               "fp16-first",
             ),
         },
+        byPosition: {
+          first:
+            compareTimings(
+              runsForBlocks(
+                firstFp32Blocks,
+              ),
+              runsForBlocks(
+                firstFp16Blocks,
+              ),
+            ),
+          second:
+            compareTimings(
+              runsForBlocks(
+                secondFp32Blocks,
+              ),
+              runsForBlocks(
+                secondFp16Blocks,
+              ),
+            ),
+        },
+        trials:
+          trialSummaries,
         quality: {
           fp32:
             summarizeQuality(
@@ -1367,15 +1607,15 @@ const finalize =
             ),
         },
         parity: {
-          paired: [
-            ...pairedForward,
-            ...pairedReverse,
-          ],
-          withinBlock:
-            withinBlocks.flat(),
+          paired,
+          withinBlock,
           crossContext: [
-            ...crossFp32,
-            ...crossFp16,
+            ...fp32CrossOne,
+            ...fp32CrossTwo,
+            ...fp32CrossThree,
+            ...fp16CrossOne,
+            ...fp16CrossTwo,
+            ...fp16CrossThree,
           ],
         },
         reports:
