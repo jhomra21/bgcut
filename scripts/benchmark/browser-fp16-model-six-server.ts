@@ -2399,8 +2399,7 @@ const app =
         url.searchParams.get(
           "session",
         ) ===
-          sessionToken &&
-        queryLaunchAuthorized
+          sessionToken
       ) {
         return new Response(
           clientSource,
@@ -2423,7 +2422,8 @@ const app =
         url.searchParams.get(
           "session",
         ) ===
-          sessionToken
+          sessionToken &&
+        queryLaunchAuthorized
       ) {
         return Response.json(
           config,
