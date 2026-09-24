@@ -85,7 +85,7 @@ describe("site design contract", () => {
     expect(themeSource).not.toContain("LIGHT_THEME_COLOR");
     expect(themeSource).not.toContain("DARK_THEME_COLOR");
     expect(indexHtml).toContain('<meta name="theme-color" content="" />');
-    expect(indexHtml).not.toMatch(/theme-color\" content=\"#[0-9a-f]{3,8}/iu);
+    expect(indexHtml).not.toMatch(/theme-color" content="#[0-9a-f]{3,8}/iu);
     expect(indexHtml).not.toContain('storedTheme === "dark" ?');
   });
 
