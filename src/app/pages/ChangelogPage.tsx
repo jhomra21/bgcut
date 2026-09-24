@@ -96,7 +96,7 @@ for (const section of document.sections) {
 
 const releaseGroups: readonly SectionRailGroup[] = [
   {
-    label: "Releases",
+    label: "History",
     items: releaseItems,
   },
 ];
@@ -110,7 +110,7 @@ export const ChangelogPage = () => (
   <ReferencePage
     title={document.title}
     pageClass="changelog-page"
-    railAriaLabel="Changelog releases"
+    railAriaLabel="Changelog history"
     railGroups={releaseGroups}
     initialSectionId={latestReleaseId}
     bottomSectionId={oldestReleaseId}
