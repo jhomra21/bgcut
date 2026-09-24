@@ -142,11 +142,6 @@ const BlockReportSchema = Schema.Struct({
   ),
 });
 
-type Mode =
-  Schema.Schema.Type<
-    typeof ModeSchema
-  >;
-
 type Sequence =
   Schema.Schema.Type<
     typeof SequenceSchema
