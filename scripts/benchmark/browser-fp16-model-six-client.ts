@@ -145,6 +145,26 @@ const queryFlag = (
     name,
   ) === "1";
 
+const sessionTokenFromLocation =
+  (): string => {
+    const match =
+      globalThis.location.pathname.match(
+        /^\/session\/([^/]+)$/u,
+      );
+
+    if (
+      match === null
+    ) {
+      throw new Error(
+        "FP16 six-image benchmark is not running from an authorized session URL.",
+      );
+    }
+
+    return decodeURIComponent(
+      match[1],
+    );
+  };
+
 const blockIndexFromLocation =
   (): number => {
     const raw =
@@ -269,6 +289,7 @@ const postJson = async (
     | PrimeRecord
     | FailureRecord
     | BlockReport,
+  sessionToken: string,
 ): Promise<Response> => {
   const response =
     await fetch(
@@ -278,6 +299,8 @@ const postJson = async (
         headers: {
           "content-type":
             "application/json",
+          "x-bgcut-benchmark-session":
+            sessionToken,
         },
         body:
           JSON.stringify(
@@ -302,12 +325,17 @@ const uploadOutput = async (
   caseIndex: number,
   run: number,
   blob: Blob,
+  sessionToken: string,
 ): Promise<void> => {
   const response =
     await fetch(
       `/output/${blockIndex}/${caseIndex}/${run}`,
       {
         method: "POST",
+        headers: {
+          "x-bgcut-benchmark-session":
+            sessionToken,
+        },
         body: blob,
       },
     );
@@ -353,6 +381,7 @@ const recordFailure = async (
     | "prime",
   startedAt: number,
   error: Error,
+  sessionToken: string,
 ): Promise<never> => {
   const failure:
     FailureRecord = {
@@ -379,6 +408,7 @@ const recordFailure = async (
   await postJson(
     "/failure",
     failure,
+    sessionToken,
   );
 
   throw error;
@@ -386,9 +416,14 @@ const recordFailure = async (
 
 const main =
   async (): Promise<void> => {
+    const sessionToken =
+      sessionTokenFromLocation();
+
     const configResponse =
       await fetch(
-        "/config.json",
+        `/config.json?session=${encodeURIComponent(
+          sessionToken,
+        )}`,
         {
           cache:
             "no-store",
@@ -532,6 +567,7 @@ const main =
       await postJson(
         "/prime",
         primeRecord,
+        sessionToken,
       );
 
       writeStatus(
@@ -565,6 +601,7 @@ const main =
         "prime",
         primeStartedAt,
         parsed,
+        sessionToken,
       );
     }
 
@@ -650,6 +687,7 @@ const main =
             caseIndex,
             run,
             outcome.result.blob,
+            sessionToken,
           );
 
           const record:
@@ -678,6 +716,7 @@ const main =
           await postJson(
             "/run",
             record,
+            sessionToken,
           );
 
           writeStatus(
@@ -701,6 +740,7 @@ const main =
             run,
             startedAt,
             parsed,
+            sessionToken,
           );
         }
       }
@@ -724,6 +764,7 @@ const main =
       await postJson(
         "/block-report",
         report,
+        sessionToken,
       );
 
     const completion =
