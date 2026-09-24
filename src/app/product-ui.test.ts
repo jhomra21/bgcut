@@ -291,7 +291,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("bgcut serve --json");
     expect(appSource).toContain('class="code-block-copy"');
     expect(appSource).toContain("navigator.clipboard.writeText(props.code)");
-    expect(appSource).toContain("code-token-keyword");
+    expect(stylesSource).toContain(".code-token-keyword");
     expect(appSource).toContain('language="shell"');
     expect(appSource).toContain('language="typescript"');
     expect(appSource).toContain("bgcut photo.jpg --gpu");
