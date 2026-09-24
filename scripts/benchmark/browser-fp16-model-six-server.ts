@@ -832,6 +832,17 @@ if (
   );
 }
 
+if (
+  fp32Fingerprint ===
+    undefined ||
+  fp16Fingerprint ===
+    undefined
+) {
+  throw new Error(
+    "FP16 six-image benchmark model fingerprints are unavailable.",
+  );
+}
+
 const fp32ModelFile =
   Bun.file(
     fp32ModelPath,
