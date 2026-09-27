@@ -5,7 +5,7 @@ import {
   BgcutImageError,
   BgcutInferenceError,
   BgcutOutputError,
-  BgcutSessionError,
+  BgcutError,
   createNativeBgcut,
   type BgcutEngine,
   type BgcutFormat,
@@ -42,11 +42,11 @@ export class BgcutError extends Error {
   }
 }
 
-export type BgcutSessionOptions = {
+export type BgcutOptions = {
   readonly engine?: BgcutEngine;
 };
 
-export type BgcutSession = {
+export type Bgcut = {
   readonly engine: "webgpu" | "cpu";
   readonly fallbackReason: string | undefined;
   readonly setupTimings: {
@@ -59,27 +59,27 @@ export type BgcutSession = {
 type OneShotRemoveOptions = {
   readonly format?: BgcutFormat;
   readonly engine?: BgcutEngine;
-  readonly session?: undefined;
+  readonly bgcut?: undefined;
 };
 
-type SessionRemoveOptions = {
+type ReusableRemoveOptions = {
   readonly format?: BgcutFormat;
   readonly engine?: never;
-  readonly session: BgcutSession;
+  readonly bgcut: Bgcut;
 };
 
 export type RemoveBackgroundOptions =
   | OneShotRemoveOptions
-  | SessionRemoveOptions;
+  | ReusableRemoveOptions;
 
 export type RemoveBackgroundResult = BgcutRemovalResult;
 
-type SessionState = {
+type BgcutState = {
   readonly native: NativeBgcut;
   closed: boolean;
 };
 
-const sessionStates = new WeakMap<BgcutSession, SessionState>();
+const bgcutStates = new WeakMap<Bgcut, BgcutState>();
 
 const runPublicEffect = async <A, E extends Error>(
   effect: Effect.Effect<A, E>,
@@ -94,7 +94,7 @@ const runPublicEffect = async <A, E extends Error>(
 };
 
 const mapCreateError = (
-  error: ModelCacheError | BgcutSessionError,
+  error: ModelCacheError | BgcutError,
 ): BgcutError => {
   if (error instanceof ModelCacheError) {
     return new BgcutError("model", error.message, error);
@@ -117,38 +117,38 @@ const mapRemoveError = (
   return new BgcutError("output", error.message, error);
 };
 
-const getOpenSessionState = (session: BgcutSession): SessionState => {
-  const state = sessionStates.get(session);
+const getOpenBgcutState = (bgcut: Bgcut): BgcutState => {
+  const state = bgcutStates.get(session);
 
   if (state === undefined) {
     throw new BgcutError(
       "engine",
-      "The supplied bgcut session was not created by createSession().",
+      "The supplied bgcut instance was not created by bgcut().",
     );
   }
 
   if (state.closed) {
-    throw new BgcutError("closed", "This bgcut session has already been closed.");
+    throw new BgcutError("closed", "This bgcut instance has already been closed.");
   }
 
   return state;
 };
 
-export const createSession = async (
-  options: BgcutSessionOptions = {},
-): Promise<BgcutSession> => {
+export const bgcut = async (
+  options: BgcutOptions = {},
+): Promise<Bgcut> => {
   const native = await runPublicEffect(
     createNativeBgcut(options.engine ?? "auto").pipe(
       Effect.mapError(mapCreateError),
     ),
   );
 
-  const session: BgcutSession = {
+  const bgcut: Bgcut = {
     engine: native.engine,
     fallbackReason: native.fallbackReason,
     setupTimings: native.setupTimings,
     close: async () => {
-      const state = sessionStates.get(session);
+      const state = bgcutStates.get(session);
 
       if (state === undefined || state.closed) {
         return;
@@ -159,20 +159,20 @@ export const createSession = async (
     },
   };
 
-  sessionStates.set(session, {
+  bgcutStates.set(session, {
     native,
     closed: false,
   });
 
-  return session;
+  return instance;
 };
 
-const removeWithSession = (
-  session: BgcutSession,
+const removeWithBgcut = (
+  bgcut: Bgcut,
   input: BgcutInput,
   format: BgcutFormat,
 ): Promise<BgcutRemovalResult> => {
-  const state = getOpenSessionState(session);
+  const state = getOpenBgcutState(instance);
 
   return runPublicEffect(
     state.native.remove(input, format).pipe(
@@ -187,15 +187,15 @@ export const removeBackground = async (
 ): Promise<RemoveBackgroundResult> => {
   const format = options.format ?? "png";
 
-  if (options.session !== undefined) {
-    return removeWithSession(options.session, input, format);
+  if (options.bgcut !== undefined) {
+    return removeWithBgcut(options.bgcut, input, format);
   }
 
-  const session = await createSession({ engine: options.engine });
+  const instance = await bgcut({ engine: options.engine });
 
   try {
-    return await removeWithSession(session, input, format);
+    return await removeWithBgcut(instance, input, format);
   } finally {
-    await session.close();
+    await instance.close();
   }
 };
