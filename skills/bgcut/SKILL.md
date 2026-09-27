@@ -46,13 +46,15 @@ Use the local app when the user wants the browser UI on their own machine:
 bgcut
 ```
 
-Use the CLI when the user wants file-in/file-out automation:
+Use the CLI when the user wants file-in/file-out automation. It accepts one file, several files, or directories:
 
 ```sh
 bgcut input.jpg -o output.png
+bgcut first.jpg second.png
+bgcut photos/ -o ./cutouts
 ```
 
-Use the Node API for application code. Prefer `removeBackground()` for one image and `createBgcut()` when several removals should share one warm ONNX Runtime session.
+Use the Node API for application code. Prefer `removeBackground()` for one image, `removeBackgrounds()` for a streaming batch, and `createBgcut().removeMany()` when the caller needs explicit session lifetime or runtime diagnostics.
 
 ## Local app
 
@@ -86,11 +88,15 @@ The browser UI supports these shortcuts:
 
 ## CLI
 
-Pass an image path to run headless removal:
+Pass one image, several images, or a directory to run headless removal:
 
 ```sh
 bgcut photo.jpg
+bgcut first.jpg second.png
+bgcut photos/
 ```
+
+Directory scans are recursive. Batch inference is sequential and reuses one ONNX Runtime session. Without `--output`, each result is written next to its source image. In batch mode, `--output` is an output directory and nested directory paths are preserved.
 
 The explicit form also works:
 
@@ -168,7 +174,24 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-For several images, use `createBgcut` so one ONNX Runtime session is reused:
+For a streaming batch, use `removeBackgrounds`:
+
+```ts
+import { removeBackgrounds } from "bgcut";
+
+for await (const item of removeBackgrounds("photos")) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  console.log(item.source.relativePath, item.result);
+}
+```
+
+The batch API accepts files, directories, iterables, and async iterables. It processes one image at a time and reuses one ONNX Runtime session. Per-image failures are yielded and later images continue.
+
+Use `createBgcut().removeMany()` when the caller needs explicit session lifetime or runtime diagnostics:
 
 ```ts
 import { createBgcut } from "bgcut";
@@ -176,8 +199,11 @@ import { createBgcut } from "bgcut";
 const bgcut = await createBgcut();
 
 try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
+  for await (const item of bgcut.removeMany(["first.jpg", "second.jpg"])) {
+    if (item.ok) {
+      console.log(item.result.timings);
+    }
+  }
 } finally {
   await bgcut.close();
 }
@@ -212,9 +238,10 @@ When the user asks to remove a background:
 5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
 7. Use `removeBackground()` for a one-shot Node API removal.
-8. Reuse one `createBgcut()` instance when application code will process multiple images, and close it when finished.
-9. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
-10. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
+8. Use `removeBackgrounds()` or `createBgcut().removeMany()` for multiple images or directories.
+9. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
+10. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
+11. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
 
 ## Examples
 
@@ -256,7 +283,8 @@ bgcut serve --json
 
 ## Current limits
 
-- One input image is processed per CLI command.
+- Batch inference is sequential.
+- Browser directory selection still depends on the UI. The browser action layer can process an iterable of `File` objects sequentially.
 - Performance depends on the machine and provider.
 - Browser warm-run timings are not CLI one-shot timings.
 - Browser and native paths use different decoders and runtime providers.
