@@ -106,20 +106,26 @@ export const removeBackgroundCli = (
   Effect.tryPromise({
     try: async () => {
       const totalStartedAt = performance.now();
+
       const batch = await isBatchInput(options.inputPaths);
+
       const format = options.format ?? "png";
+
       const remover = await bgcut({ engine: options.engine });
+
       const results: CliRemovalItem[] = [];
       const failures: CliRemovalFailure[] = [];
 
       try {
         if (!batch) {
           const inputPath = resolve(options.inputPaths[0]);
+
           const output = resolveSingleOutput(
             inputPath,
             options.outputPath,
             options.format,
           );
+
           const result = await remover.removeBackground(inputPath, {
             format: output.format,
           });
@@ -145,6 +151,7 @@ export const removeBackgroundCli = (
             options.outputPath === undefined
               ? undefined
               : resolve(options.outputPath);
+
           const prefixDirectoryRoot = options.inputPaths.length > 1;
           const claimedOutputs = new Set<string>();
 
