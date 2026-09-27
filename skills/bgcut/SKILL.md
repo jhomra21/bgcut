@@ -54,7 +54,7 @@ bgcut first.jpg second.png
 bgcut photos/ -o ./cutouts
 ```
 
-Use the Node API for application code. Call `removeBackground()` for every image. Open bgcut once and pass that instance to the same function when several removals should share a warm runtime.
+Use the Node API for application code. Open bgcut once, use `removeBackground()` for one image or `removeMany()` for several inputs, and close the instance when finished.
 
 ## Local app
 
@@ -155,56 +155,49 @@ The `-gpu` and `-cpu` aliases also work. If the user explicitly chooses `--gpu`,
 
 ## Node API
 
-### Single image
-
-Use `removeBackground()` directly:
+Open one bgcut instance and close it when finished:
 
 ```ts
-import { writeFile } from "node:fs/promises";
-import { removeBackground } from "bgcut";
+import { bgcut } from "bgcut";
 
-const result = await removeBackground("photo.jpg");
-await writeFile("photo-nobg.png", result.data);
-```
-
-Use one-shot options when the caller needs a specific output format or engine:
-
-```ts
-const result = await removeBackground("photo.jpg", {
-  format: "webp",
-  engine: "cpu",
-});
-```
-
-### Multiple images
-
-Open bgcut once and pass that instance to the same removal function:
-
-```ts
-import { bgcut, removeBackground } from "bgcut";
-
-const runtime = await bgcut();
+const remover = await bgcut();
 
 try {
-  for (const input of ["first.jpg", "second.jpg"]) {
-    const result = await removeBackground(input, {
-      bgcut: runtime,
-    });
-
-    console.log(input, result.timings);
-  }
+  // Use remover.removeBackground() or remover.removeMany().
 } finally {
-  await runtime.close();
+  await remover.close();
 }
 ```
 
-`bgcut()` keeps one ONNX Runtime instance warm across calls. `bgcut()` or `bgcut({ engine: "auto" })` tries WebGPU and falls back to CPU if runtime creation fails. `bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU.
+### Single image
 
-The package has one removal operation: `removeBackground()`. The reusable bgcut instance changes runtime ownership, not the image operation.
+```ts
+const result = await remover.removeBackground("photo.jpg");
+```
 
-The Node image API does not scan directories. Use the CLI for directory processing, or enumerate files in application code and call `removeBackground()` with one shared bgcut instance.
+Use `format: "png" | "webp" | "jpg"` per image when needed.
 
-Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+### Multiple images
+
+```ts
+for await (const item of remover.removeMany([
+  "first.jpg",
+  "second.png",
+])) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  console.log(item.source.input, item.result);
+}
+```
+
+`removeMany()` also accepts directories, iterables, and async iterables. Directories are recursive by default. Processing is sequential and results are yielded one at a time. Per-image failures use `ok: false` and do not stop later inputs.
+
+`bgcut({ engine: "auto" })` tries WebGPU and falls back to CPU if runtime creation fails. `bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU.
+
+Single-image inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Supported input formats are JPEG, PNG, WebP, and AVIF. Output formats are `png`, `webp`, and `jpg`.
 
 Node API failures are `BgcutError` instances. Use `error.code` for programmatic handling. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
 
@@ -225,9 +218,8 @@ When the user asks to remove a background:
 5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
 7. Use `removeBackground()` for a one-shot Node API removal.
-8. For several images, open bgcut once and call `removeBackground()` sequentially with that instance.
-9. Use the CLI for directory traversal unless application code already owns file discovery.
-10. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
+8. Use `removeMany()` for several files or directories.
+9. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
 11. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
 12. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
 
@@ -272,7 +264,7 @@ bgcut serve --json
 ## Current limits
 
 - Batch inference is sequential.
-- Browser directory selection still depends on the UI. The UI should call the same browser removal operation once per selected file.
+- Browser directory selection still depends on the UI. The browser UI should preserve the same single-item versus many-item behavior.
 - Performance depends on the machine and provider.
 - Browser warm-run timings are not CLI one-shot timings.
 - Browser and native paths use different decoders and runtime providers.
