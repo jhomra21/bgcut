@@ -129,6 +129,7 @@ export const removeBackgroundCli = (
           const result = await remover.removeBackground(inputPath, {
             format: output.format,
           });
+
           const writeStartedAt = performance.now();
 
           await mkdir(dirname(output.outputPath), { recursive: true });
