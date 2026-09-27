@@ -135,7 +135,7 @@ try {
 
   if (
     !help.includes("bgcut serve") ||
-    !help.includes("bgcut <image>") ||
+    !help.includes("bgcut <image|directory>") ||
     !help.includes("Open the local bgcut web app")
   ) {
     throw new Error(`Installed bgcut binary returned unexpected help output:\n${help}`);
@@ -146,7 +146,7 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import('bgcut').then((module) => { if (typeof module.createBgcut !== 'function' || typeof module.removeBackground !== 'function' || typeof module.BgcutError !== 'function') process.exit(2) })",
+      "import('bgcut').then((module) => { if (typeof module.createBgcut !== 'function' || typeof module.removeBackground !== 'function' || typeof module.removeBackgrounds !== 'function' || typeof module.BgcutError !== 'function') process.exit(2) })",
     ],
     consumerDirectory,
   );
@@ -305,13 +305,43 @@ try {
     throw new Error(`Installed Node CLI did not complete a real CPU inference:\n${cliOutput}`);
   }
 
+  const batchInputDirectory = join(temporaryRoot, "batch-input");
+  const nestedBatchInputDirectory = join(batchInputDirectory, "nested");
+  const batchOutputDirectory = join(temporaryRoot, "batch-output");
+
+  await mkdir(nestedBatchInputDirectory, { recursive: true });
+  await Promise.all([
+    copyFile(inputPath, join(batchInputDirectory, "first.png")),
+    copyFile(inputPath, join(nestedBatchInputDirectory, "second.webp")),
+  ]);
+
+  const batchCliOutput = run(
+    binPath,
+    [batchInputDirectory, "--cpu", "-o", batchOutputDirectory],
+    consumerDirectory,
+    { env: smokeEnvironment },
+  );
+
+  const batchOutputPaths = [
+    join(batchOutputDirectory, "first-nobg.png"),
+    join(batchOutputDirectory, "nested", "second-nobg.png"),
+  ];
+
+  if (
+    (batchCliOutput.match(/✓ cpu/gu) ?? []).length !== 2 ||
+    (await stat(batchOutputPaths[0])).size <= 0 ||
+    (await stat(batchOutputPaths[1])).size <= 0
+  ) {
+    throw new Error(`Installed Node CLI did not complete recursive directory inference:\n${batchCliOutput}`);
+  }
+
   const apiSmokePath = join(consumerDirectory, "api-smoke.mjs");
   const apiOutputPath = join(temporaryRoot, "api-output.webp");
 
   await writeFile(
     apiSmokePath,
     `import { writeFile } from "node:fs/promises";
-import { BgcutError, createBgcut, removeBackground } from "bgcut";
+import { BgcutError, createBgcut, removeBackground, removeBackgrounds } from "bgcut";
 
 const expectBgcutError = async (operation, expectedCode, exitCode) => {
   let received;
@@ -367,13 +397,20 @@ try {
 
   const first = await bgcut.remove(process.argv[2]);
   const second = await bgcut.remove(process.argv[2], { format: "webp" });
+  const reusableBatch = [];
+
+  for await (const item of bgcut.removeMany([process.argv[2], process.argv[2]])) {
+    reusableBatch.push(item);
+  }
 
   if (
     bgcut.engine !== "cpu" ||
     first.engine !== "cpu" ||
     second.engine !== "cpu" ||
     first.data.length === 0 ||
-    second.data.length === 0
+    second.data.length === 0 ||
+    reusableBatch.length !== 2 ||
+    reusableBatch.some((item) => !item.ok || item.result.engine !== "cpu")
   ) {
     process.exit(5);
   }
@@ -385,6 +422,18 @@ try {
     "closed",
     6,
   );
+
+  const oneShotBatch = [];
+
+  for await (const item of removeBackgrounds([process.argv[2]], {
+    engine: "cpu",
+  })) {
+    oneShotBatch.push(item);
+  }
+
+  if (oneShotBatch.length !== 1 || !oneShotBatch[0].ok) {
+    process.exit(7);
+  }
 
   await writeFile(process.argv[3], second.data);
 } finally {
@@ -420,7 +469,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model routes, public Node API errors, reusable Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: single and recursive-directory Node CLI inference, local web app, cached model routes, public Node API errors, reusable and streaming batch Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
