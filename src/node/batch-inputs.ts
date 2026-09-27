@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Data, Either, Schema } from "effect";
 import { readdir, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve } from "node:path";
 
@@ -14,6 +14,11 @@ export type BgcutInputSource = {
   readonly rootPath?: string;
   readonly relativePath?: string;
 };
+
+export class BgcutInputPathError extends Data.TaggedError("BgcutInputPathError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 const DIRECTORY_IMAGE_EXTENSIONS = new Set([
   ".avif",
@@ -35,9 +40,16 @@ const isDirectoryImage = (path: string): boolean =>
   DIRECTORY_IMAGE_EXTENSIONS.has(extname(path).toLowerCase());
 
 const readDirectoryEntries = async (path: string) => {
-  const entries = await readdir(path, { withFileTypes: true });
+  try {
+    const entries = await readdir(path, { withFileTypes: true });
 
-  return entries.sort((left, right) => left.name.localeCompare(right.name));
+    return entries.sort((left, right) => left.name.localeCompare(right.name));
+  } catch (cause) {
+    throw new BgcutInputPathError({
+      message: `Could not read image directory ${path}.`,
+      cause,
+    });
+  }
 };
 
 async function* walkDirectory(
