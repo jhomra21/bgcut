@@ -137,7 +137,6 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain('<section id="privacy" class="doc-section">');
     expect(appSource).toContain("Local app");
     expect(appSource).toContain("Node API");
-    expect(appSource).toContain('import { removeBackground } from "bgcut"');
     expect(appSource).toContain('import { bgcut } from "bgcut"');
     expect(appSource).toContain('import { BgcutError, bgcut } from "bgcut"');
     expect(appSource).toContain("BgcutRemovalResult");
@@ -307,14 +306,14 @@ describe("browser product UI", () => {
     expect(appSource).toContain("bgcut photo.jpg --cpu");
     expect(appSource).toContain("bgcut first.jpg second.png");
     expect(appSource).toContain("bgcut photos/ -o ./cutouts");
-    expect(appSource).toContain('import { bgcut, removeBackground } from "bgcut"');
+    expect(appSource).toContain('import { bgcut } from "bgcut"');
     expect(appSource).toContain("batches sequentially by default");
     expect(appSource).not.toContain("removeBackgrounds");
     expect(appSource).toContain("removeMany");
     expect(appSource).not.toContain("createBgcut");
     expect(appSource).not.toContain("createSession");
-    expect(appSource).toContain("RemoveBackgroundResult");
-    expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
+    expect(appSource).toContain("BgcutRemovalResult");
+    expect(appSource).toContain('import { BgcutError, bgcut } from "bgcut"');
     expect(appSource).toContain('bgcut({ engine: \\"gpu\\" })');
     expect(appSource).toContain('bgcut({ engine: \\"cpu\\" })');
     expect(appSource).toContain("195,872,736 bytes");
