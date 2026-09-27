@@ -96,7 +96,7 @@ bgcut first.jpg second.png
 bgcut photos/
 ```
 
-Directory scans are recursive. Batch inference is sequential and reuses one ONNX Runtime session. Without `--output`, each result is written next to its source image. In batch mode, `--output` is an output directory and nested directory paths are preserved.
+Directory scans are recursive. Batch inference is sequential and reuses one warm runtime. Without `--output`, each result is written next to its source image. In batch mode, `--output` is an output directory and nested directory paths are preserved.
 
 The explicit form also works:
 
@@ -155,7 +155,9 @@ The `-gpu` and `-cpu` aliases also work. If the user explicitly chooses `--gpu`,
 
 ## Node API
 
-Use `removeBackground()` for every image:
+### Single image
+
+Use `removeBackground()` directly:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -174,26 +176,33 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-For several images, create one session and pass it to the same removal function:
+### Multiple images
+
+Open bgcut once and pass that instance to the same removal function:
 
 ```ts
-import { createSession, removeBackground } from "bgcut";
+import { bgcut, removeBackground } from "bgcut";
 
-const session = await createSession();
+const runtime = await bgcut();
 
 try {
   for (const input of ["first.jpg", "second.jpg"]) {
-    const result = await removeBackground(input, { session });
+    const result = await removeBackground(input, {
+      bgcut: runtime,
+    });
+
     console.log(input, result.timings);
   }
 } finally {
-  await session.close();
+  await runtime.close();
 }
 ```
 
-The session keeps one ONNX Runtime instance warm across calls. `createSession()` or `createSession({ engine: "auto" })` tries WebGPU and falls back to CPU if session creation fails. `createSession({ engine: "gpu" })` requires native WebGPU. `createSession({ engine: "cpu" })` requires CPU.
+`bgcut()` keeps one ONNX Runtime instance warm across calls. `bgcut()` or `bgcut({ engine: "auto" })` tries WebGPU and falls back to CPU if runtime creation fails. `bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU.
 
-The Node API does not scan directories. Use the CLI for directory processing, or enumerate files in application code and call `removeBackground()` with one shared session.
+The package has one removal operation: `removeBackground()`. The reusable bgcut instance changes runtime ownership, not the image operation.
+
+The Node image API does not scan directories. Use the CLI for directory processing, or enumerate files in application code and call `removeBackground()` with one shared bgcut instance.
 
 Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
 
@@ -216,7 +225,7 @@ When the user asks to remove a background:
 5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
 7. Use `removeBackground()` for a one-shot Node API removal.
-8. For several images, create one session and call `removeBackground()` sequentially with that session.
+8. For several images, open bgcut once and call `removeBackground()` sequentially with that instance.
 9. Use the CLI for directory traversal unless application code already owns file discovery.
 10. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
 11. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
