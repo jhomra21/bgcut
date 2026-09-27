@@ -302,6 +302,11 @@ describe("browser product UI", () => {
     expect(appSource).toContain('language="typescript"');
     expect(appSource).toContain("bgcut photo.jpg --gpu");
     expect(appSource).toContain("bgcut photo.jpg --cpu");
+    expect(appSource).toContain("bgcut first.jpg second.png");
+    expect(appSource).toContain("bgcut photos/ -o ./cutouts");
+    expect(appSource).toContain("removeBackgrounds");
+    expect(appSource).toContain("removeMany");
+    expect(appSource).toContain("processes images sequentially");
     expect(appSource).toContain("RemoveBackgroundResult");
     expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
     expect(appSource).toContain('engine: "gpu"');
