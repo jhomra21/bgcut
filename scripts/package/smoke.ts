@@ -146,7 +146,7 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import('bgcut').then((module) => { if (typeof module.createSession !== 'function' || typeof module.removeBackground !== 'function' || typeof module.BgcutError !== 'function' || 'createBgcut' in module || 'removeBackgrounds' in module) process.exit(2) })",
+      "import('bgcut').then((module) => { if (typeof module.bgcut !== 'function' || typeof module.removeBackground !== 'function' || typeof module.BgcutError !== 'function' || 'createSession' in module || 'createBgcut' in module || 'removeBackgrounds' in module) process.exit(2) })",
     ],
     consumerDirectory,
   );
@@ -341,7 +341,7 @@ try {
   await writeFile(
     apiSmokePath,
     `import { writeFile } from "node:fs/promises";
-import { BgcutError, createSession, removeBackground } from "bgcut";
+import { BgcutError, bgcut, removeBackground } from "bgcut";
 
 const expectBgcutError = async (operation, expectedCode, exitCode) => {
   let received;
@@ -385,23 +385,23 @@ if (
   process.exit(3);
 }
 
-const session = await createSession({ engine: "cpu" });
+const instance = await bgcut({ engine: "cpu" });
 
 try {
   await expectBgcutError(
-    () => removeBackground(invalidImage, { session }),
+    () => removeBackground(invalidImage, { bgcut: instance }),
     "input",
     4,
   );
 
-  const first = await removeBackground(process.argv[2], { session });
+  const first = await removeBackground(process.argv[2], { bgcut: instance });
   const second = await removeBackground(process.argv[2], {
-    session,
+    bgcut: instance,
     format: "webp",
   });
 
   if (
-    session.engine !== "cpu" ||
+    instance.engine !== "cpu" ||
     first.engine !== "cpu" ||
     second.engine !== "cpu" ||
     first.data.length === 0 ||
@@ -412,17 +412,17 @@ try {
     process.exit(5);
   }
 
-  await session.close();
+  await instance.close();
 
   await expectBgcutError(
-    () => removeBackground(process.argv[2], { session }),
+    () => removeBackground(process.argv[2], { bgcut: instance }),
     "closed",
     6,
   );
 
   await writeFile(process.argv[3], second.data);
 } finally {
-  await session.close();
+  await instance.close();
 }
 `,
   );
@@ -446,7 +446,7 @@ try {
     !skill.includes("npx bgcut input.jpg") ||
     !skill.includes("bgcut serve --json") ||
     !skill.includes('import { removeBackground } from "bgcut"') ||
-    !skill.includes('import { createSession, removeBackground } from "bgcut"') ||
+    !skill.includes('import { bgcut, removeBackground } from "bgcut"') ||
     !skill.includes("same operating-system cache directory") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
@@ -454,7 +454,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: single and recursive-directory Node CLI inference, local web app, cached model routes, public Node API errors, reusable-session Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: single and recursive-directory Node CLI inference, local web app, cached model routes, public Node API errors, reusable bgcut Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
