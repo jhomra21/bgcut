@@ -178,102 +178,111 @@ Install bgcut:
 npm install bgcut
 ```
 
-### Single image
-
-Use `removeBackground()` directly when you are processing one image:
+Create a bgcut instance once and use its methods:
 
 ```ts
-import { writeFile } from "node:fs/promises";
-import { removeBackground } from "bgcut";
+import { bgcut } from "bgcut";
 
-const result = await removeBackground("photo.jpg");
-await writeFile("photo-nobg.png", result.data);
+const remover = await bgcut();
+
+try {
+  const result = await remover.removeBackground("photo.jpg");
+} finally {
+  await remover.close();
+}
 ```
 
-A one-shot call owns setup and cleanup. Pass `format` or `engine` only when you need to override the defaults:
+### Single image
+
+Use `removeBackground()` on the instance:
 
 ```ts
-const result = await removeBackground("photo.jpg", {
+const result = await remover.removeBackground("photo.jpg");
+```
+
+Choose an output format per image when needed:
+
+```ts
+const result = await remover.removeBackground("photo.jpg", {
   format: "webp",
-  engine: "cpu",
 });
+```
+
+Choose the execution engine when opening bgcut:
+
+```ts
+const remover = await bgcut({ engine: "cpu" });
 ```
 
 ### Multiple images
 
-Open bgcut once, reuse it for every image, then close it:
+Use `removeMany()` for several files, a directory, an iterable, or an async iterable:
 
 ```ts
-import { bgcut, removeBackground } from "bgcut";
-
-const runtime = await bgcut();
-
-try {
-  for (const input of ["first.jpg", "second.jpg"]) {
-    const result = await removeBackground(input, {
-      bgcut: runtime,
-    });
-
-    console.log(input, result.timings);
+for await (const item of remover.removeMany([
+  "first.jpg",
+  "second.png",
+])) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
   }
-} finally {
-  await runtime.close();
+
+  console.log(item.source.input, item.result);
 }
 ```
 
-There is still one removal operation: `removeBackground()`. The `bgcut()` function only gives the caller ownership of a reusable warm runtime.
+Directory input works with the same method:
 
-`bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU. The default `"auto"` mode tries WebGPU first and falls back to CPU if WebGPU runtime creation fails.
-
-Processing several images is sequential by default in bgcut's CLI and product UI. Application code can choose its own scheduling, but parallel removal increases decoded-image, model-input, output, and runtime memory pressure.
-
-### Directories
-
-The image API does not scan the filesystem. Use the CLI for directory processing:
-
-```sh
-bgcut photos/
-bgcut photos/ -o ./cutouts
+```ts
+for await (const item of remover.removeMany("photos")) {
+  // Directories are recursive by default.
+}
 ```
 
-Node applications that already own file discovery should enumerate their paths and call the same `removeBackground()` function with one shared bgcut runtime.
+`removeMany()` processes inputs sequentially and yields one result at a time. It keeps one warm runtime instead of decoding or inferring an entire batch at once. Per-image failures are yielded with `ok: false` and do not stop later images.
+
+Set `recursive: false` when a directory should include only its immediate image files:
+
+```ts
+for await (const item of remover.removeMany("photos", {
+  recursive: false,
+})) {
+  // ...
+}
+```
 
 ### Inputs and results
 
-Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+Single-image inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. `removeMany()` accepts one of those inputs or an iterable/async iterable of them.
 
-Every result includes:
+Supported image formats are JPEG, PNG, WebP, and AVIF. Output formats are `png`, `webp`, and `jpg`.
 
-```ts
-type RemoveBackgroundResult = {
-  data: Uint8Array;
-  width: number;
-  height: number;
-  format: "png" | "webp" | "jpg";
-  engine: "webgpu" | "cpu";
-  fallbackReason: string | undefined;
-  timings: {
-    totalMs: number;
-    prepareMs: number;
-    inferenceMs: number;
-    encodeMs: number;
-  };
-};
-```
+Every successful removal includes encoded bytes, source dimensions, output format, selected engine, fallback reason, and timings.
+
+### Lifecycle and engines
+
+Always call `close()` when the instance is no longer needed.
+
+`bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU. The default `"auto"` mode tries WebGPU first and falls back to CPU if WebGPU runtime creation fails.
 
 ### Errors
 
-Node API failures use one public error type:
+Node API failures use `BgcutError`:
 
 ```ts
-import { BgcutError, removeBackground } from "bgcut";
+import { BgcutError, bgcut } from "bgcut";
+
+const remover = await bgcut();
 
 try {
-  await removeBackground("photo.jpg");
+  await remover.removeBackground("photo.jpg");
 } catch (error) {
   if (error instanceof BgcutError) {
     console.error(error.code, error.message);
   }
+} finally {
+  await remover.close();
 }
 ```
 
