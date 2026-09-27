@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Either, Schema } from "effect";
 import { readdir, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve } from "node:path";
 
@@ -159,12 +159,11 @@ const mapRemoveError = (
 const asError = (cause: unknown): Error =>
   cause instanceof Error ? cause : new Error(String(cause));
 
-const isAtomicBatchInput = (
-  input: BgcutBatchInput,
-): input is BgcutInput =>
-  typeof input === "string" ||
-  input instanceof Uint8Array ||
-  input instanceof ArrayBuffer;
+const decodePathInput = (input: unknown): string | undefined => {
+  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
+
+  return Either.isRight(decoded) ? decoded.right : undefined;
+};
 
 const isDirectoryImage = (path: string): boolean =>
   DIRECTORY_IMAGE_EXTENSIONS.has(extname(path).toLowerCase());
@@ -215,13 +214,15 @@ async function* expandSingleInput(
   input: BgcutInput,
   recursive: boolean,
 ): AsyncGenerator<BgcutBatchSource> {
-  if (typeof input !== "string") {
+  const inputPath = decodePathInput(input);
+
+  if (inputPath === undefined) {
     yield { input };
 
     return;
   }
 
-  const path = resolve(input);
+  const path = resolve(inputPath);
   let inputStat;
 
   try {
@@ -229,7 +230,7 @@ async function* expandSingleInput(
   } catch (cause) {
     throw new BgcutError(
       "input",
-      `Could not inspect input path ${input}.`,
+      `Could not inspect input path ${inputPath}.`,
       asError(cause),
     );
   }
@@ -241,7 +242,7 @@ async function* expandSingleInput(
   }
 
   if (!inputStat.isFile()) {
-    throw new BgcutError("input", `Input path is not a file or directory: ${input}.`);
+    throw new BgcutError("input", `Input path is not a file or directory: ${inputPath}.`);
   }
 
   yield {
@@ -254,8 +255,17 @@ async function* expandBatchInputs(
   inputs: BgcutBatchInput,
   recursive: boolean,
 ): AsyncGenerator<BgcutBatchSource> {
-  if (isAtomicBatchInput(inputs)) {
-    yield* expandSingleInput(inputs, recursive);
+  const pathInput = decodePathInput(inputs);
+
+  if (
+    pathInput !== undefined ||
+    inputs instanceof Uint8Array ||
+    inputs instanceof ArrayBuffer
+  ) {
+    yield* expandSingleInput(
+      pathInput ?? inputs as Uint8Array | ArrayBuffer,
+      recursive,
+    );
 
     return;
   }
