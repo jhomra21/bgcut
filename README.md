@@ -70,7 +70,7 @@ The local server only binds to the loopback interface. Its UI contains the bgcut
 
 ## CLI
 
-Passing an image keeps the headless file-in/file-out behavior:
+Pass one image to keep the existing file-in/file-out behavior:
 
 ```sh
 bgcut photo.jpg
@@ -82,7 +82,17 @@ The explicit command is also available:
 bgcut remove photo.jpg
 ```
 
-The default command writes a transparent PNG next to the input image. Choose the output path with `-o` or `--output`:
+Pass several files or a directory to process a batch:
+
+```sh
+bgcut first.jpg second.png
+bgcut photos/
+bgcut photos/ -o ./cutouts
+```
+
+Directory scans are recursive and include JPEG, PNG, WebP, and AVIF files. Batch inference is sequential and reuses one ONNX Runtime session. Without `--output`, each result is written next to its source image. In batch mode, `--output` names an output directory and preserves nested directory paths.
+
+For one input file, the default command writes a transparent PNG next to the input image. Choose the output file with `-o` or `--output`:
 
 ```sh
 bgcut photo.jpg -o portrait.png
@@ -187,20 +197,39 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-For several images, create one bgcut instance and reuse its ONNX Runtime session:
+For several images, use the streaming batch API. It accepts files, directories, or iterables and yields one result at a time:
 
 ```ts
 import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { removeBackgrounds } from "bgcut";
+
+for await (const item of removeBackgrounds("photos")) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  const name = item.source.relativePath ?? "image.png";
+  await writeFile(join("cutouts", name), item.result.data);
+}
+```
+
+Directory traversal is recursive by default. Processing is sequential, so bgcut reuses one warm ONNX Runtime session and does not decode an entire batch at once. Per-image failures have `ok: false` and do not stop later images.
+
+When application code needs the selected engine or setup timings, create one instance and call `removeMany()`:
+
+```ts
 import { createBgcut } from "bgcut";
 
 const bgcut = await createBgcut();
 
 try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
-
-  await writeFile("first-nobg.png", first.data);
-  await writeFile("second-nobg.webp", second.data);
+  for await (const item of bgcut.removeMany(["first.jpg", "second.jpg"])) {
+    if (item.ok) {
+      console.log(item.source.input, item.result.timings);
+    }
+  }
 } finally {
   await bgcut.close();
 }
