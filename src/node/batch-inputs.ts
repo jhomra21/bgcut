@@ -1,4 +1,4 @@
-import { Data } from "effect";
+import { Either, Schema } from "effect";
 import { readdir, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve } from "node:path";
 
@@ -15,11 +15,6 @@ export type BgcutInputSource = {
   readonly relativePath?: string;
 };
 
-export class BgcutInputPathError extends Data.TaggedError("BgcutInputPathError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
 const DIRECTORY_IMAGE_EXTENSIONS = new Set([
   ".avif",
   ".jpeg",
@@ -28,20 +23,21 @@ const DIRECTORY_IMAGE_EXTENSIONS = new Set([
   ".webp",
 ]);
 
+const decodePathInput = (
+  input: BgcutManyInput,
+): string | undefined => {
+  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
+
+  return Either.isRight(decoded) ? decoded.right : undefined;
+};
+
 const isDirectoryImage = (path: string): boolean =>
   DIRECTORY_IMAGE_EXTENSIONS.has(extname(path).toLowerCase());
 
 const readDirectoryEntries = async (path: string) => {
-  try {
-    const entries = await readdir(path, { withFileTypes: true });
+  const entries = await readdir(path, { withFileTypes: true });
 
-    return entries.sort((left, right) => left.name.localeCompare(right.name));
-  } catch (cause) {
-    throw new BgcutInputPathError({
-      message: `Could not read image directory ${path}.`,
-      cause,
-    });
-  }
+  return entries.sort((left, right) => left.name.localeCompare(right.name));
 };
 
 async function* walkDirectory(
@@ -72,24 +68,19 @@ async function* walkDirectory(
   }
 }
 
-const isAtomicInput = (
-  input: BgcutManyInput,
-): input is BgcutInput =>
-  typeof input === "string" ||
-  input instanceof Uint8Array ||
-  input instanceof ArrayBuffer;
-
 async function* expandOne(
   input: BgcutInput,
   recursive: boolean,
 ): AsyncGenerator<BgcutInputSource> {
-  if (typeof input !== "string") {
+  const inputPath = decodePathInput(input);
+
+  if (inputPath === undefined) {
     yield { input };
 
     return;
   }
 
-  const path = resolve(input);
+  const path = resolve(inputPath);
 
   try {
     const inputStat = await stat(path);
@@ -100,7 +91,7 @@ async function* expandOne(
       return;
     }
   } catch {
-    // Let removeBackground() report an ordinary input error for missing files.
+    // removeBackground() reports the ordinary input error for missing files.
   }
 
   yield {
@@ -113,7 +104,15 @@ export async function* expandBgcutInputs(
   inputs: BgcutManyInput,
   recursive: boolean,
 ): AsyncGenerator<BgcutInputSource> {
-  if (isAtomicInput(inputs)) {
+  const pathInput = decodePathInput(inputs);
+
+  if (pathInput !== undefined) {
+    yield* expandOne(pathInput, recursive);
+
+    return;
+  }
+
+  if (inputs instanceof Uint8Array || inputs instanceof ArrayBuffer) {
     yield* expandOne(inputs, recursive);
 
     return;

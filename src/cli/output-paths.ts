@@ -2,12 +2,17 @@ import { Data } from "effect";
 import { basename, extname, join, parse, resolve } from "node:path";
 
 import type { CliFormat } from "./args";
-import type { CliInputSource } from "./input-paths";
 import type { BgcutFormat } from "../node/index";
 
 export type ResolvedSingleOutput = {
   readonly outputPath: string;
   readonly format: BgcutFormat;
+};
+
+export type BatchOutputSource = {
+  readonly inputPath: string;
+  readonly rootPath?: string;
+  readonly relativePath: string;
 };
 
 export class CliOutputPathError extends Data.TaggedError("CliOutputPathError")<{
@@ -87,7 +92,7 @@ export const resolveSingleOutput = (
 };
 
 type BatchOutputOptions = {
-  readonly source: CliInputSource;
+  readonly source: BatchOutputSource;
   readonly outputRoot: string | undefined;
   readonly format: BgcutFormat;
   readonly prefixDirectoryRoot: boolean;
