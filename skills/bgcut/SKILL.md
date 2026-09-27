@@ -217,9 +217,10 @@ When the user asks to remove a background:
 4. Preserve explicit provider constraints. Do not turn a requested GPU-only run into CPU silently.
 5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
-7. Use `removeBackground()` for a one-shot Node API removal.
-8. Use `removeMany()` for several files or directories.
-9. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
+7. Open one bgcut instance for Node API work and close it when finished.
+8. Use `removeBackground()` for one image.
+9. Use `removeMany()` for several files or directories.
+10. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
 11. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
 12. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
 
