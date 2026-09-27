@@ -159,7 +159,7 @@ const mapRemoveError = (
 const asError = (cause: unknown): Error =>
   cause instanceof Error ? cause : new Error(String(cause));
 
-const decodePathInput = (input: unknown): string | undefined => {
+const decodePathInput = (input: BgcutBatchInput): string | undefined => {
   const decoded = Schema.decodeUnknownEither(Schema.String)(input);
 
   return Either.isRight(decoded) ? decoded.right : undefined;
@@ -257,15 +257,14 @@ async function* expandBatchInputs(
 ): AsyncGenerator<BgcutBatchSource> {
   const pathInput = decodePathInput(inputs);
 
-  if (
-    pathInput !== undefined ||
-    inputs instanceof Uint8Array ||
-    inputs instanceof ArrayBuffer
-  ) {
-    yield* expandSingleInput(
-      pathInput ?? inputs as Uint8Array | ArrayBuffer,
-      recursive,
-    );
+  if (pathInput !== undefined) {
+    yield* expandSingleInput(pathInput, recursive);
+
+    return;
+  }
+
+  if (inputs instanceof Uint8Array || inputs instanceof ArrayBuffer) {
+    yield* expandSingleInput(inputs, recursive);
 
     return;
   }
