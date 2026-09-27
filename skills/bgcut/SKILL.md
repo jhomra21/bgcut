@@ -54,7 +54,7 @@ bgcut first.jpg second.png
 bgcut photos/ -o ./cutouts
 ```
 
-Use the Node API for application code. Prefer `removeBackground()` for one image, `removeBackgrounds()` for a streaming batch, and `createBgcut().removeMany()` when the caller needs explicit session lifetime or runtime diagnostics.
+Use the Node API for application code. Call `removeBackground()` for every image. Create one session and pass it to that same function when several removals should share a warm runtime.
 
 ## Local app
 
@@ -155,7 +155,7 @@ The `-gpu` and `-cpu` aliases also work. If the user explicitly chooses `--gpu`,
 
 ## Node API
 
-For one image, import `removeBackground`:
+Use `removeBackground()` for every image:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -165,7 +165,7 @@ const result = await removeBackground("photo.jpg");
 await writeFile("photo-nobg.png", result.data);
 ```
 
-Use the one-shot options when the caller needs a specific output format or engine:
+Use one-shot options when the caller needs a specific output format or engine:
 
 ```ts
 const result = await removeBackground("photo.jpg", {
@@ -174,48 +174,26 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-For a streaming batch, use `removeBackgrounds`:
+For several images, create one session and pass it to the same removal function:
 
 ```ts
-import { removeBackgrounds } from "bgcut";
+import { createSession, removeBackground } from "bgcut";
 
-for await (const item of removeBackgrounds("photos")) {
-  if (!item.ok) {
-    console.error(item.source.input, item.error);
-    continue;
-  }
-
-  console.log(item.source.relativePath, item.result);
-}
-```
-
-The batch API accepts files, directories, iterables, and async iterables. It processes one image at a time and reuses one ONNX Runtime session. Per-image failures are yielded and later images continue.
-
-Use `createBgcut().removeMany()` when the caller needs explicit session lifetime or runtime diagnostics:
-
-```ts
-import { createBgcut } from "bgcut";
-
-const bgcut = await createBgcut();
+const session = await createSession();
 
 try {
-  for await (const item of bgcut.removeMany(["first.jpg", "second.jpg"])) {
-    if (item.ok) {
-      console.log(item.result.timings);
-    }
+  for (const input of ["first.jpg", "second.jpg"]) {
+    const result = await removeBackground(input, { session });
+    console.log(input, result.timings);
   }
 } finally {
-  await bgcut.close();
+  await session.close();
 }
 ```
 
-Engine options:
+The session keeps one ONNX Runtime instance warm across calls. `createSession()` or `createSession({ engine: "auto" })` tries WebGPU and falls back to CPU if session creation fails. `createSession({ engine: "gpu" })` requires native WebGPU. `createSession({ engine: "cpu" })` requires CPU.
 
-- `createBgcut()` or `createBgcut({ engine: "auto" })`: try WebGPU, then CPU if session creation fails
-- `createBgcut({ engine: "gpu" })`: require native WebGPU
-- `createBgcut({ engine: "cpu" })`: require CPU
-
-`removeBackground()` accepts the same `engine` values together with an optional `format`.
+The Node API does not scan directories. Use the CLI for directory processing, or enumerate files in application code and call `removeBackground()` with one shared session.
 
 Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
 
@@ -238,10 +216,11 @@ When the user asks to remove a background:
 5. Report the output path and selected engine for CLI work.
 6. If decoding fails, report the decoder error. Do not guess the real file type from its extension.
 7. Use `removeBackground()` for a one-shot Node API removal.
-8. Use `removeBackgrounds()` or `createBgcut().removeMany()` for multiple images or directories.
-9. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
-10. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
-11. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
+8. For several images, create one session and call `removeBackground()` sequentially with that session.
+9. Use the CLI for directory traversal unless application code already owns file discovery.
+10. Keep batch inference sequential unless the caller explicitly implements and accepts a higher-memory concurrency policy.
+11. Handle Node API failures through `BgcutError.code` when programmatic recovery is needed.
+12. Do not upload images to a remote background-removal service unless the user explicitly asks to use one.
 
 ## Examples
 
@@ -284,7 +263,7 @@ bgcut serve --json
 ## Current limits
 
 - Batch inference is sequential.
-- Browser directory selection still depends on the UI. The browser action layer can process an iterable of `File` objects sequentially.
+- Browser directory selection still depends on the UI. The UI should call the same browser removal operation once per selected file.
 - Performance depends on the machine and provider.
 - Browser warm-run timings are not CLI one-shot timings.
 - Browser and native paths use different decoders and runtime providers.
