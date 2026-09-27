@@ -186,6 +186,7 @@ export const removeBackgroundCli = (
       const totalStartedAt = performance.now();
 
       const batch = await isBatchInput(options.inputPaths);
+
       const singleOutput = batch
         ? undefined
         : resolveSingleOutput(
