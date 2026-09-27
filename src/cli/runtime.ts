@@ -15,6 +15,7 @@ import {
   createBgcut,
   type BgcutExecutionEngine,
   type BgcutFormat,
+  type BgcutInput,
   type BgcutRemovalResult,
 } from "../node/index";
 import { prepareNativeImage } from "../node/runtime";
@@ -123,6 +124,7 @@ const resolveSingleOutput = (
   }
 
   const format = requestedFormat ?? outputFormat ?? "png";
+
   const outputPath = extension.length === 0
     ? `${requestedOutput}${extensionForFormat(format)}`
     : requestedOutput;
@@ -155,6 +157,7 @@ const batchOutputPath = (
   }
 
   const relativeSource = relativePath ?? basename(inputPath);
+
   const rootedRelativeSource =
     rootPath !== undefined && prefixDirectoryRoot
       ? join(basename(rootPath), relativeSource)
@@ -163,7 +166,7 @@ const batchOutputPath = (
   return join(outputRoot, withOutputSuffix(rootedRelativeSource, format));
 };
 
-const decodeBatchPath = (input: unknown): string => {
+const decodeBatchPath = (input: BgcutInput): string => {
   const decoded = Schema.decodeUnknownEither(Schema.String)(input);
 
   if (Either.isLeft(decoded)) {
@@ -181,6 +184,7 @@ export const removeBackgroundCli = (
   Effect.tryPromise({
     try: async () => {
       const totalStartedAt = performance.now();
+
       const batch = await isBatchInput(options.inputPaths);
       const singleOutput = batch
         ? undefined
@@ -189,12 +193,16 @@ export const removeBackgroundCli = (
             options.outputPath,
             options.format,
           );
+
       const format = singleOutput?.format ?? options.format ?? "png";
+
       const outputRoot =
         batch && options.outputPath !== undefined
           ? resolve(options.outputPath)
           : undefined;
+
       const prefixDirectoryRoot = options.inputPaths.length > 1;
+
       const bgcut = await createBgcut({ engine: options.engine });
       const results: CliRemovalItem[] = [];
       const failures: CliRemovalFailure[] = [];
@@ -223,6 +231,7 @@ export const removeBackgroundCli = (
             format,
             prefixDirectoryRoot,
           );
+
           const resolvedOutput = resolve(outputPath);
 
           if (resolve(inputPath) === resolvedOutput) {
@@ -247,7 +256,7 @@ export const removeBackgroundCli = (
           try {
             await mkdir(dirname(resolvedOutput), { recursive: true });
             await writeFile(resolvedOutput, item.result.data);
-          } catch (cause) {
+          } catch {
             failures.push({
               inputPath,
               message: `Could not write ${outputPath}.`,
