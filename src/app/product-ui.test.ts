@@ -138,9 +138,9 @@ describe("browser product UI", () => {
     expect(appSource).toContain("Local app");
     expect(appSource).toContain("Node API");
     expect(appSource).toContain('import { removeBackground } from "bgcut"');
-    expect(appSource).toContain('import { bgcut, removeBackground } from "bgcut"');
-    expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
-    expect(appSource).toContain("RemoveBackgroundResult");
+    expect(appSource).toContain('import { bgcut } from "bgcut"');
+    expect(appSource).toContain('import { BgcutError, bgcut } from "bgcut"');
+    expect(appSource).toContain("BgcutRemovalResult");
     expect(appSource).toContain("Single image");
     expect(appSource).toContain("Multiple images");
     expect(appSource).toContain("Directory input");
@@ -310,7 +310,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('import { bgcut, removeBackground } from "bgcut"');
     expect(appSource).toContain("batches sequentially by default");
     expect(appSource).not.toContain("removeBackgrounds");
-    expect(appSource).not.toContain("removeMany");
+    expect(appSource).toContain("removeMany");
     expect(appSource).not.toContain("createBgcut");
     expect(appSource).not.toContain("createSession");
     expect(appSource).toContain("RemoveBackgroundResult");
