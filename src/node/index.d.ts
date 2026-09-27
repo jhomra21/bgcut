@@ -41,11 +41,11 @@ export declare class BgcutError extends Error {
   constructor(code: BgcutErrorCode, message: string, cause?: Error);
 }
 
-export type BgcutSessionOptions = {
+export type BgcutOptions = {
   readonly engine?: BgcutEngine;
 };
 
-export type BgcutSession = {
+export type Bgcut = {
   readonly engine: BgcutExecutionEngine;
   readonly fallbackReason: string | undefined;
   readonly setupTimings: BgcutSetupTimings;
@@ -55,36 +55,36 @@ export type BgcutSession = {
 type OneShotRemoveOptions = {
   readonly format?: BgcutFormat;
   readonly engine?: BgcutEngine;
-  readonly session?: undefined;
+  readonly bgcut?: undefined;
 };
 
-type SessionRemoveOptions = {
+type ReusableRemoveOptions = {
   readonly format?: BgcutFormat;
   readonly engine?: never;
-  readonly session: BgcutSession;
+  readonly bgcut: Bgcut;
 };
 
 export type RemoveBackgroundOptions =
   | OneShotRemoveOptions
-  | SessionRemoveOptions;
+  | ReusableRemoveOptions;
 
 export type RemoveBackgroundResult = BgcutRemovalResult;
 
 /**
- * Create a reusable ONNX Runtime session.
+ * Create a reusable bgcut instance.
  *
- * Pass the returned session to removeBackground() when processing several
+ * Pass the returned bgcut instance to removeBackground() when processing several
  * images. Call close() when finished.
  */
-export declare const createSession: (
-  options?: BgcutSessionOptions,
-) => Promise<BgcutSession>;
+export declare const bgcut: (
+  options?: BgcutOptions,
+) => Promise<Bgcut>;
 
 /**
  * Remove the background from one image.
  *
- * Without a session, bgcut creates and closes a temporary runtime for this
- * call. Pass a session from createSession() to reuse one warm runtime across
+ * Without a bgcut instance, bgcut creates and closes a temporary runtime for this
+ * call. Pass a bgcut instance to reuse one warm runtime across
  * several calls.
  */
 export declare const removeBackground: (
