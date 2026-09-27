@@ -54,7 +54,7 @@ bgcut first.jpg second.png
 bgcut photos/ -o ./cutouts
 ```
 
-Use the Node API for application code. Call `removeBackground()` for every image. Create one session and pass it to that same function when several removals should share a warm runtime.
+Use the Node API for application code. Call `removeBackground()` for every image. Open bgcut once and pass that instance to the same function when several removals should share a warm runtime.
 
 ## Local app
 
