@@ -32,10 +32,15 @@ After a global install:
 ```sh
 bgcut photo.jpg
 bgcut photo.jpg -o portrait.png
+bgcut first.jpg second.png
+bgcut photos/
+bgcut photos/ -o ./cutouts
 bgcut photo.jpg --webp
 bgcut photo.jpg --gpu
 bgcut photo.jpg --cpu
 ```
+
+Directories are scanned recursively. Batch inference is sequential and reuses one ONNX Runtime session. In batch mode, `--output` names an output directory. Without it, each result is written next to its source image.
 
 Supported input formats: JPEG, PNG, WebP, AVIF.
 
@@ -74,20 +79,24 @@ import { removeBackground } from "bgcut";
 const result = await removeBackground("photo.jpg");
 ```
 
-Several images:
+Streaming batch:
 
 ```ts
-import { createBgcut } from "bgcut";
+import { removeBackgrounds } from "bgcut";
 
-const bgcut = await createBgcut();
+for await (const item of removeBackgrounds("photos")) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
 
-try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
-} finally {
-  await bgcut.close();
+  console.log(item.source.relativePath, item.result);
 }
 ```
+
+`removeBackgrounds()` accepts files, directories, iterables, and async iterables. It traverses directories recursively by default, processes images sequentially, and yields one result at a time. Per-image failures are yielded with `ok: false` and do not stop later images.
+
+Use `createBgcut().removeMany()` for the same batch behavior when the caller needs explicit session lifetime, selected-engine details, or timings.
 
 Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
 
