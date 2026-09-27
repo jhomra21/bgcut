@@ -14,7 +14,7 @@ import {
 } from "./output-paths";
 import {
   BgcutError,
-  createSession,
+  bgcut,
   removeBackground,
   type BgcutExecutionEngine,
   type BgcutRemovalResult,
@@ -84,7 +84,7 @@ export const removeBackgroundCli = (
           : undefined;
 
       const prefixDirectoryRoot = options.inputPaths.length > 1;
-      const session = await createSession({ engine: options.engine });
+      const instance = await bgcut({ engine: options.engine });
       const results: CliRemovalItem[] = [];
       const failures: CliRemovalFailure[] = [];
       const claimedOutputs = new Set<string>();
@@ -95,7 +95,7 @@ export const removeBackgroundCli = (
 
           try {
             result = await removeBackground(source.inputPath, {
-              session,
+              bgcut: instance,
               format,
             });
           } catch (cause) {
@@ -161,7 +161,7 @@ export const removeBackgroundCli = (
           });
         }
       } finally {
-        await session.close();
+        await instance.close();
       }
 
       if (results.length === 0 && failures.length === 0) {
@@ -173,9 +173,9 @@ export const removeBackgroundCli = (
       return {
         results,
         failures,
-        engine: session.engine,
-        fallbackReason: session.fallbackReason,
-        setupTimings: session.setupTimings,
+        engine: instance.engine,
+        fallbackReason: instance.fallbackReason,
+        setupTimings: instance.setupTimings,
         totalMs: performance.now() - totalStartedAt,
       };
     },
