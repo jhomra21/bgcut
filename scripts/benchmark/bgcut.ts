@@ -10,7 +10,8 @@ import {
   MODEL_SIZE_BYTES,
 } from "../../src/shared/model-config";
 import {
-  createBgcut,
+  createSession,
+  removeBackground,
   type BgcutEngine,
   type BgcutRemovalTimings,
 } from "../../src/node";
@@ -104,7 +105,7 @@ if (manifest.cases.length === 0) {
 
 await mkdir(outputRoot, { recursive: true });
 
-const bgcut = await createBgcut({ engine: requestedEngine });
+const session = await createSession({ engine: requestedEngine });
 
 const caseReports: CaseReport[] = [];
 
@@ -114,13 +115,13 @@ try {
     const outputName = `${benchmarkCase.id.replaceAll("/", "__").replaceAll("\\", "__")}.png`;
     const outputPath = join(outputRoot, outputName);
 
-    const firstResult = await bgcut.remove(inputPath, { format: "png" });
+    const firstResult = await removeBackground(inputPath, { session, format: "png" });
     await writeFile(outputPath, firstResult.data);
 
     const warmRuns: BgcutRemovalTimings[] = [];
 
     for (let run = 0; run < warmRepeats; run += 1) {
-      const warmResult = await bgcut.remove(inputPath, { format: "png" });
+      const warmResult = await removeBackground(inputPath, { session, format: "png" });
       warmRuns.push(warmResult.timings);
     }
 
@@ -136,7 +137,7 @@ try {
     });
   }
 } finally {
-  await bgcut.close();
+  await session.close();
 }
 
 const report = {
@@ -158,9 +159,9 @@ const report = {
     node: process.versions.node,
   },
   requestedEngine,
-  selectedEngine: bgcut.engine,
-  fallbackReason: bgcut.fallbackReason ?? null,
-  setupTimings: bgcut.setupTimings,
+  selectedEngine: session.engine,
+  fallbackReason: session.fallbackReason ?? null,
+  setupTimings: session.setupTimings,
   warmRepeats,
   cases: caseReports,
 };
