@@ -178,7 +178,7 @@ Install bgcut:
 npm install bgcut
 ```
 
-For one image, use `removeBackground()`. It creates the runtime, removes the background, and closes the runtime before returning:
+Use `removeBackground()` for every image. Without a session, bgcut creates and closes a temporary runtime for that call:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -188,7 +188,7 @@ const result = await removeBackground("photo.jpg");
 await writeFile("photo-nobg.png", result.data);
 ```
 
-Pass output format or engine preferences only when you need them:
+Pass `format` or `engine` when you need to override the defaults:
 
 ```ts
 const result = await removeBackground("photo.jpg", {
@@ -197,47 +197,28 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-For several images, use the streaming batch API. It accepts files, directories, or iterables and yields one result at a time:
+For several images, create one session and pass it to the same `removeBackground()` function:
 
 ```ts
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { removeBackgrounds } from "bgcut";
+import { createSession, removeBackground } from "bgcut";
 
-for await (const item of removeBackgrounds("photos")) {
-  if (!item.ok) {
-    console.error(item.source.input, item.error);
-    continue;
-  }
-
-  const name = item.source.relativePath ?? "image.png";
-  await writeFile(join("cutouts", name), item.result.data);
-}
-```
-
-Directory traversal is recursive by default. Processing is sequential, so bgcut reuses one warm ONNX Runtime session and does not decode an entire batch at once. Per-image failures have `ok: false` and do not stop later images.
-
-When application code needs the selected engine or setup timings, create one instance and call `removeMany()`:
-
-```ts
-import { createBgcut } from "bgcut";
-
-const bgcut = await createBgcut();
+const session = await createSession();
 
 try {
-  for await (const item of bgcut.removeMany(["first.jpg", "second.jpg"])) {
-    if (item.ok) {
-      console.log(item.source.input, item.result.timings);
-    }
+  for (const input of ["first.jpg", "second.jpg"]) {
+    const result = await removeBackground(input, { session });
+    console.log(input, result.timings);
   }
 } finally {
-  await bgcut.close();
+  await session.close();
 }
 ```
 
-`createBgcut({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if the WebGPU session cannot start. Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`.
+The session keeps one ONNX Runtime instance warm across calls. `createSession({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if WebGPU session creation fails.
 
-`removeBackground()` returns the encoded bytes, source width and height, and output format. The reusable `createBgcut()` path also exposes selected-engine, fallback, and timing diagnostics.
+The Node API removes images. It does not own directory traversal. Use the CLI for directory processing, or enumerate files in application code and call the same `removeBackground()` function with one shared session.
+
+Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`. Every result includes encoded bytes, source dimensions, output format, selected engine, fallback reason, and removal timings.
 
 Node API failures use one public error type:
 
