@@ -231,8 +231,8 @@ try {
           />
           <p>
             <code>bgcut()</code> defaults to automatic engine selection.
-            <code>bgcut({ engine: "gpu" })</code> requires native WebGPU and
-            <code>bgcut({ engine: "cpu" })</code> requires CPU. bgcut's CLI and product UI process
+            <code>{"bgcut({ engine: \"gpu\" })"}</code> requires native WebGPU and
+            <code>{"bgcut({ engine: \"cpu\" })"}</code> requires CPU. bgcut's CLI and product UI process
             batches sequentially by default to limit memory pressure while keeping the runtime
             warm.
           </p>
