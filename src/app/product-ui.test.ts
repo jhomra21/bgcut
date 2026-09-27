@@ -307,7 +307,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("bgcut first.jpg second.png");
     expect(appSource).toContain("bgcut photos/ -o ./cutouts");
     expect(appSource).toContain('import { bgcut } from "bgcut"');
-    expect(appSource).toContain("batches sequentially by default");
+    expect(appSource).toContain("Processing is sequential");
     expect(appSource).not.toContain("removeBackgrounds");
     expect(appSource).toContain("removeMany");
     expect(appSource).not.toContain("createBgcut");
