@@ -315,8 +315,8 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("createSession");
     expect(appSource).toContain("RemoveBackgroundResult");
     expect(appSource).toContain('import { BgcutError, removeBackground } from "bgcut"');
-    expect(appSource).toContain('engine: "gpu"');
-    expect(appSource).toContain('engine: "cpu"');
+    expect(appSource).toContain('bgcut({ engine: \\"gpu\\" })');
+    expect(appSource).toContain('bgcut({ engine: \\"cpu\\" })');
     expect(appSource).toContain("195,872,736 bytes");
     expect(appSource).toContain("4461109672dda07a054892aef076b5fcc5fc40bbc91f51a357a7593c7f45ad9c");
     expect(appSource).toContain("98,572,669 bytes");
