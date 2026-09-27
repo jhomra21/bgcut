@@ -408,7 +408,7 @@ try {
 } finally {
   await remover.close();
 }
-``,
+`,
   );
 
   run(
@@ -430,7 +430,8 @@ try {
     !skill.includes("npx bgcut input.jpg") ||
     !skill.includes("bgcut serve --json") ||
     !skill.includes('import { bgcut } from "bgcut"') ||
-    !skill.includes('import { bgcut } from "bgcut"') ||
+    !skill.includes("remover.removeBackground") ||
+    !skill.includes("remover.removeMany") ||
     !skill.includes("same operating-system cache directory") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
