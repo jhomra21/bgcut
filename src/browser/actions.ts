@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 
+import { mapSequential, type MaybeAsyncIterable } from "../shared/batch";
 import { formatBackgroundRemovalError, formatImageError } from "./errors";
 import { decodeImage } from "./image";
 import {
@@ -29,6 +30,11 @@ export type RemoveBrowserBackgroundResult =
       readonly ok: false;
       readonly message: string;
     };
+
+export type RemoveBrowserBackgroundBatchItem = {
+  readonly file: File;
+  readonly outcome: RemoveBrowserBackgroundResult;
+};
 
 export const decodeBrowserImage = (
   file: File,
@@ -65,3 +71,11 @@ export const removeBrowserBackground = (
       }),
     ),
   );
+
+export const removeBrowserBackgrounds = (
+  files: MaybeAsyncIterable<File>,
+): AsyncIterable<RemoveBrowserBackgroundBatchItem> =>
+  mapSequential(files, async (file) => ({
+    file,
+    outcome: await removeBrowserBackground(file),
+  }));

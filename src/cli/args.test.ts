@@ -54,69 +54,45 @@ describe("parseCliArgs", () => {
     expect(await parse(["remove", "images/cat.jpg"])).toEqual({
       kind: "run",
       options: {
-        inputPath: "images/cat.jpg",
-        outputPath: "images/cat-nobg.png",
-        format: "png",
+        inputPaths: ["images/cat.jpg"],
+        outputPath: undefined,
+        format: undefined,
         engine: "auto",
       },
     });
   });
 
-  test("defaults to a PNG next to the input", async () => {
-    expect(await parse(["images/cat.jpg"])).toEqual({
+  test("accepts multiple image and directory inputs", async () => {
+    expect(await parse(["images/", "cat.jpg", "dog.webp", "--webp", "-o", "out"])).toEqual({
       kind: "run",
       options: {
-        inputPath: "images/cat.jpg",
-        outputPath: "images/cat-nobg.png",
-        format: "png",
-        engine: "auto",
-      },
-    });
-  });
-
-  test("accepts long format flags without a value", async () => {
-    expect(await parse(["cat.jpg", "--webp"])).toEqual({
-      kind: "run",
-      options: {
-        inputPath: "cat.jpg",
-        outputPath: "cat-nobg.webp",
+        inputPaths: ["images/", "cat.jpg", "dog.webp"],
+        outputPath: "out",
         format: "webp",
         engine: "auto",
       },
     });
   });
 
-  test("accepts compact word-style format flags", async () => {
-    expect(await parse(["cat.jpg", "-png"])).toEqual({
+  test("accepts format and engine flags without changing input order", async () => {
+    expect(await parse(["cat.jpg", "-gpu", "dog.png", "-png"])).toEqual({
       kind: "run",
       options: {
-        inputPath: "cat.jpg",
-        outputPath: "cat-nobg.png",
+        inputPaths: ["cat.jpg", "dog.png"],
+        outputPath: undefined,
         format: "png",
-        engine: "auto",
+        engine: "gpu",
       },
     });
   });
 
-  test("infers format from an explicit output filename", async () => {
+  test("preserves explicit output for runtime file-or-directory resolution", async () => {
     expect(await parse(["cat.jpg", "-o", "cutout.webp"])).toEqual({
       kind: "run",
       options: {
-        inputPath: "cat.jpg",
+        inputPaths: ["cat.jpg"],
         outputPath: "cutout.webp",
-        format: "webp",
-        engine: "auto",
-      },
-    });
-  });
-
-  test("appends the selected extension to an extensionless output", async () => {
-    expect(await parse(["cat.jpg", "-webp", "-o", "cutout"])).toEqual({
-      kind: "run",
-      options: {
-        inputPath: "cat.jpg",
-        outputPath: "cutout.webp",
-        format: "webp",
+        format: undefined,
         engine: "auto",
       },
     });
@@ -126,22 +102,10 @@ describe("parseCliArgs", () => {
     expect(await parse(["cat.png", "--jpeg"])).toEqual({
       kind: "run",
       options: {
-        inputPath: "cat.png",
-        outputPath: "cat-nobg.jpg",
+        inputPaths: ["cat.png"],
+        outputPath: undefined,
         format: "jpg",
         engine: "auto",
-      },
-    });
-  });
-
-  test("supports an explicit GPU engine", async () => {
-    expect(await parse(["cat.jpg", "-gpu"])).toEqual({
-      kind: "run",
-      options: {
-        inputPath: "cat.jpg",
-        outputPath: "cat-nobg.png",
-        format: "png",
-        engine: "gpu",
       },
     });
   });
@@ -156,11 +120,6 @@ describe("parseCliArgs", () => {
       .toBe("Only one output format can be specified.");
   });
 
-  test("rejects a format that conflicts with the output extension", async () => {
-    expect(await parseFailure(["cat.jpg", "--png", "-o", "cutout.webp"]))
-      .toContain("conflicts with the requested --png format");
-  });
-
   test("returns help without requiring an input", async () => {
     expect(await parse(["--help"])).toEqual({ kind: "help" });
     expect(await parse(["serve", "--help"])).toEqual({ kind: "help" });
@@ -169,5 +128,10 @@ describe("parseCliArgs", () => {
   test("rejects invalid local app ports", async () => {
     expect(await parseFailure(["serve", "--port", "99999"]))
       .toContain("Invalid port");
+  });
+
+  test("requires at least one input for headless removal", async () => {
+    expect(await parseFailure(["remove", "--png"]))
+      .toContain("At least one input image or directory path is required");
   });
 });

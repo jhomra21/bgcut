@@ -36,12 +36,6 @@ export type BgcutErrorCode =
   | "output"
   | "closed";
 
-/**
- * Stable public error returned by the Node API.
- *
- * Inspect `code` for programmatic handling. The original internal error is
- * available as `cause`.
- */
 export declare class BgcutError extends Error {
   readonly code: BgcutErrorCode;
   constructor(code: BgcutErrorCode, message: string, cause?: Error);
@@ -67,6 +61,37 @@ export type RemoveBackgroundResult = {
   readonly format: BgcutFormat;
 };
 
+export type BgcutBatchInput =
+  | BgcutInput
+  | Iterable<BgcutInput>
+  | AsyncIterable<BgcutInput>;
+
+export type BgcutBatchRemoveOptions = BgcutRemoveOptions & {
+  readonly recursive?: boolean;
+};
+
+export type RemoveBackgroundsOptions = RemoveBackgroundOptions & {
+  readonly recursive?: boolean;
+};
+
+export type BgcutBatchSource = {
+  readonly input: BgcutInput;
+  readonly rootPath?: string;
+  readonly relativePath?: string;
+};
+
+export type BgcutBatchResult =
+  | {
+      readonly ok: true;
+      readonly source: BgcutBatchSource;
+      readonly result: BgcutRemovalResult;
+    }
+  | {
+      readonly ok: false;
+      readonly source: BgcutBatchSource;
+      readonly error: BgcutError;
+    };
+
 export type Bgcut = {
   readonly engine: BgcutExecutionEngine;
   readonly fallbackReason: string | undefined;
@@ -75,6 +100,10 @@ export type Bgcut = {
     input: BgcutInput,
     options?: BgcutRemoveOptions,
   ) => Promise<BgcutRemovalResult>;
+  readonly removeMany: (
+    inputs: BgcutBatchInput,
+    options?: BgcutBatchRemoveOptions,
+  ) => AsyncIterable<BgcutBatchResult>;
   readonly close: () => Promise<void>;
 };
 
@@ -90,10 +119,21 @@ export declare const createBgcut: (
 
 /**
  * Remove one image background and close the temporary runtime automatically.
- *
- * Use `createBgcut()` instead when processing several images.
  */
 export declare const removeBackground: (
   input: BgcutInput,
   options?: RemoveBackgroundOptions,
 ) => Promise<RemoveBackgroundResult>;
+
+/**
+ * Process files, directories, or iterables sequentially with one reusable
+ * runtime. Directory traversal is recursive by default.
+ *
+ * Results are yielded one at a time so callers do not have to retain an
+ * entire batch in memory. Per-image failures are yielded with `ok: false`
+ * and do not stop later images.
+ */
+export declare function removeBackgrounds(
+  inputs: BgcutBatchInput,
+  options?: RemoveBackgroundsOptions,
+): AsyncIterable<BgcutBatchResult>;

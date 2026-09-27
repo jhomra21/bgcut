@@ -1,14 +1,13 @@
 import { Data, Effect } from "effect";
-import { dirname, extname, join, parse } from "node:path";
 
 export type CliFormat = "png" | "webp" | "jpg";
 
 export type CliEngine = "auto" | "gpu" | "cpu";
 
 export type CliOptions = {
-  readonly inputPath: string;
-  readonly outputPath: string;
-  readonly format: CliFormat;
+  readonly inputPaths: readonly string[];
+  readonly outputPath: string | undefined;
+  readonly format: CliFormat | undefined;
   readonly engine: CliEngine;
 };
 
@@ -47,69 +46,6 @@ const engineFlags = new Map<string, CliEngine>([
 
 const serveFlags = new Set(["--no-open", "--json", "--port"]);
 
-const formatFromExtension = (path: string): CliFormat | undefined => {
-  const extension = extname(path).toLowerCase();
-
-  if (extension === ".png") {
-    return "png";
-  }
-
-  if (extension === ".webp") {
-    return "webp";
-  }
-
-  if (extension === ".jpg" || extension === ".jpeg") {
-    return "jpg";
-  }
-
-  return undefined;
-};
-
-const extensionForFormat = (format: CliFormat): string => `.${format}`;
-
-const defaultOutputPath = (inputPath: string, format: CliFormat): string => {
-  const parsed = parse(inputPath);
-  const baseName = parsed.name.length > 0 ? parsed.name : "image";
-
-  return join(dirname(inputPath), `${baseName}-nobg${extensionForFormat(format)}`);
-};
-
-const resolveOutputPath = (
-  inputPath: string,
-  requestedOutput: string | undefined,
-  requestedFormat: CliFormat | undefined,
-): Effect.Effect<{ readonly outputPath: string; readonly format: CliFormat }, CliArgumentError> =>
-  Effect.gen(function* () {
-    if (requestedOutput === undefined) {
-      const format = requestedFormat ?? "png";
-
-      return { outputPath: defaultOutputPath(inputPath, format), format };
-    }
-
-    const extension = extname(requestedOutput);
-    const outputFormat = formatFromExtension(requestedOutput);
-
-    if (extension.length > 0 && outputFormat === undefined) {
-      return yield* new CliArgumentError({
-        message: `Unsupported output extension "${extension}". Use PNG, WebP, JPG, or JPEG.`,
-      });
-    }
-
-    if (requestedFormat !== undefined && outputFormat !== undefined && requestedFormat !== outputFormat) {
-      return yield* new CliArgumentError({
-        message: `Output path "${requestedOutput}" conflicts with the requested --${requestedFormat} format.`,
-      });
-    }
-
-    const format = requestedFormat ?? outputFormat ?? "png";
-
-    const outputPath = extension.length === 0
-      ? `${requestedOutput}${extensionForFormat(format)}`
-      : requestedOutput;
-
-    return { outputPath, format };
-  });
-
 const parsePort = (value: string | undefined): Effect.Effect<number, CliArgumentError> =>
   Effect.gen(function* () {
     if (value === undefined || value.startsWith("-")) {
@@ -129,7 +65,10 @@ const parsePort = (value: string | undefined): Effect.Effect<number, CliArgument
 
 const parseServeArgs = (
   args: readonly string[],
-): Effect.Effect<{ readonly kind: "serve"; readonly options: ServeOptions } | { readonly kind: "help" }, CliArgumentError> =>
+): Effect.Effect<
+  { readonly kind: "serve"; readonly options: ServeOptions } | { readonly kind: "help" },
+  CliArgumentError
+> =>
   Effect.gen(function* () {
     let port = 0;
     let open = true;
@@ -174,9 +113,11 @@ const parseServeArgs = (
     };
   });
 
-const parseRunArgs = (args: readonly string[]): Effect.Effect<ParsedCli, CliArgumentError> =>
+const parseRunArgs = (
+  args: readonly string[],
+): Effect.Effect<ParsedCli, CliArgumentError> =>
   Effect.gen(function* () {
-    let inputPath: string | undefined;
+    const inputPaths: string[] = [];
     let outputPath: string | undefined;
     let format: CliFormat | undefined;
     let engine: CliEngine = "auto";
@@ -240,31 +181,27 @@ const parseRunArgs = (args: readonly string[]): Effect.Effect<ParsedCli, CliArgu
         return yield* new CliArgumentError({ message: `Unknown option "${argument}".` });
       }
 
-      if (inputPath !== undefined) {
-        return yield* new CliArgumentError({ message: "Only one input image can be processed per command for now." });
-      }
-
-      inputPath = argument;
+      inputPaths.push(argument);
     }
 
-    if (inputPath === undefined) {
-      return yield* new CliArgumentError({ message: "An input image path is required." });
+    if (inputPaths.length === 0) {
+      return yield* new CliArgumentError({ message: "At least one input image or directory path is required." });
     }
-
-    const output = yield* resolveOutputPath(inputPath, outputPath, format);
 
     return {
       kind: "run",
       options: {
-        inputPath,
-        outputPath: output.outputPath,
-        format: output.format,
+        inputPaths,
+        outputPath,
+        format,
         engine,
       },
     };
   });
 
-export const parseCliArgs = (args: readonly string[]): Effect.Effect<ParsedCli, CliArgumentError> => {
+export const parseCliArgs = (
+  args: readonly string[],
+): Effect.Effect<ParsedCli, CliArgumentError> => {
   if (args.length === 0) {
     return parseServeArgs([]);
   }
