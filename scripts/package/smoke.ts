@@ -435,7 +435,7 @@ try {
   );
 
   if ((await stat(apiOutputPath)).size <= 0) {
-    throw new Error("Installed Node API did not complete reusable-session inference.");
+    throw new Error("Installed Node API did not complete reusable bgcut inference.");
   }
 
   const skillPath = join(consumerDirectory, "node_modules", "bgcut", "skills", "bgcut", "SKILL.md");
