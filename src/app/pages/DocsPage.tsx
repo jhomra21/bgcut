@@ -164,9 +164,26 @@ bgcut photo.jpg --cpu`}
           <h3>Node API</h3>
           <p>Install <code>bgcut</code> from npm:</p>
           <CodeBlock language="shell" code="npm install bgcut" />
+
+          <div class="spec-table" role="table" aria-label="Node API">
+            <div class="spec-row" role="row">
+              <strong role="cell">removeBackground(input, options?)</strong>
+              <span role="cell">Remove one image. Without a reusable bgcut instance, the call owns setup and cleanup.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">bgcut(options?)</strong>
+              <span role="cell">Open a reusable runtime for several removeBackground() calls. Close it when finished.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">BgcutError</strong>
+              <span role="cell">Public error type with stable error codes for programmatic handling.</span>
+            </div>
+          </div>
+
+          <h4>Single image</h4>
           <p>
-            Use <code>removeBackground()</code> for every image. Without a session, bgcut creates
-            and closes a temporary runtime for that call.
+            Use <code>removeBackground()</code> directly for one image. A one-shot call creates the
+            runtime, removes the background, and cleans up before returning.
           </p>
           <CodeBlock
             language="typescript"
@@ -176,22 +193,66 @@ import { removeBackground } from "bgcut";
 const result = await removeBackground("photo.jpg");
 await writeFile("photo-nobg.png", result.data);`}
           />
-
-          <h4>Options and result</h4>
           <p>
             Pass <code>format</code> or <code>engine</code> only when you need to override the
-            defaults. Inputs can be a file path, <code>Uint8Array</code>, or
-            <code>ArrayBuffer</code>. Output formats are <code>png</code>, <code>webp</code>, and
-            <code>jpg</code>.
+            defaults.
           </p>
           <CodeBlock
             language="typescript"
             code={`const result = await removeBackground("photo.jpg", {
   format: "webp",
   engine: "cpu",
-});
+});`}
+          />
 
-type RemoveBackgroundResult = {
+          <h4>Multiple images</h4>
+          <p>
+            Open bgcut once, pass that instance to the same <code>removeBackground()</code>
+            function for each image, then close it. This keeps one ONNX Runtime instance warm
+            across the batch without adding another removal API.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`import { bgcut, removeBackground } from "bgcut";
+
+const runtime = await bgcut();
+
+try {
+  for (const input of ["first.jpg", "second.jpg"]) {
+    const result = await removeBackground(input, {
+      bgcut: runtime,
+    });
+
+    console.log(input, result.timings);
+  }
+} finally {
+  await runtime.close();
+}`}
+          />
+          <p>
+            <code>bgcut()</code> defaults to automatic engine selection.
+            <code>bgcut({ engine: "gpu" })</code> requires native WebGPU and
+            <code>bgcut({ engine: "cpu" })</code> requires CPU. bgcut's CLI and product UI process
+            batches sequentially by default to limit memory pressure while keeping the runtime
+            warm.
+          </p>
+
+          <h4>Directory input</h4>
+          <p>
+            Directory traversal belongs to the CLI, not the image API. Use
+            <code>bgcut photos/</code> for recursive directory processing. Node applications that
+            already own file discovery should enumerate paths and call
+            <code>removeBackground()</code> with one shared bgcut instance.
+          </p>
+
+          <h4>Inputs and result</h4>
+          <p>
+            Inputs can be a file path, <code>Uint8Array</code>, or <code>ArrayBuffer</code>. Output
+            formats are <code>png</code>, <code>webp</code>, and <code>jpg</code>.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`type RemoveBackgroundResult = {
   data: Uint8Array;
   width: number;
   height: number;
@@ -206,35 +267,6 @@ type RemoveBackgroundResult = {
   };
 };`}
           />
-
-          <h4>Reuse one session</h4>
-          <p>
-            For several images, create one session and pass it to the same
-            <code>removeBackground()</code> function. Processing remains sequential unless the
-            caller explicitly adds concurrency.
-          </p>
-          <CodeBlock
-            language="typescript"
-            code={`import { createSession, removeBackground } from "bgcut";
-
-const session = await createSession();
-
-try {
-  for (const input of ["first.jpg", "second.jpg"]) {
-    const result = await removeBackground(input, { session });
-    console.log(input, result.timings);
-  }
-} finally {
-  await session.close();
-}`}
-          />
-          <p>
-            <code>createSession()</code> defaults to automatic engine selection. Use
-            <code>engine: "gpu"</code> to require native WebGPU or <code>engine: "cpu"</code> to
-            require CPU. Directory traversal stays outside the image-removal API. Use the CLI for
-            directories, or enumerate files in application code and call
-            <code>removeBackground()</code> with one shared session.
-          </p>
 
           <h4>Errors</h4>
           <p>
