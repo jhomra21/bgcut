@@ -109,15 +109,20 @@ bgcut serve --json`}
         <section id="cli" class="reference-section doc-section">
           <h3>CLI</h3>
           <p>
-            Pass one image path to run headless removal. By default, bgcut writes
-            <code>&lt;name&gt;-nobg.png</code> next to the input image. The explicit
-            <code>remove</code> command does the same thing.
+            Pass one image path for the existing file-in/file-out flow. Pass several files or a
+            directory for batch removal. Directory scans are recursive. Batch inference runs one
+            image at a time and reuses one ONNX Runtime session.
           </p>
           <CodeBlock
             language="shell"
             code={`bgcut photo.jpg
 bgcut remove photo.jpg
 bgcut photo.jpg -o portrait.png
+
+# several files or a directory
+bgcut first.jpg second.png
+bgcut photos/
+bgcut photos/ -o ./cutouts
 
 # output formats
 bgcut photo.jpg --png
@@ -131,7 +136,7 @@ bgcut photo.jpg --cpu`}
           <div class="spec-table" role="table" aria-label="CLI behavior">
             <div class="spec-row" role="row">
               <strong role="cell">Inputs</strong>
-              <span role="cell">JPEG, PNG, WebP, AVIF</span>
+              <span role="cell">JPEG, PNG, WebP, AVIF files; recursive directories</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Outputs</strong>
@@ -147,8 +152,10 @@ bgcut photo.jpg --cpu`}
             </div>
           </div>
           <p>
-            Sharp/libvips decodes the image from its contents, not from the filename extension.
-            bgcut also accepts <code>-png</code>, <code>-webp</code>, <code>-jpg</code>,
+            For a single file, <code>--output</code> names the output file. For a batch, it names
+            an output directory and preserves nested paths. Without <code>--output</code>, each
+            result is written next to its source image. Sharp/libvips decodes each image from its
+            contents, not from the filename extension. bgcut also accepts <code>-png</code>, <code>-webp</code>, <code>-jpg</code>,
             <code>-gpu</code>, and <code>-cpu</code>.
           </p>
         </section>
@@ -192,10 +199,34 @@ type RemoveBackgroundResult = {
 };`}
           />
 
+          <h4>Streaming batch</h4>
+          <p>
+            Use <code>removeBackgrounds()</code> for files, directories, or iterables. It yields one
+            result at a time, processes images sequentially, and reuses one ONNX Runtime session.
+            Directory traversal is recursive by default.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`import { removeBackgrounds } from "bgcut";
+
+for await (const item of removeBackgrounds("photos")) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  console.log(item.source.relativePath, item.result);
+}`}
+          />
+          <p>
+            A failed image yields <code>ok: false</code> and does not stop later images. The
+            streaming result keeps bgcut from collecting every encoded output in memory.
+          </p>
+
           <h4>Reusable session</h4>
           <p>
-            When processing several images, create one bgcut instance so the ONNX Runtime session
-            stays warm across removals.
+            Use <code>createBgcut().removeMany()</code> when application code also needs the
+            selected engine, fallback reason, setup timings, or explicit session lifetime.
           </p>
           <CodeBlock
             language="typescript"
@@ -204,8 +235,11 @@ type RemoveBackgroundResult = {
 const bgcut = await createBgcut();
 
 try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
+  for await (const item of bgcut.removeMany(["first.jpg", "second.jpg"])) {
+    if (item.ok) {
+      console.log(item.source.input, item.result.timings);
+    }
+  }
 } finally {
   await bgcut.close();
 }`}
@@ -213,8 +247,7 @@ try {
           <p>
             <code>createBgcut()</code> defaults to automatic engine selection. Use
             <code>engine: "gpu"</code> to require native WebGPU or <code>engine: "cpu"</code> to
-            require CPU. The reusable instance also exposes the selected engine, fallback reason,
-            setup timings, and per-removal timings for callers that need runtime diagnostics.
+            require CPU.
           </p>
 
           <h4>Errors</h4>
