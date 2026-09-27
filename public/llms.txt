@@ -71,7 +71,7 @@ Install:
 npm install bgcut
 ```
 
-Remove one image:
+Single image:
 
 ```ts
 import { removeBackground } from "bgcut";
@@ -79,28 +79,32 @@ import { removeBackground } from "bgcut";
 const result = await removeBackground("photo.jpg");
 ```
 
-Reuse one runtime for several images:
+Multiple images:
 
 ```ts
-import { createSession, removeBackground } from "bgcut";
+import { bgcut, removeBackground } from "bgcut";
 
-const session = await createSession();
+const runtime = await bgcut();
 
 try {
   for (const input of ["first.jpg", "second.jpg"]) {
-    await removeBackground(input, { session });
+    await removeBackground(input, {
+      bgcut: runtime,
+    });
   }
 } finally {
-  await session.close();
+  await runtime.close();
 }
 ```
 
-The package has one removal operation: `removeBackground()`. A session changes runtime ownership, not the removal API. The Node API does not scan directories. Use the CLI for directory processing or enumerate files in application code.
+There is one removal operation: `removeBackground()`. Calling `bgcut()` gives the caller a reusable warm runtime for several calls and explicit lifecycle control.
+
+The Node image API does not scan directories. Use the CLI for directory processing or enumerate files in application code.
 
 Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
 
 Engine values:
-- `auto`: try native WebGPU, then CPU if session creation fails.
+- `auto`: try native WebGPU, then CPU if runtime creation fails.
 - `gpu`: require native WebGPU.
 - `cpu`: require CPU.
 
