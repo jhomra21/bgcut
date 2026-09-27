@@ -165,8 +165,8 @@ bgcut photo.jpg --cpu`}
           <p>Install <code>bgcut</code> from npm:</p>
           <CodeBlock language="shell" code="npm install bgcut" />
           <p>
-            For one image, use <code>removeBackground()</code>. It owns setup and cleanup for the
-            call and returns only the image result fields most callers need.
+            Use <code>removeBackground()</code> for every image. Without a session, bgcut creates
+            and closes a temporary runtime for that call.
           </p>
           <CodeBlock
             language="typescript"
@@ -177,7 +177,7 @@ const result = await removeBackground("photo.jpg");
 await writeFile("photo-nobg.png", result.data);`}
           />
 
-          <h4>One-shot options and result</h4>
+          <h4>Options and result</h4>
           <p>
             Pass <code>format</code> or <code>engine</code> only when you need to override the
             defaults. Inputs can be a file path, <code>Uint8Array</code>, or
@@ -196,58 +196,44 @@ type RemoveBackgroundResult = {
   width: number;
   height: number;
   format: "png" | "webp" | "jpg";
+  engine: "webgpu" | "cpu";
+  fallbackReason: string | undefined;
+  timings: {
+    totalMs: number;
+    prepareMs: number;
+    inferenceMs: number;
+    encodeMs: number;
+  };
 };`}
           />
 
-          <h4>Streaming batch</h4>
+          <h4>Reuse one session</h4>
           <p>
-            Use <code>removeBackgrounds()</code> for files, directories, or iterables. It yields one
-            result at a time, processes images sequentially, and reuses one ONNX Runtime session.
-            Directory traversal is recursive by default.
+            For several images, create one session and pass it to the same
+            <code>removeBackground()</code> function. Processing remains sequential unless the
+            caller explicitly adds concurrency.
           </p>
           <CodeBlock
             language="typescript"
-            code={`import { removeBackgrounds } from "bgcut";
+            code={`import { createSession, removeBackground } from "bgcut";
 
-for await (const item of removeBackgrounds("photos")) {
-  if (!item.ok) {
-    console.error(item.source.input, item.error);
-    continue;
-  }
-
-  console.log(item.source.relativePath, item.result);
-}`}
-          />
-          <p>
-            A failed image yields <code>ok: false</code> and does not stop later images. The
-            streaming result keeps bgcut from collecting every encoded output in memory.
-          </p>
-
-          <h4>Reusable session</h4>
-          <p>
-            Use <code>createBgcut().removeMany()</code> when application code also needs the
-            selected engine, fallback reason, setup timings, or explicit session lifetime.
-          </p>
-          <CodeBlock
-            language="typescript"
-            code={`import { createBgcut } from "bgcut";
-
-const bgcut = await createBgcut();
+const session = await createSession();
 
 try {
-  for await (const item of bgcut.removeMany(["first.jpg", "second.jpg"])) {
-    if (item.ok) {
-      console.log(item.source.input, item.result.timings);
-    }
+  for (const input of ["first.jpg", "second.jpg"]) {
+    const result = await removeBackground(input, { session });
+    console.log(input, result.timings);
   }
 } finally {
-  await bgcut.close();
+  await session.close();
 }`}
           />
           <p>
-            <code>createBgcut()</code> defaults to automatic engine selection. Use
+            <code>createSession()</code> defaults to automatic engine selection. Use
             <code>engine: "gpu"</code> to require native WebGPU or <code>engine: "cpu"</code> to
-            require CPU.
+            require CPU. Directory traversal stays outside the image-removal API. Use the CLI for
+            directories, or enumerate files in application code and call
+            <code>removeBackground()</code> with one shared session.
           </p>
 
           <h4>Errors</h4>
@@ -272,7 +258,6 @@ try {
             <code>inference</code>, <code>output</code>, and <code>closed</code>.
           </p>
         </section>
-
         <section id="model" class="reference-section doc-section">
           <h3>Model and runtime</h3>
           <p class="docs-section-summary">
