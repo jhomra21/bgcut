@@ -172,7 +172,7 @@ const readDirectoryEntries = async (path: string) => {
   try {
     const entries = await readdir(path, { withFileTypes: true });
 
-    return entries.toSorted((left, right) => left.name.localeCompare(right.name));
+    return entries.sort((left, right) => left.name.localeCompare(right.name));
   } catch (cause) {
     throw new BgcutError(
       "input",
