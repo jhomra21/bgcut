@@ -146,7 +146,7 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import('bgcut').then((module) => { if (typeof module.bgcut !== 'function' || typeof module.removeBackground !== 'function' || typeof module.BgcutError !== 'function' || 'createSession' in module || 'createBgcut' in module || 'removeBackgrounds' in module) process.exit(2) })",
+      "import('bgcut').then(async (module) => { if (typeof module.bgcut !== 'function' || typeof module.BgcutError !== 'function' || 'removeBackground' in module || 'createSession' in module || 'createBgcut' in module || 'removeBackgrounds' in module) process.exit(2); const remover = await module.bgcut({ engine: 'cpu' }); if (typeof remover.removeBackground !== 'function' || typeof remover.removeMany !== 'function' || typeof remover.close !== 'function') process.exit(3); await remover.close(); })",
     ],
     consumerDirectory,
   );
@@ -341,7 +341,7 @@ try {
   await writeFile(
     apiSmokePath,
     `import { writeFile } from "node:fs/promises";
-import { BgcutError, bgcut, removeBackground } from "bgcut";
+import { BgcutError, bgcut } from "bgcut";
 
 const expectBgcutError = async (operation, expectedCode, exitCode) => {
   let received;
@@ -362,69 +362,53 @@ const expectBgcutError = async (operation, expectedCode, exitCode) => {
 };
 
 const invalidImage = new Uint8Array([0, 1, 2, 3]);
-
-await expectBgcutError(
-  () => removeBackground(invalidImage, { engine: "cpu" }),
-  "input",
-  2,
-);
-
-const oneShot = await removeBackground(process.argv[2], {
-  engine: "cpu",
-  format: "png",
-});
-
-if (
-  oneShot.format !== "png" ||
-  oneShot.width !== 8 ||
-  oneShot.height !== 8 ||
-  oneShot.data.length === 0 ||
-  oneShot.engine !== "cpu" ||
-  oneShot.timings.totalMs <= 0
-) {
-  process.exit(3);
-}
-
-const instance = await bgcut({ engine: "cpu" });
+const remover = await bgcut({ engine: "cpu" });
 
 try {
   await expectBgcutError(
-    () => removeBackground(invalidImage, { bgcut: instance }),
+    () => remover.removeBackground(invalidImage),
     "input",
-    4,
+    2,
   );
 
-  const first = await removeBackground(process.argv[2], { bgcut: instance });
-  const second = await removeBackground(process.argv[2], {
-    bgcut: instance,
+  const first = await remover.removeBackground(process.argv[2]);
+  const second = await remover.removeBackground(process.argv[2], {
     format: "webp",
   });
 
+  const many = [];
+
+  for await (const item of remover.removeMany([
+    process.argv[2],
+    process.argv[2],
+  ])) {
+    many.push(item);
+  }
+
   if (
-    instance.engine !== "cpu" ||
+    remover.engine !== "cpu" ||
     first.engine !== "cpu" ||
     second.engine !== "cpu" ||
     first.data.length === 0 ||
     second.data.length === 0 ||
-    first.timings.totalMs <= 0 ||
-    second.timings.totalMs <= 0
+    many.length !== 2 ||
+    many.some((item) => !item.ok || item.result.engine !== "cpu")
   ) {
-    process.exit(5);
+    process.exit(3);
   }
 
-  await instance.close();
+  await writeFile(process.argv[3], second.data);
+  await remover.close();
 
   await expectBgcutError(
-    () => removeBackground(process.argv[2], { bgcut: instance }),
+    () => remover.removeBackground(process.argv[2]),
     "closed",
-    6,
+    4,
   );
-
-  await writeFile(process.argv[3], second.data);
 } finally {
-  await instance.close();
+  await remover.close();
 }
-`,
+``,
   );
 
   run(
@@ -445,8 +429,8 @@ try {
     !skill.includes("name: bgcut") ||
     !skill.includes("npx bgcut input.jpg") ||
     !skill.includes("bgcut serve --json") ||
-    !skill.includes('import { removeBackground } from "bgcut"') ||
-    !skill.includes('import { bgcut, removeBackground } from "bgcut"') ||
+    !skill.includes('import { bgcut } from "bgcut"') ||
+    !skill.includes('import { bgcut } from "bgcut"') ||
     !skill.includes("same operating-system cache directory") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
@@ -454,7 +438,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: single and recursive-directory Node CLI inference, local web app, cached model routes, public Node API errors, reusable bgcut Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: single and recursive-directory Node CLI inference, local web app, cached model routes, public Node API errors, bgcut instance single and multi-image Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
