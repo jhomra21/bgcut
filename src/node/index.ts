@@ -1,6 +1,4 @@
-import { Effect, Either, Schema } from "effect";
-import { readdir, stat } from "node:fs/promises";
-import { basename, extname, join, relative, resolve } from "node:path";
+import { Effect, Either } from "effect";
 
 import { ModelCacheError } from "../native/model-cache";
 import {
@@ -13,6 +11,7 @@ import {
   type BgcutFormat,
   type BgcutInput,
   type BgcutRemovalResult,
+  type NativeBgcut,
 } from "./runtime";
 
 export type {
@@ -43,82 +42,44 @@ export class BgcutError extends Error {
   }
 }
 
-export type BgcutOptions = {
+export type BgcutSessionOptions = {
   readonly engine?: BgcutEngine;
 };
 
-export type BgcutRemoveOptions = {
-  readonly format?: BgcutFormat;
-};
-
-export type RemoveBackgroundOptions = {
-  readonly engine?: BgcutEngine;
-  readonly format?: BgcutFormat;
-};
-
-export type RemoveBackgroundResult = {
-  readonly data: Uint8Array;
-  readonly width: number;
-  readonly height: number;
-  readonly format: BgcutFormat;
-};
-
-export type BgcutBatchInput =
-  | BgcutInput
-  | Iterable<BgcutInput>
-  | AsyncIterable<BgcutInput>;
-
-export type BgcutBatchRemoveOptions = BgcutRemoveOptions & {
-  readonly recursive?: boolean;
-};
-
-export type RemoveBackgroundsOptions = RemoveBackgroundOptions & {
-  readonly recursive?: boolean;
-};
-
-export type BgcutBatchSource = {
-  readonly input: BgcutInput;
-  readonly rootPath?: string;
-  readonly relativePath?: string;
-};
-
-export type BgcutBatchResult =
-  | {
-      readonly ok: true;
-      readonly source: BgcutBatchSource;
-      readonly result: BgcutRemovalResult;
-    }
-  | {
-      readonly ok: false;
-      readonly source: BgcutBatchSource;
-      readonly error: BgcutError;
-    };
-
-export type Bgcut = {
+export type BgcutSession = {
   readonly engine: "webgpu" | "cpu";
   readonly fallbackReason: string | undefined;
   readonly setupTimings: {
     readonly modelMs: number;
     readonly sessionMs: number;
   };
-  readonly remove: (
-    input: BgcutInput,
-    options?: BgcutRemoveOptions,
-  ) => Promise<BgcutRemovalResult>;
-  readonly removeMany: (
-    inputs: BgcutBatchInput,
-    options?: BgcutBatchRemoveOptions,
-  ) => AsyncIterable<BgcutBatchResult>;
   readonly close: () => Promise<void>;
 };
 
-const DIRECTORY_IMAGE_EXTENSIONS = new Set([
-  ".avif",
-  ".jpeg",
-  ".jpg",
-  ".png",
-  ".webp",
-]);
+type OneShotRemoveOptions = {
+  readonly format?: BgcutFormat;
+  readonly engine?: BgcutEngine;
+  readonly session?: undefined;
+};
+
+type SessionRemoveOptions = {
+  readonly format?: BgcutFormat;
+  readonly engine?: never;
+  readonly session: BgcutSession;
+};
+
+export type RemoveBackgroundOptions =
+  | OneShotRemoveOptions
+  | SessionRemoveOptions;
+
+export type RemoveBackgroundResult = BgcutRemovalResult;
+
+type SessionState = {
+  readonly native: NativeBgcut;
+  closed: boolean;
+};
+
+const sessionStates = new WeakMap<BgcutSession, SessionState>();
 
 const runPublicEffect = async <A, E extends Error>(
   effect: Effect.Effect<A, E>,
@@ -156,241 +117,85 @@ const mapRemoveError = (
   return new BgcutError("output", error.message, error);
 };
 
-const asError = (cause: unknown): Error =>
-  cause instanceof Error ? cause : new Error(String(cause));
+const getOpenSessionState = (session: BgcutSession): SessionState => {
+  const state = sessionStates.get(session);
 
-const decodePathInput = (input: BgcutBatchInput): string | undefined => {
-  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
-
-  return Either.isRight(decoded) ? decoded.right : undefined;
-};
-
-const isDirectoryImage = (path: string): boolean =>
-  DIRECTORY_IMAGE_EXTENSIONS.has(extname(path).toLowerCase());
-
-const readDirectoryEntries = async (path: string) => {
-  try {
-    const entries = await readdir(path, { withFileTypes: true });
-
-    return entries.sort((left, right) => left.name.localeCompare(right.name));
-  } catch (cause) {
+  if (state === undefined) {
     throw new BgcutError(
-      "input",
-      `Could not read image directory ${path}.`,
-      asError(cause),
-    );
-  }
-};
-
-async function* walkDirectory(
-  rootPath: string,
-  currentPath: string,
-  recursive: boolean,
-): AsyncGenerator<BgcutBatchSource> {
-  for (const entry of await readDirectoryEntries(currentPath)) {
-    const path = join(currentPath, entry.name);
-
-    if (entry.isDirectory()) {
-      if (recursive) {
-        yield* walkDirectory(rootPath, path, recursive);
-      }
-
-      continue;
-    }
-
-    if (!entry.isFile() || !isDirectoryImage(path)) {
-      continue;
-    }
-
-    yield {
-      input: path,
-      rootPath,
-      relativePath: relative(rootPath, path),
-    };
-  }
-}
-
-async function* expandSingleInput(
-  input: BgcutInput,
-  recursive: boolean,
-): AsyncGenerator<BgcutBatchSource> {
-  const inputPath = decodePathInput(input);
-
-  if (inputPath === undefined) {
-    yield { input };
-
-    return;
-  }
-
-  const path = resolve(inputPath);
-  let inputStat;
-
-  try {
-    inputStat = await stat(path);
-  } catch (cause) {
-    throw new BgcutError(
-      "input",
-      `Could not inspect input path ${inputPath}.`,
-      asError(cause),
+      "engine",
+      "The supplied bgcut session was not created by createSession().",
     );
   }
 
-  if (inputStat.isDirectory()) {
-    yield* walkDirectory(path, path, recursive);
-
-    return;
+  if (state.closed) {
+    throw new BgcutError("closed", "This bgcut session has already been closed.");
   }
 
-  if (!inputStat.isFile()) {
-    throw new BgcutError("input", `Input path is not a file or directory: ${inputPath}.`);
-  }
+  return state;
+};
 
-  yield {
-    input: path,
-    relativePath: basename(path),
-  };
-}
-
-async function* expandBatchInputs(
-  inputs: BgcutBatchInput,
-  recursive: boolean,
-): AsyncGenerator<BgcutBatchSource> {
-  const pathInput = decodePathInput(inputs);
-
-  if (pathInput !== undefined) {
-    yield* expandSingleInput(pathInput, recursive);
-
-    return;
-  }
-
-  if (inputs instanceof Uint8Array || inputs instanceof ArrayBuffer) {
-    yield* expandSingleInput(inputs, recursive);
-
-    return;
-  }
-
-  for await (const input of inputs) {
-    yield* expandSingleInput(input, recursive);
-  }
-}
-
-export const createBgcut = async (
-  options: BgcutOptions = {},
-): Promise<Bgcut> => {
+export const createSession = async (
+  options: BgcutSessionOptions = {},
+): Promise<BgcutSession> => {
   const native = await runPublicEffect(
     createNativeBgcut(options.engine ?? "auto").pipe(
       Effect.mapError(mapCreateError),
     ),
   );
 
-  let closed = false;
-
-  const remove = (
-    input: BgcutInput,
-    removeOptions: BgcutRemoveOptions = {},
-  ): Promise<BgcutRemovalResult> => {
-    if (closed) {
-      return Promise.reject(
-        new BgcutError("closed", "This bgcut instance has already been closed."),
-      );
-    }
-
-    return runPublicEffect(
-      native.remove(input, removeOptions.format ?? "png").pipe(
-        Effect.mapError(mapRemoveError),
-      ),
-    );
-  };
-
-  const removeMany = async function* (
-    inputs: BgcutBatchInput,
-    removeOptions: BgcutBatchRemoveOptions = {},
-  ): AsyncGenerator<BgcutBatchResult> {
-    if (closed) {
-      throw new BgcutError("closed", "This bgcut instance has already been closed.");
-    }
-
-    for await (const source of expandBatchInputs(
-      inputs,
-      removeOptions.recursive ?? true,
-    )) {
-      try {
-        const result = await remove(source.input, {
-          format: removeOptions.format,
-        });
-
-        yield {
-          ok: true,
-          source,
-          result,
-        };
-      } catch (error) {
-        if (!(error instanceof BgcutError)) {
-          throw error;
-        }
-
-        if (error.code === "closed") {
-          throw error;
-        }
-
-        yield {
-          ok: false,
-          source,
-          error,
-        };
-      }
-    }
-  };
-
-  return {
+  const session: BgcutSession = {
     engine: native.engine,
     fallbackReason: native.fallbackReason,
     setupTimings: native.setupTimings,
-    remove,
-    removeMany,
     close: async () => {
-      if (closed) {
+      const state = sessionStates.get(session);
+
+      if (state === undefined || state.closed) {
         return;
       }
 
-      closed = true;
-      await Effect.runPromise(native.close());
+      state.closed = true;
+      await Effect.runPromise(state.native.close());
     },
   };
+
+  sessionStates.set(session, {
+    native,
+    closed: false,
+  });
+
+  return session;
+};
+
+const removeWithSession = (
+  session: BgcutSession,
+  input: BgcutInput,
+  format: BgcutFormat,
+): Promise<BgcutRemovalResult> => {
+  const state = getOpenSessionState(session);
+
+  return runPublicEffect(
+    state.native.remove(input, format).pipe(
+      Effect.mapError(mapRemoveError),
+    ),
+  );
 };
 
 export const removeBackground = async (
   input: BgcutInput,
   options: RemoveBackgroundOptions = {},
 ): Promise<RemoveBackgroundResult> => {
-  const bgcut = await createBgcut({ engine: options.engine });
+  const format = options.format ?? "png";
+
+  if (options.session !== undefined) {
+    return removeWithSession(options.session, input, format);
+  }
+
+  const session = await createSession({ engine: options.engine });
 
   try {
-    const result = await bgcut.remove(input, { format: options.format });
-
-    return {
-      data: result.data,
-      width: result.width,
-      height: result.height,
-      format: result.format,
-    };
+    return await removeWithSession(session, input, format);
   } finally {
-    await bgcut.close();
+    await session.close();
   }
 };
-
-export async function* removeBackgrounds(
-  inputs: BgcutBatchInput,
-  options: RemoveBackgroundsOptions = {},
-): AsyncGenerator<BgcutBatchResult> {
-  const bgcut = await createBgcut({ engine: options.engine });
-
-  try {
-    yield* bgcut.removeMany(inputs, {
-      format: options.format,
-      recursive: options.recursive,
-    });
-  } finally {
-    await bgcut.close();
-  }
-}

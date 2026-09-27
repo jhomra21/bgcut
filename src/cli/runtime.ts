@@ -1,21 +1,22 @@
-import { Data, Effect, Either, Schema } from "effect";
-import { mkdir, stat, writeFile } from "node:fs/promises";
-import {
-  basename,
-  dirname,
-  extname,
-  join,
-  parse,
-  resolve,
-} from "node:path";
+import { Data, Effect } from "effect";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
-import type { CliFormat, CliOptions } from "./args";
+import type { CliOptions } from "./args";
+import {
+  expandCliInputPaths,
+  isCliBatchInput,
+} from "./input-paths";
+import {
+  CliOutputPathError,
+  resolveBatchOutput,
+  resolveSingleOutput,
+} from "./output-paths";
 import {
   BgcutError,
-  createBgcut,
+  createSession,
+  removeBackground,
   type BgcutExecutionEngine,
-  type BgcutFormat,
-  type BgcutInput,
   type BgcutRemovalResult,
 } from "../node/index";
 import { prepareNativeImage } from "../node/runtime";
@@ -51,132 +52,12 @@ export type CliRemovalSummary = {
   readonly totalMs: number;
 };
 
-type ResolvedSingleOutput = {
-  readonly outputPath: string;
-  readonly format: BgcutFormat;
-};
-
 export class CliRuntimeError extends Data.TaggedError("CliRuntimeError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
 
 export const prepareImage = prepareNativeImage;
-
-const outputFormatFromPath = (path: string): CliFormat | undefined => {
-  const extension = extname(path).toLowerCase();
-
-  if (extension === ".png") {
-    return "png";
-  }
-
-  if (extension === ".webp") {
-    return "webp";
-  }
-
-  if (extension === ".jpg" || extension === ".jpeg") {
-    return "jpg";
-  }
-
-  return undefined;
-};
-
-const extensionForFormat = (format: BgcutFormat): string => `.${format}`;
-
-const withOutputSuffix = (path: string, format: BgcutFormat): string => {
-  const parsed = parse(path);
-  const baseName = parsed.name.length > 0 ? parsed.name : "image";
-
-  return join(parsed.dir, `${baseName}-nobg${extensionForFormat(format)}`);
-};
-
-const resolveSingleOutput = (
-  inputPath: string,
-  requestedOutput: string | undefined,
-  requestedFormat: CliFormat | undefined,
-): ResolvedSingleOutput => {
-  if (requestedOutput === undefined) {
-    const format = requestedFormat ?? "png";
-
-    return {
-      outputPath: withOutputSuffix(inputPath, format),
-      format,
-    };
-  }
-
-  const extension = extname(requestedOutput);
-  const outputFormat = outputFormatFromPath(requestedOutput);
-
-  if (extension.length > 0 && outputFormat === undefined) {
-    throw new CliRuntimeError({
-      message: `Unsupported output extension "${extension}". Use PNG, WebP, JPG, or JPEG.`,
-    });
-  }
-
-  if (
-    requestedFormat !== undefined &&
-    outputFormat !== undefined &&
-    requestedFormat !== outputFormat
-  ) {
-    throw new CliRuntimeError({
-      message: `Output path "${requestedOutput}" conflicts with the requested --${requestedFormat} format.`,
-    });
-  }
-
-  const format = requestedFormat ?? outputFormat ?? "png";
-
-  const outputPath = extension.length === 0
-    ? `${requestedOutput}${extensionForFormat(format)}`
-    : requestedOutput;
-
-  return { outputPath, format };
-};
-
-const isBatchInput = async (inputPaths: readonly string[]): Promise<boolean> => {
-  if (inputPaths.length > 1) {
-    return true;
-  }
-
-  try {
-    return (await stat(inputPaths[0])).isDirectory();
-  } catch {
-    return false;
-  }
-};
-
-const batchOutputPath = (
-  inputPath: string,
-  rootPath: string | undefined,
-  relativePath: string | undefined,
-  outputRoot: string | undefined,
-  format: BgcutFormat,
-  prefixDirectoryRoot: boolean,
-): string => {
-  if (outputRoot === undefined) {
-    return withOutputSuffix(inputPath, format);
-  }
-
-  const relativeSource = relativePath ?? basename(inputPath);
-
-  const rootedRelativeSource =
-    rootPath !== undefined && prefixDirectoryRoot
-      ? join(basename(rootPath), relativeSource)
-      : relativeSource;
-
-  return join(outputRoot, withOutputSuffix(rootedRelativeSource, format));
-};
-
-const decodeBatchPath = (input: BgcutInput): string => {
-  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
-
-  if (Either.isLeft(decoded)) {
-    throw new CliRuntimeError({
-      message: "CLI batch processing received a non-path input.",
-    });
-  }
-
-  return decoded.right;
-};
 
 export const removeBackgroundCli = (
   options: CliOptions,
@@ -185,7 +66,7 @@ export const removeBackgroundCli = (
     try: async () => {
       const totalStartedAt = performance.now();
 
-      const batch = await isBatchInput(options.inputPaths);
+      const batch = await isCliBatchInput(options.inputPaths);
 
       const singleOutput = batch
         ? undefined
@@ -203,83 +84,84 @@ export const removeBackgroundCli = (
           : undefined;
 
       const prefixDirectoryRoot = options.inputPaths.length > 1;
-
-      const bgcut = await createBgcut({ engine: options.engine });
+      const session = await createSession({ engine: options.engine });
       const results: CliRemovalItem[] = [];
       const failures: CliRemovalFailure[] = [];
       const claimedOutputs = new Set<string>();
 
       try {
-        for await (const item of bgcut.removeMany(options.inputPaths, {
-          format,
-          recursive: true,
-        })) {
-          const inputPath = decodeBatchPath(item.source.input);
+        for await (const source of expandCliInputPaths(options.inputPaths)) {
+          let result: BgcutRemovalResult;
 
-          if (!item.ok) {
-            failures.push({
-              inputPath,
-              message: item.error.message,
+          try {
+            result = await removeBackground(source.inputPath, {
+              session,
+              format,
             });
-            continue;
+          } catch (cause) {
+            if (cause instanceof BgcutError) {
+              failures.push({
+                inputPath: source.inputPath,
+                message: cause.message,
+              });
+              continue;
+            }
+
+            throw cause;
           }
 
-          const outputPath = singleOutput?.outputPath ?? batchOutputPath(
-            inputPath,
-            item.source.rootPath,
-            item.source.relativePath,
+          const outputPath = singleOutput?.outputPath ?? resolveBatchOutput({
+            source,
             outputRoot,
             format,
             prefixDirectoryRoot,
-          );
+          });
 
-          const resolvedOutput = resolve(outputPath);
-
-          if (resolve(inputPath) === resolvedOutput) {
+          if (resolve(source.inputPath) === outputPath) {
             failures.push({
-              inputPath,
+              inputPath: source.inputPath,
               message: "Input and output paths must be different.",
             });
             continue;
           }
 
-          if (claimedOutputs.has(resolvedOutput)) {
+          if (claimedOutputs.has(outputPath)) {
             failures.push({
-              inputPath,
+              inputPath: source.inputPath,
               message: `Another input already maps to ${outputPath}. Choose a different output directory.`,
             });
             continue;
           }
 
-          claimedOutputs.add(resolvedOutput);
+          claimedOutputs.add(outputPath);
           const writeStartedAt = performance.now();
 
           try {
-            await mkdir(dirname(resolvedOutput), { recursive: true });
-            await writeFile(resolvedOutput, item.result.data);
+            await mkdir(dirname(outputPath), { recursive: true });
+            await writeFile(outputPath, result.data);
           } catch {
             failures.push({
-              inputPath,
+              inputPath: source.inputPath,
               message: `Could not write ${outputPath}.`,
             });
             continue;
           }
 
           results.push({
-            inputPath,
-            outputPath: resolvedOutput,
-            width: item.result.width,
-            height: item.result.height,
-            engine: item.result.engine,
-            fallbackReason: item.result.fallbackReason,
+            inputPath: source.inputPath,
+            outputPath,
+            width: result.width,
+            height: result.height,
+            engine: result.engine,
+            fallbackReason: result.fallbackReason,
             timings: {
-              ...item.result.timings,
+              ...result.timings,
               writeMs: performance.now() - writeStartedAt,
             },
           });
         }
       } finally {
-        await bgcut.close();
+        await session.close();
       }
 
       if (results.length === 0 && failures.length === 0) {
@@ -291,15 +173,22 @@ export const removeBackgroundCli = (
       return {
         results,
         failures,
-        engine: bgcut.engine,
-        fallbackReason: bgcut.fallbackReason,
-        setupTimings: bgcut.setupTimings,
+        engine: session.engine,
+        fallbackReason: session.fallbackReason,
+        setupTimings: session.setupTimings,
         totalMs: performance.now() - totalStartedAt,
       };
     },
     catch: (cause) => {
       if (cause instanceof CliRuntimeError) {
         return cause;
+      }
+
+      if (cause instanceof CliOutputPathError) {
+        return new CliRuntimeError({
+          message: cause.message,
+          cause,
+        });
       }
 
       if (cause instanceof BgcutError) {

@@ -1,10 +1,9 @@
 import { Effect } from "effect";
 
-import { mapSequential, type MaybeAsyncIterable } from "../shared/batch";
 import { formatBackgroundRemovalError, formatImageError } from "./errors";
 import { decodeImage } from "./image";
 import {
-  removeBackground,
+  removeBackground as removeBackgroundEffect,
   type BackgroundRemovalResult,
 } from "./inference";
 
@@ -21,7 +20,7 @@ export type DecodeBrowserImageResult =
       readonly message: string;
     };
 
-export type RemoveBrowserBackgroundResult =
+export type RemoveBackgroundResult =
   | {
       readonly ok: true;
       readonly result: BackgroundRemovalResult;
@@ -30,11 +29,6 @@ export type RemoveBrowserBackgroundResult =
       readonly ok: false;
       readonly message: string;
     };
-
-export type RemoveBrowserBackgroundBatchItem = {
-  readonly file: File;
-  readonly outcome: RemoveBrowserBackgroundResult;
-};
 
 export const decodeBrowserImage = (
   file: File,
@@ -54,11 +48,11 @@ export const decodeBrowserImage = (
     ),
   );
 
-export const removeBrowserBackground = (
+export const removeBackground = (
   file: File,
-): Promise<RemoveBrowserBackgroundResult> =>
+): Promise<RemoveBackgroundResult> =>
   Effect.runPromise(
-    removeBackground(file).pipe(
+    removeBackgroundEffect(file).pipe(
       Effect.match({
         onFailure: (error) => ({
           ok: false as const,
@@ -71,11 +65,3 @@ export const removeBrowserBackground = (
       }),
     ),
   );
-
-export const removeBrowserBackgrounds = (
-  files: MaybeAsyncIterable<File>,
-): AsyncIterable<RemoveBrowserBackgroundBatchItem> =>
-  mapSequential(files, async (file) => ({
-    file,
-    outcome: await removeBrowserBackground(file),
-  }));
