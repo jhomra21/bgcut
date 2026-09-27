@@ -71,10 +71,10 @@ export type RemoveBackgroundOptions =
 export type RemoveBackgroundResult = BgcutRemovalResult;
 
 /**
- * Create a reusable bgcut instance.
+ * Open a reusable bgcut runtime.
  *
- * Pass the returned bgcut instance to removeBackground() when processing several
- * images. Call close() when finished.
+ * Reuse the returned instance when processing several images, then call
+ * close() when finished.
  */
 export declare const bgcut: (
   options?: BgcutOptions,
@@ -83,9 +83,8 @@ export declare const bgcut: (
 /**
  * Remove the background from one image.
  *
- * Without a bgcut instance, bgcut creates and closes a temporary runtime for this
- * call. Pass a bgcut instance to reuse one warm runtime across
- * several calls.
+ * Without a bgcut instance, this call owns setup and cleanup. Pass a bgcut
+ * instance to reuse one warm runtime across several calls.
  */
 export declare const removeBackground: (
   input: BgcutInput,
