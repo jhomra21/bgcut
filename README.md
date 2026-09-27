@@ -178,7 +178,9 @@ Install bgcut:
 npm install bgcut
 ```
 
-Use `removeBackground()` for every image. Without a session, bgcut creates and closes a temporary runtime for that call:
+### Single image
+
+Use `removeBackground()` directly when you are processing one image:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -188,7 +190,7 @@ const result = await removeBackground("photo.jpg");
 await writeFile("photo-nobg.png", result.data);
 ```
 
-Pass `format` or `engine` when you need to override the defaults:
+A one-shot call owns setup and cleanup. Pass `format` or `engine` only when you need to override the defaults:
 
 ```ts
 const result = await removeBackground("photo.jpg", {
@@ -197,28 +199,69 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-For several images, create one session and pass it to the same `removeBackground()` function:
+### Multiple images
+
+Open bgcut once, reuse it for every image, then close it:
 
 ```ts
-import { createSession, removeBackground } from "bgcut";
+import { bgcut, removeBackground } from "bgcut";
 
-const session = await createSession();
+const runtime = await bgcut();
 
 try {
   for (const input of ["first.jpg", "second.jpg"]) {
-    const result = await removeBackground(input, { session });
+    const result = await removeBackground(input, {
+      bgcut: runtime,
+    });
+
     console.log(input, result.timings);
   }
 } finally {
-  await session.close();
+  await runtime.close();
 }
 ```
 
-The session keeps one ONNX Runtime instance warm across calls. `createSession({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if WebGPU session creation fails.
+There is still one removal operation: `removeBackground()`. The `bgcut()` function only gives the caller ownership of a reusable warm runtime.
 
-The Node API removes images. It does not own directory traversal. Use the CLI for directory processing, or enumerate files in application code and call the same `removeBackground()` function with one shared session.
+`bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU. The default `"auto"` mode tries WebGPU first and falls back to CPU if WebGPU runtime creation fails.
 
-Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`. Every result includes encoded bytes, source dimensions, output format, selected engine, fallback reason, and removal timings.
+Processing several images is sequential by default in bgcut's CLI and product UI. Application code can choose its own scheduling, but parallel removal increases decoded-image, model-input, output, and runtime memory pressure.
+
+### Directories
+
+The image API does not scan the filesystem. Use the CLI for directory processing:
+
+```sh
+bgcut photos/
+bgcut photos/ -o ./cutouts
+```
+
+Node applications that already own file discovery should enumerate their paths and call the same `removeBackground()` function with one shared bgcut runtime.
+
+### Inputs and results
+
+Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+
+Every result includes:
+
+```ts
+type RemoveBackgroundResult = {
+  data: Uint8Array;
+  width: number;
+  height: number;
+  format: "png" | "webp" | "jpg";
+  engine: "webgpu" | "cpu";
+  fallbackReason: string | undefined;
+  timings: {
+    totalMs: number;
+    prepareMs: number;
+    inferenceMs: number;
+    encodeMs: number;
+  };
+};
+```
+
+### Errors
 
 Node API failures use one public error type:
 
