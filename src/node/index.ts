@@ -2,6 +2,12 @@ import { Effect, Either } from "effect";
 
 import { ModelCacheError } from "../native/model-cache";
 import {
+  BgcutInputPathError,
+  expandBgcutInputs,
+  type BgcutInputSource,
+  type BgcutManyInput,
+} from "./batch-inputs";
+import {
   BgcutImageError,
   BgcutInferenceError,
   BgcutOutputError,
@@ -11,7 +17,6 @@ import {
   type BgcutFormat,
   type BgcutInput,
   type BgcutRemovalResult,
-  type NativeBgcut,
 } from "./runtime";
 
 export type {
@@ -23,6 +28,10 @@ export type {
   BgcutRemovalTimings,
   BgcutSetupTimings,
 } from "./runtime";
+export type {
+  BgcutInputSource,
+  BgcutManyInput,
+} from "./batch-inputs";
 
 export type BgcutErrorCode =
   | "model"
@@ -46,6 +55,26 @@ export type BgcutOptions = {
   readonly engine?: BgcutEngine;
 };
 
+export type BgcutRemoveOptions = {
+  readonly format?: BgcutFormat;
+};
+
+export type BgcutRemoveManyOptions = BgcutRemoveOptions & {
+  readonly recursive?: boolean;
+};
+
+export type BgcutManyResult =
+  | {
+      readonly ok: true;
+      readonly source: BgcutInputSource;
+      readonly result: BgcutRemovalResult;
+    }
+  | {
+      readonly ok: false;
+      readonly source: BgcutInputSource;
+      readonly error: BgcutError;
+    };
+
 export type Bgcut = {
   readonly engine: "webgpu" | "cpu";
   readonly fallbackReason: string | undefined;
@@ -53,33 +82,16 @@ export type Bgcut = {
     readonly modelMs: number;
     readonly sessionMs: number;
   };
+  readonly removeBackground: (
+    input: BgcutInput,
+    options?: BgcutRemoveOptions,
+  ) => Promise<BgcutRemovalResult>;
+  readonly removeMany: (
+    inputs: BgcutManyInput,
+    options?: BgcutRemoveManyOptions,
+  ) => AsyncIterable<BgcutManyResult>;
   readonly close: () => Promise<void>;
 };
-
-type OneShotRemoveOptions = {
-  readonly format?: BgcutFormat;
-  readonly engine?: BgcutEngine;
-  readonly bgcut?: undefined;
-};
-
-type ReusableRemoveOptions = {
-  readonly format?: BgcutFormat;
-  readonly engine?: never;
-  readonly bgcut: Bgcut;
-};
-
-export type RemoveBackgroundOptions =
-  | OneShotRemoveOptions
-  | ReusableRemoveOptions;
-
-export type RemoveBackgroundResult = BgcutRemovalResult;
-
-type BgcutState = {
-  readonly native: NativeBgcut;
-  closed: boolean;
-};
-
-const bgcutStates = new WeakMap<Bgcut, BgcutState>();
 
 const runPublicEffect = async <A, E extends Error>(
   effect: Effect.Effect<A, E>,
@@ -117,23 +129,6 @@ const mapRemoveError = (
   return new BgcutError("output", error.message, error);
 };
 
-const getOpenBgcutState = (instance: Bgcut): BgcutState => {
-  const state = bgcutStates.get(instance);
-
-  if (state === undefined) {
-    throw new BgcutError(
-      "engine",
-      "The supplied bgcut instance was not created by bgcut().",
-    );
-  }
-
-  if (state.closed) {
-    throw new BgcutError("closed", "This bgcut instance has already been closed.");
-  }
-
-  return state;
-};
-
 export const bgcut = async (
   options: BgcutOptions = {},
 ): Promise<Bgcut> => {
@@ -143,59 +138,99 @@ export const bgcut = async (
     ),
   );
 
-  const instance: Bgcut = {
+  let closed = false;
+
+  const assertOpen = () => {
+    if (closed) {
+      throw new BgcutError("closed", "This bgcut instance has already been closed.");
+    }
+  };
+
+  const removeBackground = (
+    input: BgcutInput,
+    removeOptions: BgcutRemoveOptions = {},
+  ): Promise<BgcutRemovalResult> => {
+    assertOpen();
+
+    return runPublicEffect(
+      native.remove(input, removeOptions.format ?? "png").pipe(
+        Effect.mapError(mapRemoveError),
+      ),
+    );
+  };
+
+  const removeMany = async function* (
+    inputs: BgcutManyInput,
+    removeOptions: BgcutRemoveManyOptions = {},
+  ): AsyncGenerator<BgcutManyResult> {
+    assertOpen();
+
+    let sawInput = false;
+
+    try {
+      for await (const source of expandBgcutInputs(
+        inputs,
+        removeOptions.recursive ?? true,
+      )) {
+        sawInput = true;
+
+        try {
+          const result = await removeBackground(source.input, {
+            format: removeOptions.format,
+          });
+
+          yield {
+            ok: true,
+            source,
+            result,
+          };
+        } catch (error) {
+          if (!(error instanceof BgcutError)) {
+            throw error;
+          }
+
+          if (error.code === "closed") {
+            throw error;
+          }
+
+          yield {
+            ok: false,
+            source,
+            error,
+          };
+        }
+      }
+    } catch (error) {
+      if (error instanceof BgcutInputPathError) {
+        throw new BgcutError("input", error.message, error);
+      }
+
+      throw error;
+    }
+
+    if (!sawInput) {
+      throw new BgcutError(
+        "input",
+        "No supported JPEG, PNG, WebP, or AVIF images were found.",
+      );
+    }
+  };
+
+  const close = async () => {
+    if (closed) {
+      return;
+    }
+
+    closed = true;
+    await Effect.runPromise(native.close());
+  };
+
+  return {
     engine: native.engine,
     fallbackReason: native.fallbackReason,
     setupTimings: native.setupTimings,
-    close: async () => {
-      const state = bgcutStates.get(instance);
-
-      if (state === undefined || state.closed) {
-        return;
-      }
-
-      state.closed = true;
-      await Effect.runPromise(state.native.close());
-    },
+    removeBackground,
+    removeMany,
+    close,
   };
-
-  bgcutStates.set(instance, {
-    native,
-    closed: false,
-  });
-
-  return instance;
-};
-
-const removeWithBgcut = (
-  instance: Bgcut,
-  input: BgcutInput,
-  format: BgcutFormat,
-): Promise<BgcutRemovalResult> => {
-  const state = getOpenBgcutState(instance);
-
-  return runPublicEffect(
-    state.native.remove(input, format).pipe(
-      Effect.mapError(mapRemoveError),
-    ),
-  );
-};
-
-export const removeBackground = async (
-  input: BgcutInput,
-  options: RemoveBackgroundOptions = {},
-): Promise<RemoveBackgroundResult> => {
-  const format = options.format ?? "png";
-
-  if (options.bgcut !== undefined) {
-    return removeWithBgcut(options.bgcut, input, format);
-  }
-
-  const instance = await bgcut({ engine: options.engine });
-
-  try {
-    return await removeWithBgcut(instance, input, format);
-  } finally {
-    await instance.close();
-  }
 };

@@ -28,6 +28,17 @@ export type BgcutRemovalResult = {
   readonly timings: BgcutRemovalTimings;
 };
 
+export type BgcutManyInput =
+  | BgcutInput
+  | Iterable<BgcutInput>
+  | AsyncIterable<BgcutInput>;
+
+export type BgcutInputSource = {
+  readonly input: BgcutInput;
+  readonly rootPath?: string;
+  readonly relativePath?: string;
+};
+
 export type BgcutErrorCode =
   | "model"
   | "engine"
@@ -45,48 +56,61 @@ export type BgcutOptions = {
   readonly engine?: BgcutEngine;
 };
 
+export type BgcutRemoveOptions = {
+  readonly format?: BgcutFormat;
+};
+
+export type BgcutRemoveManyOptions = BgcutRemoveOptions & {
+  readonly recursive?: boolean;
+};
+
+export type BgcutManyResult =
+  | {
+      readonly ok: true;
+      readonly source: BgcutInputSource;
+      readonly result: BgcutRemovalResult;
+    }
+  | {
+      readonly ok: false;
+      readonly source: BgcutInputSource;
+      readonly error: BgcutError;
+    };
+
 export type Bgcut = {
   readonly engine: BgcutExecutionEngine;
   readonly fallbackReason: string | undefined;
   readonly setupTimings: BgcutSetupTimings;
+
+  /**
+   * Remove the background from one image with this bgcut instance.
+   */
+  readonly removeBackground: (
+    input: BgcutInput,
+    options?: BgcutRemoveOptions,
+  ) => Promise<BgcutRemovalResult>;
+
+  /**
+   * Process files, directories, iterables, or async iterables sequentially.
+   *
+   * Directories are recursive by default. Results are yielded one at a time.
+   * Per-image failures are yielded with ok: false and do not stop later inputs.
+   */
+  readonly removeMany: (
+    inputs: BgcutManyInput,
+    options?: BgcutRemoveManyOptions,
+  ) => AsyncIterable<BgcutManyResult>;
+
+  /**
+   * Release the reusable native runtime.
+   */
   readonly close: () => Promise<void>;
 };
 
-type OneShotRemoveOptions = {
-  readonly format?: BgcutFormat;
-  readonly engine?: BgcutEngine;
-  readonly bgcut?: undefined;
-};
-
-type ReusableRemoveOptions = {
-  readonly format?: BgcutFormat;
-  readonly engine?: never;
-  readonly bgcut: Bgcut;
-};
-
-export type RemoveBackgroundOptions =
-  | OneShotRemoveOptions
-  | ReusableRemoveOptions;
-
-export type RemoveBackgroundResult = BgcutRemovalResult;
-
 /**
- * Open a reusable bgcut runtime.
+ * Open a reusable bgcut instance.
  *
- * Reuse the returned instance when processing several images, then call
- * close() when finished.
+ * Call close() when finished.
  */
 export declare const bgcut: (
   options?: BgcutOptions,
 ) => Promise<Bgcut>;
-
-/**
- * Remove the background from one image.
- *
- * Without a bgcut instance, this call owns setup and cleanup. Pass a bgcut
- * instance to reuse one warm runtime across several calls.
- */
-export declare const removeBackground: (
-  input: BgcutInput,
-  options?: RemoveBackgroundOptions,
-) => Promise<RemoveBackgroundResult>;
