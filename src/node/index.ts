@@ -5,7 +5,7 @@ import {
   BgcutImageError,
   BgcutInferenceError,
   BgcutOutputError,
-  BgcutError,
+  BgcutSessionError,
   createNativeBgcut,
   type BgcutEngine,
   type BgcutFormat,
@@ -94,7 +94,7 @@ const runPublicEffect = async <A, E extends Error>(
 };
 
 const mapCreateError = (
-  error: ModelCacheError | BgcutError,
+  error: ModelCacheError | BgcutSessionError,
 ): BgcutError => {
   if (error instanceof ModelCacheError) {
     return new BgcutError("model", error.message, error);
@@ -117,8 +117,8 @@ const mapRemoveError = (
   return new BgcutError("output", error.message, error);
 };
 
-const getOpenBgcutState = (bgcut: Bgcut): BgcutState => {
-  const state = bgcutStates.get(session);
+const getOpenBgcutState = (instance: Bgcut): BgcutState => {
+  const state = bgcutStates.get(instance);
 
   if (state === undefined) {
     throw new BgcutError(
@@ -143,12 +143,12 @@ export const bgcut = async (
     ),
   );
 
-  const bgcut: Bgcut = {
+  const instance: Bgcut = {
     engine: native.engine,
     fallbackReason: native.fallbackReason,
     setupTimings: native.setupTimings,
     close: async () => {
-      const state = bgcutStates.get(session);
+      const state = bgcutStates.get(instance);
 
       if (state === undefined || state.closed) {
         return;
@@ -159,7 +159,7 @@ export const bgcut = async (
     },
   };
 
-  bgcutStates.set(session, {
+  bgcutStates.set(instance, {
     native,
     closed: false,
   });
@@ -168,7 +168,7 @@ export const bgcut = async (
 };
 
 const removeWithBgcut = (
-  bgcut: Bgcut,
+  instance: Bgcut,
   input: BgcutInput,
   format: BgcutFormat,
 ): Promise<BgcutRemovalResult> => {
