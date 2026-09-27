@@ -1,4 +1,4 @@
-import { Data, Effect } from "effect";
+import { Data, Effect, Either, Schema } from "effect";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import {
   basename,
@@ -50,6 +50,11 @@ export type CliRemovalSummary = {
   readonly totalMs: number;
 };
 
+type ResolvedSingleOutput = {
+  readonly outputPath: string;
+  readonly format: BgcutFormat;
+};
+
 export class CliRuntimeError extends Data.TaggedError("CliRuntimeError")<{
   readonly message: string;
   readonly cause?: unknown;
@@ -88,7 +93,7 @@ const resolveSingleOutput = (
   inputPath: string,
   requestedOutput: string | undefined,
   requestedFormat: CliFormat | undefined,
-): { readonly outputPath: string; readonly format: BgcutFormat } => {
+): ResolvedSingleOutput => {
   if (requestedOutput === undefined) {
     const format = requestedFormat ?? "png";
 
@@ -158,8 +163,17 @@ const batchOutputPath = (
   return join(outputRoot, withOutputSuffix(rootedRelativeSource, format));
 };
 
-const asMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+const decodeBatchPath = (input: unknown): string => {
+  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
+
+  if (Either.isLeft(decoded)) {
+    throw new CliRuntimeError({
+      message: "CLI batch processing received a non-path input.",
+    });
+  }
+
+  return decoded.right;
+};
 
 export const removeBackgroundCli = (
   options: CliOptions,
@@ -191,10 +205,7 @@ export const removeBackgroundCli = (
           format,
           recursive: true,
         })) {
-          const inputPath =
-            typeof item.source.input === "string"
-              ? item.source.input
-              : "<memory>";
+          const inputPath = decodeBatchPath(item.source.input);
 
           if (!item.ok) {
             failures.push({
@@ -239,7 +250,7 @@ export const removeBackgroundCli = (
           } catch (cause) {
             failures.push({
               inputPath,
-              message: `Could not write ${outputPath}. ${asMessage(cause)}`,
+              message: `Could not write ${outputPath}.`,
             });
             continue;
           }
