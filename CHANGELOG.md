@@ -2,6 +2,15 @@
 
 User-facing changes to bgcut are listed here.
 
+## 0.6.0 - 2026-09-28
+
+- Reworked the Node API around `bgcut()`. The returned instance owns `removeBackground()`, `removeMany()`, and `close()`, so single-image and multi-image work use one API object and one runtime lifecycle.
+- Added `removeMany()` for files, directories, iterables, and async iterables. Directory scans are recursive by default, processing is sequential, results are yielded one at a time, and one failed image does not stop later inputs.
+- Expanded the CLI to accept several image paths or directories. The CLI uses the same public bgcut object API, and batch `--output` paths preserve nested directory structure.
+- Reworked the hosted Node API documentation, README, `llms.txt`, TypeScript declarations, and packaged agent skill around the new object API, with separate examples for single images, multiple images, directory input, lifecycle, engines, and errors.
+- Added copy controls and lightweight syntax highlighting to hosted code examples, plus direct agent links to `/llms.txt`, the packaged skill, and Node API types. Successful copies now show a themed green check.
+- Polished the hosted site layout: route changes keep header geometry stable, changelog dates align separately from versions, the homepage intro is smaller, the theme moon is centered, model artifacts are easier to compare, and component colors stay behind semantic theme tokens.
+
 ## 0.5.0 - 2026-09-24
 
 - Safari WebGPU now uses a reusable no-capture ONNX Runtime session and selects the validated internal-FP16 BiRefNet artifact when the WebGPU device exposes `shader-f16`. Safari without that feature, Chromium-family WebGPU, browser WebAssembly, and native Node/CLI keep FP32.
