@@ -171,15 +171,15 @@ bgcut photo.jpg --cpu`}
               <span role="cell">Open a reusable bgcut instance. Close it when finished.</span>
             </div>
             <div class="spec-row" role="row">
-              <strong role="cell">bgcut.removeBackground(input, options?)</strong>
+              <strong role="cell">remover.removeBackground(input, options?)</strong>
               <span role="cell">Remove one image with the open instance.</span>
             </div>
             <div class="spec-row" role="row">
-              <strong role="cell">bgcut.removeMany(inputs, options?)</strong>
+              <strong role="cell">remover.removeMany(inputs, options?)</strong>
               <span role="cell">Process files, directories, or iterables sequentially and stream per-image results.</span>
             </div>
             <div class="spec-row" role="row">
-              <strong role="cell">bgcut.close()</strong>
+              <strong role="cell">remover.close()</strong>
               <span role="cell">Release the reusable native runtime.</span>
             </div>
           </div>
