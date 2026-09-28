@@ -138,7 +138,7 @@ If `-o` ends in `.png`, `.webp`, `.jpg`, or `.jpeg`, bgcut can infer the output 
 
 ### Engine selection
 
-Automatic mode tries native ONNX Runtime WebGPU first and uses the CPU provider if a WebGPU session cannot start:
+Automatic mode tries native ONNX Runtime WebGPU first and uses the CPU provider if the WebGPU runtime cannot start:
 
 ```sh
 bgcut photo.jpg
