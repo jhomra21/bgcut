@@ -9,7 +9,7 @@ User-facing changes to bgcut are listed here.
 - Expanded the CLI to accept several image paths or directories. The CLI uses the same public bgcut object API, and batch `--output` paths preserve nested directory structure.
 - Reworked the hosted Node API documentation, README, `llms.txt`, TypeScript declarations, and packaged agent skill around the new object API, with separate examples for single images, multiple images, directory input, lifecycle, engines, and errors.
 - Added copy controls and lightweight syntax highlighting to hosted code examples, plus direct agent links to `/llms.txt`, the packaged skill, and Node API types. Successful copies now show a themed green check.
-- Polished the hosted site layout: route changes keep header geometry stable, changelog dates align separately from versions, the homepage intro is smaller, the theme moon is centered, model artifacts are easier to compare, and component colors stay behind semantic theme tokens.
+- Fixed hosted layout details. Route changes keep header geometry stable, changelog dates align separately from versions, the homepage intro is smaller, the theme moon is centered, model artifacts use a comparison table, and component colors use semantic theme tokens.
 
 ## 0.5.0 - 2026-09-24
 
