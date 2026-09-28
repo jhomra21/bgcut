@@ -90,7 +90,7 @@ bgcut photos/
 bgcut photos/ -o ./cutouts
 ```
 
-Directory scans are recursive and include JPEG, PNG, WebP, and AVIF files. Batch inference is sequential and reuses one ONNX Runtime session. Without `--output`, each result is written next to its source image. In batch mode, `--output` names an output directory and preserves nested directory paths.
+Directory scans are recursive and include JPEG, PNG, WebP, and AVIF files. Batch inference is sequential and reuses one warm runtime. Without `--output`, each result is written next to its source image. In batch mode, `--output` names an output directory and preserves nested directory paths.
 
 For one input file, the default command writes a transparent PNG next to the input image. Choose the output file with `-o` or `--output`:
 
@@ -126,7 +126,7 @@ The browser accepts JPEG, PNG, WebP, and AVIF.
 
 ### Engine selection
 
-Automatic mode tries native WebGPU first. If a WebGPU session cannot start, it uses the native CPU provider.
+Automatic mode tries native WebGPU first. If the WebGPU runtime cannot start, it uses the native CPU provider.
 
 ```sh
 bgcut photo.jpg
