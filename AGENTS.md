@@ -11,6 +11,8 @@
 - Use TypeGPU for GPU compute and image-processing code when it keeps the implementation simpler. Use raw WebGPU when it does not.
 - Keep Solid components separate from ONNX Runtime sessions, GPU buffers, shaders, and model internals.
 - Keep the image engine usable without the browser UI.
+- Keep the public Node API on the `bgcut()` object: `removeBackground()` for one image, `removeMany()` for several inputs or directories, and `close()` for lifecycle cleanup. The CLI must use the same public methods instead of bypassing them.
+- Do not add duplicate top-level removal functions when the bgcut object already owns that operation.
 - Add an abstraction only when a concrete second use case needs it.
 - Run `bun run check` before considering a change complete.
 - oxlint is required.
