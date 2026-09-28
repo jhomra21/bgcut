@@ -10,7 +10,7 @@ The current product has browser and native paths.
 
 The browser uses one application-owned WebGPU device, TypeGPU preprocessing, GPU output readback, and source-resolution PNG export. Safari uses ONNX Runtime's reusable no-capture session and selects the validated internal-FP16 model when the adapter exposes `shader-f16`; otherwise it keeps FP32. Chromium-family WebGPU keeps the FP32 model and graph-capture session path. Browser WebAssembly also keeps the FP32 model. See [`engineering/benchmarks.md`](engineering/benchmarks.md) for the measured Safari FP16 result and [`engineering/graph-capture.md`](engineering/graph-capture.md) for the earlier graph-capture work.
 
-The CLI uses ONNX Runtime Node with the FP32 model. Automatic mode tries native WebGPU first and falls back to CPU when a WebGPU session cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
+The CLI uses ONNX Runtime Node with the FP32 model. Automatic mode tries native WebGPU first and falls back to CPU when the WebGPU runtime cannot start. The CLI accepts JPEG, PNG, WebP, and AVIF and preserves source dimensions in the output.
 
 The production web target is `bgcut.dev`. Workers Static Assets carry the app shell, while the ONNX model artifacts and discrete ONNX Runtime files are served through the same Worker from private R2.
 
@@ -26,7 +26,7 @@ For changes to this flow:
 4. Verify the packaged local app separately from the hosted site when shell or routing behavior changes.
 5. Deploy the accepted candidate to `bgcut.dev` and repeat the affected hosted-browser checks.
 
-Editor controls, batch processing, and advanced settings require their own product scope. Do not fold them into the accepted single-image flow incidentally.
+Editor controls, a multi-image browser UI, and advanced settings require their own product scope. Do not fold them into the accepted single-image browser flow incidentally.
 
 ## 2. Define a browser engine API
 
