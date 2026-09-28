@@ -40,7 +40,7 @@ bgcut photo.jpg --gpu
 bgcut photo.jpg --cpu
 ```
 
-Directories are scanned recursively. Batch inference is sequential and reuses one ONNX Runtime session. In batch mode, `--output` names an output directory. Without it, each result is written next to its source image.
+Directories are scanned recursively. Batch inference is sequential and reuses one warm runtime. In batch mode, `--output` names an output directory. Without it, each result is written next to its source image.
 
 Supported input formats: JPEG, PNG, WebP, AVIF.
 
@@ -49,7 +49,7 @@ Output formats:
 - WebP: lossless, transparent.
 - JPG/JPEG: white background because JPEG has no alpha channel.
 
-Automatic native engine selection tries WebGPU first and uses CPU if WebGPU session creation fails. Explicit `--gpu` does not silently fall back to CPU.
+Automatic native engine selection tries WebGPU first and uses CPU if the WebGPU runtime cannot start. Explicit `--gpu` does not silently fall back to CPU.
 
 ## Local app
 
