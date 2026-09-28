@@ -4,7 +4,7 @@ This file records measured bgcut runtime results and the rules for comparing the
 
 These numbers belong to specific commits, images, runtimes, and machines. Do not reuse them as general performance claims.
 
-## Cross-tool benchmark harness
+## Cross-tool benchmark commands
 
 The repository includes two benchmark commands. They keep timing and quality measurement separate so outputs from other tools can use the same quality scorer.
 
@@ -27,7 +27,7 @@ The manifest uses paths relative to the manifest file.
 }
 ```
 
-`benchmark:bgcut` creates one reusable bgcut session, records model and session setup separately, records the first removal for each image, then records the median of the requested warm reruns. It writes source-resolution PNG results plus `timings.json`.
+`benchmark:bgcut` creates one reusable bgcut instance, records model and runtime setup separately, records the first removal for each image, then records the median of the requested warm reruns. It writes source-resolution PNG results plus `timings.json`.
 
 `benchmark:score` reads `<id>.png` from any tool output directory. Transparent PNGs use their alpha channel. Grayscale or RGB files are treated as masks. Output dimensions must match the reference mask. The report contains normalized alpha MAE and MSE plus foreground IoU and F1 at an alpha threshold of 128.
 
@@ -36,7 +36,7 @@ For a cross-tool run:
 1. Use the exact same source files and reference masks.
 2. Keep the machine, browser, power state, and network conditions fixed.
 3. Report setup, first-run processing, and warm processing separately.
-4. Use a reusable session for tools that support one. Do not compare a warm bgcut session with a competitor that starts a new process for every image.
+4. Reuse the runtime for tools that support it. Do not compare a warm bgcut instance with a competitor that starts a new process for every image.
 5. Save every output at the source dimensions. Record any model-side resize separately.
 6. Score the saved outputs with the same `benchmark:score` command.
 7. For remote services, label timing as end-to-end API latency. It includes upload, server queue, processing, and download time and is not a local inference measurement.
