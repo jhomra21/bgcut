@@ -141,28 +141,17 @@ Keep model and session behavior predictable:
 
 Large model and image data should not live in Solid stores.
 
-## 8. Add batch work after single-image behavior is stable
+## 8. Extend batch scheduling only when measurements justify it
 
-Batch processing needs a scheduler rather than a loop around `remove()`.
+The public Node API already provides `removeMany()`. It processes inputs sequentially, yields each result as it finishes, reuses one warm runtime, and continues after per-image failures.
 
-It should support bounded concurrency, pause, resume, cancel, per-image errors, model reuse, and recovery after one failed job.
+Do not add parallel inference only to increase throughput. Measure decoded-image memory, model-input memory, GPU buffers, encoded outputs, throughput, and latency first. If the product later needs pause, resume, cancel, or bounded concurrency, add those controls around the existing bgcut instance instead of creating another removal API.
 
-Benchmark throughput and memory use before choosing the concurrency level.
+## 9. Split the headless API into another package only when release ownership requires it
 
-## 9. Expose a headless library only when there is a second consumer
+The Node API belongs in the `bgcut` package today. Do not create a second package only for repository organization.
 
-Do not split out a package only for repository organization.
-
-A future library might expose:
-
-```ts
-removeBackground(input, options)
-getCapabilities()
-clearModelCache()
-createEditorDocument(input)
-refineMask(mask, settings)
-composite(source, mask, options)
-```
+Future capabilities should stay on the bgcut object when they share its runtime lifecycle. Examples might include capability reporting, explicit cache management, mask refinement, or compositing.
 
 Application code should not need ONNX tensor shapes, TypeGPU internals, or raw GPU buffers.
 
