@@ -17,7 +17,7 @@ bgcut removes image backgrounds locally through the hosted browser app, packaged
 - Browser UI: interactive local removal and before/after inspection.
 - Local app: run `npx bgcut` or `bgcut` after a global install.
 - CLI: file-in/file-out automation.
-- Node API: application code and reusable sessions.
+- Node API: application code through a reusable bgcut instance.
 
 ## CLI quick reference
 
