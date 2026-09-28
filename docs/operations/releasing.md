@@ -63,7 +63,7 @@ For a stable release, the workflow:
 4. runs `bun run check`;
 5. reads the package name and version from `package.json`;
 6. publishes the package to npm `latest` when that exact version is not already present;
-7. verifies registry propagation;
+7. verifies registry propagation for up to 10 minutes;
 8. extracts the matching version section from `CHANGELOG.md`;
 9. creates or updates the matching `v<version>` GitHub release with those changelog notes.
 
@@ -106,7 +106,7 @@ At minimum:
 2. verify changed result actions and keyboard shortcuts;
 3. run the headless Node CLI on a real image;
 4. verify `bgcut serve --json` returns valid startup metadata and serves the packaged app;
-5. exercise the public Node API paths changed by the release;
+5. exercise the public Node API paths changed by the release, including `bgcut()`, `removeBackground()`, `removeMany()`, and `close()` when those contracts changed;
 6. check the browser console for unexpected errors.
 
 If acceptance finds a package defect, fix it in a new version. Do not overwrite the published npm version.
@@ -135,7 +135,7 @@ That file is part of the package contract. Agents should be able to use bgcut wi
 
 When local-app behavior, CLI syntax, Node API behavior, input formats, output formats, engine behavior, caching, privacy behavior, or install commands change, update the README, the packaged skill, tests, and changelog in the same product change.
 
-`scripts/package/smoke.ts` must verify the installed Node CLI, packaged local app, reusable Node API, and bundled skill from the packed tarball.
+`scripts/package/smoke.ts` must verify the installed Node CLI, packaged local app, the public bgcut object API, and bundled skill from the packed tarball.
 
 ## Failed releases
 
