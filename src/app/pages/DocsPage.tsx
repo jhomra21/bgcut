@@ -111,7 +111,7 @@ bgcut serve --json`}
           <p>
             Pass one image path for the existing file-in/file-out flow. Pass several files or a
             directory for batch removal. Directory scans are recursive. Batch inference runs one
-            image at a time and reuses one ONNX Runtime session.
+            image at a time and reuses one warm runtime.
           </p>
           <CodeBlock
             language="shell"
@@ -144,11 +144,11 @@ bgcut photo.jpg --cpu`}
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Automatic engine</strong>
-              <span role="cell">Create a WebGPU session first, then use CPU if session creation fails</span>
+              <span role="cell">Start the WebGPU runtime first, then use CPU if it cannot start</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">GPU-only</strong>
-              <span role="cell"><code>--gpu</code> returns an error if the WebGPU session cannot start</span>
+              <span role="cell"><code>--gpu</code> returns an error if the WebGPU runtime cannot start</span>
             </div>
           </div>
           <p>
