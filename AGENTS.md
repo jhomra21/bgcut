@@ -31,7 +31,7 @@
 - `scripts/cloudflare/`: Cloudflare build, runtime upload, and smoke tooling.
 - `scripts/model/`: model preparation and integrity tooling.
 - `scripts/package/`: npm package preparation and installed-consumer smoke tests.
-- `tests/`: repository-level policy tests that do not belong to one runtime surface.
+- `tests/`: repository-level policy tests that do not belong to one runtime.
 - `docs/operations/`: deployment and release runbooks.
 - `docs/engineering/`: benchmark and implementation records.
 - `docs/roadmap.md`: planned work that is outside the current public product contract.
@@ -60,7 +60,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - Prefer one shared `GPUDevice` across ONNX Runtime WebGPU and TypeGPU when the runtime contract supports it.
 - Keep model-specific behavior behind the inference boundary so the UI does not depend on ONNX details.
 - Keep public documentation focused on bgcut. Do not expose internal comparison-tool names or acceptance fixtures unless they become part of the public product contract.
-- Keep the normal browser UI limited to the user flow. Developer diagnostics and benchmark controls do not belong in the main product surface.
+- Keep the normal browser UI limited to the user flow. Developer diagnostics and benchmark controls do not belong in the main product UI.
 - The hosted `/changelog` page must render only full stable `X.Y.Z` release sections from root `CHANGELOG.md`. Date-only notes and prerelease sections must stay out of the website changelog. Do not duplicate changelog prose in app source.
 
 ## Web deployment policy
@@ -89,7 +89,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
 - Prepare each release in a dedicated PR after the product changes are merged and accepted.
-- Update `CHANGELOG.md`, the hosted `/docs` surface, and other user-facing docs before the release version is finalized.
+- Update `CHANGELOG.md`, hosted `/docs`, and other user-facing docs before the release version is finalized.
 - Merge only after CI passes on the exact release head.
 - Never reuse or overwrite an npm version that already exists.
 - Keep `package.json` repository metadata aligned with `jhomra21/bgcut` because npm Trusted Publishing checks repository identity.
@@ -146,7 +146,7 @@ Use it as a reference for small interfaces, explicit capabilities, and code that
 
 Repository: `mattpocock/skills`
 
-Use `skills/engineering/codebase-design` when changing caller-facing interfaces and `skills/engineering/tdd` when choosing tests for those interfaces. Prefer deep modules, small caller-facing surfaces, and tests through the public seam.
+Use `skills/engineering/codebase-design` when changing caller-facing interfaces and `skills/engineering/tdd` when choosing tests for those interfaces. Prefer deep modules, small caller-facing interfaces, and tests through the public seam.
 
 ## Reference policy
 
