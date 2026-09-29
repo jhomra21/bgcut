@@ -11,6 +11,7 @@ if (root === null) {
 }
 
 root.replaceChildren();
+
 syncThemeColor();
 
 render(() => <App />, root);

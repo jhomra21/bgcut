@@ -11,7 +11,9 @@ import {
 } from "../../src/shared/site-metadata";
 
 const root = resolve(import.meta.dir, "../..");
+
 const distDirectory = resolve(root, "dist");
+
 const changelogPath = resolve(root, "CHANGELOG.md");
 
 const htmlEscape = (value: string): string =>
@@ -289,11 +291,14 @@ ${urls}
 };
 
 const templatePath = resolve(distDirectory, "index.html");
+
 const template = await readFile(templatePath, "utf8");
+
 const changelogSource = await readFile(changelogPath, "utf8");
 
 for (const page of PUBLIC_SITE_PAGES) {
   const html = renderPageHtml(template, page, changelogSource);
+
   const outputPath =
     page === "home"
       ? templatePath
@@ -304,4 +309,5 @@ for (const page of PUBLIC_SITE_PAGES) {
 }
 
 await writeFile(resolve(distDirectory, "sitemap.xml"), renderSitemap());
+
 console.log(`Prepared sitemap for ${INDEXED_SITE_PAGES.length} indexable routes.`);
