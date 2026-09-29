@@ -8,15 +8,11 @@ Submit this sitemap:
 
 `https://bgcut.dev/sitemap.xml`
 
-The sitemap intentionally includes only the public pages that should appear in search results:
+The build generates the sitemap from `INDEXED_SITE_PAGES` in `src/shared/site-metadata.ts`. Do not maintain a second hand-written URL list here.
 
-- `https://bgcut.dev/`
-- `https://bgcut.dev/docs`
-- `https://bgcut.dev/changelog`
+Privacy and Terms remain crawlable from the footer but use `noindex` and are not listed in the generated sitemap.
 
-Privacy and Terms remain crawlable from the footer but use `noindex` and are not listed in the sitemap.
-
-After a meaningful content or metadata change, use URL Inspection on the three indexable URLs above. Confirm that the inspected canonical matches the URL being inspected, then request indexing when the rendered page looks correct.
+After a meaningful content or metadata change, use URL Inspection on the affected indexable URLs. Confirm that the inspected canonical matches the URL being inspected, then request indexing when the rendered page looks correct.
 
 Use the Performance report to watch:
 
@@ -43,6 +39,8 @@ Do not add `require-trusted-types-for 'script'` only to satisfy Lighthouse. Trus
 
 The root `index.html` contains the homepage metadata and WebApplication structured data.
 
-Hosted builds generate route-specific HTML files for Docs, Changelog, Privacy, and Terms. Keep their title, description, canonical, and robots values in `src/shared/site-metadata.ts`. Do not duplicate those values in page components.
+Hosted builds generate route-specific HTML for every public route, including nested guides, comparisons, and tools. Keep title, description, canonical, indexing state, and route paths in the shared metadata registry instead of duplicating them in components.
 
-The packaged local app does not generate or expose these hosted metadata routes.
+`bun run site:audit` checks the generated HTML, sitemap, canonicals, robots directives, structured data, H1 count, duplicate indexed metadata, and internal route links. Both normal and Cloudflare builds run it.
+
+The packaged local app does not generate or expose these hosted content routes.

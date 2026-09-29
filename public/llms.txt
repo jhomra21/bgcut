@@ -6,6 +6,10 @@ bgcut removes image backgrounds locally through the hosted browser app, packaged
 
 - [Background remover](https://bgcut.dev/)
 - [Documentation](https://bgcut.dev/docs)
+- [Guides](https://bgcut.dev/guides)
+- [Comparisons](https://bgcut.dev/compare)
+- [Free image tools](https://bgcut.dev/tools)
+- [Transparency checker](https://bgcut.dev/tools/transparency-checker)
 - [Changelog](https://bgcut.dev/changelog)
 - [npm package](https://www.npmjs.com/package/bgcut)
 - [GitHub repository](https://github.com/jhomra21/bgcut)
@@ -172,3 +176,13 @@ Source images, decoded pixels, masks, and generated outputs stay on the user's m
 For tool execution rules, provider constraints, supported formats, model caching, output handling, and failure behavior, use the packaged skill at `skills/bgcut/SKILL.md`. After installation it is available at `node_modules/bgcut/skills/bgcut/SKILL.md`.
 
 Do not infer support beyond the documented JPEG, PNG, WebP, and AVIF inputs. Preserve explicit GPU or CPU constraints instead of silently changing providers.
+
+## Search-focused resources
+
+- [Remove a background without uploading](https://bgcut.dev/guides/remove-background-without-uploading)
+- [Node.js background removal](https://bgcut.dev/guides/node-js-background-removal)
+- [Batch background removal from the CLI](https://bgcut.dev/guides/batch-background-removal-cli)
+- [How local background removal works](https://bgcut.dev/guides/how-local-background-removal-works)
+- [PNG vs WebP vs JPEG transparency](https://bgcut.dev/guides/png-webp-jpeg-transparency)
+- [Local remove.bg alternative](https://bgcut.dev/remove-bg-alternative)
+- [Local remove.bg API alternative](https://bgcut.dev/remove-bg-api-alternative)
