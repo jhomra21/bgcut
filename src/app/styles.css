@@ -1401,11 +1401,11 @@ figure {
 }
 
 .site-footer-links a:hover,
-.site-footer-links a[aria-current="page"] {
+.site-footer-links a[aria-current] {
   color: var(--text-primary);
 }
 
-.site-footer-links a[aria-current="page"] {
+.site-footer-links a[aria-current] {
   text-decoration: underline;
   text-decoration-color: var(--border-link);
   text-underline-offset: 4px;

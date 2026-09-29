@@ -125,23 +125,29 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
   </header>
 );
 
-const footerSectionIsCurrent = (
+type FooterCurrent = "page" | "location" | undefined;
+
+const footerCurrent = (
   page: SitePage,
   section: "guides" | "tools" | "compare" | "changelog" | "privacy" | "terms",
-): boolean => {
-  if (section === "guides") {
-    return page === "guides" || isGuidePage(page);
+): FooterCurrent => {
+  if (page === section) {
+    return "page";
   }
 
-  if (section === "tools") {
-    return page === "tools" || isToolPage(page);
+  if (section === "guides" && isGuidePage(page)) {
+    return "location";
   }
 
-  if (section === "compare") {
-    return page === "compare" || isComparisonPage(page);
+  if (section === "tools" && isToolPage(page)) {
+    return "location";
   }
 
-  return page === section;
+  if (section === "compare" && isComparisonPage(page)) {
+    return "location";
+  }
+
+  return undefined;
 };
 
 export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
@@ -176,7 +182,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
     <nav class="site-footer-links" aria-label="Footer navigation">
       <a
         href="/guides"
-        aria-current={footerSectionIsCurrent(props.page, "guides") ? "page" : undefined}
+        aria-current={footerCurrent(props.page, "guides")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -190,7 +196,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
       </a>
       <a
         href="/tools"
-        aria-current={footerSectionIsCurrent(props.page, "tools") ? "page" : undefined}
+        aria-current={footerCurrent(props.page, "tools")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -204,7 +210,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
       </a>
       <a
         href="/compare"
-        aria-current={footerSectionIsCurrent(props.page, "compare") ? "page" : undefined}
+        aria-current={footerCurrent(props.page, "compare")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -218,7 +224,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
       </a>
       <a
         href="/changelog"
-        aria-current={footerSectionIsCurrent(props.page, "changelog") ? "page" : undefined}
+        aria-current={footerCurrent(props.page, "changelog")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -232,7 +238,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
       </a>
       <a
         href="/privacy"
-        aria-current={footerSectionIsCurrent(props.page, "privacy") ? "page" : undefined}
+        aria-current={footerCurrent(props.page, "privacy")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -246,7 +252,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
       </a>
       <a
         href="/terms"
-        aria-current={footerSectionIsCurrent(props.page, "terms") ? "page" : undefined}
+        aria-current={footerCurrent(props.page, "terms")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;

@@ -55,27 +55,33 @@ const staticHeader = (page: PublicSitePage): string => {
   </header>`;
 };
 
+type StaticFooterCurrent = "page" | "location" | undefined;
+
 const staticFooterCurrent = (
   page: PublicSitePage,
   section: "guides" | "tools" | "compare" | "changelog" | "privacy" | "terms",
-): boolean => {
-  if (section === "guides") {
-    return page === "guides" || isGuidePage(page);
+): StaticFooterCurrent => {
+  if (page === section) {
+    return "page";
   }
 
-  if (section === "tools") {
-    return page === "tools" || isToolPage(page);
+  if (section === "guides" && isGuidePage(page)) {
+    return "location";
   }
 
-  if (section === "compare") {
-    return page === "compare" || isComparisonPage(page);
+  if (section === "tools" && isToolPage(page)) {
+    return "location";
   }
 
-  return page === section;
+  if (section === "compare" && isComparisonPage(page)) {
+    return "location";
+  }
+
+  return undefined;
 };
 
-const staticAriaCurrent = (current: boolean): string =>
-  current ? ' aria-current="page"' : "";
+const staticAriaCurrent = (current: StaticFooterCurrent): string =>
+  current === undefined ? "" : ` aria-current="${current}"`;
 
 const staticBreadcrumb = (
   parentHref: string,
@@ -91,7 +97,7 @@ const staticBreadcrumb = (
 
 const staticFooter = (page: PublicSitePage): string => `<footer class="site-footer">
   <div class="site-footer-meta">
-    <a class="site-footer-brand brand-link" href="/" aria-label="bgcut home"${staticAriaCurrent(page === "home")}>bgcut</a>
+    <a class="site-footer-brand brand-link" href="/" aria-label="bgcut home"${staticAriaCurrent(page === "home" ? "page" : undefined)}>bgcut</a>
     <span>MIT licensed</span>
   </div>
   <nav class="site-footer-links" aria-label="Footer navigation">
