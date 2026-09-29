@@ -1,5 +1,7 @@
 import { For } from "@solidjs/web";
 
+import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
+
 import {
   COMPARISONS,
   COMPARISON_PAGE_IDS,
@@ -15,7 +17,6 @@ const pathForComparison = (comparison: Comparison): string =>
 export const ComparisonIndexPage = () => (
   <main class="page-content legal-shell">
     <article class="guide-page comparison-index">
-      <p class="guide-kicker">Comparisons</p>
       <h1>Background removal alternatives and comparisons</h1>
       <p class="guide-summary">
         Factual comparisons based on documented interfaces, deployment models, and licenses.
@@ -46,7 +47,11 @@ export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
   return (
     <main class="page-content legal-shell">
       <article class="guide-page comparison-page">
-        <p class="guide-kicker"><a href="/compare">Comparisons</a></p>
+        <ContentBreadcrumb
+          parentHref="/compare"
+          parentLabel="Compare"
+          currentLabel={comparison().title}
+        />
         <h1>{comparison().title}</h1>
         <p class="guide-summary">{comparison().intro}</p>
         <p class="guide-date">

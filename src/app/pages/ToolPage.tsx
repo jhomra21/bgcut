@@ -1,5 +1,7 @@
 import { Show, createSignal } from "solid-js";
 
+import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
+
 type TransparencyResult = {
   readonly width: number;
   readonly height: number;
@@ -89,7 +91,6 @@ const inspectTransparency = async (file: File): Promise<TransparencyResult> => {
 export const ToolIndexPage = () => (
   <main class="page-content legal-shell">
     <article class="guide-page tool-index">
-      <p class="guide-kicker">Tools</p>
       <h1>Free image tools</h1>
       <p class="guide-summary">
         Small local utilities for checking image files before or after background removal.
@@ -161,7 +162,11 @@ export const TransparencyCheckerPage = () => {
   return (
     <main class="page-content legal-shell">
       <article class="guide-page tool-page">
-        <p class="guide-kicker"><a href="/tools">Tools</a></p>
+        <ContentBreadcrumb
+          parentHref="/tools"
+          parentLabel="Tools"
+          currentLabel="Image transparency checker"
+        />
         <h1>Image transparency checker</h1>
         <p class="guide-summary">
           Check whether an image contains transparent or partially transparent pixels. The file is

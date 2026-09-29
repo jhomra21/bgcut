@@ -55,18 +55,52 @@ const staticHeader = (page: PublicSitePage): string => {
   </header>`;
 };
 
-const staticFooter = (): string => `<footer class="site-footer">
+const staticFooterCurrent = (
+  page: PublicSitePage,
+  section: "guides" | "tools" | "compare" | "changelog" | "privacy" | "terms",
+): boolean => {
+  if (section === "guides") {
+    return page === "guides" || isGuidePage(page);
+  }
+
+  if (section === "tools") {
+    return page === "tools" || isToolPage(page);
+  }
+
+  if (section === "compare") {
+    return page === "compare" || isComparisonPage(page);
+  }
+
+  return page === section;
+};
+
+const staticAriaCurrent = (current: boolean): string =>
+  current ? ' aria-current="page"' : "";
+
+const staticBreadcrumb = (
+  parentHref: string,
+  parentLabel: string,
+  currentLabel: string,
+): string => `<nav class="content-breadcrumb" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="${parentHref}">${htmlEscape(parentLabel)}</a></li>
+    <li class="content-breadcrumb-separator" aria-hidden="true">/</li>
+    <li aria-current="page">${htmlEscape(currentLabel)}</li>
+  </ol>
+</nav>`;
+
+const staticFooter = (page: PublicSitePage): string => `<footer class="site-footer">
   <div class="site-footer-meta">
-    <a class="site-footer-brand brand-link" href="/" aria-label="bgcut home">bgcut</a>
+    <a class="site-footer-brand brand-link" href="/" aria-label="bgcut home"${staticAriaCurrent(page === "home")}>bgcut</a>
     <span>MIT licensed</span>
   </div>
   <nav class="site-footer-links" aria-label="Footer navigation">
-    <a href="/guides">Guides</a>
-    <a href="/tools">Tools</a>
-    <a href="/compare">Compare</a>
-    <a href="/changelog">Changelog</a>
-    <a href="/privacy">Privacy</a>
-    <a href="/terms">Terms</a>
+    <a href="/guides"${staticAriaCurrent(staticFooterCurrent(page, "guides"))}>Guides</a>
+    <a href="/tools"${staticAriaCurrent(staticFooterCurrent(page, "tools"))}>Tools</a>
+    <a href="/compare"${staticAriaCurrent(staticFooterCurrent(page, "compare"))}>Compare</a>
+    <a href="/changelog"${staticAriaCurrent(staticFooterCurrent(page, "changelog"))}>Changelog</a>
+    <a href="/privacy"${staticAriaCurrent(staticFooterCurrent(page, "privacy"))}>Privacy</a>
+    <a href="/terms"${staticAriaCurrent(staticFooterCurrent(page, "terms"))}>Terms</a>
   </nav>
 </footer>`;
 
@@ -227,7 +261,6 @@ const staticIntentPage = (content: IntentPage): string => {
 
   return `<main class="page-content legal-shell">
     <article class="guide-page intent-page">
-      <p class="guide-kicker">${htmlEscape(content.eyebrow)}</p>
       <h1>${htmlEscape(content.title)}</h1>
       <p class="guide-summary">${htmlEscape(content.summary)}</p>
       <div class="intent-actions">
@@ -248,7 +281,6 @@ const staticGuideIndex = (): string => {
 
   return `<main class="page-content legal-shell">
     <article class="guide-page guide-index">
-      <p class="guide-kicker">Guides</p>
       <h1>Local background removal guides</h1>
       <p class="guide-summary">Practical notes for browser privacy, WebGPU and WebAssembly, Node.js, CLI batches, image formats, and the bgcut processing pipeline.</p>
       <div class="guide-list">${items}</div>
@@ -280,7 +312,7 @@ const staticGuide = (guide: Guide): string => {
 
   return `<main class="page-content legal-shell">
     <article class="guide-page">
-      <p class="guide-kicker"><a href="/guides">Guides</a></p>
+      ${staticBreadcrumb("/guides", "Guides", guide.title)}
       <h1>${htmlEscape(guide.title)}</h1>
       <p class="guide-summary">${htmlEscape(guide.summary)}</p>
       <p class="guide-date">Published <time datetime="${guide.publishedAt}">${guide.publishedAt}</time></p>
@@ -302,7 +334,6 @@ const staticComparisonIndex = (): string => {
 
   return `<main class="page-content legal-shell">
     <article class="guide-page comparison-index">
-      <p class="guide-kicker">Comparisons</p>
       <h1>Background removal alternatives and comparisons</h1>
       <p class="guide-summary">Factual comparisons based on documented interfaces, deployment models, and licenses. Quality and performance are left unranked unless a reproducible benchmark exists.</p>
       <div class="guide-list">${items}</div>
@@ -339,7 +370,7 @@ const staticComparison = (comparison: Comparison): string => {
 
   return `<main class="page-content legal-shell">
     <article class="guide-page comparison-page">
-      <p class="guide-kicker"><a href="/compare">Comparisons</a></p>
+      ${staticBreadcrumb("/compare", "Compare", comparison.title)}
       <h1>${htmlEscape(comparison.title)}</h1>
       <p class="guide-summary">${htmlEscape(comparison.intro)}</p>
       <p class="guide-date">Facts checked <time datetime="${comparison.checkedAt}">${comparison.checkedAt}</time></p>
@@ -363,7 +394,6 @@ const staticComparison = (comparison: Comparison): string => {
 
 const staticToolIndex = (): string => `<main class="page-content legal-shell">
   <article class="guide-page tool-index">
-    <p class="guide-kicker">Tools</p>
     <h1>Free image tools</h1>
     <p class="guide-summary">Small local utilities for checking image files before or after background removal.</p>
     <div class="guide-list">
@@ -377,7 +407,7 @@ const staticToolIndex = (): string => `<main class="page-content legal-shell">
 
 const staticTransparencyChecker = (): string => `<main class="page-content legal-shell">
   <article class="guide-page tool-page">
-    <p class="guide-kicker"><a href="/tools">Tools</a></p>
+    ${staticBreadcrumb("/tools", "Tools", "Image transparency checker")}
     <h1>Image transparency checker</h1>
     <p class="guide-summary">Check whether an image contains transparent or partially transparent pixels. The file is decoded and inspected in your browser. It is not uploaded to bgcut.</p>
     <section>
@@ -459,7 +489,7 @@ const staticPageShell = (
 ): string => `<div class="site-root" data-static-route="${page}">
   <div class="site-header-shell">${staticHeader(page)}</div>
   <div class="route-stage">${staticContentForPage(page, changelogSource)}</div>
-  <div class="site-footer-shell">${staticFooter()}</div>
+  <div class="site-footer-shell">${staticFooter(page)}</div>
 </div>`;
 
 const renderPageHtml = (

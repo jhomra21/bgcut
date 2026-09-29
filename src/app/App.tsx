@@ -180,7 +180,7 @@ const App = () => {
       </div>
 
       <div class="site-footer-shell">
-        <SiteFooter onNavigate={navigate} />
+        <SiteFooter page={navPage()} onNavigate={navigate} />
       </div>
     </div>
   );

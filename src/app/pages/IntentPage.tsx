@@ -9,7 +9,6 @@ export const IntentPageView = (props: { readonly page: IntentPageId }) => {
   return (
     <main class="page-content legal-shell">
       <article class="guide-page intent-page">
-        <p class="guide-kicker">{content().eyebrow}</p>
         <h1>{content().title}</h1>
         <p class="guide-summary">{content().summary}</p>
 

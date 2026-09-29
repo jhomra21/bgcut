@@ -221,7 +221,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
     expect(appSource).toContain("route-stage route-stage-");
     expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
-    expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
+    expect(appSource).toContain('<SiteFooter page={navPage()} onNavigate={navigate} />');
   });
 
   test("keeps docs and changelog on one shared reference-page shell", () => {

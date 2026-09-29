@@ -1400,8 +1400,15 @@ figure {
   transition: color 150ms ease;
 }
 
-.site-footer-links a:hover {
+.site-footer-links a:hover,
+.site-footer-links a[aria-current="page"] {
   color: var(--text-primary);
+}
+
+.site-footer-links a[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-color: var(--border-link);
+  text-underline-offset: 4px;
 }
 
 
@@ -1757,7 +1764,6 @@ figure {
   padding: 44px 0 72px;
 }
 
-.guide-kicker,
 .guide-date {
   margin: 0;
   color: var(--text-muted);
@@ -1765,16 +1771,43 @@ figure {
   line-height: 1.5;
 }
 
-.guide-kicker a {
+.content-breadcrumb {
+  margin: 0 0 9px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.content-breadcrumb ol {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.content-breadcrumb li:last-child {
+  min-width: 0;
+  color: var(--text-secondary);
+}
+
+.content-breadcrumb a {
   color: inherit;
   text-decoration: underline;
   text-decoration-color: var(--border-link);
   text-underline-offset: 3px;
 }
 
+.content-breadcrumb-separator {
+  color: var(--text-muted);
+}
+
 .guide-page > h1 {
   max-width: 700px;
-  margin: 8px 0 14px;
+  margin: 0 0 14px;
   color: var(--text-primary);
   font-size: clamp(32px, 5vw, 46px);
   font-weight: 760;

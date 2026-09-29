@@ -1,5 +1,6 @@
 import { For, Show } from "@solidjs/web";
 
+import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
 import { CodeBlock } from "../components/CodeBlock";
 import { GUIDES, GUIDE_PAGE_IDS, type Guide, type GuidePageId } from "../../shared/guides";
 
@@ -8,7 +9,6 @@ const pathForGuide = (guide: Guide): string => `/guides/${guide.slug}`;
 export const GuideIndexPage = () => (
   <main class="page-content legal-shell">
     <article class="guide-page guide-index">
-      <p class="guide-kicker">Guides</p>
       <h1>Local background removal guides</h1>
       <p class="guide-summary">
         Practical notes for browser privacy, WebGPU and WebAssembly, Node.js, CLI batches,
@@ -39,7 +39,11 @@ export const GuidePage = (props: { readonly page: GuidePageId }) => {
   return (
     <main class="page-content legal-shell">
       <article class="guide-page">
-        <p class="guide-kicker"><a href="/guides">Guides</a></p>
+        <ContentBreadcrumb
+          parentHref="/guides"
+          parentLabel="Guides"
+          currentLabel={guide().title}
+        />
         <h1>{guide().title}</h1>
         <p class="guide-summary">{guide().summary}</p>
         <p class="guide-date">
