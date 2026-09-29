@@ -4,7 +4,7 @@ User-facing changes to bgcut are listed here.
 
 ## 0.6.0 - 2026-09-28
 
-- Reworked the Node API around `bgcut()`. The returned instance owns `removeBackground()`, `removeMany()`, and `close()`, so single-image and multi-image work use one API object and one runtime lifecycle.
+- Reworked the Node API around `bgcut()`. The returned instance owns `removeBackground()`, `removeMany()`, and `close()`, so single-image and multi-image work use one API object and one runtime lifecycle. Migrating from 0.5.x means replacing the top-level `removeBackground()` and `createBgcut()` exports with `bgcut()`; reusable `.remove()` calls become `.removeBackground()`.
 - Added `removeMany()` for files, directories, iterables, and async iterables. Directory scans are recursive by default, processing is sequential, results are yielded one at a time, and one failed image does not stop later inputs.
 - Expanded the CLI to accept several image paths or directories. The CLI uses the same public bgcut object API, and batch `--output` paths preserve nested directory structure.
 - Reworked the hosted Node API documentation, README, `llms.txt`, TypeScript declarations, and packaged agent skill around the new object API, with separate examples for single images, multiple images, directory input, lifecycle, engines, and errors.

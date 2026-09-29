@@ -56,6 +56,8 @@ bgcut photos/ -o ./cutouts
 
 Use the Node API for application code. Open bgcut once, use `removeBackground()` for one image or `removeMany()` for several inputs, and close the instance when finished.
 
+The hosted browser and local app run inference in the browser. The CLI and Node API use the native runtime. Use the CLI when paths and output files are the contract. Use the Node API when another program needs the result bytes, dimensions, engine details, timings, or per-image batch results.
+
 ## Local app
 
 Running `bgcut` with no image opens the packaged web UI on a loopback address. The explicit form is:
@@ -200,6 +202,36 @@ for await (const item of remover.removeMany([
 Single-image inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Supported input formats are JPEG, PNG, WebP, and AVIF. Output formats are `png`, `webp`, and `jpg`.
 
 Node API failures are `BgcutError` instances. Use `error.code` for programmatic handling. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
+
+### Migrating Node code from 0.5.x
+
+Version 0.6 does not export the old top-level `removeBackground()` or `createBgcut()` functions.
+
+Before, in 0.5.x:
+
+```ts
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg", {
+  engine: "cpu",
+  format: "webp",
+});
+```
+
+After, in 0.6:
+
+```ts
+import { bgcut } from "bgcut";
+
+const remover = await bgcut({ engine: "cpu" });
+try {
+  const result = await remover.removeBackground("photo.jpg", { format: "webp" });
+} finally {
+  await remover.close();
+}
+```
+
+For reusable 0.5.x code, replace `createBgcut()` with `bgcut()` and replace `.remove()` with `.removeBackground()`. For several inputs, use `removeMany()` unless the caller needs custom scheduling.
 
 ## Model cache
 

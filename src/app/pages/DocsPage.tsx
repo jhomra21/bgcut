@@ -46,6 +46,25 @@ export const DocsPage = () => (
             For headless removal, run <a href="#cli"><code>npx bgcut photo.jpg</code></a>.
             For application code, <a href="#node-api">install bgcut and use the Node API</a>.
           </p>
+          <h4>Choose an interface</h4>
+          <div class="spec-table" role="table" aria-label="bgcut interfaces">
+            <div class="spec-row" role="row">
+              <strong role="cell">Hosted browser</strong>
+              <span role="cell">Interactive removal and before/after inspection without an install.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Local app</strong>
+              <span role="cell">The browser workflow from the npm package on a loopback server.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">CLI</strong>
+              <span role="cell">File-in/file-out automation, shell scripts, and directory batches.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Node API</strong>
+              <span role="cell">Application code that reuses one native runtime across removals.</span>
+            </div>
+          </div>
         </section>
 
         <section id="web-ui" class="reference-section doc-section">
@@ -197,6 +216,72 @@ try {
   await remover.close();
 }`}
           />
+
+          <h4>Migrating from 0.5.x</h4>
+          <p>
+            Version 0.6 removes the top-level <code>removeBackground()</code> and
+            <code>createBgcut()</code> exports. Open one instance with <code>bgcut()</code>, call
+            methods on that instance, and close it when finished. Choose the engine when opening
+            the instance. Choose the output format per removal.
+          </p>
+          <p>One image in 0.5.x:</p>
+          <CodeBlock
+            language="typescript"
+            code={`import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg", {
+  engine: "cpu",
+  format: "webp",
+});`}
+          />
+          <p>The same call in 0.6:</p>
+          <CodeBlock
+            language="typescript"
+            code={`import { bgcut } from "bgcut";
+
+const remover = await bgcut({ engine: "cpu" });
+
+try {
+  const result = await remover.removeBackground("photo.jpg", {
+    format: "webp",
+  });
+} finally {
+  await remover.close();
+}`}
+          />
+          <p>Reusable work in 0.5.x:</p>
+          <CodeBlock
+            language="typescript"
+            code={`import { createBgcut } from "bgcut";
+
+const remover = await createBgcut();
+
+try {
+  await remover.remove("first.jpg");
+  await remover.remove("second.jpg");
+} finally {
+  await remover.close();
+}`}
+          />
+          <p>The same work in 0.6:</p>
+          <CodeBlock
+            language="typescript"
+            code={`import { bgcut } from "bgcut";
+
+const remover = await bgcut();
+
+try {
+  await remover.removeBackground("first.jpg");
+  await remover.removeBackground("second.jpg");
+} finally {
+  await remover.close();
+}`}
+          />
+          <p>
+            For several inputs, prefer <code>removeMany()</code>. It accepts files, directories,
+            iterables, and async iterables. It yields each result as it finishes and keeps later
+            inputs running after an image-level failure.
+          </p>
 
           <h4>Single image</h4>
           <p>

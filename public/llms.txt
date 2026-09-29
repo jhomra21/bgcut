@@ -19,6 +19,8 @@ bgcut removes image backgrounds locally through the hosted browser app, packaged
 - CLI: file-in/file-out automation.
 - Node API: application code through a reusable bgcut instance.
 
+The hosted browser and local app run inference in the browser. The CLI and Node API use the native runtime. Reuse one Node API instance for repeated work and close it when finished.
+
 ## CLI quick reference
 
 Run one removal:
@@ -121,6 +123,36 @@ Engine values for `bgcut({ engine })`:
 - `cpu`: require CPU.
 
 Public Node errors are `BgcutError`. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
+
+## Migrating from 0.5.x
+
+Version 0.6 removes the top-level `removeBackground()` and `createBgcut()` exports.
+
+Before, one image in 0.5.x:
+
+```ts
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg", {
+  engine: "cpu",
+  format: "webp",
+});
+```
+
+After, in 0.6:
+
+```ts
+import { bgcut } from "bgcut";
+
+const remover = await bgcut({ engine: "cpu" });
+try {
+  const result = await remover.removeBackground("photo.jpg", { format: "webp" });
+} finally {
+  await remover.close();
+}
+```
+
+Reusable `createBgcut().remove()` calls become `bgcut().removeBackground()`. For several inputs, prefer `removeMany()` instead of a manual sequential loop.
 
 ## Browser runtime
 
