@@ -107,6 +107,19 @@ export const ToolIndexPage = () => (
 
 export const TransparencyCheckerPage = () => {
   const [state, setState] = createSignal<CheckerState>({ status: "empty" });
+
+  const errorMessage = (): string | undefined => {
+    const current = state();
+
+    return current.status === "error" ? current.message : undefined;
+  };
+
+  const readyResult = (): TransparencyResult | undefined => {
+    const current = state();
+
+    return current.status === "ready" ? current.result : undefined;
+  };
+
   let fileInput: HTMLInputElement | undefined;
 
   const check = (file: File) => {
@@ -183,23 +196,14 @@ export const TransparencyCheckerPage = () => {
             <p class="tool-status" role="status">Checking pixels...</p>
           </Show>
 
-          <Show when={state().status === "error"}>
-            <p class="tool-status tool-status-error" role="alert">
-              {state().status === "error" ? state().message : ""}
-            </p>
+          <Show keyed when={errorMessage()}>
+            {(message) => (
+              <p class="tool-status tool-status-error" role="alert">{message}</p>
+            )}
           </Show>
 
-          <Show when={state().status === "ready"}>
-            {() => {
-              const current = state();
-
-              if (current.status !== "ready") {
-                return null;
-              }
-
-              const result = current.result;
-
-              return (
+          <Show keyed when={readyResult()}>
+            {(result) => (
                 <div class="tool-result" aria-live="polite">
                   <div class="tool-result-head">
                     <strong>{result.hasTransparency ? "Transparency found" : "No transparent pixels found"}</strong>
@@ -214,8 +218,7 @@ export const TransparencyCheckerPage = () => {
                     <div><dt>Opaque</dt><dd>{result.opaquePixels.toLocaleString()} ({percent(result.opaquePixels, result.totalPixels)})</dd></div>
                   </dl>
                 </div>
-              );
-            }}
+            )}
           </Show>
         </section>
 
