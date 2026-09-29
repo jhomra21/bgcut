@@ -24,7 +24,8 @@ export type SitePageMetadata = {
 
 export const SITE_ORIGIN = "https://bgcut.dev";
 
-// SAFETY: GUIDE_PAGE_IDS lists every GuidePageId, and each tuple uses the same page key.\nconst GUIDE_SITE_METADATA = Object.fromEntries(
+// SAFETY: GUIDE_PAGE_IDS lists every GuidePageId, and each tuple uses the same page key.
+const GUIDE_SITE_METADATA = Object.fromEntries(
   GUIDE_PAGE_IDS.map((page) => {
     const guide = GUIDES[page];
 

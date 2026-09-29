@@ -207,9 +207,11 @@ const staticGuide = (guide: Guide): string => {
     const paragraphs = section.paragraphs
       .map((paragraph) => `<p>${htmlEscape(paragraph)}</p>`)
       .join("");
+
     const bullets = section.bullets === undefined
       ? ""
       : `<ul>${section.bullets.map((item) => `<li>${htmlEscape(item)}</li>`).join("")}</ul>`;
+
     const code = section.code === undefined
       ? ""
       : `<pre><code>${htmlEscape(section.code.code)}</code></pre>`;
