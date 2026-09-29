@@ -7,6 +7,7 @@ bgcut keeps user-facing package documentation in the root `README.md`. The hoste
 - [`operations/deploying.md`](operations/deploying.md): Cloudflare Workers, R2, local deployment checks, and production verification.
 - [`operations/releasing.md`](operations/releasing.md): npm Trusted Publishing and the release process.
 - [`operations/search-console.md`](operations/search-console.md): Search Console, sitemap, route metadata, and Lighthouse checks.
+- [`operations/seo-keyword-map.md`](operations/seo-keyword-map.md): target queries, page ownership, article topics, comparisons, and adjacent tools.
 
 ## Engineering
 
