@@ -83,6 +83,14 @@ const staticHome = (): string => `<main class="page-content home-shell">
       </span>
     </div>
   </section>
+  <section class="home-resources" aria-label="Background removal resources">
+    <a href="/private-background-remover"><strong>Private browser removal</strong><span>What stays on your device and what the site downloads.</span></a>
+    <a href="/node-background-removal"><strong>Node.js API</strong><span>Run local background removal inside application code.</span></a>
+    <a href="/background-removal-cli"><strong>CLI</strong><span>Process files and folders from the command line.</span></a>
+    <a href="/batch-background-remover"><strong>Batch removal</strong><span>Reuse one runtime across multiple images.</span></a>
+    <a href="/open-source-background-remover"><strong>Open source</strong><span>Inspect the MIT-licensed implementation and local runtimes.</span></a>
+    <a href="/tools/transparency-checker"><strong>Transparency checker</strong><span>Inspect alpha pixels without uploading the image.</span></a>
+  </section>
 </main>`;
 
 const staticDocs = (): string => `<main class="page-content content-shell">
