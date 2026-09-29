@@ -17,16 +17,16 @@ export const SITE_ORIGIN = "https://bgcut.dev";
 export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadata>> = {
   home: {
     path: "/",
-    title: "Free Background Remover - Private & Local | bgcut",
+    title: "Free Background Remover - Private, Local, No Uploads | bgcut",
     description:
-      "Remove image backgrounds free in your browser. bgcut runs locally with WebGPU when available, supports PNG, JPEG, WebP and AVIF, and does not upload your images.",
+      "Remove image backgrounds free in your browser. Images stay on your device, with WebGPU when available. No signup, credits, or image uploads to bgcut.",
     index: true,
   },
   docs: {
     path: "/docs",
     title: "bgcut Docs - Browser, CLI and Node.js Background Removal",
     description:
-      "Use bgcut as a browser background remover, local CLI, or Node.js background removal API with WebGPU and CPU support.",
+      "Use bgcut in the browser, from the command line, or from Node.js. Learn local background removal, batch processing, engines, formats, and runtime behavior.",
     index: true,
   },
   changelog: {
@@ -52,8 +52,43 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
   },
 };
 
+export const PUBLIC_SITE_PAGES = [
+  "home",
+  "docs",
+  "changelog",
+  "privacy",
+  "terms",
+] as const satisfies readonly PublicSitePage[];
+
+export const INDEXED_SITE_PAGES = PUBLIC_SITE_PAGES.filter(
+  (page) => SITE_PAGE_METADATA[page].index,
+);
+
 export const canonicalUrlForPage = (page: PublicSitePage): string =>
   new URL(SITE_PAGE_METADATA[page].path, SITE_ORIGIN).href;
+
+const breadcrumbStructuredDataForPage = (page: PublicSitePage) => {
+  const metadata = SITE_PAGE_METADATA[page];
+  const url = canonicalUrlForPage(page);
+
+  return {
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "bgcut",
+        item: `${SITE_ORIGIN}/`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: metadata.title,
+        item: url,
+      },
+    ],
+  };
+};
 
 export const structuredDataForPage = (page: PublicSitePage) => {
   const metadata = SITE_PAGE_METADATA[page];
@@ -69,6 +104,10 @@ export const structuredDataForPage = (page: PublicSitePage) => {
           name: "bgcut",
           url: `${SITE_ORIGIN}/`,
           description: metadata.description,
+          sameAs: [
+            "https://github.com/jhomra21/bgcut",
+            "https://www.npmjs.com/package/bgcut",
+          ],
         },
         {
           "@type": "WebApplication",
@@ -80,6 +119,11 @@ export const structuredDataForPage = (page: PublicSitePage) => {
           operatingSystem: "Any",
           image: `${SITE_ORIGIN}/og-image.png`,
           isAccessibleForFree: true,
+          softwareHelp: `${SITE_ORIGIN}/docs`,
+          sameAs: [
+            "https://github.com/jhomra21/bgcut",
+            "https://www.npmjs.com/package/bgcut",
+          ],
           offers: {
             "@type": "Offer",
             price: "0",
@@ -92,12 +136,18 @@ export const structuredDataForPage = (page: PublicSitePage) => {
 
   return {
     "@context": "https://schema.org",
-    "@type": page === "changelog" ? "CollectionPage" : "WebPage",
-    name: metadata.title,
-    url,
-    description: metadata.description,
-    isPartOf: {
-      "@id": `${SITE_ORIGIN}/#website`,
-    },
+    "@graph": [
+      {
+        "@type": page === "changelog" ? "CollectionPage" : "WebPage",
+        "@id": `${url}#page`,
+        name: metadata.title,
+        url,
+        description: metadata.description,
+        isPartOf: {
+          "@id": `${SITE_ORIGIN}/#website`,
+        },
+      },
+      breadcrumbStructuredDataForPage(page),
+    ],
   };
 };

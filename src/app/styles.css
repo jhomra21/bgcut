@@ -776,7 +776,17 @@ figure {
   padding: 6px 0 20px;
 }
 
+.home-intro h1 {
+  margin: 0 0 4px;
+  max-width: 680px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
 .home-intro p {
+  margin: 0;
   max-width: 680px;
   color: var(--text-secondary);
   font-size: 13px;

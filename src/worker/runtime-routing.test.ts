@@ -55,11 +55,21 @@ describe("Cloudflare runtime routing", () => {
     expect(packageSource).toContain("cloudflare:model:local");
   });
 
-  test("ships static search metadata and discovery files through Cloudflare assets", () => {
+  test("ships generated search routes and discovery files through Cloudflare assets", () => {
     expect(packageSource).toContain('"site:prepare-routes"');
     expect(cloudflareBuildSource).toContain('"llms.txt"');
+    expect(cloudflareBuildSource).toContain('GENERATED_SITE_ROOT_FILES = ["sitemap.xml"]');
     expect(cloudflareBuildSource).toContain('"docs.html"');
     expect(cloudflareBuildSource).toContain('"changelog.html"');
+  });
+
+  test("returns canonical HTML routes instead of SPA soft 404s", () => {
+    expect(workerSource).toContain("PUBLIC_SITE_PAGES");
+    expect(workerSource).toContain("PUBLIC_SITE_PATHS");
+    expect(workerSource).toContain('url.pathname === "/index.html"');
+    expect(workerSource).toContain("Response.redirect(redirect, 308)");
+    expect(workerSource).toContain('status: 404');
+    expect(workerSource).toContain('"x-robots-tag": "noindex"');
   });
 
   test("hardens static responses and caches fingerprinted assets", () => {

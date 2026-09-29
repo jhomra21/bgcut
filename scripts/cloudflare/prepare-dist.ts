@@ -17,8 +17,9 @@ const SITE_ROOT_FILES = [
   "og-image.png",
   "robots.txt",
   "site.webmanifest",
-  "sitemap.xml",
 ] as const;
+
+const GENERATED_SITE_ROOT_FILES = ["sitemap.xml"] as const;
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -94,7 +95,7 @@ if (leakedOrtRuntime.length > 0) {
   );
 }
 
-const missingSiteFiles = SITE_ROOT_FILES.filter((name) => !deployNames.includes(name));
+const missingSiteFiles = [...SITE_ROOT_FILES, ...GENERATED_SITE_ROOT_FILES].filter((name) => !deployNames.includes(name));
 
 if (missingSiteFiles.length > 0) {
   throw new Error(
