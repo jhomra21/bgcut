@@ -171,6 +171,7 @@ export const canonicalUrlForPage = (page: PublicSitePage): string =>
 const breadcrumbStructuredDataForPage = (page: PublicSitePage) => {
   const metadata = SITE_PAGE_METADATA[page];
   const url = canonicalUrlForPage(page);
+
   const items = [
     {
       "@type": "ListItem",

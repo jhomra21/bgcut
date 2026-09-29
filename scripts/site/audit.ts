@@ -10,6 +10,7 @@ import {
 } from "../../src/shared/site-metadata";
 
 const root = resolve(import.meta.dir, "../..");
+
 const distDirectory = resolve(root, "dist");
 
 const outputPathForPage = (page: PublicSitePage): string => {
@@ -24,6 +25,7 @@ const outputPathForPage = (page: PublicSitePage): string => {
 };
 
 const failures: string[] = [];
+
 let checks = 0;
 
 const check = (condition: boolean, message: string): void => {
@@ -49,10 +51,13 @@ const indexedPaths = new Set(
 );
 
 const seenTitles = new Map<string, string>();
+
 const seenDescriptions = new Map<string, string>();
+
 const seenCanonicals = new Set<string>();
 
 const sitemap = await readFile(resolve(distDirectory, "sitemap.xml"), "utf8");
+
 const robots = await readFile(resolve(distDirectory, "robots.txt"), "utf8");
 
 check(
@@ -62,26 +67,35 @@ check(
 
 for (const page of PUBLIC_SITE_PAGES) {
   const metadata = SITE_PAGE_METADATA[page];
+
   const html = await readFile(outputPathForPage(page), "utf8");
+
   const canonical = canonicalUrlForPage(page);
+
   const title = matchContent(html, /<title>([^<]+)<\/title>/u);
+
   const description = matchContent(
     html,
     /<meta\s+name="description"\s+content="([^"]*)"/u,
   );
+
   const robotsContent = matchContent(
     html,
     /<meta\s+name="robots"\s+content="([^"]*)"/u,
   );
+
   const canonicalHref = matchContent(
     html,
     /<link\s+rel="canonical"\s+href="([^"]*)"/u,
   );
+
   const ogUrl = matchContent(
     html,
     /<meta\s+property="og:url"\s+content="([^"]*)"/u,
   );
+
   const h1Count = html.match(/<h1(?:\s[^>]*)?>/gu)?.length ?? 0;
+
   const structuredData = matchContent(
     html,
     /<script\s+id="site-structured-data"\s+type="application\/ld\+json">([\s\S]*?)<\/script>/u,
@@ -120,6 +134,7 @@ for (const page of PUBLIC_SITE_PAGES) {
     );
 
     const existingTitlePath = seenTitles.get(metadata.title);
+
     check(
       existingTitlePath === undefined,
       `${metadata.path}: duplicate title also used by ${existingTitlePath ?? "another page"}.`,
@@ -127,6 +142,7 @@ for (const page of PUBLIC_SITE_PAGES) {
     seenTitles.set(metadata.title, metadata.path);
 
     const existingDescriptionPath = seenDescriptions.get(metadata.description);
+
     check(
       existingDescriptionPath === undefined,
       `${metadata.path}: duplicate description also used by ${existingDescriptionPath ?? "another page"}.`,

@@ -9,7 +9,7 @@ import {
   type Comparison,
 } from "../../src/shared/comparisons";
 import { GUIDES, GUIDE_PAGE_IDS, isGuidePage, type Guide } from "../../src/shared/guides";
-import { SITE_TOOLS, isToolPage } from "../../src/shared/tools";
+import { isToolPage } from "../../src/shared/tools";
 import {
   canonicalUrlForPage,
   INDEXED_SITE_PAGES,
