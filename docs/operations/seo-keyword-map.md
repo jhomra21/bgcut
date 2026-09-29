@@ -20,11 +20,11 @@ Searches for the name "bgcut" are not enough to identify this project. Other pro
 | Target page | Primary intent | Supporting searches | User | Page job | Status |
 | --- | --- | --- | --- | --- | --- |
 | `/` | free background remover | remove background from image, background remover online, free image background remover | Anyone removing one image | Let the visitor remove a background immediately, then explain local processing and supported formats | Live |
-| `/private-background-remover` | private background remover | no upload background remover, local background remover, background remover no signup, browser background remover | Privacy-sensitive users | Explain exactly what stays on the device and give direct access to the remover | Planned |
-| `/node-background-removal` | Node.js background removal | background removal npm, remove background Node.js, JavaScript background removal Node | Node.js developers | Show the current `bgcut()` object API, reuse, errors, formats, and local runtime behavior | Planned |
-| `/background-removal-cli` | background remover CLI | remove background command line, image background removal terminal, local background removal CLI | Developers and automation users | Show single-file commands, engine selection, output formats, and directory input | Planned |
-| `/batch-background-remover` | batch background remover | bulk background remover, batch remove image backgrounds, remove backgrounds from folder | People processing many files | Explain sequential warm-runtime processing for multiple files and directories | Planned |
-| `/open-source-background-remover` | open source background remover | local open source background remover, self-hosted background removal, offline background remover | Developers and privacy-sensitive users | Explain the MIT-licensed project, local runtimes, deployment choices, and limits | Planned |
+| `/private-background-remover` | private background remover | no upload background remover, local background remover, background remover no signup, browser background remover | Privacy-sensitive users | Explain exactly what stays on the device and give direct access to the remover | In PR |
+| `/node-background-removal` | Node.js background removal | background removal npm, remove background Node.js, JavaScript background removal Node | Node.js developers | Show the current `bgcut()` object API, reuse, errors, formats, and local runtime behavior | In PR |
+| `/background-removal-cli` | background remover CLI | remove background command line, image background removal terminal, local background removal CLI | Developers and automation users | Show single-file commands, engine selection, output formats, and directory input | In PR |
+| `/batch-background-remover` | batch background remover | bulk background remover, batch remove image backgrounds, remove backgrounds from folder | People processing many files | Explain sequential warm-runtime processing for multiple files and directories | In PR |
+| `/open-source-background-remover` | open source background remover | local open source background remover, self-hosted background removal, offline background remover | Developers and privacy-sensitive users | Explain the MIT-licensed project, local runtimes, deployment choices, and limits | In PR |
 | `/benchmarks` | background removal benchmark | WebGPU background removal benchmark, local background remover performance, browser background removal speed | Technical evaluators | Publish reproducible measurements with device, browser, image size, runtime, version, and fixtures | Planned |
 | `/docs` | bgcut documentation | bgcut Node API, bgcut CLI, bgcut local app | Existing users | Hold the complete product contract and link to intent-specific pages for deeper examples | Live |
 | `/changelog` | bgcut changelog | bgcut release notes, bgcut updates | Existing users | Record shipped changes and give search engines dated product facts | Live |
@@ -79,7 +79,7 @@ Do not create calculators or generators with no connection to bgcut.
 
 Every indexable page should link to the page that owns its main intent. Articles should link to their primary product page near the first useful example, not only in a footer.
 
-The homepage should link to privacy, Node.js, CLI, batch, open-source, and benchmark pages once those pages exist. Product pages can link to related guides. Comparison pages should link to the relevant product page and docs.
+The homepage links to the private-browser, Node.js, CLI, batch, open-source, and transparency-tool pages. Add a benchmark link only after the benchmark route exists. Product pages can link to related guides. Comparison pages should link to the relevant product page and docs.
 
 Do not use the same anchor text for unrelated destinations. Do not create near-duplicate pages for singular, plural, "AI", "online", or "free" keyword variants.
 
