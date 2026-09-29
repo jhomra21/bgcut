@@ -2,6 +2,7 @@ import { createSignal, onSettled } from "solid-js";
 
 import { isComparisonPage } from "../shared/comparisons";
 import { isGuidePage } from "../shared/guides";
+import { isIntentPage } from "../shared/intent-pages";
 import { isToolPage } from "../shared/tools";
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
@@ -19,6 +20,7 @@ import { ComparisonIndexPage, ComparisonPage } from "./pages/ComparisonPage";
 import { DocsPage } from "./pages/DocsPage";
 import { GuideIndexPage, GuidePage } from "./pages/GuidePage";
 import { HomePage } from "./pages/HomePage";
+import { IntentPageView } from "./pages/IntentPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { applySiteMetadata } from "./site-metadata";
 import { TermsPage } from "./pages/TermsPage";
@@ -34,6 +36,10 @@ const PageContent = (props: { readonly page: SitePage }) => {
 
   if (props.page === "changelog") {
     return <ChangelogPage />;
+  }
+
+  if (isIntentPage(props.page)) {
+    return <IntentPageView page={props.page} />;
   }
 
   if (props.page === "guides") {

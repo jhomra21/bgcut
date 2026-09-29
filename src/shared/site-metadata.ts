@@ -6,6 +6,7 @@ import {
   type ComparisonPageId,
 } from "./comparisons";
 import { SITE_TOOLS, TOOL_PAGE_IDS, isToolPage, type ToolPageId } from "./tools";
+import { INTENT_PAGES, INTENT_PAGE_IDS, isIntentPage, type IntentPageId } from "./intent-pages";
 import {
   GUIDES,
   GUIDE_PAGE_IDS,
@@ -23,7 +24,7 @@ export type CoreSitePage =
   | "privacy"
   | "terms";
 
-export type PublicSitePage = CoreSitePage | GuidePageId | ComparisonPageId | ToolPageId;
+export type PublicSitePage = CoreSitePage | GuidePageId | ComparisonPageId | ToolPageId | IntentPageId;
 
 export type SitePageMetadata = {
   readonly path: string;
@@ -67,6 +68,23 @@ const COMPARISON_SITE_METADATA = Object.fromEntries(
     ];
   }),
 ) as Record<ComparisonPageId, SitePageMetadata>;
+
+// SAFETY: INTENT_PAGE_IDS lists every IntentPageId, and each tuple uses the same page key.
+const INTENT_SITE_METADATA = Object.fromEntries(
+  INTENT_PAGE_IDS.map((page) => {
+    const content = INTENT_PAGES[page];
+
+    return [
+      page,
+      {
+        path: `/${content.slug}`,
+        title: `${content.title} | bgcut`,
+        description: content.description,
+        index: true,
+      },
+    ];
+  }),
+) as Record<IntentPageId, SitePageMetadata>;
 
 // SAFETY: TOOL_PAGE_IDS lists every ToolPageId, and each tuple uses the same page key.
 const TOOL_SITE_METADATA = Object.fromEntries(
@@ -144,6 +162,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
   },
   ...GUIDE_SITE_METADATA,
   ...COMPARISON_SITE_METADATA,
+  ...INTENT_SITE_METADATA,
   ...TOOL_SITE_METADATA,
 };
 
@@ -152,6 +171,7 @@ export const PUBLIC_SITE_PAGES = [
   "docs",
   "changelog",
   "guides",
+  ...INTENT_PAGE_IDS,
   ...GUIDE_PAGE_IDS,
   "compare",
   ...COMPARISON_PAGE_IDS,
@@ -275,6 +295,28 @@ export const structuredDataForPage = (page: PublicSitePage) => {
             priceCurrency: "USD",
           },
         },
+      ],
+    };
+  }
+
+  if (isIntentPage(page)) {
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebPage",
+          "@id": `${url}#page`,
+          name: metadata.title,
+          url,
+          description: metadata.description,
+          isPartOf: {
+            "@id": `${SITE_ORIGIN}/#website`,
+          },
+          about: {
+            "@id": `${SITE_ORIGIN}/#app`,
+          },
+        },
+        breadcrumbStructuredDataForPage(page),
       ],
     };
   }

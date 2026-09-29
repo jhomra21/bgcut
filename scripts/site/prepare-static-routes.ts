@@ -9,6 +9,7 @@ import {
   type Comparison,
 } from "../../src/shared/comparisons";
 import { GUIDES, GUIDE_PAGE_IDS, isGuidePage, type Guide } from "../../src/shared/guides";
+import { INTENT_PAGES, isIntentPage, type IntentPage } from "../../src/shared/intent-pages";
 import { isToolPage } from "../../src/shared/tools";
 import {
   canonicalUrlForPage,
@@ -195,6 +196,41 @@ const staticChangelog = (source: string): string => {
   </main>`;
 };
 
+const staticIntentPage = (content: IntentPage): string => {
+  const sections = content.sections.map((section) => {
+    const paragraphs = section.paragraphs
+      .map((paragraph) => `<p>${htmlEscape(paragraph)}</p>`)
+      .join("");
+
+    const bullets = section.bullets === undefined
+      ? ""
+      : `<ul>${section.bullets.map((item) => `<li>${htmlEscape(item)}</li>`).join("")}</ul>`;
+
+    const code = section.code === undefined
+      ? ""
+      : `<pre><code>${htmlEscape(section.code.code)}</code></pre>`;
+
+    return `<section><h2>${htmlEscape(section.title)}</h2>${paragraphs}${bullets}${code}</section>`;
+  }).join("");
+
+  const guideLink = content.guideHref === undefined
+    ? ""
+    : `<a href="${content.guideHref}">Read the guide</a>`;
+
+  return `<main class="page-content legal-shell">
+    <article class="guide-page intent-page">
+      <p class="guide-kicker">${htmlEscape(content.eyebrow)}</p>
+      <h1>${htmlEscape(content.title)}</h1>
+      <p class="guide-summary">${htmlEscape(content.summary)}</p>
+      <div class="intent-actions">
+        <a class="intent-primary-link" href="${htmlEscape(content.ctaHref)}">${htmlEscape(content.ctaLabel)}</a>
+        ${guideLink}
+      </div>
+      ${sections}
+    </article>
+  </main>`;
+};
+
 const staticGuideIndex = (): string => {
   const items = GUIDE_PAGE_IDS.map((page) => {
     const guide = GUIDES[page];
@@ -372,6 +408,10 @@ const staticContentForPage = (page: PublicSitePage, changelogSource: string): st
 
   if (page === "docs") {
     return staticDocs();
+  }
+
+  if (isIntentPage(page)) {
+    return staticIntentPage(INTENT_PAGES[page]);
   }
 
   if (page === "changelog") {

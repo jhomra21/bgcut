@@ -2052,3 +2052,31 @@ figure {
     flex-direction: column;
   }
 }
+
+
+.intent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 22px 0 38px;
+}
+
+.intent-actions a {
+  align-items: center;
+  display: inline-flex;
+  min-height: 34px;
+  color: var(--text-link);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: var(--border-link);
+  text-underline-offset: 3px;
+}
+
+.intent-actions .intent-primary-link {
+  padding: 0 13px;
+  border-radius: 7px;
+  background: var(--background-inverse);
+  color: var(--text-inverse);
+  text-decoration: none;
+}
