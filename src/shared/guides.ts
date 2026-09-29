@@ -172,7 +172,8 @@ export const GUIDES: Readonly<Record<GuidePageId, Guide>> = {
         ],
         code: {
           language: "typescript",
-          code: `import { bgcut } from "bgcut";
+          code: `import { writeFile } from "node:fs/promises";
+import { bgcut } from "bgcut";
 
 const remover = await bgcut();
 
@@ -181,7 +182,7 @@ try {
     format: "webp",
   });
 
-  await Bun.write("photo.webp", result.data);
+  await writeFile("photo.webp", result.data);
 } finally {
   await remover.close();
 }`,

@@ -1,9 +1,19 @@
-export type PublicSitePage =
+import {
+  GUIDES,
+  GUIDE_PAGE_IDS,
+  isGuidePage,
+  type GuidePageId,
+} from "./guides";
+
+export type CoreSitePage =
   | "home"
   | "docs"
   | "changelog"
+  | "guides"
   | "privacy"
   | "terms";
+
+export type PublicSitePage = CoreSitePage | GuidePageId;
 
 export type SitePageMetadata = {
   readonly path: string;
@@ -13,6 +23,22 @@ export type SitePageMetadata = {
 };
 
 export const SITE_ORIGIN = "https://bgcut.dev";
+
+const GUIDE_SITE_METADATA = Object.fromEntries(
+  GUIDE_PAGE_IDS.map((page) => {
+    const guide = GUIDES[page];
+
+    return [
+      page,
+      {
+        path: `/guides/${guide.slug}`,
+        title: `${guide.title} | bgcut`,
+        description: guide.description,
+        index: true,
+      },
+    ];
+  }),
+) as Record<GuidePageId, SitePageMetadata>;
 
 export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadata>> = {
   home: {
@@ -36,6 +62,13 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
       "Release notes for bgcut, including browser, CLI, Node.js API, performance, packaging, and background-removal changes.",
     index: true,
   },
+  guides: {
+    path: "/guides",
+    title: "Background Removal Guides - Local, Browser, CLI and Node.js | bgcut",
+    description:
+      "Practical guides to local background removal with browser WebGPU and WebAssembly, Node.js, CLI batches, image formats, and privacy checks.",
+    index: true,
+  },
   privacy: {
     path: "/privacy",
     title: "Privacy | bgcut",
@@ -50,12 +83,15 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
       "Terms covering bgcut.dev, the bgcut software, third-party dependencies, and use of generated background-removal output.",
     index: false,
   },
+  ...GUIDE_SITE_METADATA,
 };
 
 export const PUBLIC_SITE_PAGES = [
   "home",
   "docs",
   "changelog",
+  "guides",
+  ...GUIDE_PAGE_IDS,
   "privacy",
   "terms",
 ] as const satisfies readonly PublicSitePage[];
@@ -70,23 +106,40 @@ export const canonicalUrlForPage = (page: PublicSitePage): string =>
 const breadcrumbStructuredDataForPage = (page: PublicSitePage) => {
   const metadata = SITE_PAGE_METADATA[page];
   const url = canonicalUrlForPage(page);
+  const items = [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: "bgcut",
+      item: `${SITE_ORIGIN}/`,
+    },
+  ];
+
+  if (isGuidePage(page)) {
+    items.push({
+      "@type": "ListItem",
+      position: 2,
+      name: "Guides",
+      item: `${SITE_ORIGIN}/guides`,
+    });
+    items.push({
+      "@type": "ListItem",
+      position: 3,
+      name: GUIDES[page].title,
+      item: url,
+    });
+  } else if (page !== "home") {
+    items.push({
+      "@type": "ListItem",
+      position: 2,
+      name: metadata.title,
+      item: url,
+    });
+  }
 
   return {
     "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "bgcut",
-        item: `${SITE_ORIGIN}/`,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: metadata.title,
-        item: url,
-      },
-    ],
+    itemListElement: items,
   };
 };
 
@@ -134,11 +187,45 @@ export const structuredDataForPage = (page: PublicSitePage) => {
     };
   }
 
+  if (isGuidePage(page)) {
+    const guide = GUIDES[page];
+
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Article",
+          "@id": `${url}#article`,
+          headline: guide.title,
+          description: guide.description,
+          datePublished: guide.publishedAt,
+          dateModified: guide.updatedAt,
+          mainEntityOfPage: url,
+          image: `${SITE_ORIGIN}/og-image.png`,
+          author: {
+            "@type": "Organization",
+            name: "bgcut",
+            url: `${SITE_ORIGIN}/`,
+          },
+          publisher: {
+            "@type": "Organization",
+            name: "bgcut",
+            url: `${SITE_ORIGIN}/`,
+          },
+        },
+        breadcrumbStructuredDataForPage(page),
+      ],
+    };
+  }
+
   return {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": page === "changelog" ? "CollectionPage" : "WebPage",
+        "@type":
+          page === "changelog" || page === "guides"
+            ? "CollectionPage"
+            : "WebPage",
         "@id": `${url}#page`,
         name: metadata.title,
         url,

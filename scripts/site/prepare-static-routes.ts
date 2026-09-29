@@ -1,6 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
+import { GUIDES, GUIDE_PAGE_IDS, isGuidePage, type Guide } from "../../src/shared/guides";
 import {
   canonicalUrlForPage,
   INDEXED_SITE_PAGES,
@@ -51,6 +52,7 @@ const staticFooter = (): string => `<footer class="site-footer">
     <span>MIT licensed</span>
   </div>
   <nav class="site-footer-links" aria-label="Footer navigation">
+    <a href="/guides">Guides</a>
     <a href="/changelog">Changelog</a>
     <a href="/privacy">Privacy</a>
     <a href="/terms">Terms</a>
@@ -116,7 +118,7 @@ await remover.close();</code></pre>
     </section>
     <section id="resources" class="reference-section doc-section">
       <h2>Resources</h2>
-      <p><a href="/llms.txt">Agent index</a>, <a href="https://github.com/jhomra21/bgcut/blob/main/src/node/index.d.ts">Node API types</a>, <a href="https://www.npmjs.com/package/bgcut">npm package</a>, and <a href="https://github.com/jhomra21/bgcut">GitHub repository</a>.</p>
+      <p><a href="/guides">Guides</a>, <a href="/llms.txt">agent index</a>, <a href="https://github.com/jhomra21/bgcut/blob/main/src/node/index.d.ts">Node API types</a>, <a href="https://www.npmjs.com/package/bgcut">npm package</a>, and <a href="https://github.com/jhomra21/bgcut">GitHub repository</a>.</p>
     </section>
   </article>
 </main>`;
@@ -183,6 +185,58 @@ const staticChangelog = (source: string): string => {
   </main>`;
 };
 
+const staticGuideIndex = (): string => {
+  const items = GUIDE_PAGE_IDS.map((page) => {
+    const guide = GUIDES[page];
+
+    return `<a href="/guides/${guide.slug}"><strong>${htmlEscape(guide.title)}</strong><span>${htmlEscape(guide.description)}</span></a>`;
+  }).join("");
+
+  return `<main class="page-content legal-shell">
+    <article class="guide-page guide-index">
+      <p class="guide-kicker">Guides</p>
+      <h1>Local background removal guides</h1>
+      <p class="guide-summary">Practical notes for browser privacy, WebGPU and WebAssembly, Node.js, CLI batches, image formats, and the bgcut processing pipeline.</p>
+      <div class="guide-list">${items}</div>
+    </article>
+  </main>`;
+};
+
+const staticGuide = (guide: Guide): string => {
+  const sections = guide.sections.map((section) => {
+    const paragraphs = section.paragraphs
+      .map((paragraph) => `<p>${htmlEscape(paragraph)}</p>`)
+      .join("");
+    const bullets = section.bullets === undefined
+      ? ""
+      : `<ul>${section.bullets.map((item) => `<li>${htmlEscape(item)}</li>`).join("")}</ul>`;
+    const code = section.code === undefined
+      ? ""
+      : `<pre><code>${htmlEscape(section.code.code)}</code></pre>`;
+
+    return `<section id="${section.id}">
+      <h2>${htmlEscape(section.title)}</h2>
+      ${paragraphs}
+      ${bullets}
+      ${code}
+    </section>`;
+  }).join("");
+
+  return `<main class="page-content legal-shell">
+    <article class="guide-page">
+      <p class="guide-kicker"><a href="/guides">Guides</a></p>
+      <h1>${htmlEscape(guide.title)}</h1>
+      <p class="guide-summary">${htmlEscape(guide.summary)}</p>
+      <p class="guide-date">Published <time datetime="${guide.publishedAt}">${guide.publishedAt}</time></p>
+      ${sections}
+      <nav class="guide-next" aria-label="Guide resources">
+        <a href="/">Use the background remover</a>
+        <a href="/docs">Read the bgcut docs</a>
+      </nav>
+    </article>
+  </main>`;
+};
+
 const staticLegal = (page: "privacy" | "terms"): string => {
   const metadata = SITE_PAGE_METADATA[page];
   const heading = page === "privacy" ? "Privacy" : "Terms of Use";
@@ -206,6 +260,14 @@ const staticContentForPage = (page: PublicSitePage, changelogSource: string): st
 
   if (page === "changelog") {
     return staticChangelog(changelogSource);
+  }
+
+  if (page === "guides") {
+    return staticGuideIndex();
+  }
+
+  if (isGuidePage(page)) {
+    return staticGuide(GUIDES[page]);
   }
 
   return staticLegal(page);
@@ -290,6 +352,16 @@ ${urls}
 `;
 };
 
+const outputPathForPage = (page: PublicSitePage, templatePath: string): string => {
+  if (page === "home") {
+    return templatePath;
+  }
+
+  const routePath = SITE_PAGE_METADATA[page].path.replace(/^\//u, "");
+
+  return resolve(distDirectory, `${routePath}.html`);
+};
+
 const templatePath = resolve(distDirectory, "index.html");
 
 const template = await readFile(templatePath, "utf8");
@@ -298,12 +370,9 @@ const changelogSource = await readFile(changelogPath, "utf8");
 
 for (const page of PUBLIC_SITE_PAGES) {
   const html = renderPageHtml(template, page, changelogSource);
+  const outputPath = outputPathForPage(page, templatePath);
 
-  const outputPath =
-    page === "home"
-      ? templatePath
-      : resolve(distDirectory, `${page}.html`);
-
+  await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, html);
   console.log(`Prepared static route ${SITE_PAGE_METADATA[page].path}.`);
 }

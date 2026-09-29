@@ -1,6 +1,6 @@
-import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
+import { isGuidePage } from "../shared/guides";
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
   currentPage,
@@ -13,14 +13,43 @@ import {
   type SitePage,
 } from "./navigation";
 import { ChangelogPage } from "./pages/ChangelogPage";
-import { applySiteMetadata } from "./site-metadata";
 import { DocsPage } from "./pages/DocsPage";
+import { GuideIndexPage, GuidePage } from "./pages/GuidePage";
 import { HomePage } from "./pages/HomePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { applySiteMetadata } from "./site-metadata";
 import { TermsPage } from "./pages/TermsPage";
 
 const isReferencePage = (page: SitePage): boolean =>
   page === "docs" || page === "changelog";
+
+const PageContent = (props: { readonly page: SitePage }) => {
+  if (props.page === "docs") {
+    return <DocsPage />;
+  }
+
+  if (props.page === "changelog") {
+    return <ChangelogPage />;
+  }
+
+  if (props.page === "guides") {
+    return <GuideIndexPage />;
+  }
+
+  if (isGuidePage(props.page)) {
+    return <GuidePage page={props.page} />;
+  }
+
+  if (props.page === "privacy") {
+    return <PrivacyPage />;
+  }
+
+  if (props.page === "terms") {
+    return <TermsPage />;
+  }
+
+  return <HomePage showIntro />;
+};
 
 const App = () => {
   if (isLocalRuntime()) {
@@ -124,30 +153,7 @@ const App = () => {
       </div>
 
       <div class={`route-stage route-stage-${routePhase()}`}>
-        <Show
-          when={page() === "docs"}
-          fallback={
-            <Show
-              when={page() === "changelog"}
-              fallback={
-                <Show
-                  when={page() === "privacy"}
-                  fallback={
-                    <Show when={page() === "terms"} fallback={<HomePage showIntro />}>
-                      <TermsPage />
-                    </Show>
-                  }
-                >
-                  <PrivacyPage />
-                </Show>
-              }
-            >
-              <ChangelogPage />
-            </Show>
-          }
-        >
-          <DocsPage />
-        </Show>
+        <PageContent page={page()} />
       </div>
 
       <div class="site-footer-shell">

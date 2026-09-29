@@ -1750,3 +1750,138 @@ figure {
     background: var(--background-primary);
   }
 }
+
+
+.guide-page {
+  width: min(720px, 100%);
+  padding: 44px 0 72px;
+}
+
+.guide-kicker,
+.guide-date {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.guide-kicker a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border-link);
+  text-underline-offset: 3px;
+}
+
+.guide-page > h1 {
+  max-width: 700px;
+  margin: 8px 0 14px;
+  color: var(--text-primary);
+  font-size: clamp(32px, 5vw, 46px);
+  font-weight: 760;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+
+.guide-summary {
+  max-width: 680px;
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.guide-page > section {
+  padding: 30px 0;
+  border-top: 1px solid var(--border-primary);
+}
+
+.guide-page > section:first-of-type {
+  margin-top: 36px;
+}
+
+.guide-page section h2 {
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+
+.guide-page section p,
+.guide-page section li {
+  max-width: 680px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.guide-page section p {
+  margin: 0 0 14px;
+}
+
+.guide-page section p:last-child {
+  margin-bottom: 0;
+}
+
+.guide-page section ul {
+  margin: 8px 0 16px;
+  padding-left: 20px;
+}
+
+.guide-page section .code-block {
+  margin-top: 18px;
+}
+
+.guide-list {
+  display: grid;
+  margin-top: 36px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.guide-list a {
+  display: grid;
+  gap: 6px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border-primary);
+  text-decoration: none;
+}
+
+.guide-list strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.guide-list span {
+  max-width: 660px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.guide-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.guide-next a {
+  color: var(--text-link);
+  font-size: 12px;
+  font-weight: 620;
+  text-decoration: underline;
+  text-decoration-color: var(--border-link);
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .guide-page {
+    padding: 30px 0 54px;
+  }
+
+  .guide-page > h1 {
+    font-size: clamp(30px, 10vw, 42px);
+  }
+}

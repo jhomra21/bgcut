@@ -152,6 +152,19 @@ export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
     </div>
     <nav class="site-footer-links" aria-label="Footer navigation">
       <a
+        href="/guides"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("guides");
+        }}
+      >
+        Guides
+      </a>
+      <a
         href="/changelog"
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
