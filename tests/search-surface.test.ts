@@ -11,6 +11,8 @@ const [
   llms,
   packageSource,
   packagePrepareSource,
+  cloudflarePrepareSource,
+  packageWebPrepareSource,
 ] = await Promise.all([
   readFile("index.html", "utf8"),
   readFile("src/shared/site-metadata.ts", "utf8"),
@@ -21,6 +23,8 @@ const [
   readFile("public/llms.txt", "utf8"),
   readFile("package.json", "utf8"),
   readFile("scripts/package/prepare.ts", "utf8"),
+  readFile("scripts/cloudflare/prepare-dist.ts", "utf8"),
+  readFile("scripts/package/prepare-web.ts", "utf8"),
 ]);
 
 const relativeLuminance = (hex: string): number => {
@@ -91,6 +95,11 @@ describe("search and Lighthouse surface", () => {
 
     expect(match?.[1]).toBeDefined();
     expect(contrastRatio(match?.[1] ?? "#000000", "#fbfbfa")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test("ships the CSP-safe theme bootstrap on hosted and packaged surfaces", () => {
+    expect(cloudflarePrepareSource).toContain('"theme-bootstrap.js"');
+    expect(packageWebPrepareSource).toContain('"theme-bootstrap.js"');
   });
 
   test("generates hosted metadata routes without adding them to the packaged local app", () => {

@@ -1,4 +1,4 @@
-import { createSignal, onSettled } from "solid-js";
+import { Match, Switch, createSignal, onSettled } from "solid-js";
 
 import { isComparisonPage } from "../shared/comparisons";
 import { isGuidePage } from "../shared/guides";
@@ -30,51 +30,48 @@ const isReferencePage = (page: SitePage): boolean =>
   page === "docs" || page === "changelog";
 
 const PageContent = (props: { readonly page: SitePage }) => {
-  if (props.page === "docs") {
-    return <DocsPage />;
-  }
+  const intentPage = () => isIntentPage(props.page) ? props.page : undefined;
+  const guidePage = () => isGuidePage(props.page) ? props.page : undefined;
+  const comparisonPage = () => isComparisonPage(props.page) ? props.page : undefined;
+  const toolPage = () => isToolPage(props.page) ? props.page : undefined;
 
-  if (props.page === "changelog") {
-    return <ChangelogPage />;
-  }
-
-  if (isIntentPage(props.page)) {
-    return <IntentPageView page={props.page} />;
-  }
-
-  if (props.page === "guides") {
-    return <GuideIndexPage />;
-  }
-
-  if (isGuidePage(props.page)) {
-    return <GuidePage page={props.page} />;
-  }
-
-  if (props.page === "compare") {
-    return <ComparisonIndexPage />;
-  }
-
-  if (isComparisonPage(props.page)) {
-    return <ComparisonPage page={props.page} />;
-  }
-
-  if (props.page === "tools") {
-    return <ToolIndexPage />;
-  }
-
-  if (isToolPage(props.page)) {
-    return <TransparencyCheckerPage />;
-  }
-
-  if (props.page === "privacy") {
-    return <PrivacyPage />;
-  }
-
-  if (props.page === "terms") {
-    return <TermsPage />;
-  }
-
-  return <HomePage showIntro />;
+  return (
+    <Switch fallback={<HomePage showIntro />}>
+      <Match when={props.page === "docs"}>
+        <DocsPage />
+      </Match>
+      <Match when={props.page === "changelog"}>
+        <ChangelogPage />
+      </Match>
+      <Match keyed when={intentPage()}>
+        {(page) => <IntentPageView page={page} />}
+      </Match>
+      <Match when={props.page === "guides"}>
+        <GuideIndexPage />
+      </Match>
+      <Match keyed when={guidePage()}>
+        {(page) => <GuidePage page={page} />}
+      </Match>
+      <Match when={props.page === "compare"}>
+        <ComparisonIndexPage />
+      </Match>
+      <Match keyed when={comparisonPage()}>
+        {(page) => <ComparisonPage page={page} />}
+      </Match>
+      <Match when={props.page === "tools"}>
+        <ToolIndexPage />
+      </Match>
+      <Match keyed when={toolPage()}>
+        {() => <TransparencyCheckerPage />}
+      </Match>
+      <Match when={props.page === "privacy"}>
+        <PrivacyPage />
+      </Match>
+      <Match when={props.page === "terms"}>
+        <TermsPage />
+      </Match>
+    </Switch>
+  );
 };
 
 const App = () => {

@@ -23,6 +23,7 @@ const SITE_ROOT_FILES = [
   "og-image.png",
   "robots.txt",
   "site.webmanifest",
+  "theme-bootstrap.js",
 ] as const;
 
 const GENERATED_SITE_ROOT_FILES = ["sitemap.xml"] as const;

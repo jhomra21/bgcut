@@ -200,7 +200,14 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("view-transition-name");
   });
 
-  test("uses one symmetric two-phase route transition for every internal page", () => {
+  test("uses reactive page control flow for every internal route transition", () => {
+    expect(appSource).toContain('import { Match, Switch, createSignal, onSettled } from "solid-js"');
+    expect(appSource).toContain('<Switch fallback={<HomePage showIntro />}>');
+    expect(appSource).toContain('<Match when={props.page === "docs"}>');
+    expect(appSource).toContain('<Match keyed when={guidePage()}>');
+    expect(appSource).toContain('<Match keyed when={comparisonPage()}>');
+    expect(appSource).not.toContain('if (props.page === "docs")');
+    expect(appSource).not.toContain('if (props.page === "changelog")');
     expect(appSource).toContain("const ROUTE_FADE_MS = 75");
     expect(appSource).toContain('type RouteTransitionPhase = "idle" | "out" | "in"');
     expect(appSource).toContain('setRoutePhase("out")');

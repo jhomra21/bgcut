@@ -6,6 +6,12 @@ const themeSource = await Bun.file(new URL("./theme.ts", import.meta.url)).text(
 
 const indexHtml = await Bun.file(new URL("../../index.html", import.meta.url)).text();
 
+const staticHeaders = await Bun.file(new URL("../../public/_headers", import.meta.url)).text();
+
+const themeBootstrap = await Bun.file(
+  new URL("../../public/theme-bootstrap.js", import.meta.url),
+).text();
+
 const appSourceFiles: string[] = [];
 
 for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
@@ -80,6 +86,17 @@ describe("site design contract", () => {
     expect(styles).not.toContain("var(--canvas)");
     expect(styles).not.toContain("var(--surface)");
     expect(styles).not.toContain("var(--line)");
+  });
+
+  test("restores a saved theme without violating the hosted CSP", () => {
+    expect(indexHtml).toContain('<script src="/theme-bootstrap.js"></script>');
+    expect(indexHtml).not.toContain('window.localStorage.getItem("bgcut-theme")');
+    expect(themeBootstrap).toContain('window.localStorage.getItem("bgcut-theme")');
+    expect(themeBootstrap).toContain("document.documentElement.dataset.theme = storedTheme");
+    expect(themeSource).toContain("storedTheme()");
+    expect(themeSource).toContain("document.documentElement.dataset.theme = initialTheme");
+    expect(staticHeaders).toContain("script-src 'self' https://static.cloudflareinsights.com 'wasm-unsafe-eval'");
+    expect(staticHeaders).not.toContain("script-src 'unsafe-inline'");
   });
 
   test("keeps raw color values inside the CSS theme layer", () => {

@@ -14,6 +14,7 @@ const SITE_ROOT_FILES = [
   "robots.txt",
   "site.webmanifest",
   "sitemap.xml",
+  "theme-bootstrap.js",
 ] as const;
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {

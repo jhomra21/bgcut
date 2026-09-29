@@ -4,8 +4,21 @@ export type SiteTheme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "bgcut-theme";
 
+const storedTheme = (): SiteTheme | undefined => {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+
+    return stored === "light" || stored === "dark" ? stored : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const initialTheme: SiteTheme =
-  document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  storedTheme() ??
+  (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+
+document.documentElement.dataset.theme = initialTheme;
 
 const [theme, setTheme] = createSignal<SiteTheme>(initialTheme);
 
