@@ -310,7 +310,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain("Processing is sequential");
     expect(appSource).not.toContain("removeBackgrounds");
     expect(appSource).toContain("removeMany");
-    expect(appSource).not.toContain("createBgcut");
+    expect(appSource).toContain("Version 0.6 removes the top-level");
+    expect(appSource).toContain("createBgcut");
     expect(appSource).not.toContain("createSession");
     expect(appSource).toContain("BgcutRemovalResult");
     expect(appSource).toContain('import { BgcutError, bgcut } from "bgcut"');
