@@ -8,6 +8,7 @@ bgcut keeps user-facing package documentation in the root `README.md`. The hoste
 - [`operations/releasing.md`](operations/releasing.md): npm Trusted Publishing and the release process.
 - [`operations/search-console.md`](operations/search-console.md): Search Console, sitemap, route metadata, and Lighthouse checks.
 - [`operations/seo-keyword-map.md`](operations/seo-keyword-map.md): target queries, page ownership, article topics, comparisons, and adjacent tools.
+- [`operations/search-claims.md`](operations/search-claims.md): canonical public claims and the product changes that require a search-content review.
 
 ## Engineering
 
