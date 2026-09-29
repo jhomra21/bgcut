@@ -17,7 +17,9 @@ bgcut removes image backgrounds locally through the hosted browser app, packaged
 - Browser UI: interactive local removal and before/after inspection.
 - Local app: run `npx bgcut` or `bgcut` after a global install.
 - CLI: file-in/file-out automation.
-- Node API: application code and reusable sessions.
+- Node API: application code through a reusable bgcut instance.
+
+The hosted browser and local app run inference in the browser. The CLI and Node API use the native runtime. Reuse one Node API instance for repeated work and close it when finished.
 
 ## CLI quick reference
 
@@ -32,10 +34,15 @@ After a global install:
 ```sh
 bgcut photo.jpg
 bgcut photo.jpg -o portrait.png
+bgcut first.jpg second.png
+bgcut photos/
+bgcut photos/ -o ./cutouts
 bgcut photo.jpg --webp
 bgcut photo.jpg --gpu
 bgcut photo.jpg --cpu
 ```
+
+Directories are scanned recursively. Batch inference is sequential and reuses one warm runtime. In batch mode, `--output` names an output directory. Without it, each result is written next to its source image.
 
 Supported input formats: JPEG, PNG, WebP, AVIF.
 
@@ -44,7 +51,7 @@ Output formats:
 - WebP: lossless, transparent.
 - JPG/JPEG: white background because JPEG has no alpha channel.
 
-Automatic native engine selection tries WebGPU first and uses CPU if WebGPU session creation fails. Explicit `--gpu` does not silently fall back to CPU.
+Automatic native engine selection tries WebGPU first and uses CPU if the WebGPU runtime cannot start. Explicit `--gpu` does not silently fall back to CPU.
 
 ## Local app
 
@@ -66,37 +73,86 @@ Install:
 npm install bgcut
 ```
 
-One image:
+Open bgcut:
 
 ```ts
-import { removeBackground } from "bgcut";
+import { bgcut } from "bgcut";
 
-const result = await removeBackground("photo.jpg");
+const remover = await bgcut();
 ```
 
-Several images:
+Single image:
 
 ```ts
-import { createBgcut } from "bgcut";
+const result = await remover.removeBackground("photo.jpg");
+```
 
-const bgcut = await createBgcut();
+Multiple images:
 
-try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
-} finally {
-  await bgcut.close();
+```ts
+for await (const item of remover.removeMany([
+  "first.jpg",
+  "second.png",
+])) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  console.log(item.result);
 }
 ```
 
-Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+Directory:
 
-Engine values:
-- `auto`: try native WebGPU, then CPU if session creation fails.
+```ts
+for await (const item of remover.removeMany("photos")) {
+  // Recursive by default.
+}
+```
+
+Call `await remover.close()` when finished.
+
+`removeMany()` processes inputs sequentially and yields one result at a time. It accepts files, directories, iterables, and async iterables. Per-image failures are yielded with `ok: false` and do not stop later inputs.
+
+Single-image inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Output formats are `png`, `webp`, and `jpg`.
+
+Engine values for `bgcut({ engine })`:
+- `auto`: try native WebGPU, then CPU if runtime creation fails.
 - `gpu`: require native WebGPU.
 - `cpu`: require CPU.
 
 Public Node errors are `BgcutError`. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
+
+## Migrating from 0.5.x
+
+Version 0.6 removes the top-level `removeBackground()` and `createBgcut()` exports.
+
+Before, one image in 0.5.x:
+
+```ts
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg", {
+  engine: "cpu",
+  format: "webp",
+});
+```
+
+After, in 0.6:
+
+```ts
+import { bgcut } from "bgcut";
+
+const remover = await bgcut({ engine: "cpu" });
+try {
+  const result = await remover.removeBackground("photo.jpg", { format: "webp" });
+} finally {
+  await remover.close();
+}
+```
+
+Reusable `createBgcut().remove()` calls become `bgcut().removeBackground()`. For several inputs, prefer `removeMany()` instead of a manual sequential loop.
 
 ## Browser runtime
 

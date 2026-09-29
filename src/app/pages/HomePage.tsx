@@ -114,7 +114,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
     setResultState({ status: "processing" });
 
     void loadBrowserActions()
-      .then((actions) => actions.removeBrowserBackground(file))
+      .then((actions) => actions.removeBackground(file))
       .then((outcome) => {
         if (version !== selectionVersion) {
           return;

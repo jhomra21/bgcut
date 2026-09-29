@@ -135,7 +135,7 @@ try {
 
   if (
     !help.includes("bgcut serve") ||
-    !help.includes("bgcut <image>") ||
+    !help.includes("bgcut <image|directory>") ||
     !help.includes("Open the local bgcut web app")
   ) {
     throw new Error(`Installed bgcut binary returned unexpected help output:\n${help}`);
@@ -146,7 +146,7 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import('bgcut').then((module) => { if (typeof module.createBgcut !== 'function' || typeof module.removeBackground !== 'function' || typeof module.BgcutError !== 'function') process.exit(2) })",
+      "import('bgcut').then(async (module) => { if (typeof module.bgcut !== 'function' || typeof module.BgcutError !== 'function' || 'removeBackground' in module || 'createSession' in module || 'createBgcut' in module || 'removeBackgrounds' in module) process.exit(2); const remover = await module.bgcut({ engine: 'cpu' }); if (typeof remover.removeBackground !== 'function' || typeof remover.removeMany !== 'function' || typeof remover.close !== 'function') process.exit(3); await remover.close(); })",
     ],
     consumerDirectory,
   );
@@ -305,13 +305,43 @@ try {
     throw new Error(`Installed Node CLI did not complete a real CPU inference:\n${cliOutput}`);
   }
 
+  const batchInputDirectory = join(temporaryRoot, "batch-input");
+  const nestedBatchInputDirectory = join(batchInputDirectory, "nested");
+  const batchOutputDirectory = join(temporaryRoot, "batch-output");
+
+  await mkdir(nestedBatchInputDirectory, { recursive: true });
+  await Promise.all([
+    copyFile(inputPath, join(batchInputDirectory, "first.png")),
+    copyFile(inputPath, join(nestedBatchInputDirectory, "second.webp")),
+  ]);
+
+  const batchCliOutput = run(
+    binPath,
+    [batchInputDirectory, "--cpu", "-o", batchOutputDirectory],
+    consumerDirectory,
+    { env: smokeEnvironment },
+  );
+
+  const batchOutputPaths = [
+    join(batchOutputDirectory, "first-nobg.png"),
+    join(batchOutputDirectory, "nested", "second-nobg.png"),
+  ];
+
+  if (
+    (batchCliOutput.match(/✓ cpu/gu) ?? []).length !== 2 ||
+    (await stat(batchOutputPaths[0])).size <= 0 ||
+    (await stat(batchOutputPaths[1])).size <= 0
+  ) {
+    throw new Error(`Installed Node CLI did not complete recursive directory inference:\n${batchCliOutput}`);
+  }
+
   const apiSmokePath = join(consumerDirectory, "api-smoke.mjs");
   const apiOutputPath = join(temporaryRoot, "api-output.webp");
 
   await writeFile(
     apiSmokePath,
     `import { writeFile } from "node:fs/promises";
-import { BgcutError, createBgcut, removeBackground } from "bgcut";
+import { BgcutError, bgcut } from "bgcut";
 
 const expectBgcutError = async (operation, expectedCode, exitCode) => {
   let received;
@@ -332,63 +362,51 @@ const expectBgcutError = async (operation, expectedCode, exitCode) => {
 };
 
 const invalidImage = new Uint8Array([0, 1, 2, 3]);
-
-await expectBgcutError(
-  () => removeBackground(invalidImage, { engine: "cpu" }),
-  "input",
-  2,
-);
-
-const oneShot = await removeBackground(process.argv[2], {
-  engine: "cpu",
-  format: "png",
-});
-
-if (
-  oneShot.format !== "png" ||
-  oneShot.width !== 8 ||
-  oneShot.height !== 8 ||
-  oneShot.data.length === 0 ||
-  "engine" in oneShot ||
-  "timings" in oneShot ||
-  "fallbackReason" in oneShot
-) {
-  process.exit(3);
-}
-
-const bgcut = await createBgcut({ engine: "cpu" });
+const remover = await bgcut({ engine: "cpu" });
 
 try {
   await expectBgcutError(
-    () => bgcut.remove(invalidImage),
+    () => remover.removeBackground(invalidImage),
     "input",
-    4,
+    2,
   );
 
-  const first = await bgcut.remove(process.argv[2]);
-  const second = await bgcut.remove(process.argv[2], { format: "webp" });
+  const first = await remover.removeBackground(process.argv[2]);
+  const second = await remover.removeBackground(process.argv[2], {
+    format: "webp",
+  });
+
+  const many = [];
+
+  for await (const item of remover.removeMany([
+    process.argv[2],
+    process.argv[2],
+  ])) {
+    many.push(item);
+  }
 
   if (
-    bgcut.engine !== "cpu" ||
+    remover.engine !== "cpu" ||
     first.engine !== "cpu" ||
     second.engine !== "cpu" ||
     first.data.length === 0 ||
-    second.data.length === 0
+    second.data.length === 0 ||
+    many.length !== 2 ||
+    many.some((item) => !item.ok || item.result.engine !== "cpu")
   ) {
-    process.exit(5);
+    process.exit(3);
   }
 
-  await bgcut.close();
+  await writeFile(process.argv[3], second.data);
+  await remover.close();
 
   await expectBgcutError(
-    () => bgcut.remove(process.argv[2]),
+    () => remover.removeBackground(process.argv[2]),
     "closed",
-    6,
+    4,
   );
-
-  await writeFile(process.argv[3], second.data);
 } finally {
-  await bgcut.close();
+  await remover.close();
 }
 `,
   );
@@ -401,7 +419,7 @@ try {
   );
 
   if ((await stat(apiOutputPath)).size <= 0) {
-    throw new Error("Installed Node API did not complete reusable-session inference.");
+    throw new Error("Installed Node API did not complete reusable bgcut inference.");
   }
 
   const skillPath = join(consumerDirectory, "node_modules", "bgcut", "skills", "bgcut", "SKILL.md");
@@ -411,8 +429,9 @@ try {
     !skill.includes("name: bgcut") ||
     !skill.includes("npx bgcut input.jpg") ||
     !skill.includes("bgcut serve --json") ||
-    !skill.includes('import { removeBackground } from "bgcut"') ||
-    !skill.includes('import { createBgcut } from "bgcut"') ||
+    !skill.includes('import { bgcut } from "bgcut"') ||
+    !skill.includes("remover.removeBackground") ||
+    !skill.includes("remover.removeMany") ||
     !skill.includes("same operating-system cache directory") ||
     skill.includes("The installed CLI currently requires Bun.")
   ) {
@@ -420,7 +439,7 @@ try {
   }
 
   console.log(
-    `npm tarball consumer smoke passed for ${packedName}: Node CLI inference, local web app, cached model routes, public Node API errors, reusable Node API inference, and bundled skill.`,
+    `npm tarball consumer smoke passed for ${packedName}: single and recursive-directory Node CLI inference, local web app, cached model routes, public Node API errors, bgcut instance single and multi-image Node API inference, and bundled skill.`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });

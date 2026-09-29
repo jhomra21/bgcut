@@ -39,6 +39,19 @@ bunx bgcut
 
 The published executable is built for Node. Bun is used to develop and build the repository, but npm and npx users do not need Bun installed to run bgcut.
 
+## Choose an interface
+
+Use the interface that matches the job:
+
+| Interface | Use it when | Start with |
+| --- | --- | --- |
+| Hosted browser | You want to remove and inspect an image interactively without installing anything. | [bgcut.dev](https://bgcut.dev) |
+| Local app | You want the browser workflow from the npm package on your own loopback server. | `npx bgcut` |
+| CLI | You want file-in/file-out automation, shell scripts, or directory batches. | `npx bgcut photo.jpg` |
+| Node API | You are calling bgcut from application code and want to reuse one native runtime. | `import { bgcut } from "bgcut"` |
+
+The hosted browser and packaged local app process images in the browser. The CLI and Node API use the native runtime. For repeated Node work, open one bgcut instance, reuse it, and call `close()` when the work is done.
+
 ## Local app
 
 Running `bgcut` with no image starts the packaged bgcut web UI on `127.0.0.1` using an available port and opens it in your browser:
@@ -70,7 +83,7 @@ The local server only binds to the loopback interface. Its UI contains the bgcut
 
 ## CLI
 
-Passing an image keeps the headless file-in/file-out behavior:
+Pass one image to keep the existing file-in/file-out behavior:
 
 ```sh
 bgcut photo.jpg
@@ -82,7 +95,17 @@ The explicit command is also available:
 bgcut remove photo.jpg
 ```
 
-The default command writes a transparent PNG next to the input image. Choose the output path with `-o` or `--output`:
+Pass several files or a directory to process a batch:
+
+```sh
+bgcut first.jpg second.png
+bgcut photos/
+bgcut photos/ -o ./cutouts
+```
+
+Directory scans are recursive and include JPEG, PNG, WebP, and AVIF files. Batch inference is sequential and reuses one warm runtime. Without `--output`, each result is written next to its source image. In batch mode, `--output` names an output directory and preserves nested directory paths.
+
+For one input file, the default command writes a transparent PNG next to the input image. Choose the output file with `-o` or `--output`:
 
 ```sh
 bgcut photo.jpg -o portrait.png
@@ -116,7 +139,7 @@ The browser accepts JPEG, PNG, WebP, and AVIF.
 
 ### Engine selection
 
-Automatic mode tries native WebGPU first. If a WebGPU session cannot start, it uses the native CPU provider.
+Automatic mode tries native WebGPU first. If the WebGPU runtime cannot start, it uses the native CPU provider.
 
 ```sh
 bgcut photo.jpg
@@ -168,59 +191,178 @@ Install bgcut:
 npm install bgcut
 ```
 
-For one image, use `removeBackground()`. It creates the runtime, removes the background, and closes the runtime before returning:
+Create a bgcut instance once and use its methods:
 
 ```ts
-import { writeFile } from "node:fs/promises";
-import { removeBackground } from "bgcut";
+import { bgcut } from "bgcut";
 
-const result = await removeBackground("photo.jpg");
-await writeFile("photo-nobg.png", result.data);
-```
-
-Pass output format or engine preferences only when you need them:
-
-```ts
-const result = await removeBackground("photo.jpg", {
-  format: "webp",
-  engine: "cpu",
-});
-```
-
-For several images, create one bgcut instance and reuse its ONNX Runtime session:
-
-```ts
-import { writeFile } from "node:fs/promises";
-import { createBgcut } from "bgcut";
-
-const bgcut = await createBgcut();
+const remover = await bgcut();
 
 try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
-
-  await writeFile("first-nobg.png", first.data);
-  await writeFile("second-nobg.webp", second.data);
+  const result = await remover.removeBackground("photo.jpg");
 } finally {
-  await bgcut.close();
+  await remover.close();
 }
 ```
 
-`createBgcut({ engine: "gpu" })` requires native WebGPU, `engine: "cpu"` requires CPU, and the default `"auto"` mode falls back to CPU if the WebGPU session cannot start. Inputs can be file paths, `Uint8Array`, or `ArrayBuffer`.
+### Migrating from 0.5.x
 
-`removeBackground()` returns the encoded bytes, source width and height, and output format. The reusable `createBgcut()` path also exposes selected-engine, fallback, and timing diagnostics.
+Version 0.6 removes the top-level `removeBackground()` and `createBgcut()` exports. Open one instance with `bgcut()`, call methods on that instance, and close it when finished. Engine selection now belongs to `bgcut({ engine })`. Output format still belongs to each removal.
 
-Node API failures use one public error type:
+For one image, change the top-level call to an instance method.
+
+Before, in 0.5.x:
 
 ```ts
-import { BgcutError, removeBackground } from "bgcut";
+import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg", {
+  engine: "cpu",
+  format: "webp",
+});
+```
+
+After, in 0.6:
+
+```ts
+import { bgcut } from "bgcut";
+
+const remover = await bgcut({ engine: "cpu" });
 
 try {
-  await removeBackground("photo.jpg");
+  const result = await remover.removeBackground("photo.jpg", {
+    format: "webp",
+  });
+} finally {
+  await remover.close();
+}
+```
+
+For reusable work, `createBgcut().remove()` becomes `bgcut().removeBackground()`.
+
+Before, in 0.5.x:
+
+```ts
+import { createBgcut } from "bgcut";
+
+const remover = await createBgcut();
+
+try {
+  await remover.remove("first.jpg");
+  await remover.remove("second.jpg");
+} finally {
+  await remover.close();
+}
+```
+
+After, in 0.6:
+
+```ts
+import { bgcut } from "bgcut";
+
+const remover = await bgcut();
+
+try {
+  await remover.removeBackground("first.jpg");
+  await remover.removeBackground("second.jpg");
+} finally {
+  await remover.close();
+}
+```
+
+For a batch, prefer `removeMany()` instead of writing the sequential loop yourself. It accepts files, directories, iterables, and async iterables, and it reports per-image failures without stopping later inputs.
+
+### Single image
+
+Use `removeBackground()` on the instance:
+
+```ts
+const result = await remover.removeBackground("photo.jpg");
+```
+
+Choose an output format per image when needed:
+
+```ts
+const result = await remover.removeBackground("photo.jpg", {
+  format: "webp",
+});
+```
+
+Choose the execution engine when opening bgcut:
+
+```ts
+const remover = await bgcut({ engine: "cpu" });
+```
+
+### Multiple images
+
+Use `removeMany()` for several files, a directory, an iterable, or an async iterable:
+
+```ts
+for await (const item of remover.removeMany([
+  "first.jpg",
+  "second.png",
+])) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  console.log(item.source.input, item.result);
+}
+```
+
+Directory input works with the same method:
+
+```ts
+for await (const item of remover.removeMany("photos")) {
+  // Directories are recursive by default.
+}
+```
+
+`removeMany()` processes inputs sequentially and yields one result at a time. It keeps one warm runtime instead of decoding or inferring an entire batch at once. Per-image failures are yielded with `ok: false` and do not stop later images.
+
+Set `recursive: false` when a directory should include only its immediate image files:
+
+```ts
+for await (const item of remover.removeMany("photos", {
+  recursive: false,
+})) {
+  // ...
+}
+```
+
+### Inputs and results
+
+Single-image inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. `removeMany()` accepts one of those inputs or an iterable/async iterable of them.
+
+Supported image formats are JPEG, PNG, WebP, and AVIF. Output formats are `png`, `webp`, and `jpg`.
+
+Every successful removal includes encoded bytes, source dimensions, output format, selected engine, fallback reason, and timings.
+
+### Lifecycle and engines
+
+Always call `close()` when the instance is no longer needed.
+
+`bgcut({ engine: "gpu" })` requires native WebGPU. `bgcut({ engine: "cpu" })` requires CPU. The default `"auto"` mode tries WebGPU first and falls back to CPU if WebGPU runtime creation fails.
+
+### Errors
+
+Node API failures use `BgcutError`:
+
+```ts
+import { BgcutError, bgcut } from "bgcut";
+
+const remover = await bgcut();
+
+try {
+  await remover.removeBackground("photo.jpg");
 } catch (error) {
   if (error instanceof BgcutError) {
     console.error(error.code, error.message);
   }
+} finally {
+  await remover.close();
 }
 ```
 

@@ -46,6 +46,25 @@ export const DocsPage = () => (
             For headless removal, run <a href="#cli"><code>npx bgcut photo.jpg</code></a>.
             For application code, <a href="#node-api">install bgcut and use the Node API</a>.
           </p>
+          <h4>Choose an interface</h4>
+          <div class="spec-table" role="table" aria-label="bgcut interfaces">
+            <div class="spec-row" role="row">
+              <strong role="cell">Hosted browser</strong>
+              <span role="cell">Interactive removal and before/after inspection without an install.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Local app</strong>
+              <span role="cell">The browser workflow from the npm package on a loopback server.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">CLI</strong>
+              <span role="cell">File-in/file-out automation, shell scripts, and directory batches.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">Node API</strong>
+              <span role="cell">Application code that reuses one native runtime across removals.</span>
+            </div>
+          </div>
         </section>
 
         <section id="web-ui" class="reference-section doc-section">
@@ -109,15 +128,20 @@ bgcut serve --json`}
         <section id="cli" class="reference-section doc-section">
           <h3>CLI</h3>
           <p>
-            Pass one image path to run headless removal. By default, bgcut writes
-            <code>&lt;name&gt;-nobg.png</code> next to the input image. The explicit
-            <code>remove</code> command does the same thing.
+            Pass one image path for the existing file-in/file-out flow. Pass several files or a
+            directory for batch removal. Directory scans are recursive. Batch inference runs one
+            image at a time and reuses one warm runtime.
           </p>
           <CodeBlock
             language="shell"
             code={`bgcut photo.jpg
 bgcut remove photo.jpg
 bgcut photo.jpg -o portrait.png
+
+# several files or a directory
+bgcut first.jpg second.png
+bgcut photos/
+bgcut photos/ -o ./cutouts
 
 # output formats
 bgcut photo.jpg --png
@@ -131,7 +155,7 @@ bgcut photo.jpg --cpu`}
           <div class="spec-table" role="table" aria-label="CLI behavior">
             <div class="spec-row" role="row">
               <strong role="cell">Inputs</strong>
-              <span role="cell">JPEG, PNG, WebP, AVIF</span>
+              <span role="cell">JPEG, PNG, WebP, AVIF files; recursive directories</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Outputs</strong>
@@ -139,16 +163,18 @@ bgcut photo.jpg --cpu`}
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">Automatic engine</strong>
-              <span role="cell">Create a WebGPU session first, then use CPU if session creation fails</span>
+              <span role="cell">Start the WebGPU runtime first, then use CPU if it cannot start</span>
             </div>
             <div class="spec-row" role="row">
               <strong role="cell">GPU-only</strong>
-              <span role="cell"><code>--gpu</code> returns an error if the WebGPU session cannot start</span>
+              <span role="cell"><code>--gpu</code> returns an error if the WebGPU runtime cannot start</span>
             </div>
           </div>
           <p>
-            Sharp/libvips decodes the image from its contents, not from the filename extension.
-            bgcut also accepts <code>-png</code>, <code>-webp</code>, <code>-jpg</code>,
+            For a single file, <code>--output</code> names the output file. For a batch, it names
+            an output directory and preserves nested paths. Without <code>--output</code>, each
+            result is written next to its source image. Sharp/libvips decodes each image from its
+            contents, not from the filename extension. bgcut also accepts <code>-png</code>, <code>-webp</code>, <code>-jpg</code>,
             <code>-gpu</code>, and <code>-cpu</code>.
           </p>
         </section>
@@ -157,64 +183,183 @@ bgcut photo.jpg --cpu`}
           <h3>Node API</h3>
           <p>Install <code>bgcut</code> from npm:</p>
           <CodeBlock language="shell" code="npm install bgcut" />
-          <p>
-            For one image, use <code>removeBackground()</code>. It owns setup and cleanup for the
-            call and returns only the image result fields most callers need.
-          </p>
+
+          <div class="spec-table" role="table" aria-label="Node API">
+            <div class="spec-row" role="row">
+              <strong role="cell">bgcut(options?)</strong>
+              <span role="cell">Open a reusable bgcut instance. Close it when finished.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">remover.removeBackground(input, options?)</strong>
+              <span role="cell">Remove one image with the open instance.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">remover.removeMany(inputs, options?)</strong>
+              <span role="cell">Process files, directories, or iterables sequentially and stream per-image results.</span>
+            </div>
+            <div class="spec-row" role="row">
+              <strong role="cell">remover.close()</strong>
+              <span role="cell">Release the reusable native runtime.</span>
+            </div>
+          </div>
+
+          <h4>Open bgcut</h4>
           <CodeBlock
             language="typescript"
-            code={`import { writeFile } from "node:fs/promises";
-import { removeBackground } from "bgcut";
+            code={`import { bgcut } from "bgcut";
 
-const result = await removeBackground("photo.jpg");
-await writeFile("photo-nobg.png", result.data);`}
+const remover = await bgcut();
+
+try {
+  // Use remover.removeBackground() or remover.removeMany().
+} finally {
+  await remover.close();
+}`}
           />
 
-          <h4>One-shot options and result</h4>
+          <h4>Migrating from 0.5.x</h4>
           <p>
-            Pass <code>format</code> or <code>engine</code> only when you need to override the
-            defaults. Inputs can be a file path, <code>Uint8Array</code>, or
-            <code>ArrayBuffer</code>. Output formats are <code>png</code>, <code>webp</code>, and
-            <code>jpg</code>.
+            Version 0.6 removes the top-level <code>removeBackground()</code> and
+            <code>createBgcut()</code> exports. Open one instance with <code>bgcut()</code>, call
+            methods on that instance, and close it when finished. Choose the engine when opening
+            the instance. Choose the output format per removal.
           </p>
+          <p>One image in 0.5.x:</p>
           <CodeBlock
             language="typescript"
-            code={`const result = await removeBackground("photo.jpg", {
-  format: "webp",
+            code={`import { removeBackground } from "bgcut";
+
+const result = await removeBackground("photo.jpg", {
   engine: "cpu",
-});
-
-type RemoveBackgroundResult = {
-  data: Uint8Array;
-  width: number;
-  height: number;
-  format: "png" | "webp" | "jpg";
-};`}
+  format: "webp",
+});`}
           />
+          <p>The same call in 0.6:</p>
+          <CodeBlock
+            language="typescript"
+            code={`import { bgcut } from "bgcut";
 
-          <h4>Reusable session</h4>
-          <p>
-            When processing several images, create one bgcut instance so the ONNX Runtime session
-            stays warm across removals.
-          </p>
+const remover = await bgcut({ engine: "cpu" });
+
+try {
+  const result = await remover.removeBackground("photo.jpg", {
+    format: "webp",
+  });
+} finally {
+  await remover.close();
+}`}
+          />
+          <p>Reusable work in 0.5.x:</p>
           <CodeBlock
             language="typescript"
             code={`import { createBgcut } from "bgcut";
 
-const bgcut = await createBgcut();
+const remover = await createBgcut();
 
 try {
-  const first = await bgcut.remove("first.jpg");
-  const second = await bgcut.remove("second.jpg", { format: "webp" });
+  await remover.remove("first.jpg");
+  await remover.remove("second.jpg");
 } finally {
-  await bgcut.close();
+  await remover.close();
+}`}
+          />
+          <p>The same work in 0.6:</p>
+          <CodeBlock
+            language="typescript"
+            code={`import { bgcut } from "bgcut";
+
+const remover = await bgcut();
+
+try {
+  await remover.removeBackground("first.jpg");
+  await remover.removeBackground("second.jpg");
+} finally {
+  await remover.close();
 }`}
           />
           <p>
-            <code>createBgcut()</code> defaults to automatic engine selection. Use
-            <code>engine: "gpu"</code> to require native WebGPU or <code>engine: "cpu"</code> to
-            require CPU. The reusable instance also exposes the selected engine, fallback reason,
-            setup timings, and per-removal timings for callers that need runtime diagnostics.
+            For several inputs, prefer <code>removeMany()</code>. It accepts files, directories,
+            iterables, and async iterables. It yields each result as it finishes and keeps later
+            inputs running after an image-level failure.
+          </p>
+
+          <h4>Single image</h4>
+          <p>
+            Use <code>removeBackground()</code> on the bgcut instance. Choose the output format per
+            image when needed.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`const result = await remover.removeBackground("photo.jpg");
+
+const webp = await remover.removeBackground("photo.jpg", {
+  format: "webp",
+});`}
+          />
+
+          <h4>Multiple images</h4>
+          <p>
+            Use <code>removeMany()</code> for several files, a directory, an iterable, or an async
+            iterable. Results are yielded one at a time. Processing is sequential so one warm
+            runtime can be reused without decoding an entire batch up front.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`for await (const item of remover.removeMany([
+  "first.jpg",
+  "second.png",
+])) {
+  if (!item.ok) {
+    console.error(item.source.input, item.error);
+    continue;
+  }
+
+  console.log(item.source.input, item.result);
+}`}
+          />
+          <p>
+            Directory inputs are recursive by default. Pass <code>recursive: false</code> to
+            process only the immediate image files.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`for await (const item of remover.removeMany("photos", {
+  recursive: false,
+})) {
+  // ...
+}`}
+          />
+
+          <h4>Inputs and result</h4>
+          <p>
+            Single-image inputs can be a file path, <code>Uint8Array</code>, or
+            <code>ArrayBuffer</code>. <code>removeMany()</code> accepts one of those inputs or an
+            iterable/async iterable of them. Supported image formats are JPEG, PNG, WebP, and AVIF.
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`type BgcutRemovalResult = {
+  data: Uint8Array;
+  width: number;
+  height: number;
+  format: "png" | "webp" | "jpg";
+  engine: "webgpu" | "cpu";
+  fallbackReason: string | undefined;
+  timings: {
+    totalMs: number;
+    prepareMs: number;
+    inferenceMs: number;
+    encodeMs: number;
+  };
+};`}
+          />
+
+          <h4>Engines and lifecycle</h4>
+          <p>
+            Choose the engine when opening bgcut. <code>{"bgcut({ engine: \"gpu\" })"}</code>
+            requires native WebGPU, while <code>{"bgcut({ engine: \"cpu\" })"}</code> requires
+            CPU. The default <code>auto</code> mode tries WebGPU first and falls back to CPU if
+            runtime creation fails. Always call <code>close()</code> when finished.
           </p>
 
           <h4>Errors</h4>
@@ -224,14 +369,18 @@ try {
           </p>
           <CodeBlock
             language="typescript"
-            code={`import { BgcutError, removeBackground } from "bgcut";
+            code={`import { BgcutError, bgcut } from "bgcut";
+
+const remover = await bgcut();
 
 try {
-  await removeBackground("photo.jpg");
+  await remover.removeBackground("photo.jpg");
 } catch (error) {
   if (error instanceof BgcutError) {
     console.error(error.code, error.message);
   }
+} finally {
+  await remover.close();
 }`}
           />
           <p>
@@ -239,7 +388,6 @@ try {
             <code>inference</code>, <code>output</code>, and <code>closed</code>.
           </p>
         </section>
-
         <section id="model" class="reference-section doc-section">
           <h3>Model and runtime</h3>
           <p class="docs-section-summary">

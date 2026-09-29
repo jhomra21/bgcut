@@ -50,8 +50,9 @@ const TS_TYPES = new Set([
 
 const TS_FUNCTIONS = new Set([
   "console",
-  "createBgcut",
+  "bgcut",
   "removeBackground",
+  "removeMany",
   "writeFile",
 ]);
 
@@ -61,7 +62,7 @@ const shellPattern =
   /#.*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|--[a-z0-9-]+|-[a-z]\b|\b(?:bgcut|bunx|npm|npx)\b|\b\d+\b/giu;
 
 const typescriptPattern =
-  /\/\/.*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:await|catch|const|finally|from|if|import|instanceof|let|try|type)\b|\b(?:ArrayBuffer|BgcutError|RemoveBackgroundResult|Uint8Array|number|string)\b|\b(?:console|createBgcut|removeBackground|writeFile)\b|\b(?:false|null|true|undefined)\b|\b\d+(?:\.\d+)?\b/gu;
+  /\/\/.*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:await|catch|const|finally|from|if|import|instanceof|let|try|type)\b|\b(?:ArrayBuffer|BgcutError|RemoveBackgroundResult|Uint8Array|number|string)\b|\b(?:bgcut|console|removeBackground|removeMany|writeFile)\b|\b(?:false|null|true|undefined)\b|\b\d+(?:\.\d+)?\b/gu;
 
 const tokenKind = (value: string, language: CodeLanguage): TokenKind | undefined => {
   if (value.startsWith("#") || value.startsWith("//")) {

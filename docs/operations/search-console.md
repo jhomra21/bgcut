@@ -23,7 +23,7 @@ Use the Performance report to watch:
 - queries that show bgcut
 - pages receiving impressions
 - click-through rate by query and page
-- query terms around background removal, browser background removal, WebGPU, CLI, and Node.js APIs
+- query terms around background removal, browser background removal, WebGPU, CLI, and Node.js API
 
 Do not add repetitive keywords solely to chase impressions. Keep search language in visible headings and copy only when it accurately describes the page.
 
