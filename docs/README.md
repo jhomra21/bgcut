@@ -12,6 +12,8 @@ bgcut keeps user-facing package documentation in the root `README.md`. The hoste
 - [`operations/ai-search.md`](operations/ai-search.md): answer-engine questions, correction workflow, and AI-search baseline.
 - [`operations/seo-competitors.md`](operations/seo-competitors.md): competitor sources, query clusters, and weekly watch rules.
 - [`operations/seo-distribution.md`](operations/seo-distribution.md): directory targets and selective outreach rules.
+- [`operations/seo-reporting.md`](operations/seo-reporting.md): weekly and monthly search reporting.
+- [`marketing/seo-social.md`](marketing/seo-social.md): ready-to-post copy for the new search pages and tool.
 
 ## Engineering
 
