@@ -26,20 +26,25 @@ const PUBLIC_SITE_PATHS = new Set(
   PUBLIC_SITE_PAGES.map((page) => SITE_PAGE_METADATA[page].path),
 );
 
+const STATIC_ROUTE_REDIRECTS = new Map(
+  PUBLIC_SITE_PAGES
+    .filter((page) => page !== "home")
+    .map((page) => [`${SITE_PAGE_METADATA[page].path}.html`, SITE_PAGE_METADATA[page].path]),
+);
+
 const normalizedSitePath = (pathname: string): string =>
   pathname === "/" ? "/" : pathname.replace(/\/+$/u, "");
 
-const htmlNavigationResponse = (request: Request, url: URL): Response | undefined => {
-  if (
-    (request.method !== "GET" && request.method !== "HEAD") ||
-    !request.headers.get("accept")?.includes("text/html")
-  ) {
+const siteNavigationResponse = (request: Request, url: URL): Response | undefined => {
+  if (request.method !== "GET" && request.method !== "HEAD") {
     return undefined;
   }
 
-  if (url.pathname === "/index.html") {
+  const staticRoute = STATIC_ROUTE_REDIRECTS.get(url.pathname);
+
+  if (url.pathname === "/index.html" || staticRoute !== undefined) {
     const redirect = new URL(url);
-    redirect.pathname = "/";
+    redirect.pathname = staticRoute ?? "/";
 
     return Response.redirect(redirect, 308);
   }
@@ -54,6 +59,12 @@ const htmlNavigationResponse = (request: Request, url: URL): Response | undefine
       return Response.redirect(redirect, 308);
     }
 
+    return undefined;
+  }
+
+  const finalSegment = normalizedPath.split("/").at(-1) ?? "";
+
+  if (finalSegment.includes(".")) {
     return undefined;
   }
 
@@ -132,7 +143,7 @@ export default {
     const asset = resolveR2Asset(url.pathname);
 
     if (asset === undefined) {
-      const navigationResponse = htmlNavigationResponse(request, url);
+      const navigationResponse = siteNavigationResponse(request, url);
 
       if (navigationResponse !== undefined) {
         return navigationResponse;

@@ -19,9 +19,8 @@ const remoteRuntimeUploadSource = await Bun.file(
 ).text();
 
 describe("Cloudflare runtime routing", () => {
-  test("routes model and runtime assets through the Worker before SPA fallback", () => {
-    expect(wranglerConfig).toContain('"/models/*"');
-    expect(wranglerConfig).toContain('"/runtime/*"');
+  test("routes requests through the Worker before static asset fallback", () => {
+    expect(wranglerConfig).toContain('"run_worker_first": true');
   });
 
   test("serves both WASM binaries and the module loader from R2", () => {
@@ -66,6 +65,7 @@ describe("Cloudflare runtime routing", () => {
   test("returns canonical HTML routes instead of SPA soft 404s", () => {
     expect(workerSource).toContain("PUBLIC_SITE_PAGES");
     expect(workerSource).toContain("PUBLIC_SITE_PATHS");
+    expect(workerSource).toContain("STATIC_ROUTE_REDIRECTS");
     expect(workerSource).toContain('url.pathname === "/index.html"');
     expect(workerSource).toContain("Response.redirect(redirect, 308)");
     expect(workerSource).toContain('status: 404');
