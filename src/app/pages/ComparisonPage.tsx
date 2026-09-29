@@ -1,7 +1,6 @@
 import { For } from "@solidjs/web";
 
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
-
 import {
   COMPARISONS,
   COMPARISON_PAGE_IDS,

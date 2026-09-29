@@ -99,7 +99,6 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
         <a
           class="site-nav-changelog"
           href="/changelog"
-        aria-current={footerSectionIsCurrent(props.page, "changelog") ? "page" : undefined}
           aria-current={props.page === "changelog" ? "page" : undefined}
           onClick={(event) => {
             if (!shouldHandleInternalNavigation(event)) {
@@ -219,6 +218,7 @@ export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate
       </a>
       <a
         href="/changelog"
+        aria-current={footerSectionIsCurrent(props.page, "changelog") ? "page" : undefined}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
