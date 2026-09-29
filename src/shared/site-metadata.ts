@@ -5,6 +5,7 @@ import {
   pathForComparison,
   type ComparisonPageId,
 } from "./comparisons";
+import { SITE_TOOLS, TOOL_PAGE_IDS, isToolPage, type ToolPageId } from "./tools";
 import {
   GUIDES,
   GUIDE_PAGE_IDS,
@@ -18,10 +19,11 @@ export type CoreSitePage =
   | "changelog"
   | "guides"
   | "compare"
+  | "tools"
   | "privacy"
   | "terms";
 
-export type PublicSitePage = CoreSitePage | GuidePageId | ComparisonPageId;
+export type PublicSitePage = CoreSitePage | GuidePageId | ComparisonPageId | ToolPageId;
 
 export type SitePageMetadata = {
   readonly path: string;
@@ -66,6 +68,23 @@ const COMPARISON_SITE_METADATA = Object.fromEntries(
   }),
 ) as Record<ComparisonPageId, SitePageMetadata>;
 
+// SAFETY: TOOL_PAGE_IDS lists every ToolPageId, and each tuple uses the same page key.
+const TOOL_SITE_METADATA = Object.fromEntries(
+  TOOL_PAGE_IDS.map((page) => {
+    const tool = SITE_TOOLS[page];
+
+    return [
+      page,
+      {
+        path: `/tools/${tool.slug}`,
+        title: `${tool.title} - Free, Local Image Tool | bgcut`,
+        description: tool.description,
+        index: true,
+      },
+    ];
+  }),
+) as Record<ToolPageId, SitePageMetadata>;
+
 export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadata>> = {
   home: {
     path: "/",
@@ -102,6 +121,13 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
       "Compare bgcut with remove.bg, BG0, IMG.LY background removal, and rembg by deployment model, interfaces, privacy, and licensing.",
     index: true,
   },
+  tools: {
+    path: "/tools",
+    title: "Free Local Image Tools | bgcut",
+    description:
+      "Free browser image utilities from bgcut. Check transparency locally without uploading the source image.",
+    index: true,
+  },
   privacy: {
     path: "/privacy",
     title: "Privacy | bgcut",
@@ -118,6 +144,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
   },
   ...GUIDE_SITE_METADATA,
   ...COMPARISON_SITE_METADATA,
+  ...TOOL_SITE_METADATA,
 };
 
 export const PUBLIC_SITE_PAGES = [
@@ -128,6 +155,8 @@ export const PUBLIC_SITE_PAGES = [
   ...GUIDE_PAGE_IDS,
   "compare",
   ...COMPARISON_PAGE_IDS,
+  "tools",
+  ...TOOL_PAGE_IDS,
   "privacy",
   "terms",
 ] as const satisfies readonly PublicSitePage[];
@@ -175,6 +204,19 @@ const breadcrumbStructuredDataForPage = (page: PublicSitePage) => {
       "@type": "ListItem",
       position: 3,
       name: COMPARISONS[page].title,
+      item: url,
+    });
+  } else if (isToolPage(page)) {
+    items.push({
+      "@type": "ListItem",
+      position: 2,
+      name: "Tools",
+      item: `${SITE_ORIGIN}/tools`,
+    });
+    items.push({
+      "@type": "ListItem",
+      position: 3,
+      name: SITE_TOOLS[page].title,
       item: url,
     });
   } else if (page !== "home") {
@@ -236,6 +278,32 @@ export const structuredDataForPage = (page: PublicSitePage) => {
     };
   }
 
+  if (isToolPage(page)) {
+    const tool = SITE_TOOLS[page];
+
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": `${url}#app`,
+          name: tool.title,
+          url,
+          description: tool.description,
+          applicationCategory: "UtilityApplication",
+          operatingSystem: "Any",
+          isAccessibleForFree: true,
+          offers: {
+            "@type": "Offer",
+            price: "0",
+            priceCurrency: "USD",
+          },
+        },
+        breadcrumbStructuredDataForPage(page),
+      ],
+    };
+  }
+
   if (isGuidePage(page)) {
     const guide = GUIDES[page];
 
@@ -272,7 +340,7 @@ export const structuredDataForPage = (page: PublicSitePage) => {
     "@graph": [
       {
         "@type":
-          page === "changelog" || page === "guides" || page === "compare"
+          page === "changelog" || page === "guides" || page === "compare" || page === "tools"
             ? "CollectionPage"
             : "WebPage",
         "@id": `${url}#page`,

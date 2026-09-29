@@ -9,6 +9,7 @@ import {
   type Comparison,
 } from "../../src/shared/comparisons";
 import { GUIDES, GUIDE_PAGE_IDS, isGuidePage, type Guide } from "../../src/shared/guides";
+import { SITE_TOOLS, isToolPage } from "../../src/shared/tools";
 import {
   canonicalUrlForPage,
   INDEXED_SITE_PAGES,
@@ -60,6 +61,7 @@ const staticFooter = (): string => `<footer class="site-footer">
   </div>
   <nav class="site-footer-links" aria-label="Footer navigation">
     <a href="/guides">Guides</a>
+    <a href="/tools">Tools</a>
     <a href="/compare">Compare</a>
     <a href="/changelog">Changelog</a>
     <a href="/privacy">Privacy</a>
@@ -315,6 +317,42 @@ const staticComparison = (comparison: Comparison): string => {
   </main>`;
 };
 
+const staticToolIndex = (): string => `<main class="page-content legal-shell">
+  <article class="guide-page tool-index">
+    <p class="guide-kicker">Tools</p>
+    <h1>Free image tools</h1>
+    <p class="guide-summary">Small local utilities for checking image files before or after background removal.</p>
+    <div class="guide-list">
+      <a href="/tools/transparency-checker">
+        <strong>Image transparency checker</strong>
+        <span>Find fully transparent, partially transparent, and opaque pixels without uploading the image.</span>
+      </a>
+    </div>
+  </article>
+</main>`;
+
+const staticTransparencyChecker = (): string => `<main class="page-content legal-shell">
+  <article class="guide-page tool-page">
+    <p class="guide-kicker"><a href="/tools">Tools</a></p>
+    <h1>Image transparency checker</h1>
+    <p class="guide-summary">Check whether an image contains transparent or partially transparent pixels. The file is decoded and inspected in your browser. It is not uploaded to bgcut.</p>
+    <section>
+      <h2>Check an image</h2>
+      <p>Choose a PNG, JPEG, WebP, or AVIF image. JavaScript enables the local pixel checker on this page.</p>
+    </section>
+    <section>
+      <h2>What the result means</h2>
+      <p>A fully transparent pixel has alpha 0. A partially transparent pixel has alpha between 1 and 254. An opaque pixel has alpha 255.</p>
+      <p>PNG and WebP can store alpha transparency. JPEG cannot. AVIF can contain alpha when the encoded image includes it.</p>
+    </section>
+    <section>
+      <h2>Why check transparency</h2>
+      <p>A checker can confirm that a cutout really contains alpha instead of a white or checkerboard background baked into the pixels.</p>
+      <p>If you need to create a transparent cutout first, use the <a href="/">bgcut background remover</a>.</p>
+    </section>
+  </article>
+</main>`;
+
 const staticLegal = (page: "privacy" | "terms"): string => {
   const metadata = SITE_PAGE_METADATA[page];
   const heading = page === "privacy" ? "Privacy" : "Terms of Use";
@@ -354,6 +392,14 @@ const staticContentForPage = (page: PublicSitePage, changelogSource: string): st
 
   if (isComparisonPage(page)) {
     return staticComparison(COMPARISONS[page]);
+  }
+
+  if (page === "tools") {
+    return staticToolIndex();
+  }
+
+  if (isToolPage(page)) {
+    return staticTransparencyChecker();
   }
 
   return staticLegal(page);

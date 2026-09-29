@@ -165,6 +165,19 @@ export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
         Guides
       </a>
       <a
+        href="/tools"
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("tools");
+        }}
+      >
+        Tools
+      </a>
+      <a
         href="/compare"
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {

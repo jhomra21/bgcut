@@ -2,6 +2,7 @@ import { createSignal, onSettled } from "solid-js";
 
 import { isComparisonPage } from "../shared/comparisons";
 import { isGuidePage } from "../shared/guides";
+import { isToolPage } from "../shared/tools";
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
   currentPage,
@@ -21,6 +22,7 @@ import { HomePage } from "./pages/HomePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { applySiteMetadata } from "./site-metadata";
 import { TermsPage } from "./pages/TermsPage";
+import { ToolIndexPage, TransparencyCheckerPage } from "./pages/ToolPage";
 
 const isReferencePage = (page: SitePage): boolean =>
   page === "docs" || page === "changelog";
@@ -48,6 +50,14 @@ const PageContent = (props: { readonly page: SitePage }) => {
 
   if (isComparisonPage(props.page)) {
     return <ComparisonPage page={props.page} />;
+  }
+
+  if (props.page === "tools") {
+    return <ToolIndexPage />;
+  }
+
+  if (isToolPage(props.page)) {
+    return <TransparencyCheckerPage />;
   }
 
   if (props.page === "privacy") {

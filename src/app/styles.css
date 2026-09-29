@@ -1935,3 +1935,120 @@ figure {
   text-decoration-color: var(--border-link);
   text-underline-offset: 3px;
 }
+
+
+.tool-page .file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tool-drop {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  padding: 28px;
+  border: 1px dashed var(--border-drop);
+  border-radius: 10px;
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tool-drop:hover {
+  background: var(--background-hover);
+}
+
+.tool-drop strong {
+  font-size: 14px;
+}
+
+.tool-drop span,
+.tool-status {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.tool-status {
+  margin: 12px 0 0;
+}
+
+.tool-status-error {
+  color: var(--text-error);
+}
+
+.tool-result {
+  margin-top: 18px;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  background: var(--background-surface);
+}
+
+.tool-result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.tool-result-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.tool-result-head span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-stats {
+  margin: 0;
+}
+
+.tool-stats > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.4fr);
+  gap: 18px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tool-stats > div:last-child {
+  border-bottom: 0;
+}
+
+.tool-stats dt,
+.tool-stats dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tool-stats dt {
+  color: var(--text-muted);
+}
+
+.tool-stats dd {
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .tool-stats > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .tool-result-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
