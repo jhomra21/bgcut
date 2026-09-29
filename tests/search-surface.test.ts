@@ -61,7 +61,8 @@ describe("search and Lighthouse surface", () => {
     expect(metadataSource).toContain("bgcut Docs - Browser, CLI and Node.js Background Removal");
     expect(metadataSource).toContain("bgcut Changelog - Releases and API Changes");
     expect(metadataSource.match(/index: false/gu)?.length).toBe(2);
-    expect(routeBuilderSource).toContain('"docs", "changelog", "privacy", "terms"');
+    expect(metadataSource).toContain("PUBLIC_SITE_PAGES");
+    expect(routeBuilderSource).toContain("for (const page of PUBLIC_SITE_PAGES)");
   });
 
   test("keeps the sitemap focused on pages intended for Google Search", () => {

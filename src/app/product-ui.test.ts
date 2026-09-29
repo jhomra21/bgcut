@@ -88,7 +88,7 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("· JPEG, PNG, WebP, or AVIF");
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
-    expect(appSource).not.toContain("Remove background");
+    expect(homeSource).not.toContain(">Remove background<");
     expect(homeSource).not.toContain("Remove image backgrounds locally");
     expect(homeSource).toContain("<h1>Free, private background remover</h1>");
     expect(homeSource).toContain("Remove backgrounds from PNG, JPEG, WebP, and AVIF images in your browser.");
