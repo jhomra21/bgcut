@@ -26,10 +26,15 @@
   },
   "keywords": [
     "background-removal",
+    "background-remover",
     "image-processing",
     "webgpu",
+    "webassembly",
     "onnx",
+    "nodejs",
     "cli",
+    "batch-processing",
+    "privacy",
     "local-ai"
   ],
   "publishConfig": {
