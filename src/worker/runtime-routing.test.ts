@@ -58,8 +58,9 @@ describe("Cloudflare runtime routing", () => {
     expect(packageSource).toContain('"site:prepare-routes"');
     expect(cloudflareBuildSource).toContain('"llms.txt"');
     expect(cloudflareBuildSource).toContain('GENERATED_SITE_ROOT_FILES = ["sitemap.xml"]');
-    expect(cloudflareBuildSource).toContain('"docs.html"');
-    expect(cloudflareBuildSource).toContain('"changelog.html"');
+    expect(cloudflareBuildSource).toContain("PUBLIC_SITE_PAGES");
+    expect(cloudflareBuildSource).toContain("routeAssetName");
+    expect(cloudflareBuildSource).toContain("SITE_PAGE_METADATA[page].path");
   });
 
   test("returns canonical HTML routes instead of SPA soft 404s", () => {

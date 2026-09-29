@@ -119,16 +119,14 @@ describe("browser product UI", () => {
     expect(localBranch).not.toContain("<TermsPage");
   });
 
-  test("exposes docs plus footer-only legal pages without an about surface", () => {
-    expect(appSource).toContain('pathname === "/docs"');
-    expect(appSource).toContain('pathname === "/changelog"');
-    expect(appSource).toContain('pathname === "/privacy"');
-    expect(appSource).toContain('pathname === "/terms"');
+  test("exposes hosted routes from shared metadata without an about surface", () => {
+    expect(appSource).toContain("PUBLIC_SITE_PAGES");
+    expect(appSource).toContain("SITE_PAGE_METADATA");
+    expect(appSource).toContain("PAGE_BY_PATH");
     expect(appSource).toContain('href="/docs"');
     expect(appSource).toContain('href="/changelog"');
     expect(appSource).toContain('href="/privacy"');
     expect(appSource).toContain('href="/terms"');
-    expect(appSource).not.toContain('pathname === "/about"');
     expect(appSource).not.toContain('href="/about"');
     expect(appSource).not.toContain("AboutPage");
     expect(appSource).toContain("SiteFooter");
