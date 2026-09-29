@@ -1,6 +1,13 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
+import {
+  COMPARISONS,
+  COMPARISON_PAGE_IDS,
+  isComparisonPage,
+  pathForComparison,
+  type Comparison,
+} from "../../src/shared/comparisons";
 import { GUIDES, GUIDE_PAGE_IDS, isGuidePage, type Guide } from "../../src/shared/guides";
 import {
   canonicalUrlForPage,
@@ -53,6 +60,7 @@ const staticFooter = (): string => `<footer class="site-footer">
   </div>
   <nav class="site-footer-links" aria-label="Footer navigation">
     <a href="/guides">Guides</a>
+    <a href="/compare">Compare</a>
     <a href="/changelog">Changelog</a>
     <a href="/privacy">Privacy</a>
     <a href="/terms">Terms</a>
@@ -239,6 +247,74 @@ const staticGuide = (guide: Guide): string => {
   </main>`;
 };
 
+const staticComparisonIndex = (): string => {
+  const items = COMPARISON_PAGE_IDS.map((page) => {
+    const comparison = COMPARISONS[page];
+
+    return `<a href="${pathForComparison(comparison)}"><strong>${htmlEscape(comparison.title)}</strong><span>${htmlEscape(comparison.description)}</span></a>`;
+  }).join("");
+
+  return `<main class="page-content legal-shell">
+    <article class="guide-page comparison-index">
+      <p class="guide-kicker">Comparisons</p>
+      <h1>Background removal alternatives and comparisons</h1>
+      <p class="guide-summary">Factual comparisons based on documented interfaces, deployment models, and licenses. Quality and performance are left unranked unless a reproducible benchmark exists.</p>
+      <div class="guide-list">${items}</div>
+    </article>
+  </main>`;
+};
+
+const staticComparison = (comparison: Comparison): string => {
+  const rows = comparison.rows.map((row) => `<tr>
+    <th scope="row">${htmlEscape(row.label)}</th>
+    <td>${htmlEscape(row.bgcut)}</td>
+    <td>${htmlEscape(row.other)}</td>
+  </tr>`).join("");
+
+  const bgcutItems = comparison.chooseBgcut
+    .map((item) => `<li>${htmlEscape(item)}</li>`)
+    .join("");
+
+  const otherItems = comparison.chooseOther
+    .map((item) => `<li>${htmlEscape(item)}</li>`)
+    .join("");
+
+  const sections = comparison.sections.map((section) => {
+    const paragraphs = section.paragraphs
+      .map((paragraph) => `<p>${htmlEscape(paragraph)}</p>`)
+      .join("");
+
+    return `<section><h2>${htmlEscape(section.title)}</h2>${paragraphs}</section>`;
+  }).join("");
+
+  const sources = comparison.sources
+    .map((source) => `<li><a href="${htmlEscape(source.href)}">${htmlEscape(source.label)}</a></li>`)
+    .join("");
+
+  return `<main class="page-content legal-shell">
+    <article class="guide-page comparison-page">
+      <p class="guide-kicker"><a href="/compare">Comparisons</a></p>
+      <h1>${htmlEscape(comparison.title)}</h1>
+      <p class="guide-summary">${htmlEscape(comparison.intro)}</p>
+      <p class="guide-date">Facts checked <time datetime="${comparison.checkedAt}">${comparison.checkedAt}</time></p>
+      <div class="comparison-table-wrap">
+        <table class="comparison-table">
+          <thead><tr><th>Area</th><th>bgcut</th><th>${htmlEscape(comparison.otherName)}</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <section><h2>Choose bgcut when</h2><ul>${bgcutItems}</ul></section>
+      <section><h2>Choose ${htmlEscape(comparison.otherName)} when</h2><ul>${otherItems}</ul></section>
+      ${sections}
+      <section>
+        <h2>Sources</h2>
+        <p>External product facts above were checked on ${comparison.checkedAt}.</p>
+        <ul>${sources}</ul>
+      </section>
+    </article>
+  </main>`;
+};
+
 const staticLegal = (page: "privacy" | "terms"): string => {
   const metadata = SITE_PAGE_METADATA[page];
   const heading = page === "privacy" ? "Privacy" : "Terms of Use";
@@ -270,6 +346,14 @@ const staticContentForPage = (page: PublicSitePage, changelogSource: string): st
 
   if (isGuidePage(page)) {
     return staticGuide(GUIDES[page]);
+  }
+
+  if (page === "compare") {
+    return staticComparisonIndex();
+  }
+
+  if (isComparisonPage(page)) {
+    return staticComparison(COMPARISONS[page]);
   }
 
   return staticLegal(page);

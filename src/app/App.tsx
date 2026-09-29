@@ -1,5 +1,6 @@
 import { createSignal, onSettled } from "solid-js";
 
+import { isComparisonPage } from "../shared/comparisons";
 import { isGuidePage } from "../shared/guides";
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
@@ -13,6 +14,7 @@ import {
   type SitePage,
 } from "./navigation";
 import { ChangelogPage } from "./pages/ChangelogPage";
+import { ComparisonIndexPage, ComparisonPage } from "./pages/ComparisonPage";
 import { DocsPage } from "./pages/DocsPage";
 import { GuideIndexPage, GuidePage } from "./pages/GuidePage";
 import { HomePage } from "./pages/HomePage";
@@ -38,6 +40,14 @@ const PageContent = (props: { readonly page: SitePage }) => {
 
   if (isGuidePage(props.page)) {
     return <GuidePage page={props.page} />;
+  }
+
+  if (props.page === "compare") {
+    return <ComparisonIndexPage />;
+  }
+
+  if (isComparisonPage(props.page)) {
+    return <ComparisonPage page={props.page} />;
   }
 
   if (props.page === "privacy") {

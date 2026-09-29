@@ -1,4 +1,11 @@
 import {
+  COMPARISONS,
+  COMPARISON_PAGE_IDS,
+  isComparisonPage,
+  pathForComparison,
+  type ComparisonPageId,
+} from "./comparisons";
+import {
   GUIDES,
   GUIDE_PAGE_IDS,
   isGuidePage,
@@ -10,10 +17,11 @@ export type CoreSitePage =
   | "docs"
   | "changelog"
   | "guides"
+  | "compare"
   | "privacy"
   | "terms";
 
-export type PublicSitePage = CoreSitePage | GuidePageId;
+export type PublicSitePage = CoreSitePage | GuidePageId | ComparisonPageId;
 
 export type SitePageMetadata = {
   readonly path: string;
@@ -40,6 +48,23 @@ const GUIDE_SITE_METADATA = Object.fromEntries(
     ];
   }),
 ) as Record<GuidePageId, SitePageMetadata>;
+
+// SAFETY: COMPARISON_PAGE_IDS lists every ComparisonPageId, and each tuple uses the same page key.
+const COMPARISON_SITE_METADATA = Object.fromEntries(
+  COMPARISON_PAGE_IDS.map((page) => {
+    const comparison = COMPARISONS[page];
+
+    return [
+      page,
+      {
+        path: pathForComparison(comparison),
+        title: `${comparison.title} | bgcut`,
+        description: comparison.description,
+        index: true,
+      },
+    ];
+  }),
+) as Record<ComparisonPageId, SitePageMetadata>;
 
 export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadata>> = {
   home: {
@@ -70,6 +95,13 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
       "Practical guides to local background removal with browser WebGPU and WebAssembly, Node.js, CLI batches, image formats, and privacy checks.",
     index: true,
   },
+  compare: {
+    path: "/compare",
+    title: "Background Remover Alternatives and Comparisons | bgcut",
+    description:
+      "Compare bgcut with remove.bg, BG0, IMG.LY background removal, and rembg by deployment model, interfaces, privacy, and licensing.",
+    index: true,
+  },
   privacy: {
     path: "/privacy",
     title: "Privacy | bgcut",
@@ -85,6 +117,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     index: false,
   },
   ...GUIDE_SITE_METADATA,
+  ...COMPARISON_SITE_METADATA,
 };
 
 export const PUBLIC_SITE_PAGES = [
@@ -93,6 +126,8 @@ export const PUBLIC_SITE_PAGES = [
   "changelog",
   "guides",
   ...GUIDE_PAGE_IDS,
+  "compare",
+  ...COMPARISON_PAGE_IDS,
   "privacy",
   "terms",
 ] as const satisfies readonly PublicSitePage[];
@@ -127,6 +162,19 @@ const breadcrumbStructuredDataForPage = (page: PublicSitePage) => {
       "@type": "ListItem",
       position: 3,
       name: GUIDES[page].title,
+      item: url,
+    });
+  } else if (isComparisonPage(page)) {
+    items.push({
+      "@type": "ListItem",
+      position: 2,
+      name: "Comparisons",
+      item: `${SITE_ORIGIN}/compare`,
+    });
+    items.push({
+      "@type": "ListItem",
+      position: 3,
+      name: COMPARISONS[page].title,
       item: url,
     });
   } else if (page !== "home") {
@@ -224,7 +272,7 @@ export const structuredDataForPage = (page: PublicSitePage) => {
     "@graph": [
       {
         "@type":
-          page === "changelog" || page === "guides"
+          page === "changelog" || page === "guides" || page === "compare"
             ? "CollectionPage"
             : "WebPage",
         "@id": `${url}#page`,

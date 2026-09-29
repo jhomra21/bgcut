@@ -427,5 +427,10 @@ export const COMPARISONS: Readonly<Record<ComparisonPageId, Comparison>> = {
   },
 };
 
+export const pathForComparison = (comparison: Comparison): string =>
+  comparison.slug.startsWith("remove-bg")
+    ? `/${comparison.slug}`
+    : `/compare/${comparison.slug}`;
+
 export const isComparisonPage = (page: string): page is ComparisonPageId =>
   Object.hasOwn(COMPARISONS, page);

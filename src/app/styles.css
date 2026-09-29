@@ -1885,3 +1885,53 @@ figure {
     font-size: clamp(30px, 10vw, 42px);
   }
 }
+
+
+.comparison-table-wrap {
+  margin: 36px 0 8px;
+  overflow-x: auto;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+}
+
+.comparison-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  background: var(--background-surface);
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  border-right: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: left;
+  vertical-align: top;
+}
+
+.comparison-table th:last-child,
+.comparison-table td:last-child {
+  border-right: 0;
+}
+
+.comparison-table tr:last-child th,
+.comparison-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.comparison-table thead th,
+.comparison-table tbody th {
+  color: var(--text-table-heading);
+  font-weight: 680;
+}
+
+.comparison-page a {
+  color: var(--text-link);
+  text-decoration: underline;
+  text-decoration-color: var(--border-link);
+  text-underline-offset: 3px;
+}
