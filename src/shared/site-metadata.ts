@@ -31,6 +31,7 @@ export type SitePageMetadata = {
   readonly title: string;
   readonly description: string;
   readonly index: boolean;
+  readonly lastModified: string;
 };
 
 export const SITE_ORIGIN = "https://bgcut.dev";
@@ -47,6 +48,7 @@ const GUIDE_SITE_METADATA = Object.fromEntries(
         title: `${guide.title} | bgcut`,
         description: guide.description,
         index: true,
+        lastModified: guide.updatedAt,
       },
     ];
   }),
@@ -64,6 +66,7 @@ const COMPARISON_SITE_METADATA = Object.fromEntries(
         title: `${comparison.title} | bgcut`,
         description: comparison.description,
         index: true,
+        lastModified: comparison.checkedAt,
       },
     ];
   }),
@@ -81,6 +84,7 @@ const INTENT_SITE_METADATA = Object.fromEntries(
         title: `${content.title} | bgcut`,
         description: content.description,
         index: true,
+        lastModified: content.updatedAt,
       },
     ];
   }),
@@ -98,6 +102,7 @@ const TOOL_SITE_METADATA = Object.fromEntries(
         title: `${tool.title} - Free, Local Image Tool | bgcut`,
         description: tool.description,
         index: true,
+        lastModified: tool.updatedAt,
       },
     ];
   }),
@@ -110,6 +115,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Remove image backgrounds free in your browser. Images stay on your device, with WebGPU when available. No signup, credits, or image uploads to bgcut.",
     index: true,
+    lastModified: "2026-09-30",
   },
   docs: {
     path: "/docs",
@@ -117,6 +123,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Use bgcut in the browser, from the command line, or from Node.js. Learn local background removal, batch processing, engines, formats, and runtime behavior.",
     index: true,
+    lastModified: "2026-09-30",
   },
   changelog: {
     path: "/changelog",
@@ -124,6 +131,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Release notes for bgcut, including browser, CLI, Node.js API, performance, packaging, and background-removal changes.",
     index: true,
+    lastModified: "2026-09-30",
   },
   guides: {
     path: "/guides",
@@ -131,6 +139,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Practical guides to local background removal with browser WebGPU and WebAssembly, Node.js, CLI batches, image formats, and privacy checks.",
     index: true,
+    lastModified: "2026-09-30",
   },
   compare: {
     path: "/compare",
@@ -138,6 +147,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Compare bgcut with remove.bg, BG0, IMG.LY background removal, and rembg by deployment model, interfaces, privacy, and licensing.",
     index: true,
+    lastModified: "2026-09-30",
   },
   tools: {
     path: "/tools",
@@ -145,6 +155,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Free browser image utilities from bgcut. Check transparency locally without uploading the source image.",
     index: true,
+    lastModified: "2026-09-30",
   },
   privacy: {
     path: "/privacy",
@@ -152,6 +163,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "How bgcut processes images locally and what network requests the hosted site, CLI, local app, and Node.js API make.",
     index: false,
+    lastModified: "2026-09-30",
   },
   terms: {
     path: "/terms",
@@ -159,6 +171,7 @@ export const SITE_PAGE_METADATA: Readonly<Record<PublicSitePage, SitePageMetadat
     description:
       "Terms covering bgcut.dev, the bgcut software, third-party dependencies, and use of generated background-removal output.",
     index: false,
+    lastModified: "2026-09-30",
   },
   ...GUIDE_SITE_METADATA,
   ...COMPARISON_SITE_METADATA,

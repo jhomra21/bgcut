@@ -125,12 +125,20 @@ for (const page of PUBLIC_SITE_PAGES) {
 
   if (metadata.index) {
     check(
+      /^\d{4}-\d{2}-\d{2}$/u.test(metadata.lastModified),
+      `${metadata.path}: lastModified must use YYYY-MM-DD.`,
+    );
+    check(
       robotsContent?.startsWith("index, follow") === true,
       `${metadata.path}: indexable page must use index, follow.`,
     );
     check(
       sitemap.includes(`<loc>${canonical}</loc>`),
       `${metadata.path}: indexable page is missing from sitemap.xml.`,
+    );
+    check(
+      sitemap.includes(`<loc>${canonical}</loc>\n    <lastmod>${metadata.lastModified}</lastmod>`),
+      `${metadata.path}: sitemap lastmod does not match route metadata.`,
     );
 
     const existingTitlePath = seenTitles.get(metadata.title);
@@ -201,6 +209,15 @@ const sitemapEntries = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(
 check(
   sitemapEntries.length === INDEXED_SITE_PAGES.length,
   `sitemap.xml has ${sitemapEntries.length} URLs, expected ${INDEXED_SITE_PAGES.length}.`,
+);
+
+const sitemapLastModifiedEntries = [...sitemap.matchAll(/<lastmod>([^<]+)<\/lastmod>/gu)].map(
+  (match) => match[1],
+);
+
+check(
+  sitemapLastModifiedEntries.length === INDEXED_SITE_PAGES.length,
+  `sitemap.xml has ${sitemapLastModifiedEntries.length} lastmod values, expected ${INDEXED_SITE_PAGES.length}.`,
 );
 
 if (failures.length > 0) {

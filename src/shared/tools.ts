@@ -7,7 +7,10 @@ export type SiteTool = {
   readonly slug: string;
   readonly title: string;
   readonly description: string;
+  readonly updatedAt: string;
 };
+
+const updatedAt = "2026-09-30";
 
 export const SITE_TOOLS: Readonly<Record<ToolPageId, SiteTool>> = {
   "tool-transparency-checker": {
@@ -16,6 +19,7 @@ export const SITE_TOOLS: Readonly<Record<ToolPageId, SiteTool>> = {
     title: "Image transparency checker",
     description:
       "Check whether a PNG, WebP, JPEG, or AVIF image contains transparent or partially transparent pixels. The file stays in your browser.",
+    updatedAt,
   },
 };
 
