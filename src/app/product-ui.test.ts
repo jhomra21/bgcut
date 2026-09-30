@@ -29,6 +29,7 @@ const resourceNavigationSource = (
       "./components/ResourceNavRail.tsx",
       "./components/ResourcePage.tsx",
       "./pages/GuidePage.tsx",
+      "./pages/IntentPage.tsx",
       "./pages/ToolPage.tsx",
       "./pages/ComparisonPage.tsx",
     ].map((path) => Bun.file(new URL(path, import.meta.url)).text()),
