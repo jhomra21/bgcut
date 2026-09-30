@@ -25,6 +25,7 @@ const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url))
 const resourceNavigationSource = (
   await Promise.all(
     [
+      "../shared/resource-navigation.ts",
       "./components/ResourceNavRail.tsx",
       "./components/ResourcePage.tsx",
       "./pages/GuidePage.tsx",
@@ -234,10 +235,10 @@ describe("browser product UI", () => {
     expect(appSource).toContain("route-stage route-stage-");
     expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
     expect(appSource).toContain('<SiteFooter page={navPage()} onNavigate={navigate} />');
-    expect(appSource).toContain('label: "Explore bgcut"');
-    expect(appSource).toContain('href: "/guides", label: "Guides"');
-    expect(appSource).toContain('href: "/tools", label: "Tools"');
-    expect(appSource).toContain('href: "/compare", label: "Compare"');
+    expect(appSource).toContain('index === 0 ? "Explore bgcut" : group.label');
+    expect(resourceNavigationSource).toContain('{ page: "guides", label: "Guides" }');
+    expect(resourceNavigationSource).toContain('{ page: "tools", label: "Tools" }');
+    expect(resourceNavigationSource).toContain('{ page: "compare", label: "Compare" }');
     expect(resourceNavigationSource).toContain('class="section-rail resource-nav-rail"');
     expect(resourceNavigationSource).toContain('<div class="section-rail-page-title">Explore</div>');
     expect(resourceNavigationSource).toContain('page="guides" pageClass="guide-index"');

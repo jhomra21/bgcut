@@ -135,7 +135,7 @@ describe("site design contract", () => {
     expect(styles).toContain("padding-top: 24px");
     expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
     expect(styles).toContain(".section-rail-group");
-    expect(styles).toContain('.section-rail a[aria-current="location"]');
+    expect(styles).toContain(".section-rail a[aria-current]");
     expect(styles).toContain(".section-rail-label");
     expect(styles).toContain("max-height: calc(100vh - 118px)");
     expect(styles).not.toContain(".docs-page-header");
