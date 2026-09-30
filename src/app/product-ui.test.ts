@@ -190,9 +190,10 @@ describe("browser product UI", () => {
     expect(appSource).toContain("setNavPage(nextPage)");
     expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
     expect(appSource).toContain('class="site-header-shell site-header-shell-floating"');
-    expect(appSource).toContain('class="brand-link site-header-brand"');
+    expect(appSource).toContain('class="brand-link"');
     expect(appSource).not.toContain("isReferencePage");
     expect(appSource).not.toContain("site-header-shell-sticky");
+    expect(appSource).not.toContain("site-header-brand");
     expect(appSource).not.toContain("headerScrolled");
     expect(appSource).not.toContain("showPageContext");
     expect(appSource).not.toContain("site-page-context");

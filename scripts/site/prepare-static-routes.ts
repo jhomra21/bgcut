@@ -45,7 +45,7 @@ const staticHeader = (page: PublicSitePage): string => {
   const changelogCurrent = page === "changelog" ? ' aria-current="page"' : "";
 
   return `<header class="app-header">
-    <a class="brand-link site-header-brand" href="/" aria-label="bgcut home">
+    <a class="brand-link" href="/" aria-label="bgcut home">
       <div class="brand-title">
         <img class="brand-mark" src="/favicon-48x48.png?v=2" alt="" width="32" height="32" aria-hidden="true" />
         <span>bgcut</span>

@@ -113,11 +113,14 @@ describe("site design contract", () => {
     expect(styles).toContain(".site-header-shell-floating");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("pointer-events: none");
-    expect(styles).toContain(".site-header-brand");
-    expect(styles).toContain("background: var(--background-surface)");
-    expect(styles).toContain("0 8px 24px var(--shadow-floating)");
+    expect(styles).toContain(".site-header-shell-floating .brand-link");
+    expect(styles).not.toContain(".site-header-brand {");
+    expect(styles).toContain("background: var(--background-primary)");
+    expect(styles).not.toContain("0 8px 24px var(--shadow-floating)");
     expect(styles).not.toContain(".site-header-shell-sticky::before");
     expect(styles).not.toContain("width: 100vw;\n  background: var(--background-header)");
+    expect(styles).toContain(".site-nav");
+    expect(styles).toContain(".theme-toggle");
     expect(styles).toContain(".section-rail-page-title");
     expect(styles).toContain("font-size: 18px");
     expect(styles).toContain("font-weight: 760");

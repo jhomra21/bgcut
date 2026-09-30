@@ -211,7 +211,7 @@ figure {
   place-items: center;
   border: 1px solid var(--border-primary);
   border-radius: 10px;
-  background: var(--background-nav);
+  background: var(--background-primary);
   color: var(--text-muted);
   padding: 0;
   transition:
@@ -263,7 +263,7 @@ figure {
   padding: 3px;
   border: 1px solid var(--border-primary);
   border-radius: 10px;
-  background: var(--background-nav);
+  background: var(--background-primary);
 }
 
 .site-nav-indicator {
@@ -726,19 +726,9 @@ figure {
   pointer-events: none;
 }
 
-.site-header-shell-floating .site-header-brand,
+.site-header-shell-floating .brand-link,
 .site-header-shell-floating .header-controls {
   pointer-events: auto;
-}
-
-.site-header-brand {
-  padding: 5px 9px 5px 5px;
-  border: 1px solid var(--border-primary);
-  border-radius: 12px;
-  background: var(--background-surface);
-  box-shadow:
-    0 1px 2px var(--shadow-nav),
-    0 8px 24px var(--shadow-floating);
 }
 
 .route-stage {
@@ -1774,7 +1764,6 @@ figure {
     border-color: var(--border-high-contrast);
   }
 
-  .site-header-brand,
   .site-nav,
   .theme-toggle {
     background: var(--background-primary);
