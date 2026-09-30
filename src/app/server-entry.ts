@@ -4,15 +4,18 @@ import {
   renderToString,
 } from "@solidjs/web";
 
-import App from "./App";
+import App, { type AppProps } from "./App";
 import { SITE_HYDRATION_RENDER_ID } from "../shared/hydration";
 import type { SitePage } from "./navigation";
 
-export const renderHostedApp = (page: SitePage): string =>
-  renderToString(
-    () => createComponent(App, { initialPage: page, runtime: "hosted" }),
+export const renderHostedApp = (page: SitePage): string => {
+  const props: AppProps = { initialPage: page, runtime: "hosted" };
+
+  return renderToString(
+    () => createComponent(App, props),
     { renderId: SITE_HYDRATION_RENDER_ID },
   );
+};
 
 export const hydrationBootstrapSource = (): string => {
   const generated = generateHydrationScript({}).trim();
