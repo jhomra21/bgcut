@@ -10,6 +10,10 @@ import {
 } from "../../src/shared/comparisons";
 import { GUIDES, GUIDE_PAGE_IDS, isGuidePage, type Guide } from "../../src/shared/guides";
 import { INTENT_PAGES, isIntentPage, type IntentPage } from "../../src/shared/intent-pages";
+import {
+  RESOURCE_NAV_GROUPS,
+  resourceNavCurrent,
+} from "../../src/shared/resource-navigation";
 import { isToolPage } from "../../src/shared/tools";
 import {
   canonicalUrlForPage,
@@ -110,39 +114,53 @@ const staticFooter = (page: PublicSitePage): string => `<footer class="site-foot
   </nav>
 </footer>`;
 
-const staticExploreLinks = (
-  items: readonly { href: string; label: string }[],
-): string => items
-  .map((item) => `<a href="${item.href}">${htmlEscape(item.label)}</a>`)
-  .join("");
+const staticResourceNav = (page: PublicSitePage): string => {
+  const groups = RESOURCE_NAV_GROUPS.map((group) => {
+    const items = group.items.map((item) => {
+      const current = resourceNavCurrent(page, item.page);
+      const ariaCurrent = current === undefined ? "" : ` aria-current="${current}"`;
 
-const staticResourceRail = (
-  areaTitle: string,
-  allHref: string,
-  allLabel: string,
-  currentLabel: string,
-  sectionItems: readonly { id: string; label: string }[],
-  exploreItems: readonly { href: string; label: string }[],
-): string => {
-  const sections = sectionItems
-    .map((item, index) => `<a href="#${item.id}"${index === 0 ? ' aria-current="location"' : ""}>${htmlEscape(item.label)}</a>`)
-    .join("");
+      return `<a href="${SITE_PAGE_METADATA[item.page].path}"${ariaCurrent}>${htmlEscape(item.label)}</a>`;
+    }).join("");
 
-  return `<aside class="section-rail" aria-label="${htmlEscape(areaTitle)} navigation">
-    <div class="section-rail-page-title">${htmlEscape(areaTitle)}</div>
-    <div class="section-rail-group section-rail-link-group">
-      <a href="${allHref}">← ${htmlEscape(allLabel)}</a>
-    </div>
-    <div class="section-rail-group">
-      <span class="section-rail-label">${htmlEscape(currentLabel)}</span>
-      ${sections}
-    </div>
-    <div class="section-rail-group section-rail-link-group section-rail-link-group-divided">
-      <span class="section-rail-label">Explore bgcut</span>
-      ${staticExploreLinks(exploreItems)}
-    </div>
+    return `<div class="section-rail-group">
+      <span class="section-rail-label">${htmlEscape(group.label)}</span>
+      ${items}
+    </div>`;
+  }).join("");
+
+  return `<aside class="section-rail resource-nav-rail" aria-label="Explore bgcut">
+    <div class="section-rail-page-title">Explore</div>
+    ${groups}
   </aside>`;
 };
+
+const staticResourcePage = (
+  page: PublicSitePage,
+  pageClass: string,
+  content: string,
+): string => `<main class="page-content content-shell">
+  <div class="content-layout">
+    ${staticResourceNav(page)}
+    <article class="guide-page resource-content-page ${pageClass}">
+      ${content}
+    </article>
+  </div>
+</main>`;
+
+const staticDocsExplore = (): string => RESOURCE_NAV_GROUPS.map((group, index) => {
+  const items = group.items
+    .map((item) => `<a href="${SITE_PAGE_METADATA[item.page].path}">${htmlEscape(item.label)}</a>`)
+    .join("");
+
+  const label = index === 0 ? "Explore bgcut" : group.label;
+  const divided = index === 0 ? " section-rail-link-group-divided" : "";
+
+  return `<div class="section-rail-group section-rail-link-group${divided}">
+    <span class="section-rail-label">${htmlEscape(label)}</span>
+    ${items}
+  </div>`;
+}).join("");
 
 const staticHome = (): string => `<main class="page-content home-shell">
   <div class="home-intro">
@@ -174,7 +192,7 @@ const staticDocs = (): string => `<main class="page-content content-shell">
       <div class="section-rail-group"><span class="section-rail-label">Start</span><a href="#quickstart" aria-current="location">Quickstart</a></div>
       <div class="section-rail-group"><span class="section-rail-label">Use</span><a href="#web-ui">Web UI</a><a href="#local-app">Local app</a><a href="#cli">CLI</a><a href="#node-api">Node API</a></div>
       <div class="section-rail-group"><span class="section-rail-label">Reference</span><a href="#model">Model &amp; runtime</a><a href="#architecture">Architecture</a><a href="#resources">Resources</a></div>
-      <div class="section-rail-group section-rail-link-group section-rail-link-group-divided"><span class="section-rail-label">Explore bgcut</span><a href="/guides">Guides</a><a href="/tools">Tools</a><a href="/compare">Compare</a></div>
+      ${staticDocsExplore()}
     </aside>
   <article class="content-page reference-page docs-page">
     <section id="quickstart" class="reference-section doc-section">
@@ -307,17 +325,15 @@ const staticIntentPage = (content: IntentPage): string => {
     ? ""
     : `<a href="${content.guideHref}">Read the guide</a>`;
 
-  return `<main class="page-content legal-shell">
-    <article class="guide-page intent-page">
-      <h1>${htmlEscape(content.title)}</h1>
-      <p class="guide-summary">${htmlEscape(content.summary)}</p>
-      <div class="intent-actions">
-        <a class="intent-primary-link" href="${htmlEscape(content.ctaHref)}">${htmlEscape(content.ctaLabel)}</a>
-        ${guideLink}
-      </div>
-      ${sections}
-    </article>
-  </main>`;
+  const body = `<h1>${htmlEscape(content.title)}</h1>
+    <p class="guide-summary">${htmlEscape(content.summary)}</p>
+    <div class="intent-actions">
+      <a class="intent-primary-link" href="${htmlEscape(content.ctaHref)}">${htmlEscape(content.ctaLabel)}</a>
+      ${guideLink}
+    </div>
+    ${sections}`;
+
+  return staticResourcePage(content.page, "intent-page", body);
 };
 
 const staticGuideIndex = (): string => {
@@ -327,13 +343,11 @@ const staticGuideIndex = (): string => {
     return `<a href="/guides/${guide.slug}"><strong>${htmlEscape(guide.title)}</strong><span>${htmlEscape(guide.description)}</span></a>`;
   }).join("");
 
-  return `<main class="page-content legal-shell">
-    <article class="guide-page guide-index">
-      <h1>Local background removal guides</h1>
-      <p class="guide-summary">Practical notes for browser privacy, WebGPU and WebAssembly, Node.js, CLI batches, image formats, and the bgcut processing pipeline.</p>
-      <div class="guide-list">${items}</div>
-    </article>
-  </main>`;
+  const body = `<h1>Local background removal guides</h1>
+    <p class="guide-summary">Practical notes for browser privacy, WebGPU and WebAssembly, Node.js, CLI batches, image formats, and the bgcut processing pipeline.</p>
+    <div class="guide-list">${items}</div>`;
+
+  return staticResourcePage("guides", "guide-index", body);
 };
 
 const staticGuide = (guide: Guide): string => {
@@ -358,38 +372,17 @@ const staticGuide = (guide: Guide): string => {
     </section>`;
   }).join("");
 
-  const sectionItems = guide.sections.map((section) => ({
-    id: section.id,
-    label: section.title,
-  }));
+  const body = `${staticBreadcrumb("/guides", "Guides", guide.title)}
+    <h1>${htmlEscape(guide.title)}</h1>
+    <p class="guide-summary">${htmlEscape(guide.summary)}</p>
+    <p class="guide-date">Published <time datetime="${guide.publishedAt}">${guide.publishedAt}</time></p>
+    ${sections}
+    <nav class="guide-next" aria-label="Guide resources">
+      <a href="/">Use the background remover</a>
+      <a href="/docs">Read the bgcut docs</a>
+    </nav>`;
 
-  return `<main class="page-content content-shell">
-    <div class="content-layout">
-      ${staticResourceRail(
-        "Guides",
-        "/guides",
-        "All guides",
-        "This guide",
-        sectionItems,
-        [
-          { href: "/docs", label: "Docs" },
-          { href: "/tools", label: "Tools" },
-          { href: "/compare", label: "Compare" },
-        ],
-      )}
-    <article class="guide-page resource-content-page guide-detail-page">
-      ${staticBreadcrumb("/guides", "Guides", guide.title)}
-      <h1>${htmlEscape(guide.title)}</h1>
-      <p class="guide-summary">${htmlEscape(guide.summary)}</p>
-      <p class="guide-date">Published <time datetime="${guide.publishedAt}">${guide.publishedAt}</time></p>
-      ${sections}
-      <nav class="guide-next" aria-label="Guide resources">
-        <a href="/">Use the background remover</a>
-        <a href="/docs">Read the bgcut docs</a>
-      </nav>
-    </article>
-    </div>
-  </main>`;
+  return staticResourcePage(guide.page, "guide-detail-page", body);
 };
 
 const staticComparisonIndex = (): string => {
@@ -399,13 +392,11 @@ const staticComparisonIndex = (): string => {
     return `<a href="${pathForComparison(comparison)}"><strong>${htmlEscape(comparison.title)}</strong><span>${htmlEscape(comparison.description)}</span></a>`;
   }).join("");
 
-  return `<main class="page-content legal-shell">
-    <article class="guide-page comparison-index">
-      <h1>Background removal alternatives and comparisons</h1>
-      <p class="guide-summary">Factual comparisons based on documented interfaces, deployment models, and licenses. Quality and performance are left unranked unless a reproducible benchmark exists.</p>
-      <div class="guide-list">${items}</div>
-    </article>
-  </main>`;
+  const body = `<h1>Background removal alternatives and comparisons</h1>
+    <p class="guide-summary">Factual comparisons based on documented interfaces, deployment models, and licenses. Quality and performance are left unranked unless a reproducible benchmark exists.</p>
+    <div class="guide-list">${items}</div>`;
+
+  return staticResourcePage("compare", "comparison-index", body);
 };
 
 const staticComparison = (comparison: Comparison): string => {
@@ -437,87 +428,45 @@ const staticComparison = (comparison: Comparison): string => {
     .map((source) => `<li><a href="${htmlEscape(source.href)}">${htmlEscape(source.label)}</a></li>`)
     .join("");
 
-  const comparisonSectionItems = [
-    { id: "choose-bgcut", label: "Choose bgcut" },
-    { id: "choose-other", label: `Choose ${comparison.otherName}` },
-    ...comparison.sections.map((section) => ({
-      id: section.title.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, ""),
-      label: section.title,
-    })),
-    { id: "sources", label: "Sources" },
-  ];
-
-  return `<main class="page-content content-shell">
-    <div class="content-layout">
-      ${staticResourceRail(
-        "Compare",
-        "/compare",
-        "All comparisons",
-        "This comparison",
-        comparisonSectionItems,
-        [
-          { href: "/docs", label: "Docs" },
-          { href: "/guides", label: "Guides" },
-          { href: "/tools", label: "Tools" },
-        ],
-      )}
-    <article class="guide-page resource-content-page comparison-page">
-      ${staticBreadcrumb("/compare", "Compare", comparison.title)}
-      <h1>${htmlEscape(comparison.title)}</h1>
-      <p class="guide-summary">${htmlEscape(comparison.intro)}</p>
-      <p class="guide-date">Facts checked <time datetime="${comparison.checkedAt}">${comparison.checkedAt}</time></p>
-      <div class="comparison-table-wrap">
-        <table class="comparison-table">
-          <thead><tr><th>Area</th><th>bgcut</th><th>${htmlEscape(comparison.otherName)}</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      <section id="choose-bgcut"><h2>Choose bgcut when</h2><ul>${bgcutItems}</ul></section>
-      <section id="choose-other"><h2>Choose ${htmlEscape(comparison.otherName)} when</h2><ul>${otherItems}</ul></section>
-      ${sections}
-      <section id="sources">
-        <h2>Sources</h2>
-        <p>External product facts above were checked on ${comparison.checkedAt}.</p>
-        <ul>${sources}</ul>
-      </section>
-    </article>
+  const body = `${staticBreadcrumb("/compare", "Compare", comparison.title)}
+    <h1>${htmlEscape(comparison.title)}</h1>
+    <p class="guide-summary">${htmlEscape(comparison.intro)}</p>
+    <p class="guide-date">Facts checked <time datetime="${comparison.checkedAt}">${comparison.checkedAt}</time></p>
+    <div class="comparison-table-wrap">
+      <table class="comparison-table">
+        <thead><tr><th>Area</th><th>bgcut</th><th>${htmlEscape(comparison.otherName)}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
-  </main>`;
+    <section id="choose-bgcut"><h2>Choose bgcut when</h2><ul>${bgcutItems}</ul></section>
+    <section id="choose-other"><h2>Choose ${htmlEscape(comparison.otherName)} when</h2><ul>${otherItems}</ul></section>
+    ${sections}
+    <section id="sources">
+      <h2>Sources</h2>
+      <p>External product facts above were checked on ${comparison.checkedAt}.</p>
+      <ul>${sources}</ul>
+    </section>`;
+
+  return staticResourcePage(comparison.page, "comparison-page", body);
 };
 
-const staticToolIndex = (): string => `<main class="page-content legal-shell">
-  <article class="guide-page tool-index">
-    <h1>Free image tools</h1>
+const staticToolIndex = (): string => staticResourcePage(
+  "tools",
+  "tool-index",
+  `<h1>Free image tools</h1>
     <p class="guide-summary">Small local utilities for checking image files before or after background removal.</p>
     <div class="guide-list">
       <a href="/tools/transparency-checker">
         <strong>Image transparency checker</strong>
         <span>Find fully transparent, partially transparent, and opaque pixels without uploading the image.</span>
       </a>
-    </div>
-  </article>
-</main>`;
+    </div>`,
+);
 
-const staticTransparencyChecker = (): string => `<main class="page-content content-shell">
-  <div class="content-layout">
-    ${staticResourceRail(
-      "Tools",
-      "/tools",
-      "All tools",
-      "This tool",
-      [
-        { id: "check-image", label: "Check an image" },
-        { id: "result-meaning", label: "What the result means" },
-        { id: "why-check", label: "Why check transparency" },
-      ],
-      [
-        { href: "/docs", label: "Docs" },
-        { href: "/guides", label: "Guides" },
-        { href: "/compare", label: "Compare" },
-      ],
-    )}
-  <article class="guide-page resource-content-page tool-page">
-    ${staticBreadcrumb("/tools", "Tools", "Image transparency checker")}
+const staticTransparencyChecker = (): string => staticResourcePage(
+  "tool-transparency-checker",
+  "tool-page",
+  `${staticBreadcrumb("/tools", "Tools", "Image transparency checker")}
     <h1>Image transparency checker</h1>
     <p class="guide-summary">Check whether an image contains transparent or partially transparent pixels. The file is decoded and inspected in your browser. It is not uploaded to bgcut.</p>
     <section id="check-image">
@@ -533,10 +482,8 @@ const staticTransparencyChecker = (): string => `<main class="page-content conte
       <h2>Why check transparency</h2>
       <p>A checker can confirm that a cutout really contains alpha instead of a white or checkerboard background baked into the pixels.</p>
       <p>If you need to create a transparent cutout first, use the <a href="/">bgcut background remover</a>.</p>
-    </section>
-  </article>
-  </div>
-</main>`;
+    </section>`,
+);
 
 const staticLegal = (page: "privacy" | "terms"): string => {
   const metadata = SITE_PAGE_METADATA[page];
