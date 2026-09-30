@@ -609,11 +609,14 @@ const renderPageHtml = (
 };
 
 const renderSitemap = (): string => {
-  const urls = INDEXED_SITE_PAGES.map(
-    (page) => `  <url>
+  const urls = INDEXED_SITE_PAGES.map((page) => {
+    const metadata = SITE_PAGE_METADATA[page];
+
+    return `  <url>
     <loc>${canonicalUrlForPage(page)}</loc>
-  </url>`,
-  ).join("\n");
+    <lastmod>${metadata.lastModified}</lastmod>
+  </url>`;
+  }).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

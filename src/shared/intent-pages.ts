@@ -25,6 +25,7 @@ export type IntentPage = {
   readonly slug: string;
   readonly title: string;
   readonly description: string;
+  readonly updatedAt: string;
   readonly summary: string;
   readonly ctaLabel: string;
   readonly ctaHref: string;
@@ -32,11 +33,14 @@ export type IntentPage = {
   readonly guideHref?: string;
 };
 
+const updatedAt = "2026-09-30";
+
 export const INTENT_PAGES: Readonly<Record<IntentPageId, IntentPage>> = {
   "intent-private-background-remover": {
     page: "intent-private-background-remover",
     slug: "private-background-remover",
     title: "Private background remover with no image upload",
+    updatedAt,
     description:
       "Remove image backgrounds locally in your browser. bgcut keeps source images, decoded pixels, masks, and results on your device instead of sending them to an inference backend.",
     summary:
@@ -72,6 +76,7 @@ export const INTENT_PAGES: Readonly<Record<IntentPageId, IntentPage>> = {
     page: "intent-node-background-removal",
     slug: "node-background-removal",
     title: "Node.js background removal that runs locally",
+    updatedAt,
     description:
       "Remove image backgrounds from Node.js with the bgcut package. Reuse one local runtime for single images, batches, directories, and streamed input.",
     summary:
@@ -119,6 +124,7 @@ try {
     page: "intent-background-removal-cli",
     slug: "background-removal-cli",
     title: "Background removal CLI for local image processing",
+    updatedAt,
     description:
       "Remove image backgrounds from the command line with bgcut. Process one file, several files, or directories locally with PNG, WebP, or JPEG output.",
     summary:
@@ -163,6 +169,7 @@ npx bgcut photo.jpg --cpu`,
     page: "intent-batch-background-remover",
     slug: "batch-background-remover",
     title: "Batch background remover for files and folders",
+    updatedAt,
     description:
       "Remove backgrounds from multiple images or recursive directories with bgcut. Reuse one warm local runtime from the CLI or Node.js API.",
     summary:
@@ -219,6 +226,7 @@ try {
     page: "intent-open-source-background-remover",
     slug: "open-source-background-remover",
     title: "Open-source local background remover",
+    updatedAt,
     description:
       "bgcut is an MIT-licensed background remover with a local browser app, CLI, and Node.js API. Inspect the source, run inference locally, and automate it without a hosted bgcut API.",
     summary:
