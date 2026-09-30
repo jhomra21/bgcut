@@ -14,11 +14,17 @@ import {
 import { SITE_HYDRATION_RENDER_ID } from "../../src/shared/hydration";
 
 const root = resolve(import.meta.dir, "../..");
+
 const distDirectory = resolve(root, "dist");
+
 const ssrDirectory = resolve(root, ".site-ssr");
+
 const ssrEntryPath = resolve(ssrDirectory, "server-entry.mjs");
+
 const clientTemplatePath = resolve(distDirectory, "index.html");
+
 const hydrationAssetName = "solid-hydration.js";
+
 const hydrationAssetPath = resolve(distDirectory, hydrationAssetName);
 
 type ServerRenderer = {
@@ -55,7 +61,30 @@ const buildServerRenderer = async (): Promise<ServerRenderer> => {
     },
   });
 
-  return import(pathToFileURL(ssrEntryPath).href) as Promise<ServerRenderer>;
+  try {
+    // SAFETY: the SSR build has one controlled entry and exports the ServerRenderer contract below.
+    return await import(pathToFileURL(ssrEntryPath).href) as ServerRenderer;
+  } catch (error) {
+    const stack = error instanceof Error ? error.stack ?? "" : String(error);
+    const location = /server-entry\.mjs:(\d+):\d+/u.exec(stack);
+    const lineNumber = location === null ? undefined : Number(location[1]);
+
+    if (lineNumber !== undefined) {
+      const source = await readFile(ssrEntryPath, "utf8");
+      const lines = source.split("\n");
+      const start = Math.max(0, lineNumber - 6);
+      const end = Math.min(lines.length, lineNumber + 5);
+
+      console.error(
+        `SSR bundle context around line ${lineNumber}:\n${lines
+          .slice(start, end)
+          .map((line, index) => `${start + index + 1}: ${line}`)
+          .join("\n")}`,
+      );
+    }
+
+    throw error;
+  }
 };
 
 const renderPageHtml = (
@@ -64,6 +93,7 @@ const renderPageHtml = (
   appHtml: string,
 ): string => {
   const metadata = SITE_PAGE_METADATA[page];
+
   const canonicalUrl = canonicalUrlForPage(page);
   const robots = metadata.index
     ? "index, follow, max-image-preview:large"

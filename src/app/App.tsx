@@ -96,6 +96,7 @@ const App = (props: AppProps = {}) => {
   }
 
   const initialPage = props.initialPage ?? currentPage();
+
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [navPage, setNavPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
