@@ -4,16 +4,12 @@ const appSourcePaths = [
   "./App.tsx",
   "./components/CodeBlock.tsx",
   "./components/ReferencePage.tsx",
-  "./components/ResourceRailPage.tsx",
   "./components/SectionRail.tsx",
   "./components/SiteChrome.tsx",
   "./navigation.ts",
   "./pages/HomePage.tsx",
   "./pages/ChangelogPage.tsx",
   "./pages/DocsPage.tsx",
-  "./pages/GuidePage.tsx",
-  "./pages/ToolPage.tsx",
-  "./pages/ComparisonPage.tsx",
   "./pages/PrivacyPage.tsx",
   "./pages/TermsPage.tsx",
 ] as const;
@@ -25,6 +21,17 @@ const appSource = (
 ).join("\n");
 
 const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
+
+const resourceNavigationSource = (
+  await Promise.all(
+    [
+      "./components/ResourceRailPage.tsx",
+      "./pages/GuidePage.tsx",
+      "./pages/ToolPage.tsx",
+      "./pages/ComparisonPage.tsx",
+    ].map((path) => Bun.file(new URL(path, import.meta.url)).text()),
+  )
+).join("\n");
 
 const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
@@ -230,10 +237,10 @@ describe("browser product UI", () => {
     expect(appSource).toContain('href: "/guides", label: "Guides"');
     expect(appSource).toContain('href: "/tools", label: "Tools"');
     expect(appSource).toContain('href: "/compare", label: "Compare"');
-    expect(appSource).toContain('pageTitleElement="div"');
-    expect(appSource).toContain('label: "This guide"');
-    expect(appSource).toContain('label: "This tool"');
-    expect(appSource).toContain('label: "This comparison"');
+    expect(resourceNavigationSource).toContain('pageTitleElement="div"');
+    expect(resourceNavigationSource).toContain('label: "This guide"');
+    expect(resourceNavigationSource).toContain('label: "This tool"');
+    expect(resourceNavigationSource).toContain('label: "This comparison"');
   });
 
   test("keeps docs and changelog on one shared reference-page shell", () => {
