@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { SITE_HYDRATION_RENDER_ID } from "../../src/shared/hydration";
 import {
   INDEXED_SITE_PAGES,
   PUBLIC_SITE_PAGES,
@@ -96,6 +97,12 @@ for (const page of PUBLIC_SITE_PAGES) {
 
   const h1Count = html.match(/<h1(?:\s[^>]*)?>/gu)?.length ?? 0;
 
+  const hydrationMarker =
+    `data-bgcut-hydrate="${SITE_HYDRATION_RENDER_ID}"`;
+
+  const hydrationBootstrap =
+    '<script src="/solid-hydration.js"></script>';
+
   const structuredData = matchContent(
     html,
     /<script\s+id="site-structured-data"\s+type="application\/ld\+json">([\s\S]*?)<\/script>/u,
@@ -112,6 +119,14 @@ for (const page of PUBLIC_SITE_PAGES) {
   );
   check(ogUrl === canonical, `${metadata.path}: og:url does not match canonical.`);
   check(h1Count === 1, `${metadata.path}: expected one static h1, found ${h1Count}.`);
+  check(
+    html.includes(hydrationMarker),
+    `${metadata.path}: prerendered root is missing its hydration marker.`,
+  );
+  check(
+    html.includes(hydrationBootstrap),
+    `${metadata.path}: Solid hydration bootstrap is missing.`,
+  );
   check(structuredData !== undefined, `${metadata.path}: structured data is missing.`);
 
   if (structuredData !== undefined) {

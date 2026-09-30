@@ -26,7 +26,7 @@ const SITE_ROOT_FILES = [
   "theme-bootstrap.js",
 ] as const;
 
-const GENERATED_SITE_ROOT_FILES = ["sitemap.xml"] as const;
+const GENERATED_SITE_ROOT_FILES = ["sitemap.xml", "solid-hydration.js"] as const;
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {
   const entries = await readdir(directory, { withFileTypes: true });
