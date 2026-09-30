@@ -4,7 +4,6 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-09-18",
   "workers_dev": true,
-  // Keep per-commit preview URLs enabled for pull-request browser acceptance.
   "preview_urls": true,
   "build": {
     "command": "bun run build:cloudflare"
@@ -27,6 +26,15 @@
       "bucket_name": "bgcut-models"
     }
   ],
+  "previews": {
+    // Preview deployments only read immutable model/runtime artifacts from this bucket.
+    "r2_buckets": [
+      {
+        "binding": "MODELS",
+        "bucket_name": "bgcut-models"
+      }
+    ]
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
