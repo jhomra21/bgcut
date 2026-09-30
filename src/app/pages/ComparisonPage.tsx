@@ -1,8 +1,7 @@
 import { For } from "@solidjs/web";
 
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
-import { ResourceRailPage } from "../components/ResourceRailPage";
-import type { SectionRailGroup, SectionRailLinkGroup } from "../components/SectionRail";
+import { ResourcePage } from "../components/ResourcePage";
 import {
   COMPARISONS,
   COMPARISON_PAGE_IDS,
@@ -21,21 +20,8 @@ const sectionId = (title: string): string =>
     .replace(/[^a-z0-9]+/gu, "-")
     .replace(/^-|-$/gu, "");
 
-const COMPARISON_EXPLORE_LINKS: readonly SectionRailLinkGroup[] = [
-  {
-    label: "Explore bgcut",
-    divided: true,
-    items: [
-      { href: "/docs", label: "Docs" },
-      { href: "/guides", label: "Guides" },
-      { href: "/tools", label: "Tools" },
-    ],
-  },
-];
-
 export const ComparisonIndexPage = () => (
-  <main class="page-content legal-shell">
-    <article class="guide-page comparison-index">
+  <ResourcePage page="compare" pageClass="comparison-index">
       <h1>Background removal alternatives and comparisons</h1>
       <p class="guide-summary">
         Factual comparisons based on documented interfaces, deployment models, and licenses.
@@ -56,41 +42,14 @@ export const ComparisonIndexPage = () => (
           }}
         </For>
       </div>
-    </article>
-  </main>
+  </ResourcePage>
 );
 
 export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
   const comparison = (): Comparison => COMPARISONS[props.page];
 
-  const railGroups = (): readonly SectionRailGroup[] => [
-    {
-      label: "This comparison",
-      items: [
-        { id: "choose-bgcut", label: "Choose bgcut" },
-        { id: "choose-other", label: `Choose ${comparison().otherName}` },
-        ...comparison().sections.map((section) => ({
-          id: sectionId(section.title),
-          label: section.title,
-        })),
-        { id: "sources", label: "Sources" },
-      ],
-    },
-  ];
-
   return (
-    <ResourceRailPage
-      areaTitle="Compare"
-      allHref="/compare"
-      allLabel="All comparisons"
-      railAriaLabel="Comparison navigation"
-      groups={railGroups()}
-      initialSectionId="choose-bgcut"
-      sectionSelector=".resource-content-page > section[id]"
-      bottomSectionId="sources"
-      exploreLinks={COMPARISON_EXPLORE_LINKS}
-      pageClass="comparison-page"
-    >
+    <ResourcePage page={props.page} pageClass="comparison-page">
         <ContentBreadcrumb
           parentHref="/compare"
           parentLabel="Compare"
@@ -161,6 +120,6 @@ export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
             </For>
           </ul>
         </section>
-    </ResourceRailPage>
+    </ResourcePage>
   );
 };

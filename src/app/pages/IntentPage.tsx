@@ -2,13 +2,13 @@ import { For, Show } from "@solidjs/web";
 
 import { INTENT_PAGES, type IntentPage, type IntentPageId } from "../../shared/intent-pages";
 import { CodeBlock } from "../components/CodeBlock";
+import { ResourcePage } from "../components/ResourcePage";
 
 export const IntentPageView = (props: { readonly page: IntentPageId }) => {
   const content = (): IntentPage => INTENT_PAGES[props.page];
 
   return (
-    <main class="page-content legal-shell">
-      <article class="guide-page intent-page">
+    <ResourcePage page={props.page} pageClass="intent-page">
         <h1>{content().title}</h1>
         <p class="guide-summary">{content().summary}</p>
 
@@ -39,7 +39,6 @@ export const IntentPageView = (props: { readonly page: IntentPageId }) => {
             </section>
           )}
         </For>
-      </article>
-    </main>
+    </ResourcePage>
   );
 };

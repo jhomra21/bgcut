@@ -860,13 +860,13 @@ figure {
   color: var(--text-primary);
 }
 
-.section-rail a[aria-current="location"] {
+.section-rail a[aria-current] {
   background: var(--background-subtle);
   color: var(--text-primary);
   font-weight: 650;
 }
 
-.section-rail a[aria-current="location"]::before {
+.section-rail a[aria-current]::before {
   content: "";
   position: absolute;
   top: 7px;
@@ -880,6 +880,10 @@ figure {
 .section-rail-link-group-divided {
   border-top: 1px solid var(--border-primary);
   padding-top: 16px;
+}
+
+.resource-nav-rail {
+  gap: 20px;
 }
 
 .content-page {
@@ -1652,7 +1656,7 @@ figure {
     white-space: nowrap;
   }
 
-  .section-rail a[aria-current="location"]::before {
+  .section-rail a[aria-current]::before {
     display: none;
   }
 

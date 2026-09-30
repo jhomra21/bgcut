@@ -25,7 +25,8 @@ const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url))
 const resourceNavigationSource = (
   await Promise.all(
     [
-      "./components/ResourceRailPage.tsx",
+      "./components/ResourceNavRail.tsx",
+      "./components/ResourcePage.tsx",
       "./pages/GuidePage.tsx",
       "./pages/ToolPage.tsx",
       "./pages/ComparisonPage.tsx",
@@ -237,10 +238,15 @@ describe("browser product UI", () => {
     expect(appSource).toContain('href: "/guides", label: "Guides"');
     expect(appSource).toContain('href: "/tools", label: "Tools"');
     expect(appSource).toContain('href: "/compare", label: "Compare"');
-    expect(resourceNavigationSource).toContain('pageTitleElement="div"');
-    expect(resourceNavigationSource).toContain('label: "This guide"');
-    expect(resourceNavigationSource).toContain('label: "This tool"');
-    expect(resourceNavigationSource).toContain('label: "This comparison"');
+    expect(resourceNavigationSource).toContain('class="section-rail resource-nav-rail"');
+    expect(resourceNavigationSource).toContain('<div class="section-rail-page-title">Explore</div>');
+    expect(resourceNavigationSource).toContain('page="guides" pageClass="guide-index"');
+    expect(resourceNavigationSource).toContain('page="tools" pageClass="tool-index"');
+    expect(resourceNavigationSource).toContain('page="compare" pageClass="comparison-index"');
+    expect(resourceNavigationSource).toContain('page={props.page} pageClass="intent-page"');
+    expect(resourceNavigationSource).not.toContain('label: "This guide"');
+    expect(resourceNavigationSource).not.toContain('label: "This tool"');
+    expect(resourceNavigationSource).not.toContain('label: "This comparison"');
   });
 
   test("keeps docs and changelog on one shared reference-page shell", () => {

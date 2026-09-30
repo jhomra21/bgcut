@@ -1,31 +1,7 @@
 import { Show, createSignal } from "solid-js";
 
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
-import { ResourceRailPage } from "../components/ResourceRailPage";
-import type { SectionRailGroup, SectionRailLinkGroup } from "../components/SectionRail";
-
-const TOOL_SECTION_GROUPS: readonly SectionRailGroup[] = [
-  {
-    label: "This tool",
-    items: [
-      { id: "check-image", label: "Check an image" },
-      { id: "result-meaning", label: "What the result means" },
-      { id: "why-check", label: "Why check transparency" },
-    ],
-  },
-];
-
-const TOOL_EXPLORE_LINKS: readonly SectionRailLinkGroup[] = [
-  {
-    label: "Explore bgcut",
-    divided: true,
-    items: [
-      { href: "/docs", label: "Docs" },
-      { href: "/guides", label: "Guides" },
-      { href: "/compare", label: "Compare" },
-    ],
-  },
-];
+import { ResourcePage } from "../components/ResourcePage";
 
 type TransparencyResult = {
   readonly width: number;
@@ -114,8 +90,7 @@ const inspectTransparency = async (file: File): Promise<TransparencyResult> => {
 };
 
 export const ToolIndexPage = () => (
-  <main class="page-content legal-shell">
-    <article class="guide-page tool-index">
+  <ResourcePage page="tools" pageClass="tool-index">
       <h1>Free image tools</h1>
       <p class="guide-summary">
         Small local utilities for checking image files before or after background removal.
@@ -127,8 +102,7 @@ export const ToolIndexPage = () => (
           <span>Find fully transparent, partially transparent, and opaque pixels without uploading the image.</span>
         </a>
       </div>
-    </article>
-  </main>
+  </ResourcePage>
 );
 
 export const TransparencyCheckerPage = () => {
@@ -185,18 +159,7 @@ export const TransparencyCheckerPage = () => {
   };
 
   return (
-    <ResourceRailPage
-      areaTitle="Tools"
-      allHref="/tools"
-      allLabel="All tools"
-      railAriaLabel="Tool navigation"
-      groups={TOOL_SECTION_GROUPS}
-      initialSectionId="check-image"
-      sectionSelector=".resource-content-page > section[id]"
-      bottomSectionId="why-check"
-      exploreLinks={TOOL_EXPLORE_LINKS}
-      pageClass="tool-page"
-    >
+    <ResourcePage page="tool-transparency-checker" pageClass="tool-page">
         <ContentBreadcrumb
           parentHref="/tools"
           parentLabel="Tools"
@@ -285,6 +248,6 @@ export const TransparencyCheckerPage = () => {
             If you need to create a transparent cutout first, use the <a href="/">bgcut background remover</a>.
           </p>
         </section>
-    </ResourceRailPage>
+    </ResourcePage>
   );
 };
