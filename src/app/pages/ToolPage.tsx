@@ -1,6 +1,31 @@
 import { Show, createSignal } from "solid-js";
 
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
+import { ResourceRailPage } from "../components/ResourceRailPage";
+import type { SectionRailGroup, SectionRailLinkGroup } from "../components/SectionRail";
+
+const TOOL_SECTION_GROUPS: readonly SectionRailGroup[] = [
+  {
+    label: "This tool",
+    items: [
+      { id: "check-image", label: "Check an image" },
+      { id: "result-meaning", label: "What the result means" },
+      { id: "why-check", label: "Why check transparency" },
+    ],
+  },
+];
+
+const TOOL_EXPLORE_LINKS: readonly SectionRailLinkGroup[] = [
+  {
+    label: "Explore bgcut",
+    divided: true,
+    items: [
+      { href: "/docs", label: "Docs" },
+      { href: "/guides", label: "Guides" },
+      { href: "/compare", label: "Compare" },
+    ],
+  },
+];
 
 type TransparencyResult = {
   readonly width: number;
@@ -160,8 +185,18 @@ export const TransparencyCheckerPage = () => {
   };
 
   return (
-    <main class="page-content legal-shell">
-      <article class="guide-page tool-page">
+    <ResourceRailPage
+      areaTitle="Tools"
+      allHref="/tools"
+      allLabel="All tools"
+      railAriaLabel="Tool navigation"
+      groups={TOOL_SECTION_GROUPS}
+      initialSectionId="check-image"
+      sectionSelector=".resource-content-page > section[id]"
+      bottomSectionId="why-check"
+      exploreLinks={TOOL_EXPLORE_LINKS}
+      pageClass="tool-page"
+    >
         <ContentBreadcrumb
           parentHref="/tools"
           parentLabel="Tools"
@@ -173,7 +208,7 @@ export const TransparencyCheckerPage = () => {
           decoded and inspected in your browser. It is not uploaded to bgcut.
         </p>
 
-        <section>
+        <section id="check-image">
           <h2>Check an image</h2>
           <input
             ref={(element) => {
@@ -227,7 +262,7 @@ export const TransparencyCheckerPage = () => {
           </Show>
         </section>
 
-        <section>
+        <section id="result-meaning">
           <h2>What the result means</h2>
           <p>
             A fully transparent pixel has alpha 0. A partially transparent pixel has alpha between
@@ -239,7 +274,7 @@ export const TransparencyCheckerPage = () => {
           </p>
         </section>
 
-        <section>
+        <section id="why-check">
           <h2>Why check transparency</h2>
           <p>
             A checker can confirm that a cutout really contains alpha instead of a white or
@@ -250,7 +285,6 @@ export const TransparencyCheckerPage = () => {
             If you need to create a transparent cutout first, use the <a href="/">bgcut background remover</a>.
           </p>
         </section>
-      </article>
-    </main>
+    </ResourceRailPage>
   );
 };

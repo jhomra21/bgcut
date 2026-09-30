@@ -1,6 +1,8 @@
 import { For } from "@solidjs/web";
 
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
+import { ResourceRailPage } from "../components/ResourceRailPage";
+import type { SectionRailGroup, SectionRailLinkGroup } from "../components/SectionRail";
 import {
   COMPARISONS,
   COMPARISON_PAGE_IDS,
@@ -12,6 +14,24 @@ const pathForComparison = (comparison: Comparison): string =>
   comparison.slug.startsWith("remove-bg")
     ? `/${comparison.slug}`
     : `/compare/${comparison.slug}`;
+
+const sectionId = (title: string): string =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-|-$/gu, "");
+
+const COMPARISON_EXPLORE_LINKS: readonly SectionRailLinkGroup[] = [
+  {
+    label: "Explore bgcut",
+    divided: true,
+    items: [
+      { href: "/docs", label: "Docs" },
+      { href: "/guides", label: "Guides" },
+      { href: "/tools", label: "Tools" },
+    ],
+  },
+];
 
 export const ComparisonIndexPage = () => (
   <main class="page-content legal-shell">
@@ -43,9 +63,34 @@ export const ComparisonIndexPage = () => (
 export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
   const comparison = (): Comparison => COMPARISONS[props.page];
 
+  const railGroups = (): readonly SectionRailGroup[] => [
+    {
+      label: "This comparison",
+      items: [
+        { id: "choose-bgcut", label: "Choose bgcut" },
+        { id: "choose-other", label: `Choose ${comparison().otherName}` },
+        ...comparison().sections.map((section) => ({
+          id: sectionId(section.title),
+          label: section.title,
+        })),
+        { id: "sources", label: "Sources" },
+      ],
+    },
+  ];
+
   return (
-    <main class="page-content legal-shell">
-      <article class="guide-page comparison-page">
+    <ResourceRailPage
+      areaTitle="Compare"
+      allHref="/compare"
+      allLabel="All comparisons"
+      railAriaLabel="Comparison navigation"
+      groups={railGroups()}
+      initialSectionId="choose-bgcut"
+      sectionSelector=".resource-content-page > section[id]"
+      bottomSectionId="sources"
+      exploreLinks={COMPARISON_EXPLORE_LINKS}
+      pageClass="comparison-page"
+    >
         <ContentBreadcrumb
           parentHref="/compare"
           parentLabel="Compare"
@@ -80,14 +125,14 @@ export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
           </table>
         </div>
 
-        <section>
+        <section id="choose-bgcut">
           <h2>Choose bgcut when</h2>
           <ul>
             <For each={comparison().chooseBgcut}>{(item) => <li>{item}</li>}</For>
           </ul>
         </section>
 
-        <section>
+        <section id="choose-other">
           <h2>Choose {comparison().otherName} when</h2>
           <ul>
             <For each={comparison().chooseOther}>{(item) => <li>{item}</li>}</For>
@@ -96,14 +141,14 @@ export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
 
         <For each={comparison().sections}>
           {(section) => (
-            <section>
+            <section id={sectionId(section.title)}>
               <h2>{section.title}</h2>
               <For each={section.paragraphs}>{(paragraph) => <p>{paragraph}</p>}</For>
             </section>
           )}
         </For>
 
-        <section>
+        <section id="sources">
           <h2>Sources</h2>
           <p>External product facts above were checked on {comparison().checkedAt}.</p>
           <ul>
@@ -116,7 +161,6 @@ export const ComparisonPage = (props: { readonly page: ComparisonPageId }) => {
             </For>
           </ul>
         </section>
-      </article>
-    </main>
+    </ResourceRailPage>
   );
 };

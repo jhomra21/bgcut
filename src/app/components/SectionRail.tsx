@@ -13,10 +13,24 @@ export type SectionRailGroup = {
   readonly items: readonly SectionRailItem[];
 };
 
+export type SectionRailLinkItem = {
+  readonly href: string;
+  readonly label: string;
+};
+
+export type SectionRailLinkGroup = {
+  readonly label?: string;
+  readonly items: readonly SectionRailLinkItem[];
+  readonly divided?: boolean;
+};
+
 type SectionRailProps = {
   readonly ariaLabel: string;
   readonly pageTitle: string;
+  readonly pageTitleElement?: "h1" | "div";
   readonly groups: readonly SectionRailGroup[];
+  readonly beforeLinks?: readonly SectionRailLinkGroup[];
+  readonly afterLinks?: readonly SectionRailLinkGroup[];
   readonly initialSectionId: string;
   readonly sectionSelector: string;
   readonly bottomSectionId?: string;
@@ -253,7 +267,25 @@ export const SectionRail = (props: SectionRailProps) => {
 
   return (
     <aside class="section-rail" aria-label={props.ariaLabel}>
-      <h1 class="section-rail-page-title">{props.pageTitle}</h1>
+      <Show
+        when={props.pageTitleElement === "div"}
+        fallback={<h1 class="section-rail-page-title">{props.pageTitle}</h1>}
+      >
+        <div class="section-rail-page-title">{props.pageTitle}</div>
+      </Show>
+
+      <For each={props.beforeLinks}>
+        {(group) => (
+          <div class="section-rail-group section-rail-link-group">
+            <Show when={group.label}>
+              {(label) => <span class="section-rail-label">{label()}</span>}
+            </Show>
+            <For each={group.items}>
+              {(item) => <a href={item.href}>{item.label}</a>}
+            </For>
+          </div>
+        )}
+      </For>
 
       <For each={props.groups}>
         {(group) => (
@@ -272,6 +304,22 @@ export const SectionRail = (props: SectionRailProps) => {
                   {item.label}
                 </a>
               )}
+            </For>
+          </div>
+        )}
+      </For>
+
+      <For each={props.afterLinks}>
+        {(group) => (
+          <div
+            class="section-rail-group section-rail-link-group"
+            classList={{ "section-rail-link-group-divided": group.divided }}
+          >
+            <Show when={group.label}>
+              {(label) => <span class="section-rail-label">{label()}</span>}
+            </Show>
+            <For each={group.items}>
+              {(item) => <a href={item.href}>{item.label}</a>}
             </For>
           </div>
         )}

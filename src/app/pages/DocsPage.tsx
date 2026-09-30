@@ -1,6 +1,18 @@
 import { CodeBlock } from "../components/CodeBlock";
 import { ReferencePage } from "../components/ReferencePage";
-import type { SectionRailGroup } from "../components/SectionRail";
+import type { SectionRailGroup, SectionRailLinkGroup } from "../components/SectionRail";
+
+const DOC_EXPLORE_LINKS: readonly SectionRailLinkGroup[] = [
+  {
+    label: "Explore bgcut",
+    divided: true,
+    items: [
+      { href: "/guides", label: "Guides" },
+      { href: "/tools", label: "Tools" },
+      { href: "/compare", label: "Compare" },
+    ],
+  },
+];
 
 const DOC_SECTION_GROUPS: readonly SectionRailGroup[] = [
   {
@@ -36,6 +48,7 @@ export const DocsPage = () => (
     railGroups={DOC_SECTION_GROUPS}
     initialSectionId="quickstart"
     bottomSectionId="resources"
+    railAfterLinks={DOC_EXPLORE_LINKS}
   >
 
         <section id="quickstart" class="reference-section doc-section docs-quickstart">

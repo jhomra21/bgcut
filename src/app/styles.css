@@ -877,6 +877,11 @@ figure {
   background: var(--text-primary);
 }
 
+.section-rail-link-group-divided {
+  border-top: 1px solid var(--border-primary);
+  padding-top: 16px;
+}
+
 .content-page {
   width: 100%;
   min-width: 0;
@@ -1632,6 +1637,11 @@ figure {
     gap: 2px;
   }
 
+  .section-rail-link-group-divided {
+    border-top: 0;
+    padding-top: 0;
+  }
+
   .section-rail-label {
     display: none;
   }
@@ -1762,6 +1772,12 @@ figure {
 .guide-page {
   width: min(720px, 100%);
   padding: 44px 0 72px;
+}
+
+.resource-content-page {
+  width: 100%;
+  min-width: 0;
+  padding-top: 24px;
 }
 
 .guide-date {

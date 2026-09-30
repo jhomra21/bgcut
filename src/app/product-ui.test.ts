@@ -222,6 +222,14 @@ describe("browser product UI", () => {
     expect(appSource).toContain("route-stage route-stage-");
     expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
     expect(appSource).toContain('<SiteFooter page={navPage()} onNavigate={navigate} />');
+    expect(appSource).toContain('label: "Explore bgcut"');
+    expect(appSource).toContain('href: "/guides", label: "Guides"');
+    expect(appSource).toContain('href: "/tools", label: "Tools"');
+    expect(appSource).toContain('href: "/compare", label: "Compare"');
+    expect(appSource).toContain('pageTitleElement="div"');
+    expect(appSource).toContain('label: "This guide"');
+    expect(appSource).toContain('label: "This tool"');
+    expect(appSource).toContain('label: "This comparison"');
   });
 
   test("keeps docs and changelog on one shared reference-page shell", () => {

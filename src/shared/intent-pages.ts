@@ -25,7 +25,6 @@ export type IntentPage = {
   readonly slug: string;
   readonly title: string;
   readonly description: string;
-  readonly eyebrow: string;
   readonly summary: string;
   readonly ctaLabel: string;
   readonly ctaHref: string;
@@ -40,7 +39,6 @@ export const INTENT_PAGES: Readonly<Record<IntentPageId, IntentPage>> = {
     title: "Private background remover with no image upload",
     description:
       "Remove image backgrounds locally in your browser. bgcut keeps source images, decoded pixels, masks, and results on your device instead of sending them to an inference backend.",
-    eyebrow: "Browser",
     summary:
       "Use bgcut when you want an interactive background remover without sending the source image to a background-removal server.",
     ctaLabel: "Remove a background",
@@ -76,7 +74,6 @@ export const INTENT_PAGES: Readonly<Record<IntentPageId, IntentPage>> = {
     title: "Node.js background removal that runs locally",
     description:
       "Remove image backgrounds from Node.js with the bgcut package. Reuse one local runtime for single images, batches, directories, and streamed input.",
-    eyebrow: "Node.js",
     summary:
       "Use the bgcut object API inside Node.js when background removal belongs in application code and you do not need a hosted HTTP service.",
     ctaLabel: "Read the Node.js docs",
@@ -124,7 +121,6 @@ try {
     title: "Background removal CLI for local image processing",
     description:
       "Remove image backgrounds from the command line with bgcut. Process one file, several files, or directories locally with PNG, WebP, or JPEG output.",
-    eyebrow: "CLI",
     summary:
       "Use the bgcut CLI for shell scripts, build jobs, local automation, and file-in/file-out workflows.",
     ctaLabel: "Read the CLI docs",
@@ -169,7 +165,6 @@ npx bgcut photo.jpg --cpu`,
     title: "Batch background remover for files and folders",
     description:
       "Remove backgrounds from multiple images or recursive directories with bgcut. Reuse one warm local runtime from the CLI or Node.js API.",
-    eyebrow: "Batch",
     summary:
       "Use one local runtime for a set of images instead of starting a separate inference process for every file.",
     ctaLabel: "See batch examples",
@@ -226,7 +221,6 @@ try {
     title: "Open-source local background remover",
     description:
       "bgcut is an MIT-licensed background remover with a local browser app, CLI, and Node.js API. Inspect the source, run inference locally, and automate it without a hosted bgcut API.",
-    eyebrow: "Open source",
     summary:
       "bgcut is built in public and licensed under MIT. The project covers an interactive browser remover plus local developer interfaces.",
     ctaLabel: "View bgcut on GitHub",
