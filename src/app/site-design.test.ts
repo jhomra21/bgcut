@@ -12,6 +12,12 @@ const themeBootstrap = await Bun.file(
   new URL("../../public/theme-bootstrap.js", import.meta.url),
 ).text();
 
+const mainSource = await Bun.file(new URL("./main.tsx", import.meta.url)).text();
+
+const staticRouteSource = await Bun.file(
+  new URL("../../scripts/site/prepare-static-routes.ts", import.meta.url),
+).text();
+
 const appSourceFiles: string[] = [];
 
 for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
@@ -38,6 +44,20 @@ describe("site design contract", () => {
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain("@media (prefers-reduced-transparency: reduce)");
     expect(styles).toContain("@media (prefers-contrast: more)");
+  });
+
+  test("hydrates prerendered hosted routes instead of replacing them", () => {
+    expect(mainSource).toContain('import { hydrate, render } from "@solidjs/web"');
+    expect(mainSource).toContain("root.dataset.bgcutHydrate");
+    expect(mainSource).toContain("hydrate(() => <App />, root");
+    expect(mainSource).toContain("render(() => <App />, root)");
+    expect(mainSource).not.toContain("root.replaceChildren()");
+    expect(staticRouteSource).toContain('renderToString');
+    expect(staticRouteSource).toContain('data-bgcut-hydrate');
+    expect(staticRouteSource).toContain('solid-hydration.js');
+    expect(staticRouteSource).toContain("buildServerRenderer");
+    expect(staticRouteSource).not.toContain("staticHome");
+    expect(staticRouteSource).not.toContain("staticGuide");
   });
 
   test("keeps every page inside the same root site bounds", () => {
