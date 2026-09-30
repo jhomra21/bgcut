@@ -716,9 +716,37 @@ figure {
 }
 
 .site-header-shell-floating {
+  --header-fade-height: 28px;
   position: sticky;
   z-index: 40;
   top: 0;
+  pointer-events: none;
+}
+
+.site-header-shell-floating::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--header-fade-height);
+  background: var(--background-primary);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 32%,
+    rgba(0, 0, 0, 0.72) 62%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 32%,
+    rgba(0, 0, 0, 0.72) 62%,
+    transparent 100%
+  );
   pointer-events: none;
 }
 
@@ -1598,6 +1626,10 @@ figure {
   .site-header-shell {
     padding-top: 20px;
     padding-bottom: 12px;
+  }
+
+  .site-header-shell-floating {
+    --header-fade-height: 16px;
   }
 
   .content-layout {

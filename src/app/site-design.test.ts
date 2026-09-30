@@ -113,6 +113,13 @@ describe("site design contract", () => {
     expect(styles).toContain(".site-header-shell-floating");
     expect(styles).toContain("position: sticky");
     expect(styles).toContain("pointer-events: none");
+    expect(styles).toContain(".site-header-shell-floating::before");
+    expect(styles).toContain("--header-fade-height: 28px");
+    expect(styles).toContain("-webkit-backdrop-filter: blur(2px)");
+    expect(styles).toContain("backdrop-filter: blur(2px)");
+    expect(styles).toContain("-webkit-mask-image: linear-gradient(");
+    expect(styles).toContain("mask-image: linear-gradient(");
+    expect(styles).toContain("--header-fade-height: 16px");
     expect(styles).toContain(".site-header-shell-floating .brand-link");
     expect(styles).not.toContain(".site-header-brand {");
     expect(styles).toContain("background: var(--background-primary)");
