@@ -14,21 +14,7 @@
     <meta name="theme-color" content="" />
     <meta name="color-scheme" content="light dark" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
-    <script>
-      (() => {
-        try {
-          const storedTheme = window.localStorage.getItem("bgcut-theme");
-
-          if (storedTheme !== "light" && storedTheme !== "dark") {
-            return;
-          }
-
-          document.documentElement.dataset.theme = storedTheme;
-        } catch {
-          // The default light theme remains active when storage is unavailable.
-        }
-      })();
-    </script>
+    <script src="/theme-bootstrap.js"></script>
 
     <link rel="canonical" href="https://bgcut.dev/" />
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png?v=2" />

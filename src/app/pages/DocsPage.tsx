@@ -1,6 +1,19 @@
+import { RESOURCE_NAV_GROUPS } from "../../shared/resource-navigation";
+import { SITE_PAGE_METADATA } from "../../shared/site-metadata";
 import { CodeBlock } from "../components/CodeBlock";
 import { ReferencePage } from "../components/ReferencePage";
-import type { SectionRailGroup } from "../components/SectionRail";
+import type { SectionRailGroup, SectionRailLinkGroup } from "../components/SectionRail";
+
+const DOC_EXPLORE_LINKS: readonly SectionRailLinkGroup[] = RESOURCE_NAV_GROUPS.map(
+  (group, index) => ({
+    label: index === 0 ? "Explore bgcut" : group.label,
+    divided: index === 0,
+    items: group.items.map((item) => ({
+      href: SITE_PAGE_METADATA[item.page].path,
+      label: item.label,
+    })),
+  }),
+);
 
 const DOC_SECTION_GROUPS: readonly SectionRailGroup[] = [
   {
@@ -36,6 +49,7 @@ export const DocsPage = () => (
     railGroups={DOC_SECTION_GROUPS}
     initialSectionId="quickstart"
     bottomSectionId="resources"
+    railAfterLinks={DOC_EXPLORE_LINKS}
   >
 
         <section id="quickstart" class="reference-section doc-section docs-quickstart">

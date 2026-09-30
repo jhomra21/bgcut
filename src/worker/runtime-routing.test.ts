@@ -19,9 +19,8 @@ const remoteRuntimeUploadSource = await Bun.file(
 ).text();
 
 describe("Cloudflare runtime routing", () => {
-  test("routes model and runtime assets through the Worker before SPA fallback", () => {
-    expect(wranglerConfig).toContain('"/models/*"');
-    expect(wranglerConfig).toContain('"/runtime/*"');
+  test("routes requests through the Worker before static asset fallback", () => {
+    expect(wranglerConfig).toContain('"run_worker_first": true');
   });
 
   test("serves both WASM binaries and the module loader from R2", () => {
@@ -55,11 +54,23 @@ describe("Cloudflare runtime routing", () => {
     expect(packageSource).toContain("cloudflare:model:local");
   });
 
-  test("ships static search metadata and discovery files through Cloudflare assets", () => {
+  test("ships generated search routes and discovery files through Cloudflare assets", () => {
     expect(packageSource).toContain('"site:prepare-routes"');
     expect(cloudflareBuildSource).toContain('"llms.txt"');
-    expect(cloudflareBuildSource).toContain('"docs.html"');
-    expect(cloudflareBuildSource).toContain('"changelog.html"');
+    expect(cloudflareBuildSource).toContain('GENERATED_SITE_ROOT_FILES = ["sitemap.xml"]');
+    expect(cloudflareBuildSource).toContain("PUBLIC_SITE_PAGES");
+    expect(cloudflareBuildSource).toContain("routeAssetName");
+    expect(cloudflareBuildSource).toContain("SITE_PAGE_METADATA[page].path");
+  });
+
+  test("returns canonical HTML routes instead of SPA soft 404s", () => {
+    expect(workerSource).toContain("PUBLIC_SITE_PAGES");
+    expect(workerSource).toContain("PUBLIC_SITE_PATHS");
+    expect(workerSource).toContain("STATIC_ROUTE_REDIRECTS");
+    expect(workerSource).toContain('url.pathname === "/index.html"');
+    expect(workerSource).toContain("Response.redirect(redirect, 308)");
+    expect(workerSource).toContain('status: 404');
+    expect(workerSource).toContain('"x-robots-tag": "noindex"');
   });
 
   test("hardens static responses and caches fingerprinted assets", () => {

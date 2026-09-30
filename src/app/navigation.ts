@@ -1,6 +1,16 @@
-export type SitePage = "home" | "docs" | "changelog" | "privacy" | "terms";
+import {
+  PUBLIC_SITE_PAGES,
+  SITE_PAGE_METADATA,
+  type PublicSitePage,
+} from "../shared/site-metadata";
+
+export type SitePage = PublicSitePage;
 
 const LOCAL_RUNTIME_META_SELECTOR = 'meta[name="bgcut-runtime"][content="local"]';
+
+const PAGE_BY_PATH = new Map(
+  PUBLIC_SITE_PAGES.map((page) => [SITE_PAGE_METADATA[page].path, page]),
+);
 
 export const isLocalRuntime = (): boolean =>
   document.querySelector(LOCAL_RUNTIME_META_SELECTOR) !== null;
@@ -16,44 +26,11 @@ export const ROUTE_FADE_MS = 75;
 export const currentPage = (): SitePage => {
   const pathname = window.location.pathname.replace(/\/+$/u, "") || "/";
 
-  if (pathname === "/docs") {
-    return "docs";
-  }
-
-  if (pathname === "/changelog") {
-    return "changelog";
-  }
-
-  if (pathname === "/privacy") {
-    return "privacy";
-  }
-
-  if (pathname === "/terms") {
-    return "terms";
-  }
-
-  return "home";
+  return PAGE_BY_PATH.get(pathname) ?? "home";
 };
 
-export const pathForPage = (page: SitePage): string => {
-  if (page === "docs") {
-    return "/docs";
-  }
-
-  if (page === "changelog") {
-    return "/changelog";
-  }
-
-  if (page === "privacy") {
-    return "/privacy";
-  }
-
-  if (page === "terms") {
-    return "/terms";
-  }
-
-  return "/";
-};
+export const pathForPage = (page: SitePage): string =>
+  SITE_PAGE_METADATA[page].path;
 
 export const shouldHandleInternalNavigation = (event: MouseEvent): boolean =>
   event.button === 0 &&

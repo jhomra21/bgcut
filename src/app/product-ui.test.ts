@@ -22,6 +22,20 @@ const appSource = (
 
 const appComponentSource = await Bun.file(new URL("./App.tsx", import.meta.url)).text();
 
+const resourceNavigationSource = (
+  await Promise.all(
+    [
+      "../shared/resource-navigation.ts",
+      "./components/ResourceNavRail.tsx",
+      "./components/ResourcePage.tsx",
+      "./pages/GuidePage.tsx",
+      "./pages/IntentPage.tsx",
+      "./pages/ToolPage.tsx",
+      "./pages/ComparisonPage.tsx",
+    ].map((path) => Bun.file(new URL(path, import.meta.url)).text()),
+  )
+).join("\n");
+
 const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.url)).text();
 
 const stylesSource = await Bun.file(new URL("./styles.css", import.meta.url)).text();
@@ -88,9 +102,10 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("· JPEG, PNG, WebP, or AVIF");
     expect(appSource).toContain("disabled={processing()}");
     expect(appSource).not.toContain(">Reset<");
-    expect(appSource).not.toContain("Remove background");
+    expect(homeSource).not.toContain(">Remove background<");
     expect(homeSource).not.toContain("Remove image backgrounds locally");
-    expect(homeSource).toContain("Free, private background remover for PNG, JPEG, WebP, and AVIF.");
+    expect(homeSource).toContain("<h1>Free, private background remover</h1>");
+    expect(homeSource).toContain("Remove backgrounds from PNG, JPEG, WebP, and AVIF images in your browser.");
   });
 
 
@@ -118,16 +133,14 @@ describe("browser product UI", () => {
     expect(localBranch).not.toContain("<TermsPage");
   });
 
-  test("exposes docs plus footer-only legal pages without an about surface", () => {
-    expect(appSource).toContain('pathname === "/docs"');
-    expect(appSource).toContain('pathname === "/changelog"');
-    expect(appSource).toContain('pathname === "/privacy"');
-    expect(appSource).toContain('pathname === "/terms"');
+  test("exposes hosted routes from shared metadata without an about surface", () => {
+    expect(appSource).toContain("PUBLIC_SITE_PAGES");
+    expect(appSource).toContain("SITE_PAGE_METADATA");
+    expect(appSource).toContain("PAGE_BY_PATH");
     expect(appSource).toContain('href="/docs"');
     expect(appSource).toContain('href="/changelog"');
     expect(appSource).toContain('href="/privacy"');
     expect(appSource).toContain('href="/terms"');
-    expect(appSource).not.toContain('pathname === "/about"');
     expect(appSource).not.toContain('href="/about"');
     expect(appSource).not.toContain("AboutPage");
     expect(appSource).toContain("SiteFooter");
@@ -176,6 +189,11 @@ describe("browser product UI", () => {
     expect(appSource).toContain("const [navPage, setNavPage] = createSignal<SitePage>(initialPage)");
     expect(appSource).toContain("setNavPage(nextPage)");
     expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
+    expect(appSource).toContain('class="site-header-shell site-header-shell-floating"');
+    expect(appSource).toContain('class="brand-link"');
+    expect(appSource).not.toContain("isReferencePage");
+    expect(appSource).not.toContain("site-header-shell-sticky");
+    expect(appSource).not.toContain("site-header-brand");
     expect(appSource).not.toContain("headerScrolled");
     expect(appSource).not.toContain("showPageContext");
     expect(appSource).not.toContain("site-page-context");
@@ -201,7 +219,14 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain("view-transition-name");
   });
 
-  test("uses one symmetric two-phase route transition for every internal page", () => {
+  test("uses reactive page control flow for every internal route transition", () => {
+    expect(appSource).toContain('import { Match, Switch, createSignal, onSettled } from "solid-js"');
+    expect(appSource).toContain('<Switch fallback={<HomePage showIntro />}>');
+    expect(appSource).toContain('<Match when={props.page === "docs"}>');
+    expect(appSource).toContain('<Match keyed when={guidePage()}>');
+    expect(appSource).toContain('<Match keyed when={comparisonPage()}>');
+    expect(appSource).not.toContain('if (props.page === "docs")');
+    expect(appSource).not.toContain('if (props.page === "changelog")');
     expect(appSource).toContain("const ROUTE_FADE_MS = 75");
     expect(appSource).toContain('type RouteTransitionPhase = "idle" | "out" | "in"');
     expect(appSource).toContain('setRoutePhase("out")');
@@ -215,7 +240,20 @@ describe("browser product UI", () => {
     expect(appSource).toContain('window.addEventListener("popstate", handlePopState)');
     expect(appSource).toContain("route-stage route-stage-");
     expect(appSource).toContain('<SiteHeader page={navPage()} onNavigate={navigate} />');
-    expect(appSource).toContain('<SiteFooter onNavigate={navigate} />');
+    expect(appSource).toContain('<SiteFooter page={navPage()} onNavigate={navigate} />');
+    expect(appSource).toContain('index === 0 ? "Explore bgcut" : group.label');
+    expect(resourceNavigationSource).toContain('{ page: "guides", label: "Guides" }');
+    expect(resourceNavigationSource).toContain('{ page: "tools", label: "Tools" }');
+    expect(resourceNavigationSource).toContain('{ page: "compare", label: "Compare" }');
+    expect(resourceNavigationSource).toContain('class="section-rail resource-nav-rail"');
+    expect(resourceNavigationSource).toContain('<div class="section-rail-page-title">Explore</div>');
+    expect(resourceNavigationSource).toContain('page="guides" pageClass="guide-index"');
+    expect(resourceNavigationSource).toContain('page="tools" pageClass="tool-index"');
+    expect(resourceNavigationSource).toContain('page="compare" pageClass="comparison-index"');
+    expect(resourceNavigationSource).toContain('page={props.page} pageClass="intent-page"');
+    expect(resourceNavigationSource).not.toContain('label: "This guide"');
+    expect(resourceNavigationSource).not.toContain('label: "This tool"');
+    expect(resourceNavigationSource).not.toContain('label: "This comparison"');
   });
 
   test("keeps docs and changelog on one shared reference-page shell", () => {

@@ -6,6 +6,12 @@ const themeSource = await Bun.file(new URL("./theme.ts", import.meta.url)).text(
 
 const indexHtml = await Bun.file(new URL("../../index.html", import.meta.url)).text();
 
+const staticHeaders = await Bun.file(new URL("../../public/_headers", import.meta.url)).text();
+
+const themeBootstrap = await Bun.file(
+  new URL("../../public/theme-bootstrap.js", import.meta.url),
+).text();
+
 const appSourceFiles: string[] = [];
 
 for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
@@ -82,6 +88,17 @@ describe("site design contract", () => {
     expect(styles).not.toContain("var(--line)");
   });
 
+  test("restores a saved theme without violating the hosted CSP", () => {
+    expect(indexHtml).toContain('<script src="/theme-bootstrap.js"></script>');
+    expect(indexHtml).not.toContain('window.localStorage.getItem("bgcut-theme")');
+    expect(themeBootstrap).toContain('window.localStorage.getItem("bgcut-theme")');
+    expect(themeBootstrap).toContain("document.documentElement.dataset.theme = storedTheme");
+    expect(themeSource).toContain("storedTheme()");
+    expect(themeSource).toContain("document.documentElement.dataset.theme = initialTheme");
+    expect(staticHeaders).toContain("script-src 'self' https://static.cloudflareinsights.com 'wasm-unsafe-eval'");
+    expect(staticHeaders).not.toContain("script-src 'unsafe-inline'");
+  });
+
   test("keeps raw color values inside the CSS theme layer", () => {
     expect(appSources).not.toMatch(/#[0-9a-f]{3,8}\b|(?:rgb|hsl)a?\s*\(/iu);
     expect(themeSource).toContain('.getPropertyValue("--background-primary")');
@@ -92,10 +109,25 @@ describe("site design contract", () => {
     expect(indexHtml).not.toContain('storedTheme === "dark" ?');
   });
 
-  test("keeps the reference title permanently in the left reading rail", () => {
-    expect(styles).toContain(".site-header-shell-sticky");
+  test("keeps the hosted header as two floating sticky islands", () => {
+    expect(styles).toContain(".site-header-shell-floating");
     expect(styles).toContain("position: sticky");
-    expect(styles).toContain("background: var(--background-header)");
+    expect(styles).toContain("pointer-events: none");
+    expect(styles).toContain(".site-header-shell-floating::before");
+    expect(styles).toContain("--header-fade-height: 28px");
+    expect(styles).toContain("-webkit-backdrop-filter: blur(2px)");
+    expect(styles).toContain("backdrop-filter: blur(2px)");
+    expect(styles).toContain("-webkit-mask-image: linear-gradient(");
+    expect(styles).toContain("mask-image: linear-gradient(");
+    expect(styles).toContain("--header-fade-height: 16px");
+    expect(styles).toContain(".site-header-shell-floating .brand-link");
+    expect(styles).not.toContain(".site-header-brand {");
+    expect(styles).toContain("background: var(--background-primary)");
+    expect(styles).not.toContain("0 8px 24px var(--shadow-floating)");
+    expect(styles).not.toContain(".site-header-shell-sticky::before");
+    expect(styles).not.toContain("width: 100vw;\n  background: var(--background-header)");
+    expect(styles).toContain(".site-nav");
+    expect(styles).toContain(".theme-toggle");
     expect(styles).toContain(".section-rail-page-title");
     expect(styles).toContain("font-size: 18px");
     expect(styles).toContain("font-weight: 760");
@@ -118,7 +150,7 @@ describe("site design contract", () => {
     expect(styles).toContain("padding-top: 24px");
     expect(styles).toContain("grid-template-columns: 144px minmax(0, 1fr)");
     expect(styles).toContain(".section-rail-group");
-    expect(styles).toContain('.section-rail a[aria-current="location"]');
+    expect(styles).toContain(".section-rail a[aria-current]");
     expect(styles).toContain(".section-rail-label");
     expect(styles).toContain("max-height: calc(100vh - 118px)");
     expect(styles).not.toContain(".docs-page-header");

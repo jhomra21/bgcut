@@ -1,3 +1,6 @@
+import { isComparisonPage } from "../../shared/comparisons";
+import { isGuidePage } from "../../shared/guides";
+import { isToolPage } from "../../shared/tools";
 import { shouldHandleInternalNavigation, type Navigate, type SitePage } from "../navigation";
 import { theme, toggleTheme } from "../theme";
 
@@ -122,13 +125,39 @@ export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate
   </header>
 );
 
-export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
+type FooterCurrent = "page" | "location" | undefined;
+
+const footerCurrent = (
+  page: SitePage,
+  section: "guides" | "tools" | "compare" | "changelog" | "privacy" | "terms",
+): FooterCurrent => {
+  if (page === section) {
+    return "page";
+  }
+
+  if (section === "guides" && isGuidePage(page)) {
+    return "location";
+  }
+
+  if (section === "tools" && isToolPage(page)) {
+    return "location";
+  }
+
+  if (section === "compare" && isComparisonPage(page)) {
+    return "location";
+  }
+
+  return undefined;
+};
+
+export const SiteFooter = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
   <footer class="site-footer">
     <div class="site-footer-meta">
       <a
         class="site-footer-brand brand-link"
         href="/"
         aria-label="bgcut home"
+        aria-current={props.page === "home" ? "page" : undefined}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -152,7 +181,50 @@ export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
     </div>
     <nav class="site-footer-links" aria-label="Footer navigation">
       <a
+        href="/guides"
+        aria-current={footerCurrent(props.page, "guides")}
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("guides");
+        }}
+      >
+        Guides
+      </a>
+      <a
+        href="/tools"
+        aria-current={footerCurrent(props.page, "tools")}
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("tools");
+        }}
+      >
+        Tools
+      </a>
+      <a
+        href="/compare"
+        aria-current={footerCurrent(props.page, "compare")}
+        onClick={(event) => {
+          if (!shouldHandleInternalNavigation(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onNavigate("compare");
+        }}
+      >
+        Compare
+      </a>
+      <a
         href="/changelog"
+        aria-current={footerCurrent(props.page, "changelog")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -166,6 +238,7 @@ export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
       </a>
       <a
         href="/privacy"
+        aria-current={footerCurrent(props.page, "privacy")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;
@@ -179,6 +252,7 @@ export const SiteFooter = (props: { readonly onNavigate: Navigate }) => (
       </a>
       <a
         href="/terms"
+        aria-current={footerCurrent(props.page, "terms")}
         onClick={(event) => {
           if (!shouldHandleInternalNavigation(event)) {
             return;

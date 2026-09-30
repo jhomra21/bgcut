@@ -16,6 +16,8 @@ Remove image backgrounds locally from the hosted web app, the installed local ap
 
 Source images stay on the user's machine. bgcut does not upload them to an application inference backend.
 
+[Private browser removal](https://bgcut.dev/private-background-remover) · [Node.js](https://bgcut.dev/node-background-removal) · [CLI](https://bgcut.dev/background-removal-cli) · [Batch](https://bgcut.dev/batch-background-remover) · [Guides](https://bgcut.dev/guides) · [Comparisons](https://bgcut.dev/compare)
+
 ## Install
 
 Run the local app without installing globally:

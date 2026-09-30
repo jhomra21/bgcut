@@ -1,6 +1,9 @@
-import { Show } from "@solidjs/web";
-import { createSignal, onSettled } from "solid-js";
+import { Match, Switch, createSignal, onSettled } from "solid-js";
 
+import { isComparisonPage } from "../shared/comparisons";
+import { isGuidePage } from "../shared/guides";
+import { isIntentPage } from "../shared/intent-pages";
+import { isToolPage } from "../shared/tools";
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
   currentPage,
@@ -13,14 +16,60 @@ import {
   type SitePage,
 } from "./navigation";
 import { ChangelogPage } from "./pages/ChangelogPage";
-import { applySiteMetadata } from "./site-metadata";
+import { ComparisonIndexPage, ComparisonPage } from "./pages/ComparisonPage";
 import { DocsPage } from "./pages/DocsPage";
+import { GuideIndexPage, GuidePage } from "./pages/GuidePage";
 import { HomePage } from "./pages/HomePage";
+import { IntentPageView } from "./pages/IntentPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { applySiteMetadata } from "./site-metadata";
 import { TermsPage } from "./pages/TermsPage";
+import { ToolIndexPage, TransparencyCheckerPage } from "./pages/ToolPage";
 
-const isReferencePage = (page: SitePage): boolean =>
-  page === "docs" || page === "changelog";
+const PageContent = (props: { readonly page: SitePage }) => {
+  const intentPage = () => isIntentPage(props.page) ? props.page : undefined;
+  const guidePage = () => isGuidePage(props.page) ? props.page : undefined;
+  const comparisonPage = () => isComparisonPage(props.page) ? props.page : undefined;
+  const toolPage = () => isToolPage(props.page) ? props.page : undefined;
+
+  return (
+    <Switch fallback={<HomePage showIntro />}>
+      <Match when={props.page === "docs"}>
+        <DocsPage />
+      </Match>
+      <Match when={props.page === "changelog"}>
+        <ChangelogPage />
+      </Match>
+      <Match keyed when={intentPage()}>
+        {(page) => <IntentPageView page={page} />}
+      </Match>
+      <Match when={props.page === "guides"}>
+        <GuideIndexPage />
+      </Match>
+      <Match keyed when={guidePage()}>
+        {(page) => <GuidePage page={page} />}
+      </Match>
+      <Match when={props.page === "compare"}>
+        <ComparisonIndexPage />
+      </Match>
+      <Match keyed when={comparisonPage()}>
+        {(page) => <ComparisonPage page={page} />}
+      </Match>
+      <Match when={props.page === "tools"}>
+        <ToolIndexPage />
+      </Match>
+      <Match keyed when={toolPage()}>
+        {() => <TransparencyCheckerPage />}
+      </Match>
+      <Match when={props.page === "privacy"}>
+        <PrivacyPage />
+      </Match>
+      <Match when={props.page === "terms"}>
+        <TermsPage />
+      </Match>
+    </Switch>
+  );
+};
 
 const App = () => {
   if (isLocalRuntime()) {
@@ -119,39 +168,16 @@ const App = () => {
 
   return (
     <div class="site-root">
-      <div class={`site-header-shell ${isReferencePage(navPage()) ? "site-header-shell-sticky" : ""}`}>
+      <div class="site-header-shell site-header-shell-floating">
         <SiteHeader page={navPage()} onNavigate={navigate} />
       </div>
 
       <div class={`route-stage route-stage-${routePhase()}`}>
-        <Show
-          when={page() === "docs"}
-          fallback={
-            <Show
-              when={page() === "changelog"}
-              fallback={
-                <Show
-                  when={page() === "privacy"}
-                  fallback={
-                    <Show when={page() === "terms"} fallback={<HomePage showIntro />}>
-                      <TermsPage />
-                    </Show>
-                  }
-                >
-                  <PrivacyPage />
-                </Show>
-              }
-            >
-              <ChangelogPage />
-            </Show>
-          }
-        >
-          <DocsPage />
-        </Show>
+        <PageContent page={page()} />
       </div>
 
       <div class="site-footer-shell">
-        <SiteFooter onNavigate={navigate} />
+        <SiteFooter page={navPage()} onNavigate={navigate} />
       </div>
     </div>
   );

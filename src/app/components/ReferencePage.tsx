@@ -3,6 +3,7 @@ import type { JSX } from "@solidjs/web";
 import {
   SectionRail,
   type SectionRailGroup,
+  type SectionRailLinkGroup,
 } from "./SectionRail";
 
 type ReferencePageProps = {
@@ -12,6 +13,7 @@ type ReferencePageProps = {
   readonly railGroups: readonly SectionRailGroup[];
   readonly initialSectionId: string;
   readonly bottomSectionId?: string;
+  readonly railAfterLinks?: readonly SectionRailLinkGroup[];
   readonly children: JSX.Element;
 };
 
@@ -22,6 +24,7 @@ export const ReferencePage = (props: ReferencePageProps) => (
         ariaLabel={props.railAriaLabel}
         pageTitle={props.title}
         groups={props.railGroups}
+        afterLinks={props.railAfterLinks}
         initialSectionId={props.initialSectionId}
         sectionSelector=".reference-page > section[id]"
         bottomSectionId={props.bottomSectionId}

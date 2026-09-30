@@ -18,10 +18,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/models/*",
-      "/runtime/*"
-    ]
+    "run_worker_first": true
   },
   "r2_buckets": [
     {
@@ -29,6 +26,15 @@
       "bucket_name": "bgcut-models"
     }
   ],
+  "previews": {
+    // Preview deployments only read immutable model/runtime artifacts from this bucket.
+    "r2_buckets": [
+      {
+        "binding": "MODELS",
+        "bucket_name": "bgcut-models"
+      }
+    ]
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,

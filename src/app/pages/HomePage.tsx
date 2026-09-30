@@ -389,9 +389,10 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
     <main class="page-content home-shell">
       <Show when={props.showIntro}>
         <div class="home-intro">
+          <h1>Free, private background remover</h1>
           <p>
-            Free, private background remover for PNG, JPEG, WebP, and AVIF. Processing runs in
-            your browser with WebGPU when available, and your images stay on your device.
+            Remove backgrounds from PNG, JPEG, WebP, and AVIF images in your browser. Processing
+            runs on your device with WebGPU when available.
           </p>
         </div>
       </Show>
@@ -535,6 +536,35 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
           )}
         </Show>
       </section>
+
+      <Show when={props.showIntro}>
+        <section class="home-resources" aria-label="Background removal resources">
+          <a href="/private-background-remover">
+            <strong>Private browser removal</strong>
+            <span>What stays on your device and what the site downloads.</span>
+          </a>
+          <a href="/node-background-removal">
+            <strong>Node.js API</strong>
+            <span>Run local background removal inside application code.</span>
+          </a>
+          <a href="/background-removal-cli">
+            <strong>CLI</strong>
+            <span>Process files and folders from the command line.</span>
+          </a>
+          <a href="/batch-background-remover">
+            <strong>Batch removal</strong>
+            <span>Reuse one runtime across multiple images.</span>
+          </a>
+          <a href="/open-source-background-remover">
+            <strong>Open source</strong>
+            <span>Inspect the MIT-licensed implementation and local runtimes.</span>
+          </a>
+          <a href="/tools/transparency-checker">
+            <strong>Transparency checker</strong>
+            <span>Inspect alpha pixels without uploading the image.</span>
+          </a>
+        </section>
+      </Show>
     </main>
   );
 };

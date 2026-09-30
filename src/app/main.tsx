@@ -10,6 +10,8 @@ if (root === null) {
   throw new Error("Missing #root element.");
 }
 
+root.replaceChildren();
+
 syncThemeColor();
 
 render(() => <App />, root);

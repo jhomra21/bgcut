@@ -1,6 +1,12 @@
 import { copyFile, readdir, rm, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
+import {
+  PUBLIC_SITE_PAGES,
+  SITE_PAGE_METADATA,
+  type PublicSitePage,
+} from "../../src/shared/site-metadata";
+
 const CLOUDFLARE_ASSET_LIMIT_BYTES = 25 * 1024 * 1024;
 
 const distDirectory = resolve(import.meta.dir, "../../dist");
@@ -17,8 +23,10 @@ const SITE_ROOT_FILES = [
   "og-image.png",
   "robots.txt",
   "site.webmanifest",
-  "sitemap.xml",
+  "theme-bootstrap.js",
 ] as const;
+
+const GENERATED_SITE_ROOT_FILES = ["sitemap.xml"] as const;
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -40,6 +48,14 @@ const walkFiles = async (directory: string): Promise<readonly string[]> => {
 const isOrtRuntimeAsset = (name: string): boolean =>
   name.includes("ort-wasm-") &&
   (name.endsWith(".wasm") || name.endsWith(".mjs"));
+
+const routeAssetName = (page: PublicSitePage): string | undefined => {
+  if (page === "home") {
+    return undefined;
+  }
+
+  return `${SITE_PAGE_METADATA[page].path.replace(/^\//u, "")}.html`;
+};
 
 for (const name of SITE_ROOT_FILES) {
   await copyFile(join(publicDirectory, name), join(distDirectory, name));
@@ -76,8 +92,10 @@ if (oversized.length > 0) {
   );
 }
 
-for (const routePage of ["docs.html", "changelog.html", "privacy.html", "terms.html"]) {
-  if (!deployNames.includes(routePage)) {
+for (const page of PUBLIC_SITE_PAGES) {
+  const routePage = routeAssetName(page);
+
+  if (routePage !== undefined && !deployNames.includes(routePage)) {
     throw new Error(`Cloudflare builds must include static metadata route ${routePage}.`);
   }
 }
@@ -94,7 +112,9 @@ if (leakedOrtRuntime.length > 0) {
   );
 }
 
-const missingSiteFiles = SITE_ROOT_FILES.filter((name) => !deployNames.includes(name));
+const missingSiteFiles = [...SITE_ROOT_FILES, ...GENERATED_SITE_ROOT_FILES].filter(
+  (name) => !deployNames.includes(name),
+);
 
 if (missingSiteFiles.length > 0) {
   throw new Error(
