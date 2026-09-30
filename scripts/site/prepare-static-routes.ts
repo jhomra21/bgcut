@@ -45,17 +45,19 @@ const staticHeader = (page: PublicSitePage): string => {
   const changelogCurrent = page === "changelog" ? ' aria-current="page"' : "";
 
   return `<header class="app-header">
-    <a class="brand-link" href="/" aria-label="bgcut home">
+    <a class="brand-link site-header-brand" href="/" aria-label="bgcut home">
       <div class="brand-title">
         <img class="brand-mark" src="/favicon-48x48.png?v=2" alt="" width="32" height="32" aria-hidden="true" />
         <span>bgcut</span>
       </div>
     </a>
-    <nav class="site-nav" aria-label="Main navigation">
-      <a href="/docs"${docsCurrent}>Docs</a>
-      <a href="/changelog"${changelogCurrent}>Changelog</a>
-      <a href="https://github.com/jhomra21/bgcut">GitHub</a>
-    </nav>
+    <div class="header-controls">
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="/docs"${docsCurrent}>Docs</a>
+        <a href="/changelog"${changelogCurrent}>Changelog</a>
+        <a href="https://github.com/jhomra21/bgcut">GitHub</a>
+      </nav>
+    </div>
   </header>`;
 };
 
@@ -545,7 +547,7 @@ const staticPageShell = (
   page: PublicSitePage,
   changelogSource: string,
 ): string => `<div class="site-root" data-static-route="${page}">
-  <div class="site-header-shell">${staticHeader(page)}</div>
+  <div class="site-header-shell site-header-shell-floating">${staticHeader(page)}</div>
   <div class="route-stage">${staticContentForPage(page, changelogSource)}</div>
   <div class="site-footer-shell">${staticFooter(page)}</div>
 </div>`;

@@ -53,7 +53,7 @@ export const LocalAppHeader = () => (
 export const SiteHeader = (props: { readonly page: SitePage; readonly onNavigate: Navigate }) => (
   <header class="app-header">
     <a
-      class="brand-link"
+      class="brand-link site-header-brand"
       href="/"
       aria-label="bgcut home"
       onClick={(event) => {

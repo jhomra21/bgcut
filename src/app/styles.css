@@ -715,23 +715,30 @@ figure {
   margin-bottom: 0;
 }
 
-.site-header-shell-sticky {
+.site-header-shell-floating {
   position: sticky;
   z-index: 40;
   top: 0;
+  pointer-events: none;
 }
 
-.site-header-shell-sticky::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 100vw;
-  background: var(--background-header);
-  backdrop-filter: blur(14px);
-  transform: translateX(-50%);
+.site-header-shell-floating .app-header {
+  pointer-events: none;
+}
+
+.site-header-shell-floating .site-header-brand,
+.site-header-shell-floating .header-controls {
+  pointer-events: auto;
+}
+
+.site-header-brand {
+  padding: 5px 9px 5px 5px;
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  background: var(--background-surface);
+  box-shadow:
+    0 1px 2px var(--shadow-nav),
+    0 8px 24px var(--shadow-floating);
 }
 
 .route-stage {
@@ -1767,7 +1774,9 @@ figure {
     border-color: var(--border-high-contrast);
   }
 
-  .site-header-shell {
+  .site-header-brand,
+  .site-nav,
+  .theme-toggle {
     background: var(--background-primary);
   }
 }

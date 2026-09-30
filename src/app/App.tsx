@@ -26,9 +26,6 @@ import { applySiteMetadata } from "./site-metadata";
 import { TermsPage } from "./pages/TermsPage";
 import { ToolIndexPage, TransparencyCheckerPage } from "./pages/ToolPage";
 
-const isReferencePage = (page: SitePage): boolean =>
-  page === "docs" || page === "changelog";
-
 const PageContent = (props: { readonly page: SitePage }) => {
   const intentPage = () => isIntentPage(props.page) ? props.page : undefined;
   const guidePage = () => isGuidePage(props.page) ? props.page : undefined;
@@ -171,7 +168,7 @@ const App = () => {
 
   return (
     <div class="site-root">
-      <div class={`site-header-shell ${isReferencePage(navPage()) ? "site-header-shell-sticky" : ""}`}>
+      <div class="site-header-shell site-header-shell-floating">
         <SiteHeader page={navPage()} onNavigate={navigate} />
       </div>
 
