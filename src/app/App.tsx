@@ -104,6 +104,7 @@ const App = (props: AppProps = {}) => {
   if (!isServer) {
     applySiteMetadata(initialPage);
   }
+
   let routeTarget = initialPage;
   let transitionTimer: number | undefined;
   let transitionVersion = 0;

@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
   const externalAssetHost = mode === "cloudflare" || mode === "package";
 
   return {
-    plugins: [solid()],
+    plugins: [solid({ ssr: true })],
     publicDir: externalAssetHost ? false : "public",
     build: mode === "package"
       ? {

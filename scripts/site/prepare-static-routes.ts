@@ -95,6 +95,7 @@ const renderPageHtml = (
   const metadata = SITE_PAGE_METADATA[page];
 
   const canonicalUrl = canonicalUrlForPage(page);
+
   const robots = metadata.index
     ? "index, follow, max-image-preview:large"
     : "noindex, follow, max-image-preview:large";
