@@ -115,6 +115,7 @@ describe("browser product UI", () => {
     expect(appSource).toContain("const LocalAppHeader = () => (");
 
     const localStart = appSource.indexOf("if (localRuntime)");
+
     const hostedStart = appSource.indexOf(
       "const initialPage = props.initialPage ?? currentPage()",
       localStart,
