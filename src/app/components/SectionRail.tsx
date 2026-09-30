@@ -312,8 +312,7 @@ export const SectionRail = (props: SectionRailProps) => {
       <For each={props.afterLinks}>
         {(group) => (
           <div
-            class="section-rail-group section-rail-link-group"
-            classList={{ "section-rail-link-group-divided": group.divided }}
+            class={`section-rail-group section-rail-link-group${group.divided ? " section-rail-link-group-divided" : ""}`}
           >
             <Show when={group.label}>
               {(label) => <span class="section-rail-label">{label()}</span>}
