@@ -5,15 +5,15 @@ import { removeBackgroundWebGpuWithStrategy } from "../../src/browser/inference"
 import type { RemovalTimings } from "../../src/browser/timing";
 import { resolveDefaultWebGpuSessionStrategy } from "../../src/browser/webgpu-session-strategy";
 
-const ModeSchema = Schema.Literal(
+const ModeSchema = Schema.Literals([
   "fp32",
   "fp16",
-);
+]);
 
-const SequenceSchema = Schema.Literal(
+const SequenceSchema = Schema.Literals([
   "fp32-first",
   "fp16-first",
-);
+]);
 
 const BlockSchema = Schema.Struct({
   index: Schema.Number,
