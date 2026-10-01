@@ -205,7 +205,7 @@ Single-image inputs can be file paths, `Uint8Array`, or `ArrayBuffer`. Supported
 
 Node API failures are `BgcutError` instances. Use `error.code` for programmatic handling. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
 
-### Migrating Node code from 0.5.x
+### Migrating Node code from 0.5.x to 0.6.1
 
 bgcut 0.6.1 does not export the old top-level `removeBackground()` or `createBgcut()` functions.
 
