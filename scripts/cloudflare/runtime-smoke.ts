@@ -206,6 +206,7 @@ const verifyHydrationBootstrapResponse = async (): Promise<void> => {
   }
 
   const html = await response.text();
+
   const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gu)];
   const source = scripts.find(
     (match) => !match[1]?.includes("src=") && match[2]?.includes("_$HY"),

@@ -146,6 +146,7 @@ for (const page of PUBLIC_SITE_PAGES) {
       `${metadata.path}: HydrationScript CSP hash is missing.`,
     );
   }
+
   check(structuredData !== undefined, `${metadata.path}: structured data is missing.`);
 
   if (structuredData !== undefined) {
