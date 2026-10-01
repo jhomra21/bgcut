@@ -2,6 +2,7 @@ import { For, Show } from "@solidjs/web";
 
 import { GUIDES, GUIDE_PAGE_IDS, type Guide, type GuidePageId } from "../../shared/guides";
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
+import { GuideVisualBlock } from "../components/GuideVisual";
 import { CodeBlock } from "../components/CodeBlock";
 import { ResourcePage } from "../components/ResourcePage";
 
@@ -11,8 +12,8 @@ export const GuideIndexPage = () => (
   <ResourcePage page="guides" pageClass="guide-index">
       <h1>Local background removal guides</h1>
       <p class="guide-summary">
-        Practical notes for browser privacy, WebGPU and WebAssembly, Node.js, CLI batches,
-        image formats, and the bgcut processing pipeline.
+        Practical notes for browser privacy, WebGPU and WebAssembly, Effect, Node.js, CLI
+        batches, image formats, and the bgcut processing pipeline.
       </p>
 
       <div class="guide-list">
@@ -63,6 +64,10 @@ export const GuidePage = (props: { readonly page: GuidePageId }) => {
                   <For each={bullets()}>{(item) => <li>{item}</li>}</For>
                 </ul>
               )}
+            </Show>
+
+            <Show when={section.visual}>
+              {(visual) => <GuideVisualBlock visual={visual()} />}
             </Show>
 
             <Show when={section.code}>
