@@ -22,6 +22,10 @@ const serverEntrySource = await Bun.file(
   new URL("./server-entry.ts", import.meta.url),
 ).text();
 
+const packageSource = await Bun.file(
+  new URL("../../package.json", import.meta.url),
+).text();
+
 const appSourceFiles: string[] = [];
 
 for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
@@ -51,9 +55,9 @@ describe("site design contract", () => {
   });
 
   test("uses the current Solid 2 RC hydration stack", () => {
-    expect(packageJson.devDependencies["solid-js"]).toBe("2.0.0-rc.11");
-    expect(packageJson.devDependencies["@solidjs/web"]).toBe("2.0.0-rc.11");
-    expect(packageJson.devDependencies["@solidjs/vite-plugin"]).toBe("3.0.0-next.46");
+    expect(packageSource).toContain('"solid-js": "2.0.0-rc.11"');
+    expect(packageSource).toContain('"@solidjs/web": "2.0.0-rc.11"');
+    expect(packageSource).toContain('"@solidjs/vite-plugin": "3.0.0-next.46"');
     expect(serverEntrySource).toContain("HydrationScript");
     expect(serverEntrySource).toContain("renderToString");
     expect(serverEntrySource).not.toContain("generateHydrationScript");
