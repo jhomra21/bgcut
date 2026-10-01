@@ -64,6 +64,13 @@ describe("site design contract", () => {
     expect(staticRouteSource).not.toContain("solid-hydration.js");
   });
 
+  test("keeps the transparency checker on an element Match branch", () => {
+    expect(appSource).toContain('<Match when={props.page === "tool-transparency-checker"}>');
+    expect(appSource).toContain("<TransparencyCheckerPage />");
+    expect(appSource).not.toContain("<Match keyed when={toolPage()}>");
+    expect(appSource).not.toContain("{() => <TransparencyCheckerPage />}");
+  });
+
   test("hydrates prerendered hosted routes instead of replacing them", () => {
     expect(mainSource).toContain('import { hydrate, render } from "@solidjs/web"');
     expect(mainSource).toContain("root.dataset.bgcutHydrate");
