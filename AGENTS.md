@@ -67,7 +67,7 @@ Keep the repository as one package until a concrete second package needs an inde
 
 - The production web target is `bgcut.dev` on Cloudflare Workers.
 - `wrangler.jsonc` is the source of truth for Cloudflare configuration.
-- The Vite app is served through Workers Static Assets.
+- Workers Static Assets serves the Vite client bundle and the Solid-prerendered public HTML routes. Hosted pages hydrate the existing prerendered DOM; bgcut does not run request-time SSR.
 - The 187 MiB ONNX model must not be deployed as a static asset. Serve it from the private `bgcut-models` R2 bucket through the Worker at the existing `/models/...` path.
 - Serve all discrete ONNX Runtime runtime files from the same R2 bucket through `/runtime/...`: the WebGPU asyncify WASM binary, the standard WASM fallback binary, and the runtime module loader.
 - The Worker may serve application, model, and runtime bytes. It must not receive source images or perform inference.
