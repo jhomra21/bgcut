@@ -29,6 +29,15 @@ const userFacingSources = [
   "README.md",
   "public/llms.txt",
   "skills/bgcut/SKILL.md",
+  "src/app/App.tsx",
+  "src/app/components/CodeBlock.tsx",
+  "src/app/components/ContentBreadcrumb.tsx",
+  "src/app/components/ReferencePage.tsx",
+  "src/app/components/ResourceNavRail.tsx",
+  "src/app/components/ResourcePage.tsx",
+  "src/app/components/SectionRail.tsx",
+  "src/app/components/SiteChrome.tsx",
+  "src/app/pages/ChangelogPage.tsx",
   "src/app/pages/ComparisonPage.tsx",
   "src/app/pages/DocsPage.tsx",
   "src/app/pages/GuidePage.tsx",
@@ -40,12 +49,14 @@ const userFacingSources = [
   "src/shared/comparisons.ts",
   "src/shared/guides.ts",
   "src/shared/intent-pages.ts",
+  "src/shared/resource-navigation.ts",
   "src/shared/site-metadata.ts",
   "src/shared/tools.ts",
 ] as const;
 
-const versionedPublicDocs = [
+const versionedDocumentationSources = [
   "README.md",
+  "docs/README.md",
   "public/llms.txt",
   "skills/bgcut/SKILL.md",
   "src/app/pages/DocsPage.tsx",
@@ -75,8 +86,8 @@ describe("repository documentation", () => {
   });
 
   test("keeps public docs on the base release without prerelease labels", async () => {
-    const [baseVersion] = packageJson.version.split("-");
-    const versionedPaths = new Set<string>(versionedPublicDocs);
+    const baseVersion = packageJson.version.split("-", 1)[0] ?? packageJson.version;
+    const versionedPaths = new Set<string>(versionedDocumentationSources);
 
     expect(baseVersion).toMatch(/^\d+\.\d+\.\d+$/u);
 
@@ -86,9 +97,13 @@ describe("repository documentation", () => {
       if (packageJson.version !== baseVersion) {
         expect(content, path).not.toContain(packageJson.version);
       }
+    }
 
-      if (versionedPaths.has(path)) {
-        expect(content, path).toContain(baseVersion);
+    for (const [path, content] of await readSources(versionedDocumentationSources)) {
+      expect(content, path).toContain(baseVersion);
+
+      if (packageJson.version !== baseVersion && path !== "docs/README.md") {
+        expect(content, path).not.toContain(packageJson.version);
       }
     }
   });
