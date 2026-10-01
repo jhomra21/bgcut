@@ -25,7 +25,8 @@ const repositoryTextPaths = [
   (path) =>
     !path.startsWith("node_modules/") &&
     !path.startsWith("dist/") &&
-    !path.startsWith(".git/"),
+    !path.startsWith(".git/") &&
+    path !== "tests/effect-v4.test.ts",
 );
 
 describe("Effect 4 repository contract", () => {
