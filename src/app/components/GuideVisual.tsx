@@ -13,7 +13,7 @@ const EffectBoundaryVisual = () => (
       <span class="guide-visual-connector" aria-hidden="true" />
 
       <div class="guide-visual-card guide-visual-card-emphasis">
-        <span class="guide-visual-label">Effect orchestration</span>
+        <span class="guide-visual-label">Effect-managed work</span>
         <code>typed errors · fallback · acquire / use / release</code>
       </div>
 
@@ -21,7 +21,7 @@ const EffectBoundaryVisual = () => (
 
       <div class="effect-boundary-details">
         <div class="guide-visual-card">
-          <span class="guide-visual-label">System boundaries</span>
+          <span class="guide-visual-label">Runtime and I/O work</span>
           <code>WebGPU setup · model cache · ONNX sessions · filesystem · export</code>
         </div>
         <div class="guide-visual-card">
@@ -32,8 +32,8 @@ const EffectBoundaryVisual = () => (
     </div>
 
     <figcaption>
-      Effect owns the fallible orchestration. The public API stays Promise-based, while pixel and
-      GPU loops remain plain TypeScript, TypeGPU, or WebGPU.
+      Effect handles failures, fallback, and cleanup. The public API stays Promise-based, while pixel
+      and GPU loops remain plain TypeScript, TypeGPU, or WebGPU.
     </figcaption>
   </figure>
 );
