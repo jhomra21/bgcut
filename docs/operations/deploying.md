@@ -13,7 +13,8 @@ GitHub: jhomra21/bgcut
               bun run cloudflare:deploy
         -> bgcut
            -> bgcut.dev
-           -> Vite SPA from Workers Static Assets
+           -> prerendered Solid HTML and client assets from Workers Static Assets
+           -> browser hydrates the existing Solid DOM
            -> /models/* from private R2 bucket bgcut-models
            -> /runtime/* from private R2 bucket bgcut-models
      -> non-production branch / PR:
@@ -24,12 +25,14 @@ GitHub: jhomra21/bgcut
 
 Source images never go through the Worker or R2. Browser image decoding, preprocessing, inference, compositing, and export stay on the user's device.
 
+The hosted site uses build-time prerendering, not request-time SSR. The build renders each public route from the Solid component tree and the browser calls `hydrate()` on that existing DOM. Development and the packaged local app still start from an empty root and use the normal client render path.
+
 `wrangler.jsonc` is the deployment source of truth. It configures:
 
 - Worker name `bgcut`
 - `bgcut.dev` as a Worker Custom Domain
-- `dist/` as the SPA asset directory
-- SPA navigation fallback to `index.html`
+- `dist/` as the static asset directory containing prerendered HTML routes and the client bundle
+- the Static Assets single-page fallback, while the Worker serves known public routes from their generated HTML files and returns 404 for unknown extensionless routes
 - preview URLs for uploaded Worker versions
 - the `MODELS` binding to the `bgcut-models` R2 bucket
 - Worker-first routing for `/models/*` and `/runtime/*`
