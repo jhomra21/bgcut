@@ -15,13 +15,18 @@ const removed = {
   oldSchemaDependency: token("@standard-schema", "/spec"),
   oldPropertyDependency: token("fast", "-check"),
   oldRandomDependency: token("pure", "-rand"),
+  oldVersionName: token("Effect ", "3"),
+  oldVersionPhrase: token("Effect", " v3"),
 };
 
-const sourcePaths = [
-  ...new Bun.Glob("src/**/*.{ts,tsx}").scanSync("."),
-  ...new Bun.Glob("scripts/**/*.ts").scanSync("."),
-  ...new Bun.Glob("tools/**/*.ts").scanSync("."),
-];
+const repositoryTextPaths = [
+  ...new Bun.Glob("**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}").scanSync("."),
+].filter(
+  (path) =>
+    !path.startsWith("node_modules/") &&
+    !path.startsWith("dist/") &&
+    !path.startsWith(".git/"),
+);
 
 describe("Effect 4 repository contract", () => {
   test("pins the stable Effect 4 package without old lockfile baggage", async () => {
@@ -37,19 +42,23 @@ describe("Effect 4 repository contract", () => {
     expect(lock).not.toContain(removed.oldRandomDependency);
   });
 
-  test("uses the Effect 4 error and schema APIs throughout runtime sources", async () => {
+  test("contains no removed Effect 3 APIs or version references in repository text", async () => {
     const removedEitherImport = new RegExp(
       `import\\s+\\{[^}]*\\b${removed.eitherModule}\\b[^}]*\\}\\s+from\\s+["']effect["']`,
       "u",
     );
 
-    for (const path of sourcePaths) {
-      const source = await readFile(path, "utf8");
+    for (const path of repositoryTextPaths) {
+      const text = await readFile(path, "utf8");
 
-      expect(source, path).not.toContain(removed.catchAll);
-      expect(source, path).not.toContain(removed.effectEither);
-      expect(source, path).not.toContain(removed.schemaEitherDecoder);
-      expect(source, path).not.toMatch(removedEitherImport);
+      expect(text, path).not.toContain(removed.catchAll);
+      expect(text, path).not.toContain(removed.effectEither);
+      expect(text, path).not.toContain(removed.schemaEitherDecoder);
+      expect(text, path).not.toContain(removed.oldEffectPackagePrefix);
+      expect(text, path).not.toContain(removed.oldEffectDependencyPrefix);
+      expect(text, path).not.toContain(removed.oldVersionName);
+      expect(text, path).not.toContain(removed.oldVersionPhrase);
+      expect(text, path).not.toMatch(removedEitherImport);
     }
   });
 });
