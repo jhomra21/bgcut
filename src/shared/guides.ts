@@ -453,9 +453,9 @@ npx bgcut photo.jpg --cpu`,
     slug: "how-bgcut-uses-effect",
     title: "How bgcut uses Effect without making everything Effect",
     description:
-      "See where bgcut 0.6.1 uses Effect for typed failures, fallback, resource cleanup, model caching, and runtime boundaries, and why tight image and GPU loops stay plain.",
+      "See where bgcut 0.6.1 uses Effect for typed failures, fallback, cleanup, model caching, and runtime setup, and why tight image and GPU loops stay plain.",
     summary:
-      "bgcut uses Effect around work that can fail, allocate resources, or cross a system boundary. Pixel math, preprocessing loops, and GPU command code stay plain TypeScript or TypeGPU when Effect would add no useful control.",
+      "bgcut uses Effect around work that can fail, allocate resources, or call the filesystem, network, GPU, browser runtime, or ONNX Runtime. Pixel math, preprocessing loops, and GPU command code stay plain TypeScript or TypeGPU.",
     publishedAt: "2026-10-01",
     updatedAt: "2026-10-01",
     sections: [
@@ -464,7 +464,7 @@ npx bgcut photo.jpg --cpu`,
         title: "The boundary we chose",
         paragraphs: [
           "bgcut runs in several environments. The hosted browser uses browser APIs, WebGPU or WebAssembly, and ONNX Runtime. The CLI and Node.js API add Sharp, filesystem access, model caching, and native ONNX Runtime.",
-          "That mix creates real failure and cleanup paths. bgcut uses Effect around GPU setup, image decoding, model downloads, session creation, inference, export, and cleanup. It does not wrap every function in Effect.",
+          "File reads can fail. GPU and ONNX sessions need cleanup. WebGPU may need a local fallback. bgcut uses Effect around GPU setup, image decoding, model downloads, session creation, inference, export, and cleanup. It does not wrap every function in Effect.",
           "As of bgcut 0.6.1, the internal runtime uses effect@4.0.0. The public Node.js API still returns Promises and async iterables, so callers do not need to know Effect.",
         ],
         visual: {
@@ -476,7 +476,7 @@ npx bgcut photo.jpg --cpu`,
         title: "Failures stay specific",
         paragraphs: [
           "Browser failures are tagged data instead of arbitrary thrown values. The error union on each Effect tells the caller which failures can come back from that operation.",
-          "Formatting uses Match.exhaustive. If a new error tag is added without a matching formatter, the match stops being exhaustive instead of silently falling through to a generic message.",
+          "The formatter uses Match.exhaustive. Adding a new error tag without handling it makes the match non-exhaustive instead of silently falling through to a generic message.",
         ],
         code: {
           language: "typescript",
@@ -533,29 +533,6 @@ export type BackgroundRemovalError =
         visual: {
           kind: "resource-lifecycle",
         },
-        code: {
-          language: "typescript",
-          code: `return yield* Effect.acquireUseRelease(
-  createGpuModelInput(runtime, sourceBitmap, timings),
-  (input) =>
-    Effect.gen(function* () {
-      const outputs = yield* Effect.tryPromise({
-        try: () =>
-          session.run(
-            { [inputName]: input.tensor },
-            { [outputName]: outputTarget.tensor },
-          ),
-        catch: (cause) =>
-          new InferenceFailed({
-            message: String(cause),
-          }),
-      });
-
-      return outputs;
-    }),
-  (input) => Effect.sync(() => releaseGpuModelInput(input)),
-);`,
-        },
       },
       {
         id: "model-cache",
@@ -597,7 +574,7 @@ const nativeSession = yield* createSession(modelPath, engine);`,
         id: "plain-code",
         title: "Hot loops stay plain",
         paragraphs: [
-          "Effect is not bgcut's pixel-processing library. Pixel math, preprocessing, compositing, TypeGPU work, and raw WebGPU commands stay as direct code when they already have clear inputs and outputs.",
+          "Effect is not bgcut's pixel-processing library. Pixel math, preprocessing, compositing, TypeGPU work, and raw WebGPU commands remain normal TypeScript, TypeGPU, or WebGPU code when they already have clear inputs and outputs.",
           "Those functions do not need an Effect wrapper when they do not own asynchronous resources or expose a failure that the caller needs to distinguish.",
           "The rule bgcut follows today is simple. Use Effect where failure, cleanup, or runtime control is part of correctness. Keep deterministic math and tight GPU work plain.",
         ],
