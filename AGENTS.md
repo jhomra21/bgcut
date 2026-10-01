@@ -90,6 +90,7 @@ Keep the repository as one package until a concrete second package needs an inde
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
 - Prepare each release in a dedicated PR after the product changes are merged and accepted.
 - Update `CHANGELOG.md`, hosted `/docs`, and other user-facing docs before the release version is finalized.
+- User-facing docs name the base `X.Y.Z` release only. While `package.json` carries a prerelease such as `X.Y.Z-beta.N`, public docs still name `X.Y.Z` and must not expose the prerelease label. `CHANGELOG.md` and internal release runbooks may record prerelease history.
 - When a release removes or renames a public API, document the replacement with a concrete migration example. Add before/after code only for behavior that actually changed.
 - Merge only after CI passes on the exact release head.
 - Never reuse or overwrite an npm version that already exists.
