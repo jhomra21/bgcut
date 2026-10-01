@@ -84,7 +84,7 @@ Keep the repository as one package until a concrete second package needs an inde
 
 ## Release and package policy
 
-- Publish public package releases with normal semantic versions through npm `latest`.
+- Stable package releases use normal semantic versions through npm `latest`. Beta candidates use `X.Y.Z-beta.N` through npm `beta` and GitHub prereleases.
 - Validate the exact package candidate before publication with the repository release gate and clean consumer checks.
 - Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
