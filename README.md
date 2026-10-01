@@ -209,7 +209,7 @@ try {
 }
 ```
 
-### Migrating from 0.5.x
+### Migrating from 0.5.x to 0.6.1
 
 bgcut 0.6.1 does not export the old top-level `removeBackground()` or `createBgcut()` functions. Open one instance with `bgcut()`, call methods on that instance, and close it when finished. Engine selection now belongs to `bgcut({ engine })`. Output format still belongs to each removal.
 
