@@ -119,7 +119,7 @@ const releaseSessionSilently = (
   session: ort.InferenceSession,
 ): Effect.Effect<void> =>
   Effect.tryPromise(() => session.release()).pipe(
-    Effect.catchAll(() => Effect.void),
+    Effect.catch(() => Effect.void),
   );
 
 const clearCachedSession = (): Effect.Effect<void> =>
@@ -381,7 +381,7 @@ const automaticRemoval = (
   file: File,
 ): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
   removeBackgroundWebGpu(file).pipe(
-    Effect.catchAll((error) =>
+    Effect.catch((error) =>
       shouldFallbackToWasm(error)
         ? removeBackgroundWithWasm(file)
         : Effect.fail(error)

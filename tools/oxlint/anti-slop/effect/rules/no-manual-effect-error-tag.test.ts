@@ -17,7 +17,7 @@ new RuleTester().run(
 				errors: [{ messageId: "tag" }],
 			},
 			{
-				code: 'Effect.catchAll(function (error) { return error.reason._tag === "Timeout" ? retry : fail; });',
+				code: 'Effect.catch(function (error) { return error.reason._tag === "Timeout" ? retry : fail; });',
 				errors: [{ messageId: "reason" }],
 			},
 			{

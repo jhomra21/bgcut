@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 
 import { ModelCacheError } from "../native/model-cache";
 import {
@@ -97,13 +97,13 @@ export type Bgcut = {
 const runPublicEffect = async <A, E extends Error>(
   effect: Effect.Effect<A, E>,
 ): Promise<A> => {
-  const result = await Effect.runPromise(Effect.either(effect));
+  const result = await Effect.runPromise(Effect.result(effect));
 
-  if (Either.isLeft(result)) {
-    throw result.left;
+  if (Result.isFailure(result)) {
+    throw result.failure;
   }
 
-  return result.right;
+  return result.success;
 };
 
 const mapCreateError = (

@@ -175,7 +175,7 @@ const createSession = (
   }
 
   return createSessionForProvider(modelPath, "webgpu").pipe(
-    Effect.catchAll((webGpuError) =>
+    Effect.catch((webGpuError) =>
       createSessionForProvider(modelPath, "cpu").pipe(
         Effect.map((nativeSession) => ({
           ...nativeSession,

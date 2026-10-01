@@ -1,7 +1,7 @@
 import type { ESTree } from "@oxlint/plugins";
 
 const equalityOperators = new Set(["==", "===", "!=", "!=="]);
-const broadEffectCatchMethods = new Set(["catch", "catchAll", "catchIf"]);
+const broadEffectCatchMethods = new Set(["catch", "catchIf"]);
 
 export const isStringLiteral = (
 	node: ESTree.Node | null | undefined,
