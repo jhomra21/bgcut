@@ -1,5 +1,6 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { Script } from "node:vm";
 
 import {
   WEBGPU_MODEL_FILENAME,
@@ -197,6 +198,36 @@ const verifyModuleResponse = async (): Promise<void> => {
   }
 };
 
+const verifyHydrationBootstrapResponse = async (): Promise<void> => {
+  const response = await fetch(`${ORIGIN}/solid-hydration.js`);
+
+  if (!response.ok) {
+    throw new Error(`Solid hydration bootstrap returned HTTP ${response.status}.`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("javascript")) {
+    throw new Error(
+      `Solid hydration bootstrap returned ${contentType || "no content type"} instead of JavaScript.`,
+    );
+  }
+
+  const source = await response.text();
+  const trimmedSource = source.trim();
+
+  if (
+    trimmedSource.length === 0 ||
+    trimmedSource.startsWith("<script") ||
+    trimmedSource.includes("</script>") ||
+    trimmedSource.includes("<!--xs-->")
+  ) {
+    throw new Error("Solid hydration bootstrap still contains HTML wrapper markup.");
+  }
+
+  new Script(source, { filename: "solid-hydration.js" });
+};
+
 const verifySitePage = async (
   pathname: string,
   expectedTitle: string,
@@ -314,6 +345,7 @@ try {
     await verifyWasmResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
     await verifyWasmResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
     await verifyModuleResponse();
+    await verifyHydrationBootstrapResponse();
     await verifySitePage(
       "/docs",
       "bgcut Docs - Browser, CLI and Node.js Background Removal",
@@ -335,7 +367,7 @@ try {
     await verifyDiscoveryFiles();
     await verifySecurityHeaders();
     console.log(
-      "Cloudflare FP16 model, runtime, search-surface, and security-header smoke passed.",
+      "Cloudflare FP16 model, runtime, hydration, search-surface, and security-header smoke passed.",
     );
   } finally {
     worker.kill();
