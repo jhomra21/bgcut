@@ -130,7 +130,7 @@ Engine values for `bgcut({ engine })`:
 
 Public Node errors are `BgcutError`. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
 
-## Migrating from 0.5.x
+## Migrating from 0.5.x to 0.6.1
 
 bgcut 0.6.1 does not export the old top-level `removeBackground()` or `createBgcut()` functions.
 
