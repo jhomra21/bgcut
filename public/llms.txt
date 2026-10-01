@@ -2,6 +2,8 @@
 
 bgcut removes image backgrounds locally through the hosted browser app, packaged local app, CLI, or Node.js API. Source images are not sent to a bgcut inference backend.
 
+This reference describes bgcut 0.6.1.
+
 ## Start here
 
 - [Background remover](https://bgcut.dev/)
@@ -128,9 +130,9 @@ Engine values for `bgcut({ engine })`:
 
 Public Node errors are `BgcutError`. Codes are `model`, `engine`, `input`, `inference`, `output`, and `closed`.
 
-## Migrating from 0.5.x
+## Migrating from 0.5.x to 0.6.1
 
-Version 0.6 removes the top-level `removeBackground()` and `createBgcut()` exports.
+bgcut 0.6.1 does not export the old top-level `removeBackground()` or `createBgcut()` functions.
 
 Before, one image in 0.5.x:
 
@@ -143,7 +145,7 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-After, in 0.6:
+In 0.6.1:
 
 ```ts
 import { bgcut } from "bgcut";

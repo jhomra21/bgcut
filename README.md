@@ -16,6 +16,8 @@ Remove image backgrounds locally from the hosted web app, the installed local ap
 
 Source images stay on the user's machine. bgcut does not upload them to an application inference backend.
 
+This documentation describes bgcut 0.6.1.
+
 [Private browser removal](https://bgcut.dev/private-background-remover) · [Node.js](https://bgcut.dev/node-background-removal) · [CLI](https://bgcut.dev/background-removal-cli) · [Batch](https://bgcut.dev/batch-background-remover) · [Guides](https://bgcut.dev/guides) · [Comparisons](https://bgcut.dev/compare)
 
 ## Install
@@ -207,9 +209,9 @@ try {
 }
 ```
 
-### Migrating from 0.5.x
+### Migrating from 0.5.x to 0.6.1
 
-Version 0.6 removes the top-level `removeBackground()` and `createBgcut()` exports. Open one instance with `bgcut()`, call methods on that instance, and close it when finished. Engine selection now belongs to `bgcut({ engine })`. Output format still belongs to each removal.
+bgcut 0.6.1 does not export the old top-level `removeBackground()` or `createBgcut()` functions. Open one instance with `bgcut()`, call methods on that instance, and close it when finished. Engine selection now belongs to `bgcut({ engine })`. Output format still belongs to each removal.
 
 For one image, change the top-level call to an instance method.
 
@@ -224,7 +226,7 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-After, in 0.6:
+In 0.6.1:
 
 ```ts
 import { bgcut } from "bgcut";
@@ -257,7 +259,7 @@ try {
 }
 ```
 
-After, in 0.6:
+In 0.6.1:
 
 ```ts
 import { bgcut } from "bgcut";

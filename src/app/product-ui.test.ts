@@ -355,7 +355,8 @@ describe("browser product UI", () => {
     expect(appSource).toContain("Processing is sequential");
     expect(appSource).not.toContain("removeBackgrounds");
     expect(appSource).toContain("removeMany");
-    expect(appSource).toContain("Version 0.6 removes the top-level");
+    expect(appSource).toContain("These docs describe bgcut <code>0.6.1</code>.");
+    expect(appSource).toContain("bgcut 0.6.1 does not export the old top-level");
     expect(appSource).toContain("createBgcut");
     expect(appSource).not.toContain("createSession");
     expect(appSource).toContain("BgcutRemovalResult");

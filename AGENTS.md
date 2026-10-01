@@ -67,7 +67,7 @@ Keep the repository as one package until a concrete second package needs an inde
 
 - The production web target is `bgcut.dev` on Cloudflare Workers.
 - `wrangler.jsonc` is the source of truth for Cloudflare configuration.
-- The Vite app is served through Workers Static Assets.
+- Workers Static Assets serves the Vite client bundle and the Solid-prerendered public HTML routes. Hosted pages hydrate the existing prerendered DOM; bgcut does not run request-time SSR.
 - The 187 MiB ONNX model must not be deployed as a static asset. Serve it from the private `bgcut-models` R2 bucket through the Worker at the existing `/models/...` path.
 - Serve all discrete ONNX Runtime runtime files from the same R2 bucket through `/runtime/...`: the WebGPU asyncify WASM binary, the standard WASM fallback binary, and the runtime module loader.
 - The Worker may serve application, model, and runtime bytes. It must not receive source images or perform inference.
@@ -84,12 +84,13 @@ Keep the repository as one package until a concrete second package needs an inde
 
 ## Release and package policy
 
-- Publish public package releases with normal semantic versions through npm `latest`.
+- Stable package releases use normal semantic versions through npm `latest`. Beta candidates use `X.Y.Z-beta.N` through npm `beta` and GitHub prereleases.
 - Validate the exact package candidate before publication with the repository release gate and clean consumer checks.
 - Releases run through `.github/workflows/release.yml` and npm Trusted Publishing. Do not use manual `npm publish` as the normal path.
 - A normal package metadata change must not publish. The release workflow requires a `main` commit that changes `package.json` and starts with `chore(release):`.
 - Prepare each release in a dedicated PR after the product changes are merged and accepted.
 - Update `CHANGELOG.md`, hosted `/docs`, and other user-facing docs before the release version is finalized.
+- User-facing docs name the base `X.Y.Z` release only. While `package.json` carries a prerelease such as `X.Y.Z-beta.N`, public docs still name `X.Y.Z` and must not expose the prerelease label. `CHANGELOG.md` and internal release runbooks may record prerelease history.
 - When a release removes or renames a public API, document the replacement with a concrete migration example. Add before/after code only for behavior that actually changed.
 - Merge only after CI passes on the exact release head.
 - Never reuse or overwrite an npm version that already exists.

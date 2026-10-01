@@ -4,9 +4,9 @@ bgcut releases run from GitHub Actions. npm publication uses Trusted Publishing 
 
 ## Release policy
 
-Public package releases use normal `X.Y.Z` versions. npm publishes them to `latest`, and GitHub creates normal releases.
+Stable releases use `X.Y.Z`, publish to npm `latest`, and create normal GitHub releases. Beta candidates use `X.Y.Z-beta.N`, publish to npm `beta`, and create GitHub prereleases. The workflow rejects other prerelease channels.
 
-`package.json` is the source of truth for the package version. `CHANGELOG.md` is the source of truth for release notes and GitHub release bodies. The hosted `/changelog` page reads that file but renders only full stable `X.Y.Z` release sections. Date-only notes and prerelease sections are not shown on the website.
+`package.json` is the source of truth for the package version. `CHANGELOG.md` is the source of truth for release notes and GitHub release bodies. The hosted `/changelog` page reads that file but renders only full stable `X.Y.Z` release sections. Date-only notes and prerelease sections are not shown on the website. User-facing README, hosted docs, `llms.txt`, and the packaged skill name the base `X.Y.Z` release without a beta label.
 
 Validate the exact package candidate before publication. npm versions are immutable, so the release commit should contain only accepted code, current documentation, and final release metadata.
 
@@ -55,17 +55,18 @@ chore(release):
 
 Normal metadata, documentation, and workflow changes do not publish by themselves.
 
-For a stable release, the workflow:
+For a release commit, the workflow:
 
 1. checks out the exact `main` commit;
 2. installs Bun 1.4.2, Node 24, and npm with Trusted Publishing support;
 3. runs `bun install --frozen-lockfile`;
 4. runs `bun run check`;
 5. reads the package name and version from `package.json`;
-6. publishes the package to npm `latest` when that exact version is not already present;
-7. verifies registry propagation for up to 10 minutes;
-8. extracts the matching version section from `CHANGELOG.md`;
-9. creates or updates the matching `v<version>` GitHub release with those changelog notes.
+6. selects npm `beta` plus a GitHub prerelease for `X.Y.Z-beta.N`, or npm `latest` plus a normal GitHub release for `X.Y.Z`;
+7. publishes the package when that exact version is not already present;
+8. verifies registry propagation for up to 10 minutes;
+9. extracts the matching version section from `CHANGELOG.md`;
+10. creates or updates the matching `v<version>` GitHub release with those changelog notes.
 
 If npm already has the exact version, the workflow skips publication and can repair the GitHub release body without republishing npm.
 
@@ -77,8 +78,8 @@ Before opening the release PR:
 
 1. Merge and accept the product changes first.
 2. Update `README.md`, the hosted `/docs` content, `skills/bgcut/SKILL.md`, privacy text, deployment notes, and engineering records when the behavior changed. If a public feature, runtime, privacy, format, interface, or pricing claim changed, review `docs/operations/search-claims.md` and every listed search surface in the same change.
-3. Add a full stable version section to `CHANGELOG.md` for the package release. Fold any accepted date-only notes that belong to the release into that version section before publication.
-4. Update `package.json` to the final `X.Y.Z` version.
+3. Add the matching version section to `CHANGELOG.md`. Use `X.Y.Z-beta.N` for a beta candidate and `X.Y.Z` for the stable release. Fold accepted notes into the stable section before final publication.
+4. Update `package.json` to the exact release version.
 5. Verify the exact release head:
 
 ```sh
@@ -91,7 +92,7 @@ bun run check
 8. Use this merge title form:
 
 ```text
-chore(release): bgcut vX.Y.Z
+chore(release): bgcut v<version>
 ```
 
 The merge to `main` starts npm publication and GitHub release creation.
@@ -113,7 +114,7 @@ If acceptance finds a package defect, fix it in a new version. Do not overwrite 
 
 ## npm installs
 
-Normal installs use the default `latest` tag:
+Normal user installs use the default `latest` tag:
 
 ```sh
 npx bgcut
@@ -122,6 +123,8 @@ npm install bgcut
 ```
 
 Bun users can run the same package with `bunx bgcut`.
+
+For prerelease acceptance, install the exact candidate or use the npm `beta` tag. Keep those commands in release and testing notes, not in user-facing README, hosted docs, `llms.txt`, or the packaged skill.
 
 ## Packaged agent skill
 
