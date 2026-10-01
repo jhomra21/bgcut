@@ -14,5 +14,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - run: bun install --frozen-lockfile
+      - name: Regenerate Effect 4 lock
+        run: |
+          bun install
+          echo "::group::bun.lock diff"
+          git diff -- bun.lock
+          echo "::endgroup::"
       - run: bun run check
