@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { Script } from "node:vm";
 import { build } from "vite";
 
 import {
@@ -180,6 +181,8 @@ const template = await readFile(clientTemplatePath, "utf8");
 try {
   const server = await buildServerRenderer();
   const hydrationSource = server.hydrationBootstrapSource();
+
+  new Script(hydrationSource, { filename: hydrationAssetName });
 
   await writeFile(hydrationAssetPath, hydrationSource);
 

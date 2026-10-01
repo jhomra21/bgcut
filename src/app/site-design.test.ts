@@ -59,6 +59,12 @@ describe("site design contract", () => {
     expect(serverEntrySource).toContain("renderToString");
     expect(staticRouteSource).toContain('data-bgcut-hydrate');
     expect(staticRouteSource).toContain('solid-hydration.js');
+    expect(staticRouteSource).toContain('import { Script } from "node:vm"');
+    expect(staticRouteSource).toContain(
+      "new Script(hydrationSource, { filename: hydrationAssetName })",
+    );
+    expect(serverEntrySource).toContain('generated.lastIndexOf("</script>")');
+    expect(serverEntrySource).toContain('trailingMarkup !== "<!--xs-->"');
     expect(staticRouteSource).toContain("buildServerRenderer");
     expect(staticRouteSource).not.toContain("staticHome");
     expect(staticRouteSource).not.toContain("staticGuide");

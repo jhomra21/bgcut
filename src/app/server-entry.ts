@@ -19,7 +19,26 @@ export const renderHostedApp = (page: SitePage): string => {
 
 export const hydrationBootstrapSource = (): string => {
   const generated = generateHydrationScript({}).trim();
-  const wrapped = /^<script(?:\s[^>]*)?>([\s\S]*)<\/script>$/u.exec(generated);
+  const openingTagEnd = generated.indexOf(">");
+  const closingTagStart = generated.lastIndexOf("</script>");
 
-  return wrapped?.[1] ?? generated;
+  if (
+    !generated.startsWith("<script") ||
+    openingTagEnd === -1 ||
+    closingTagStart <= openingTagEnd
+  ) {
+    throw new Error("Solid hydration bootstrap did not contain a script wrapper.");
+  }
+
+  const trailingMarkup = generated
+    .slice(closingTagStart + "</script>".length)
+    .trim();
+
+  if (trailingMarkup !== "" && trailingMarkup !== "<!--xs-->") {
+    throw new Error(
+      `Solid hydration bootstrap had unexpected trailing markup: ${trailingMarkup}`,
+    );
+  }
+
+  return generated.slice(openingTagEnd + 1, closingTagStart).trim();
 };
