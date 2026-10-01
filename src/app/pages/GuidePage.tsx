@@ -1,9 +1,9 @@
 import { For, Show } from "@solidjs/web";
 
 import { GUIDES, GUIDE_PAGE_IDS, type Guide, type GuidePageId } from "../../shared/guides";
+import { CodeBlock } from "../components/CodeBlock";
 import { ContentBreadcrumb } from "../components/ContentBreadcrumb";
 import { GuideVisualBlock } from "../components/GuideVisual";
-import { CodeBlock } from "../components/CodeBlock";
 import { ResourcePage } from "../components/ResourcePage";
 
 const pathForGuide = (guide: Guide): string => `/guides/${guide.slug}`;
