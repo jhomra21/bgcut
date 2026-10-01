@@ -54,6 +54,7 @@ export const DocsPage = () => (
 
         <section id="quickstart" class="reference-section doc-section docs-quickstart">
           <h3>Quickstart</h3>
+          <p>These docs describe bgcut <code>0.6.1</code>.</p>
           <p>Run the local web app from npm without installing bgcut globally:</p>
           <CodeBlock language="shell" code="npx bgcut" />
           <p class="docs-related">
@@ -231,10 +232,10 @@ try {
 }`}
           />
 
-          <h4>Migrating from 0.5.x</h4>
+          <h4>Migrating from 0.5.x to 0.6.1</h4>
           <p>
-            Version 0.6 removes the top-level <code>removeBackground()</code> and
-            <code>createBgcut()</code> exports. Open one instance with <code>bgcut()</code>, call
+            bgcut 0.6.1 does not export the old top-level <code>removeBackground()</code> or
+            <code>createBgcut()</code> functions. Open one instance with <code>bgcut()</code>, call
             methods on that instance, and close it when finished. Choose the engine when opening
             the instance. Choose the output format per removal.
           </p>
@@ -248,7 +249,7 @@ const result = await removeBackground("photo.jpg", {
   format: "webp",
 });`}
           />
-          <p>The same call in 0.6:</p>
+          <p>The same call in 0.6.1:</p>
           <CodeBlock
             language="typescript"
             code={`import { bgcut } from "bgcut";
@@ -277,7 +278,7 @@ try {
   await remover.close();
 }`}
           />
-          <p>The same work in 0.6:</p>
+          <p>The same work in 0.6.1:</p>
           <CodeBlock
             language="typescript"
             code={`import { bgcut } from "bgcut";
