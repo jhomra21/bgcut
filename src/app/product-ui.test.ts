@@ -40,6 +40,16 @@ const homeSource = await Bun.file(new URL("./pages/HomePage.tsx", import.meta.ur
 
 const stylesSource = await Bun.file(new URL("./styles.css", import.meta.url)).text();
 
+const guideSource = (
+  await Promise.all(
+    [
+      "../shared/guides.ts",
+      "./components/GuideVisual.tsx",
+      "./pages/GuidePage.tsx",
+    ].map((path) => Bun.file(new URL(path, import.meta.url)).text()),
+  )
+).join("\n");
+
 const sourceInputBlock = (): string => {
   const start = appSource.indexOf('id="source-file-input"');
 
@@ -391,6 +401,18 @@ describe("browser product UI", () => {
     expect(appSource).toContain("skills/bgcut/SKILL.md");
     expect(appSource).toContain("src/node/index.d.ts");
     expect(appSource).toContain('class="resource-grid"');
+  });
+
+  test("publishes the Effect engineering guide with focused visuals", () => {
+    expect(guideSource).toContain('"guide-how-bgcut-uses-effect"');
+    expect(guideSource).toContain('slug: "how-bgcut-uses-effect"');
+    expect(guideSource).toContain("How bgcut uses Effect without making everything Effect");
+    expect(guideSource).toContain('kind: "effect-boundary"');
+    expect(guideSource).toContain('kind: "resource-lifecycle"');
+    expect(guideSource).toContain('class="guide-visual effect-boundary-visual"');
+    expect(guideSource).toContain('class="guide-visual resource-lifecycle-visual"');
+    expect(stylesSource).toContain(".effect-boundary-details");
+    expect(stylesSource).toContain(".resource-lifecycle-flow");
   });
 
   test("keeps website documentation aligned with the shipped runtime behavior", () => {
