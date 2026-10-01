@@ -2,6 +2,14 @@
 
 User-facing changes to bgcut are listed here.
 
+## 0.6.1 - 2026-10-01
+
+- Hosted pages now prerender from the same Solid component tree used in the browser and hydrate the existing DOM. The Cloudflare build produces 27 hydratable routes and checks the hydration script and CSP in its runtime smoke.
+- Updated the hosted app to `solid-js@2.0.0-rc.11`, `@solidjs/web@2.0.0-rc.11`, and `@solidjs/vite-plugin@3.0.0-next.46`. Fixed the transparency checker so file selection and drop handlers remain active after Safari hydration.
+- Expanded bgcut.dev with Guides, Tools, and Compare pages, page-specific search metadata, and current sitemap `lastmod` dates.
+- Migrated the internal Effect dependency to `effect@4.0.0` and added a repository check that rejects removed Effect APIs and obsolete version references.
+- No public Node API, CLI command syntax, background-removal model, or inference algorithm changed in 0.6.1.
+
 ## 0.6.1-beta.0 - 2026-10-01
 
 - Rebuilt hosted static pages from the same Solid component tree used in the browser, then hydrate the prerendered DOM instead of deleting it and rendering the app again. The build now produces 27 hydratable routes and checks the hydration script and CSP in the Cloudflare runtime smoke.
