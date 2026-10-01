@@ -44,6 +44,14 @@ const matchContent = (html: string, pattern: RegExp): string | undefined =>
 const normalizeInternalHref = (href: string): string =>
   (href.split("#", 1)[0] ?? "/").replace(/\/+$/u, "") || "/";
 
+const hydrationScriptSource = (html: string): string | undefined => {
+  const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gu)];
+
+  return scripts.find(
+    (match) => !match[1]?.includes("src=") && match[2]?.includes("_$HY"),
+  )?.[2];
+};
+
 const publicPaths = new Set(
   PUBLIC_SITE_PAGES.map((page) => SITE_PAGE_METADATA[page].path),
 );
@@ -103,10 +111,7 @@ for (const page of PUBLIC_SITE_PAGES) {
   const hydrationMarker =
     `data-bgcut-hydrate="${SITE_HYDRATION_RENDER_ID}"`;
 
-  const hydrationScript = matchContent(
-    html,
-    /<script(?:\s[^>]*)?>([\s\S]*?_\$HY[\s\S]*?)<\/script>/u,
-  );
+  const hydrationScript = hydrationScriptSource(html);
 
   const structuredData = matchContent(
     html,

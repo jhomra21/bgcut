@@ -206,8 +206,10 @@ const verifyHydrationBootstrapResponse = async (): Promise<void> => {
   }
 
   const html = await response.text();
-  const match = /<script(?:\s[^>]*)?>([\s\S]*?_\$HY[\s\S]*?)<\/script>/u.exec(html);
-  const source = match?.[1];
+  const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gu)];
+  const source = scripts.find(
+    (match) => !match[1]?.includes("src=") && match[2]?.includes("_$HY"),
+  )?.[2];
 
   if (source === undefined) {
     throw new Error("Hosted HTML is missing Solid HydrationScript.");
@@ -219,6 +221,7 @@ const verifyHydrationBootstrapResponse = async (): Promise<void> => {
     "SHA-256",
     new TextEncoder().encode(source),
   );
+
   const encodedHash = Buffer.from(hash).toString("base64");
   const csp = response.headers.get("content-security-policy") ?? "";
 
