@@ -5,6 +5,7 @@ import packageJson from "../package.json";
 
 const writingSources = [
   "README.md",
+  "docs/README.md",
   "docs/operations/releasing.md",
   "docs/operations/deploying.md",
   "docs/operations/search-console.md",
@@ -87,8 +88,6 @@ describe("repository documentation", () => {
 
   test("keeps public docs on the base release without prerelease labels", async () => {
     const baseVersion = packageJson.version.split("-", 1)[0] ?? packageJson.version;
-    const versionedPaths = new Set<string>(versionedDocumentationSources);
-
     expect(baseVersion).toMatch(/^\d+\.\d+\.\d+$/u);
 
     for (const [path, content] of await readSources(userFacingSources)) {
@@ -102,7 +101,7 @@ describe("repository documentation", () => {
     for (const [path, content] of await readSources(versionedDocumentationSources)) {
       expect(content, path).toContain(baseVersion);
 
-      if (packageJson.version !== baseVersion && path !== "docs/README.md") {
+      if (packageJson.version !== baseVersion) {
         expect(content, path).not.toContain(packageJson.version);
       }
     }
