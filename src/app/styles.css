@@ -1557,6 +1557,84 @@ figure {
   outline-offset: 3px;
 }
 
+
+.guide-visual {
+  margin: 22px 0 24px;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  background: var(--background-surface);
+  padding: 16px;
+}
+
+.guide-visual-card {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--background-surface);
+  padding: 12px;
+}
+
+.guide-visual-card-emphasis {
+  border-color: var(--border-strong);
+  background: var(--background-subtle);
+}
+
+.guide-visual-label {
+  color: var(--text-heading-secondary);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.guide-visual code {
+  color: var(--text-secondary);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.guide-visual figcaption {
+  max-width: 680px;
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.effect-boundary-stack {
+  display: grid;
+  gap: 0;
+}
+
+.guide-visual-connector {
+  width: 1px;
+  height: 18px;
+  justify-self: center;
+  background: var(--border-strong);
+}
+
+.effect-boundary-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.resource-lifecycle-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.resource-lifecycle-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
 @media (max-width: 640px) {
   .app-header {
     align-items: flex-start;
@@ -1715,6 +1793,15 @@ figure {
   .architecture-grid {
     grid-template-columns: 1fr;
     gap: 18px;
+  }
+
+  .effect-boundary-details,
+  .resource-lifecycle-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-lifecycle-arrow {
+    transform: rotate(90deg);
   }
 
   .resource-grid {

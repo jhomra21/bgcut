@@ -4,6 +4,7 @@ export const GUIDE_PAGE_IDS = [
   "guide-node-js-background-removal",
   "guide-batch-background-removal-cli",
   "guide-how-local-background-removal-works",
+  "guide-how-bgcut-uses-effect",
   "guide-png-webp-jpeg-transparency",
   "guide-background-removal-privacy",
   "guide-browser-cli-node",
@@ -16,12 +17,17 @@ export type GuideCodeBlock = {
   readonly code: string;
 };
 
+export type GuideVisual =
+  | { readonly kind: "effect-boundary" }
+  | { readonly kind: "resource-lifecycle" };
+
 export type GuideSection = {
   readonly id: string;
   readonly title: string;
   readonly paragraphs: readonly string[];
   readonly bullets?: readonly string[];
   readonly code?: GuideCodeBlock;
+  readonly visual?: GuideVisual;
 };
 
 export type Guide = {
@@ -439,6 +445,151 @@ npx bgcut photo.jpg --cpu`,
           "Local inference removes the need to send the image to an inference provider. Other parts of the device and browser still matter, including extensions, endpoint management, shared accounts, local storage, screen capture, and the destination where you later upload the result.",
           "Treat 'no upload' as a specific data-flow property, not a complete security guarantee.",
         ],
+      },
+    ],
+  },
+  "guide-how-bgcut-uses-effect": {
+    page: "guide-how-bgcut-uses-effect",
+    slug: "how-bgcut-uses-effect",
+    title: "How bgcut uses Effect without making everything Effect",
+    description:
+      "See where bgcut 0.6.1 uses Effect for typed failures, fallback, cleanup, model caching, and runtime setup, and why tight image and GPU loops stay plain.",
+    summary:
+      "bgcut uses Effect around work that can fail, allocate resources, or call the filesystem, network, GPU, browser runtime, or ONNX Runtime. Pixel math, preprocessing loops, and GPU command code stay plain TypeScript or TypeGPU.",
+    publishedAt: "2026-10-01",
+    updatedAt: "2026-10-01",
+    sections: [
+      {
+        id: "boundary",
+        title: "The boundary we chose",
+        paragraphs: [
+          "bgcut runs in several environments. The hosted browser uses browser APIs, WebGPU or WebAssembly, and ONNX Runtime. The CLI and Node.js API add Sharp, filesystem access, model caching, and native ONNX Runtime.",
+          "File reads can fail. GPU and ONNX sessions need cleanup. WebGPU may need a local fallback. bgcut uses Effect around GPU setup, image decoding, model downloads, session creation, inference, export, and cleanup. It does not wrap every function in Effect.",
+          "As of bgcut 0.6.1, the internal runtime uses effect@4.0.0. The public Node.js API still returns Promises and async iterables, so callers do not need to know Effect.",
+        ],
+        visual: {
+          kind: "effect-boundary",
+        },
+      },
+      {
+        id: "typed-failures",
+        title: "Failures stay specific",
+        paragraphs: [
+          "Browser failures are tagged data instead of arbitrary thrown values. The error union on each Effect tells the caller which failures can come back from that operation.",
+          "The formatter uses Match.exhaustive. Adding a new error tag without handling it makes the match non-exhaustive instead of silently falling through to a generic message.",
+        ],
+        code: {
+          language: "typescript",
+          code: `export class ModelLoadFailed extends Data.TaggedError(
+  "ModelLoadFailed",
+)<{
+  readonly message: string;
+}> {}
+
+export class InferenceFailed extends Data.TaggedError(
+  "InferenceFailed",
+)<{
+  readonly message: string;
+}> {}
+
+export type BackgroundRemovalError =
+  | GpuRuntimeError
+  | ImageError
+  | ModelDownloadFailed
+  | ModelLoadFailed
+  | InferenceFailed
+  | ExportFailed;`,
+        },
+      },
+      {
+        id: "fallback",
+        title: "Fallback is a decision, not a catch-all",
+        paragraphs: [
+          "Automatic browser mode tries WebGPU first. It falls back to WebAssembly only when shouldFallbackToWasm says the specific error permits it.",
+          "That distinction matters. A bad image should remain an input error. A model failure should not be hidden by switching engines.",
+          "Native auto mode follows the same idea at session creation. It tries WebGPU, then CPU if session creation fails. Explicit gpu and cpu requests do not silently change engines.",
+        ],
+        code: {
+          language: "typescript",
+          code: `const automaticRemoval = (
+  file: File,
+): Effect.Effect<BackgroundRemovalResult, BackgroundRemovalError> =>
+  removeBackgroundWebGpu(file).pipe(
+    Effect.catch((error) =>
+      shouldFallbackToWasm(error)
+        ? removeBackgroundWithWasm(file)
+        : Effect.fail(error),
+    ),
+  );`,
+        },
+      },
+      {
+        id: "resources",
+        title: "Resources have owners",
+        paragraphs: [
+          "Browser removal owns objects that need explicit cleanup, including ImageBitmap instances, GPU input buffers, and some ONNX session leases.",
+          "Effect.acquireUseRelease keeps acquisition, use, and cleanup in one expression. The release step still runs when the use step fails.",
+        ],
+        visual: {
+          kind: "resource-lifecycle",
+        },
+      },
+      {
+        id: "model-cache",
+        title: "The model cache is one typed workflow",
+        paragraphs: [
+          "Native bgcut needs a validated model before it can create a session. The cache workflow checks the current file's size and SHA-256, tries compatible older cache locations, downloads to a temporary file when needed, verifies it, and only then moves it into place.",
+          "Each network and filesystem failure becomes ModelCacheError. The caller gets one typed operation instead of a chain of unrelated promise failures.",
+        ],
+        code: {
+          language: "typescript",
+          code: `const modelPath = yield* ensureCachedModel();
+const nativeSession = yield* createSession(modelPath, engine);`,
+        },
+      },
+      {
+        id: "public-api",
+        title: "Effect stops at the public API",
+        paragraphs: [
+          "The public Node.js API does not return Effect values. runPublicEffect executes the internal Effect, reads its Result, and throws the mapped public error when the operation fails.",
+          "That lets the runtime keep detailed errors such as ModelCacheError, BgcutSessionError, and BgcutInferenceError internally while users work with a smaller BgcutError contract.",
+          "The CLI also has one Effect program and interprets it with runPromiseExit. Argument parsing, local-server startup, runtime failures, and the final exit code share one execution path without changing the Node.js API.",
+        ],
+        code: {
+          language: "typescript",
+          code: `const runPublicEffect = async <A, E extends Error>(
+  effect: Effect.Effect<A, E>,
+): Promise<A> => {
+  const result = await Effect.runPromise(Effect.result(effect));
+
+  if (Result.isFailure(result)) {
+    throw result.failure;
+  }
+
+  return result.success;
+};`,
+        },
+      },
+      {
+        id: "plain-code",
+        title: "Hot loops stay plain",
+        paragraphs: [
+          "Effect is not bgcut's pixel-processing library. Pixel math, preprocessing, compositing, TypeGPU work, and raw WebGPU commands remain normal TypeScript, TypeGPU, or WebGPU code when they already have clear inputs and outputs.",
+          "Those functions do not need an Effect wrapper when they do not own asynchronous resources or expose a failure that the caller needs to distinguish.",
+          "The rule bgcut follows today is simple. Use Effect where failure, cleanup, or runtime control is part of correctness. Keep deterministic math and tight GPU work plain.",
+        ],
+        code: {
+          language: "typescript",
+          code: `const createMask = (logits: Float32Array): Uint8Array => {
+  const alpha = new Uint8Array(logits.length);
+
+  for (let index = 0; index < logits.length; index += 1) {
+    alpha[index] = logitToAlphaByte(logits[index]);
+  }
+
+  return alpha;
+};`,
+        },
       },
     ],
   },

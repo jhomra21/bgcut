@@ -185,6 +185,7 @@ Do not infer support beyond the documented JPEG, PNG, WebP, and AVIF inputs. Pre
 - [Node.js background removal](https://bgcut.dev/guides/node-js-background-removal)
 - [Batch background removal from the CLI](https://bgcut.dev/guides/batch-background-removal-cli)
 - [How local background removal works](https://bgcut.dev/guides/how-local-background-removal-works)
+- [How bgcut uses Effect](https://bgcut.dev/guides/how-bgcut-uses-effect)
 - [PNG vs WebP vs JPEG transparency](https://bgcut.dev/guides/png-webp-jpeg-transparency)
 - [Local remove.bg alternative](https://bgcut.dev/remove-bg-alternative)
 - [Local remove.bg API alternative](https://bgcut.dev/remove-bg-api-alternative)
