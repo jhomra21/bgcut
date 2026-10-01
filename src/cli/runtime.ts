@@ -1,4 +1,4 @@
-import { Data, Effect, Either, Schema } from "effect";
+import { Data, Effect, Schema } from "effect";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
@@ -56,16 +56,16 @@ export class CliRuntimeError extends Data.TaggedError("CliRuntimeError")<{
 
 export const prepareImage = prepareNativeImage;
 
-const decodePath = (input: BgcutInputSource["input"]): string => {
-  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
+const isString = Schema.is(Schema.String);
 
-  if (Either.isLeft(decoded)) {
+const decodePath = (input: BgcutInputSource["input"]): string => {
+  if (!isString(input)) {
     throw new CliRuntimeError({
       message: "CLI removal received an in-memory input unexpectedly.",
     });
   }
 
-  return decoded.right;
+  return input;
 };
 
 const toBatchOutputSource = (

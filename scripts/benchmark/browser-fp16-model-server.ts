@@ -45,15 +45,15 @@ const BenchmarkManifestSchema = Schema.Struct({
   ),
 });
 
-const ModeSchema = Schema.Literal(
+const ModeSchema = Schema.Literals([
   "fp32",
   "fp16",
-);
+]);
 
-const SequenceSchema = Schema.Literal(
+const SequenceSchema = Schema.Literals([
   "fp32-first",
   "fp16-first",
-);
+]);
 
 const BlockSchema = Schema.Struct({
   index: Schema.Number,
@@ -100,10 +100,10 @@ const FailureRecordSchema = Schema.Struct({
   blockIndex: Schema.Number,
   sequence: SequenceSchema,
   mode: ModeSchema,
-  run: Schema.Union(
+  run: Schema.Union([
     Schema.Number,
     Schema.Literal("prime"),
-  ),
+  ]),
   elapsedMs: Schema.Number,
   message: Schema.String,
   stack: Schema.String,

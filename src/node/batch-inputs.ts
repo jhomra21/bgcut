@@ -1,4 +1,4 @@
-import { Data, Either, Schema } from "effect";
+import { Data, Schema } from "effect";
 import { readdir, stat } from "node:fs/promises";
 import { basename, extname, join, relative, resolve } from "node:path";
 
@@ -28,13 +28,12 @@ const DIRECTORY_IMAGE_EXTENSIONS = new Set([
   ".webp",
 ]);
 
+const isString = Schema.is(Schema.String);
+
 const decodePathInput = (
   input: BgcutManyInput,
-): string | undefined => {
-  const decoded = Schema.decodeUnknownEither(Schema.String)(input);
-
-  return Either.isRight(decoded) ? decoded.right : undefined;
-};
+): string | undefined =>
+  isString(input) ? input : undefined;
 
 const isDirectoryImage = (path: string): boolean =>
   DIRECTORY_IMAGE_EXTENSIONS.has(extname(path).toLowerCase());
