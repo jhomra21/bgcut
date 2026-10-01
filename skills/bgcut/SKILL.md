@@ -7,6 +7,8 @@ description: Remove image backgrounds locally with the bgcut local app, CLI, or 
 
 Use `bgcut` for local background removal. Source images stay on the user's machine. The package may download validated model artifacts on first use, but it does not upload source images to an application inference backend.
 
+This skill describes bgcut 0.6.1.
+
 ## Install
 
 Run the packaged local app without a global install:
@@ -205,7 +207,7 @@ Node API failures are `BgcutError` instances. Use `error.code` for programmatic 
 
 ### Migrating Node code from 0.5.x
 
-Version 0.6 does not export the old top-level `removeBackground()` or `createBgcut()` functions.
+bgcut 0.6.1 does not export the old top-level `removeBackground()` or `createBgcut()` functions.
 
 Before, in 0.5.x:
 
@@ -218,7 +220,7 @@ const result = await removeBackground("photo.jpg", {
 });
 ```
 
-After, in 0.6:
+In 0.6.1:
 
 ```ts
 import { bgcut } from "bgcut";
