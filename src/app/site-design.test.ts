@@ -65,10 +65,10 @@ describe("site design contract", () => {
   });
 
   test("keeps the transparency checker on an element Match branch", () => {
-    expect(appSource).toContain('<Match when={props.page === "tool-transparency-checker"}>');
-    expect(appSource).toContain("<TransparencyCheckerPage />");
-    expect(appSource).not.toContain("<Match keyed when={toolPage()}>");
-    expect(appSource).not.toContain("{() => <TransparencyCheckerPage />}");
+    expect(appSources).toContain('<Match when={props.page === "tool-transparency-checker"}>');
+    expect(appSources).toContain("<TransparencyCheckerPage />");
+    expect(appSources).not.toContain("<Match keyed when={toolPage()}>");
+    expect(appSources).not.toContain("{() => <TransparencyCheckerPage />}");
   });
 
   test("hydrates prerendered hosted routes instead of replacing them", () => {
