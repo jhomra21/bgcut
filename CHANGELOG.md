@@ -7,7 +7,7 @@ User-facing changes to bgcut are listed here.
 - Rebuilt hosted static pages from the same Solid component tree used in the browser, then hydrate the prerendered DOM instead of deleting it and rendering the app again. The build now produces 27 hydratable routes and checks the hydration script and CSP in the Cloudflare runtime smoke.
 - Updated the hosted app to `solid-js@2.0.0-rc.11`, `@solidjs/web@2.0.0-rc.11`, and `@solidjs/vite-plugin@3.0.0-next.46`. Fixed the transparency checker branch so file selection and drop handlers stay active after Safari hydration.
 - Expanded bgcut.dev discovery content with Guides, Tools, and Compare pages, added page-specific search metadata, and added accurate sitemap `lastmod` dates.
-- Migrated the internal Effect dependency to `effect@4.0.0`, removed v3-only APIs and lockfile dependencies, and added a repository check that rejects old Effect 3 usage.
+- Migrated the internal Effect dependency to `effect@4.0.0`, removed APIs and lockfile dependencies from the previous Effect version, and added a repository check that rejects removed Effect APIs and version references.
 - No public Node API, CLI command syntax, background-removal model, or inference algorithm changed in this beta.
 
 ## 0.6.0 - 2026-09-28
