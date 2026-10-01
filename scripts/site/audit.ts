@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { SITE_HYDRATION_RENDER_ID } from "../../src/shared/hydration";
 import {
   INDEXED_SITE_PAGES,
   PUBLIC_SITE_PAGES,
@@ -42,6 +44,14 @@ const matchContent = (html: string, pattern: RegExp): string | undefined =>
 const normalizeInternalHref = (href: string): string =>
   (href.split("#", 1)[0] ?? "/").replace(/\/+$/u, "") || "/";
 
+const hydrationScriptSource = (html: string): string | undefined => {
+  const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gu)];
+
+  return scripts.find(
+    (match) => !match[1]?.includes("src=") && match[2]?.includes("_$HY"),
+  )?.[2];
+};
+
 const publicPaths = new Set(
   PUBLIC_SITE_PAGES.map((page) => SITE_PAGE_METADATA[page].path),
 );
@@ -59,6 +69,8 @@ const seenCanonicals = new Set<string>();
 const sitemap = await readFile(resolve(distDirectory, "sitemap.xml"), "utf8");
 
 const robots = await readFile(resolve(distDirectory, "robots.txt"), "utf8");
+
+const headers = await readFile(resolve(distDirectory, "_headers"), "utf8");
 
 check(
   robots.includes("Sitemap: https://bgcut.dev/sitemap.xml"),
@@ -96,6 +108,11 @@ for (const page of PUBLIC_SITE_PAGES) {
 
   const h1Count = html.match(/<h1(?:\s[^>]*)?>/gu)?.length ?? 0;
 
+  const hydrationMarker =
+    `data-bgcut-hydrate="${SITE_HYDRATION_RENDER_ID}"`;
+
+  const hydrationScript = hydrationScriptSource(html);
+
   const structuredData = matchContent(
     html,
     /<script\s+id="site-structured-data"\s+type="application\/ld\+json">([\s\S]*?)<\/script>/u,
@@ -112,6 +129,24 @@ for (const page of PUBLIC_SITE_PAGES) {
   );
   check(ogUrl === canonical, `${metadata.path}: og:url does not match canonical.`);
   check(h1Count === 1, `${metadata.path}: expected one static h1, found ${h1Count}.`);
+  check(
+    html.includes(hydrationMarker),
+    `${metadata.path}: prerendered root is missing its hydration marker.`,
+  );
+  check(
+    hydrationScript !== undefined,
+    `${metadata.path}: Solid HydrationScript is missing.`,
+  );
+
+  if (hydrationScript !== undefined) {
+    const hash = createHash("sha256").update(hydrationScript).digest("base64");
+
+    check(
+      headers.includes(`'sha256-${hash}'`),
+      `${metadata.path}: HydrationScript CSP hash is missing.`,
+    );
+  }
+
   check(structuredData !== undefined, `${metadata.path}: structured data is missing.`);
 
   if (structuredData !== undefined) {

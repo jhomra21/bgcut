@@ -1,9 +1,9 @@
 import { Match, Switch, createSignal, onSettled } from "solid-js";
+import { isServer } from "@solidjs/web";
 
 import { isComparisonPage } from "../shared/comparisons";
 import { isGuidePage } from "../shared/guides";
 import { isIntentPage } from "../shared/intent-pages";
-import { isToolPage } from "../shared/tools";
 import { LocalAppHeader, SiteFooter, SiteHeader } from "./components/SiteChrome";
 import {
   currentPage,
@@ -30,7 +30,6 @@ const PageContent = (props: { readonly page: SitePage }) => {
   const intentPage = () => isIntentPage(props.page) ? props.page : undefined;
   const guidePage = () => isGuidePage(props.page) ? props.page : undefined;
   const comparisonPage = () => isComparisonPage(props.page) ? props.page : undefined;
-  const toolPage = () => isToolPage(props.page) ? props.page : undefined;
 
   return (
     <Switch fallback={<HomePage showIntro />}>
@@ -58,8 +57,8 @@ const PageContent = (props: { readonly page: SitePage }) => {
       <Match when={props.page === "tools"}>
         <ToolIndexPage />
       </Match>
-      <Match keyed when={toolPage()}>
-        {() => <TransparencyCheckerPage />}
+      <Match when={props.page === "tool-transparency-checker"}>
+        <TransparencyCheckerPage />
       </Match>
       <Match when={props.page === "privacy"}>
         <PrivacyPage />
@@ -71,8 +70,19 @@ const PageContent = (props: { readonly page: SitePage }) => {
   );
 };
 
-const App = () => {
-  if (isLocalRuntime()) {
+export type AppRuntime = "hosted" | "local";
+
+export type AppProps = {
+  readonly initialPage?: SitePage;
+  readonly runtime?: AppRuntime;
+};
+
+const App = (props: AppProps = {}) => {
+  const localRuntime =
+    props.runtime === "local" ||
+    (props.runtime === undefined && !isServer && isLocalRuntime());
+
+  if (localRuntime) {
     return (
       <div class="site-root local-app-root">
         <div class="site-header-shell">
@@ -83,12 +93,16 @@ const App = () => {
     );
   }
 
-  const initialPage = currentPage();
+  const initialPage = props.initialPage ?? currentPage();
+
   const [page, setPage] = createSignal<SitePage>(initialPage);
   const [navPage, setNavPage] = createSignal<SitePage>(initialPage);
   const [routePhase, setRoutePhase] = createSignal<RouteTransitionPhase>("idle");
 
-  applySiteMetadata(initialPage);
+  if (!isServer) {
+    applySiteMetadata(initialPage);
+  }
+
   let routeTarget = initialPage;
   let transitionTimer: number | undefined;
   let transitionVersion = 0;

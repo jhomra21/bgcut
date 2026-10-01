@@ -114,9 +114,16 @@ describe("browser product UI", () => {
     expect(appSource).toContain('meta[name="bgcut-runtime"][content="local"]');
     expect(appSource).toContain("const LocalAppHeader = () => (");
 
-    const localStart = appSource.indexOf("if (isLocalRuntime())");
-    const hostedStart = appSource.indexOf("const initialPage = currentPage()", localStart);
+    const localStart = appSource.indexOf("if (localRuntime)");
 
+    const hostedStart = appSource.indexOf(
+      "const initialPage = props.initialPage ?? currentPage()",
+      localStart,
+    );
+
+    expect(appSource).toContain("const localRuntime =");
+    expect(appSource).toContain("props.runtime === \"local\"");
+    expect(appSource).toContain("!isServer && isLocalRuntime()");
     expect(localStart).toBeGreaterThanOrEqual(0);
     expect(hostedStart).toBeGreaterThan(localStart);
 

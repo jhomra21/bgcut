@@ -58,6 +58,10 @@ const routeAssetName = (page: PublicSitePage): string | undefined => {
 };
 
 for (const name of SITE_ROOT_FILES) {
+  if (name === "_headers") {
+    continue;
+  }
+
   await copyFile(join(publicDirectory, name), join(distDirectory, name));
 }
 

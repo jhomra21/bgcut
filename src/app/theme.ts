@@ -1,10 +1,15 @@
 import { createSignal } from "solid-js";
+import { isServer } from "@solidjs/web";
 
 export type SiteTheme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "bgcut-theme";
 
 const storedTheme = (): SiteTheme | undefined => {
+  if (isServer) {
+    return undefined;
+  }
+
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
 
@@ -16,13 +21,19 @@ const storedTheme = (): SiteTheme | undefined => {
 
 const initialTheme: SiteTheme =
   storedTheme() ??
-  (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+  (!isServer && document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 
-document.documentElement.dataset.theme = initialTheme;
+if (!isServer) {
+  document.documentElement.dataset.theme = initialTheme;
+}
 
 const [theme, setTheme] = createSignal<SiteTheme>(initialTheme);
 
 export const syncThemeColor = () => {
+  if (isServer) {
+    return;
+  }
+
   const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 
   if (themeColor === null) {

@@ -12,6 +12,20 @@ const themeBootstrap = await Bun.file(
   new URL("../../public/theme-bootstrap.js", import.meta.url),
 ).text();
 
+const mainSource = await Bun.file(new URL("./main.tsx", import.meta.url)).text();
+
+const staticRouteSource = await Bun.file(
+  new URL("../../scripts/site/prepare-static-routes.ts", import.meta.url),
+).text();
+
+const serverEntrySource = await Bun.file(
+  new URL("./server-entry.ts", import.meta.url),
+).text();
+
+const packageSource = await Bun.file(
+  new URL("../../package.json", import.meta.url),
+).text();
+
 const appSourceFiles: string[] = [];
 
 for await (const path of new Bun.Glob("**/*.{ts,tsx}").scan(import.meta.dir)) {
@@ -38,6 +52,43 @@ describe("site design contract", () => {
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain("@media (prefers-reduced-transparency: reduce)");
     expect(styles).toContain("@media (prefers-contrast: more)");
+  });
+
+  test("uses the current Solid 2 RC hydration stack", () => {
+    expect(packageSource).toContain('"solid-js": "2.0.0-rc.11"');
+    expect(packageSource).toContain('"@solidjs/web": "2.0.0-rc.11"');
+    expect(packageSource).toContain('"@solidjs/vite-plugin": "3.0.0-next.46"');
+    expect(serverEntrySource).toContain("HydrationScript");
+    expect(serverEntrySource).toContain("renderToString");
+    expect(serverEntrySource).not.toContain("generateHydrationScript");
+    expect(staticRouteSource).not.toContain("solid-hydration.js");
+  });
+
+  test("keeps the transparency checker on an element Match branch", () => {
+    expect(appSources).toContain('<Match when={props.page === "tool-transparency-checker"}>');
+    expect(appSources).toContain("<TransparencyCheckerPage />");
+    expect(appSources).not.toContain("<Match keyed when={toolPage()}>");
+    expect(appSources).not.toContain("{() => <TransparencyCheckerPage />}");
+  });
+
+  test("hydrates prerendered hosted routes instead of replacing them", () => {
+    expect(mainSource).toContain('import { hydrate, render } from "@solidjs/web"');
+    expect(mainSource).toContain("root.dataset.bgcutHydrate");
+    expect(mainSource).toContain("hydrate(() => <App />, root");
+    expect(mainSource).toContain("render(() => <App />, root)");
+    expect(mainSource).not.toContain("root.replaceChildren()");
+    expect(serverEntrySource).toContain("renderToString");
+    expect(staticRouteSource).toContain('data-bgcut-hydrate');
+    expect(serverEntrySource).toContain("HydrationScript");
+    expect(serverEntrySource).toContain("renderHydrationScript");
+    expect(staticRouteSource).toContain('import { Script } from "node:vm"');
+    expect(staticRouteSource).toContain("addHydrationCspHash");
+    expect(staticRouteSource).toContain('new Script(hydrationSource, { filename: "Solid HydrationScript" })');
+    expect(staticRouteSource).not.toContain("solid-hydration.js");
+    expect(serverEntrySource).not.toContain("generateHydrationScript");
+    expect(staticRouteSource).toContain("buildServerRenderer");
+    expect(staticRouteSource).not.toContain("staticHome");
+    expect(staticRouteSource).not.toContain("staticGuide");
   });
 
   test("keeps every page inside the same root site bounds", () => {

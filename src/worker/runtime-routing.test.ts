@@ -57,7 +57,9 @@ describe("Cloudflare runtime routing", () => {
   test("ships generated search routes and discovery files through Cloudflare assets", () => {
     expect(packageSource).toContain('"site:prepare-routes"');
     expect(cloudflareBuildSource).toContain('"llms.txt"');
-    expect(cloudflareBuildSource).toContain('GENERATED_SITE_ROOT_FILES = ["sitemap.xml"]');
+    expect(cloudflareBuildSource).toContain(
+      'GENERATED_SITE_ROOT_FILES = ["sitemap.xml"]',
+    );
     expect(cloudflareBuildSource).toContain("PUBLIC_SITE_PAGES");
     expect(cloudflareBuildSource).toContain("routeAssetName");
     expect(cloudflareBuildSource).toContain("SITE_PAGE_METADATA[page].path");

@@ -1,5 +1,6 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { Script } from "node:vm";
 
 import {
   WEBGPU_MODEL_FILENAME,
@@ -197,6 +198,40 @@ const verifyModuleResponse = async (): Promise<void> => {
   }
 };
 
+const verifyHydrationBootstrapResponse = async (): Promise<void> => {
+  const response = await fetch(ORIGIN);
+
+  if (!response.ok) {
+    throw new Error(`Hosted home returned HTTP ${response.status}.`);
+  }
+
+  const html = await response.text();
+
+  const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gu)];
+
+  const source = scripts.find(
+    (match) => !match[1]?.includes("src=") && match[2]?.includes("_$HY"),
+  )?.[2];
+
+  if (source === undefined) {
+    throw new Error("Hosted HTML is missing Solid HydrationScript.");
+  }
+
+  new Script(source, { filename: "Solid HydrationScript" });
+
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(source),
+  );
+
+  const encodedHash = Buffer.from(hash).toString("base64");
+  const csp = response.headers.get("content-security-policy") ?? "";
+
+  if (!csp.includes(`'sha256-${encodedHash}'`)) {
+    throw new Error("Hosted CSP does not authorize Solid HydrationScript.");
+  }
+};
+
 const verifySitePage = async (
   pathname: string,
   expectedTitle: string,
@@ -314,6 +349,7 @@ try {
     await verifyWasmResponse("WebGPU", ORT_WEBGPU_WASM_PUBLIC_PATH);
     await verifyWasmResponse("WebAssembly", ORT_WASM_PUBLIC_PATH);
     await verifyModuleResponse();
+    await verifyHydrationBootstrapResponse();
     await verifySitePage(
       "/docs",
       "bgcut Docs - Browser, CLI and Node.js Background Removal",
@@ -335,7 +371,7 @@ try {
     await verifyDiscoveryFiles();
     await verifySecurityHeaders();
     console.log(
-      "Cloudflare FP16 model, runtime, search-surface, and security-header smoke passed.",
+      "Cloudflare FP16 model, runtime, hydration, search-surface, and security-header smoke passed.",
     );
   } finally {
     worker.kill();
