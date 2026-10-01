@@ -19,11 +19,13 @@ const writingSources = [
   "tools/oxlint/anti-slop/UPSTREAM.md",
   "src/app/App.tsx",
   "src/app/components/SiteChrome.tsx",
+  "src/app/components/GuideVisual.tsx",
   "src/app/pages/HomePage.tsx",
   "src/app/pages/ChangelogPage.tsx",
   "src/app/pages/DocsPage.tsx",
   "src/app/pages/PrivacyPage.tsx",
   "src/app/pages/TermsPage.tsx",
+  "src/shared/guides.ts",
 ] as const;
 
 const userFacingSources = [
@@ -32,6 +34,7 @@ const userFacingSources = [
   "skills/bgcut/SKILL.md",
   "src/app/App.tsx",
   "src/app/components/CodeBlock.tsx",
+  "src/app/components/GuideVisual.tsx",
   "src/app/components/ContentBreadcrumb.tsx",
   "src/app/components/ReferencePage.tsx",
   "src/app/components/ResourceNavRail.tsx",
