@@ -26,7 +26,7 @@ const SITE_ROOT_FILES = [
   "theme-bootstrap.js",
 ] as const;
 
-const GENERATED_SITE_ROOT_FILES = ["sitemap.xml", "solid-hydration.js"] as const;
+const GENERATED_SITE_ROOT_FILES = ["sitemap.xml"] as const;
 
 const walkFiles = async (directory: string): Promise<readonly string[]> => {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -58,6 +58,10 @@ const routeAssetName = (page: PublicSitePage): string | undefined => {
 };
 
 for (const name of SITE_ROOT_FILES) {
+  if (name === "_headers") {
+    continue;
+  }
+
   await copyFile(join(publicDirectory, name), join(distDirectory, name));
 }
 

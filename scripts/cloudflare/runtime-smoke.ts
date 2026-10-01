@@ -199,33 +199,32 @@ const verifyModuleResponse = async (): Promise<void> => {
 };
 
 const verifyHydrationBootstrapResponse = async (): Promise<void> => {
-  const response = await fetch(`${ORIGIN}/solid-hydration.js`);
+  const response = await fetch(ORIGIN);
 
   if (!response.ok) {
-    throw new Error(`Solid hydration bootstrap returned HTTP ${response.status}.`);
+    throw new Error(`Hosted home returned HTTP ${response.status}.`);
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
+  const html = await response.text();
+  const match = /<script(?:\s[^>]*)?>([\s\S]*?_\$HY[\s\S]*?)<\/script>/u.exec(html);
+  const source = match?.[1];
 
-  if (!contentType.includes("javascript")) {
-    throw new Error(
-      `Solid hydration bootstrap returned ${contentType || "no content type"} instead of JavaScript.`,
-    );
+  if (source === undefined) {
+    throw new Error("Hosted HTML is missing Solid HydrationScript.");
   }
 
-  const source = await response.text();
-  const trimmedSource = source.trim();
+  new Script(source, { filename: "Solid HydrationScript" });
 
-  if (
-    trimmedSource.length === 0 ||
-    trimmedSource.startsWith("<script") ||
-    trimmedSource.includes("</script>") ||
-    trimmedSource.includes("<!--xs-->")
-  ) {
-    throw new Error("Solid hydration bootstrap still contains HTML wrapper markup.");
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(source),
+  );
+  const encodedHash = Buffer.from(hash).toString("base64");
+  const csp = response.headers.get("content-security-policy") ?? "";
+
+  if (!csp.includes(`'sha256-${encodedHash}'`)) {
+    throw new Error("Hosted CSP does not authorize Solid HydrationScript.");
   }
-
-  new Script(source, { filename: "solid-hydration.js" });
 };
 
 const verifySitePage = async (

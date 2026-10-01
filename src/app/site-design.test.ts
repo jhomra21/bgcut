@@ -58,13 +58,13 @@ describe("site design contract", () => {
     expect(mainSource).not.toContain("root.replaceChildren()");
     expect(serverEntrySource).toContain("renderToString");
     expect(staticRouteSource).toContain('data-bgcut-hydrate');
-    expect(staticRouteSource).toContain('solid-hydration.js');
+    expect(serverEntrySource).toContain("HydrationScript");
+    expect(serverEntrySource).toContain("renderHydrationScript");
     expect(staticRouteSource).toContain('import { Script } from "node:vm"');
-    expect(staticRouteSource).toContain(
-      "new Script(hydrationSource, { filename: hydrationAssetName })",
-    );
-    expect(serverEntrySource).toContain('generated.lastIndexOf("</script>")');
-    expect(serverEntrySource).toContain('trailingMarkup !== "<!--xs-->"');
+    expect(staticRouteSource).toContain("addHydrationCspHash");
+    expect(staticRouteSource).toContain('new Script(hydrationSource, { filename: "Solid HydrationScript" })');
+    expect(staticRouteSource).not.toContain("solid-hydration.js");
+    expect(serverEntrySource).not.toContain("generateHydrationScript");
     expect(staticRouteSource).toContain("buildServerRenderer");
     expect(staticRouteSource).not.toContain("staticHome");
     expect(staticRouteSource).not.toContain("staticGuide");

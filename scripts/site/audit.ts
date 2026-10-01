@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -61,6 +62,8 @@ const sitemap = await readFile(resolve(distDirectory, "sitemap.xml"), "utf8");
 
 const robots = await readFile(resolve(distDirectory, "robots.txt"), "utf8");
 
+const headers = await readFile(resolve(distDirectory, "_headers"), "utf8");
+
 check(
   robots.includes("Sitemap: https://bgcut.dev/sitemap.xml"),
   "robots.txt must advertise the production sitemap.",
@@ -100,8 +103,10 @@ for (const page of PUBLIC_SITE_PAGES) {
   const hydrationMarker =
     `data-bgcut-hydrate="${SITE_HYDRATION_RENDER_ID}"`;
 
-  const hydrationBootstrap =
-    '<script src="/solid-hydration.js"></script>';
+  const hydrationScript = matchContent(
+    html,
+    /<script(?:\s[^>]*)?>([\s\S]*?_\$HY[\s\S]*?)<\/script>/u,
+  );
 
   const structuredData = matchContent(
     html,
@@ -124,9 +129,18 @@ for (const page of PUBLIC_SITE_PAGES) {
     `${metadata.path}: prerendered root is missing its hydration marker.`,
   );
   check(
-    html.includes(hydrationBootstrap),
-    `${metadata.path}: Solid hydration bootstrap is missing.`,
+    hydrationScript !== undefined,
+    `${metadata.path}: Solid HydrationScript is missing.`,
   );
+
+  if (hydrationScript !== undefined) {
+    const hash = createHash("sha256").update(hydrationScript).digest("base64");
+
+    check(
+      headers.includes(`'sha256-${hash}'`),
+      `${metadata.path}: HydrationScript CSP hash is missing.`,
+    );
+  }
   check(structuredData !== undefined, `${metadata.path}: structured data is missing.`);
 
   if (structuredData !== undefined) {

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -24,13 +25,11 @@ const ssrEntryPath = resolve(ssrDirectory, "server-entry.mjs");
 
 const clientTemplatePath = resolve(distDirectory, "index.html");
 
-const hydrationAssetName = "solid-hydration.js";
-
-const hydrationAssetPath = resolve(distDirectory, hydrationAssetName);
+const headersPath = resolve(distDirectory, "_headers");
 
 type ServerRenderer = {
   readonly renderHostedApp: (page: PublicSitePage) => string;
-  readonly hydrationBootstrapSource: () => string;
+  readonly renderHydrationScript: () => string;
 };
 
 const htmlEscape = (value: string): string =>
@@ -88,10 +87,44 @@ const buildServerRenderer = async (): Promise<ServerRenderer> => {
   }
 };
 
+const hydrationScriptSource = (markup: string): string => {
+  const openingTagEnd = markup.indexOf(">");
+  const closingTagStart = markup.lastIndexOf("</script>");
+
+  if (
+    !markup.startsWith("<script") ||
+    openingTagEnd === -1 ||
+    closingTagStart <= openingTagEnd
+  ) {
+    throw new Error("Solid HydrationScript did not render a script element.");
+  }
+
+  return markup.slice(openingTagEnd + 1, closingTagStart);
+};
+
+const addHydrationCspHash = async (source: string): Promise<void> => {
+  const hash = createHash("sha256").update(source).digest("base64");
+  const token = `'sha256-${hash}'`;
+  const headers = await readFile(headersPath, "utf8");
+
+  if (!headers.includes("script-src ")) {
+    throw new Error("Cloudflare headers are missing the script-src CSP directive.");
+  }
+
+  const updated = headers.replace(
+    /(script-src [^;\n]+)(;)/u,
+    (full, directive: string, suffix: string) =>
+      directive.includes(token) ? full : `${directive} ${token}${suffix}`,
+  );
+
+  await writeFile(headersPath, updated);
+};
+
 const renderPageHtml = (
   template: string,
   page: PublicSitePage,
   appHtml: string,
+  hydrationMarkup: string,
 ): string => {
   const metadata = SITE_PAGE_METADATA[page];
 
@@ -141,7 +174,7 @@ const renderPageHtml = (
     )
     .replace(
       '<script src="/theme-bootstrap.js"></script>',
-      '<script src="/theme-bootstrap.js"></script>\n    <script src="/solid-hydration.js"></script>',
+      `<script src="/theme-bootstrap.js"></script>\n    ${hydrationMarkup}`,
     )
     .replace(
       '<div id="root"></div>',
@@ -180,15 +213,15 @@ const template = await readFile(clientTemplatePath, "utf8");
 
 try {
   const server = await buildServerRenderer();
-  const hydrationSource = server.hydrationBootstrapSource();
+  const hydrationMarkup = server.renderHydrationScript();
+  const hydrationSource = hydrationScriptSource(hydrationMarkup);
 
-  new Script(hydrationSource, { filename: hydrationAssetName });
-
-  await writeFile(hydrationAssetPath, hydrationSource);
+  new Script(hydrationSource, { filename: "Solid HydrationScript" });
+  await addHydrationCspHash(hydrationSource);
 
   for (const page of PUBLIC_SITE_PAGES) {
     const appHtml = server.renderHostedApp(page);
-    const html = renderPageHtml(template, page, appHtml);
+    const html = renderPageHtml(template, page, appHtml, hydrationMarkup);
     const outputPath = outputPathForPage(page, clientTemplatePath);
 
     await mkdir(dirname(outputPath), { recursive: true });

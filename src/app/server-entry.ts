@@ -1,6 +1,6 @@
 import {
+  HydrationScript,
   createComponent,
-  generateHydrationScript,
   renderToString,
 } from "@solidjs/web";
 
@@ -17,28 +17,8 @@ export const renderHostedApp = (page: SitePage): string => {
   );
 };
 
-export const hydrationBootstrapSource = (): string => {
-  const generated = generateHydrationScript({}).trim();
-  const openingTagEnd = generated.indexOf(">");
-  const closingTagStart = generated.lastIndexOf("</script>");
-
-  if (
-    !generated.startsWith("<script") ||
-    openingTagEnd === -1 ||
-    closingTagStart <= openingTagEnd
-  ) {
-    throw new Error("Solid hydration bootstrap did not contain a script wrapper.");
-  }
-
-  const trailingMarkup = generated
-    .slice(closingTagStart + "</script>".length)
-    .trim();
-
-  if (trailingMarkup !== "" && trailingMarkup !== "<!--xs-->") {
-    throw new Error(
-      `Solid hydration bootstrap had unexpected trailing markup: ${trailingMarkup}`,
-    );
-  }
-
-  return generated.slice(openingTagEnd + 1, closingTagStart).trim();
-};
+export const renderHydrationScript = (): string =>
+  renderToString(
+    () => createComponent(HydrationScript, {}),
+    { renderId: SITE_HYDRATION_RENDER_ID },
+  );

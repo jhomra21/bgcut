@@ -58,7 +58,7 @@ describe("Cloudflare runtime routing", () => {
     expect(packageSource).toContain('"site:prepare-routes"');
     expect(cloudflareBuildSource).toContain('"llms.txt"');
     expect(cloudflareBuildSource).toContain(
-      'GENERATED_SITE_ROOT_FILES = ["sitemap.xml", "solid-hydration.js"]',
+      'GENERATED_SITE_ROOT_FILES = ["sitemap.xml"]',
     );
     expect(cloudflareBuildSource).toContain("PUBLIC_SITE_PAGES");
     expect(cloudflareBuildSource).toContain("routeAssetName");
