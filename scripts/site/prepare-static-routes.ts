@@ -25,6 +25,8 @@ const ssrEntryPath = resolve(ssrDirectory, "server-entry.mjs");
 
 const clientTemplatePath = resolve(distDirectory, "index.html");
 
+const publicHeadersPath = resolve(root, "public/_headers");
+
 const headersPath = resolve(distDirectory, "_headers");
 
 type ServerRenderer = {
@@ -105,7 +107,7 @@ const hydrationScriptSource = (markup: string): string => {
 const addHydrationCspHash = async (source: string): Promise<void> => {
   const hash = createHash("sha256").update(source).digest("base64");
   const token = `'sha256-${hash}'`;
-  const headers = await readFile(headersPath, "utf8");
+  const headers = await readFile(publicHeadersPath, "utf8");
 
   if (!headers.includes("script-src ")) {
     throw new Error("Cloudflare headers are missing the script-src CSP directive.");
