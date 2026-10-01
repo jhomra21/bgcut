@@ -50,6 +50,16 @@ describe("site design contract", () => {
     expect(styles).toContain("@media (prefers-contrast: more)");
   });
 
+  test("uses the current Solid 2 RC hydration stack", () => {
+    expect(packageJson.devDependencies["solid-js"]).toBe("2.0.0-rc.11");
+    expect(packageJson.devDependencies["@solidjs/web"]).toBe("2.0.0-rc.11");
+    expect(packageJson.devDependencies["@solidjs/vite-plugin"]).toBe("3.0.0-next.46");
+    expect(serverEntrySource).toContain("HydrationScript");
+    expect(serverEntrySource).toContain("renderToString");
+    expect(serverEntrySource).not.toContain("generateHydrationScript");
+    expect(staticRouteSource).not.toContain("solid-hydration.js");
+  });
+
   test("hydrates prerendered hosted routes instead of replacing them", () => {
     expect(mainSource).toContain('import { hydrate, render } from "@solidjs/web"');
     expect(mainSource).toContain("root.dataset.bgcutHydrate");

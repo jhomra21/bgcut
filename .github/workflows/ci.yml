@@ -14,10 +14,5 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - name: Regenerate Solid 2 RC lock
-        run: |
-          bun install
-          echo "::group::bun.lock diff"
-          git diff -- bun.lock
-          echo "::endgroup::"
+      - run: bun install --frozen-lockfile
       - run: bun run check
