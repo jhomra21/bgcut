@@ -32,7 +32,7 @@ const source = await output.text();
 for (const expected of [
   "sam21-tiny",
   "edgetam",
-  "VideoSampleSink",
+  "The benchmark input has no video track.",
 ]) {
   if (!source.includes(expected)) {
     throw new Error(
