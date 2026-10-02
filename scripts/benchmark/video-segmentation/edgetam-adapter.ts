@@ -1,6 +1,7 @@
 import * as ort from "onnxruntime-web/webgpu";
 
 import {
+  addChannelBias,
   channelsToTokens,
   closeVideoSessions,
   concatenateFloat32,
@@ -525,6 +526,19 @@ export const createEdgeTamAdapter =
       throw error;
     }
 
+    const noMemoryEmbedding =
+      constants
+        .no_memory_embedding;
+
+    if (
+      noMemoryEmbedding ===
+      undefined
+    ) {
+      throw new Error(
+        "EdgeTAM constants are missing no_memory_embedding.",
+      );
+    }
+
     const bank =
       new EdgeMemoryBank(
         constants
@@ -709,7 +723,23 @@ export const createEdgeTamAdapter =
         const decoded =
           await decode(
             vision,
-            vision.feats2,
+            new ort.Tensor(
+              "float32",
+              addChannelBias(
+                floatData(
+                  vision.feats2,
+                  "EdgeTAM feats2",
+                ),
+                FEATURE_CHANNELS,
+                noMemoryEmbedding,
+              ),
+              [
+                1,
+                FEATURE_CHANNELS,
+                FEATURE_SIDE,
+                FEATURE_SIDE,
+              ],
+            ),
             promptTensors,
           );
 
