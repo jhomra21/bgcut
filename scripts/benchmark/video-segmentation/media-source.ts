@@ -57,6 +57,7 @@ export const openMediaBunnyVideoSource = async (
     }
 
     const firstTimestamp = await track.getFirstTimestamp();
+
     const duration =
       (await input.getDurationFromMetadata([track], {
         skipLiveWait: true,
