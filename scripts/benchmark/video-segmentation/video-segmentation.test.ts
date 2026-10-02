@@ -11,15 +11,24 @@ import {
 } from "./report";
 
 describe("video segmentation bake-off", () => {
-  test("compares the two full temporal ONNX candidates on the same input geometry", () => {
+  test("compares the two deployable temporal candidates", () => {
     const sam = VIDEO_SEGMENTATION_CANDIDATES["sam21-tiny"];
     const edge = VIDEO_SEGMENTATION_CANDIDATES.edgetam;
 
-    expect(sam.inputSize).toBe(1024);
+    expect(sam.inputSize).toBe(512);
     expect(edge.inputSize).toBe(1024);
-    expect(sam.artifacts.map((artifact) => artifact.role)).toEqual(
-      edge.artifacts.map((artifact) => artifact.role),
-    );
+    expect(
+      sam.artifacts.some(
+        (artifact) =>
+          artifact.role === "pointer-tpos",
+      ),
+    ).toBe(true);
+    expect(
+      edge.artifacts.some(
+        (artifact) =>
+          artifact.role === "pointer-tpos",
+      ),
+    ).toBe(false);
     expect(sam.license).toBe("Apache-2.0");
     expect(edge.license).toBe("Apache-2.0");
     expect(reportedModelSizeMb(edge)).toBeLessThan(
