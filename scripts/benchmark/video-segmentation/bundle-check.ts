@@ -10,6 +10,10 @@ const result = await Bun.build({
       import.meta.dir,
       "probe-client.ts",
     ),
+    join(
+      import.meta.dir,
+      "temporal-smoke-client.ts",
+    ),
   ],
   target: "browser",
   format: "esm",
@@ -25,9 +29,9 @@ if (!result.success) {
   );
 }
 
-if (result.outputs.length !== 2) {
+if (result.outputs.length !== 3) {
   throw new Error(
-    `Video segmentation benchmark produced ${result.outputs.length} browser bundles instead of two.`,
+    `Video segmentation benchmark produced ${result.outputs.length} browser bundles instead of three.`,
   );
 }
 
@@ -44,6 +48,7 @@ for (const expected of [
   "edgetam",
   "The benchmark input has no video track.",
   "Video model probe requires WebGPU.",
+  "VIDEO TEMPORAL SMOKE FAILED",
 ]) {
   if (!combined.includes(expected)) {
     throw new Error(
