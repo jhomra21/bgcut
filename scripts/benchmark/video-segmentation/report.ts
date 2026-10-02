@@ -13,6 +13,7 @@ const percentile = (
   }
 
   const sorted = values.toSorted((a, b) => a - b);
+
   const index = Math.min(
     sorted.length - 1,
     Math.max(
@@ -83,11 +84,13 @@ export const summarizeVideoSegmentationFrames = (
 ): VideoSegmentationBenchmarkReport["summary"] => {
   const decode = frames.map((frame) => frame.decodeMs);
   const inference = frames.map((frame) => frame.inferenceMs);
+
   const temporalIou = frames.flatMap((frame) =>
     frame.temporalMaskIou === null
       ? []
       : [frame.temporalMaskIou],
   );
+
   const totalInferenceMs = inference.reduce(
     (sum, duration) => sum + duration,
     0,
