@@ -6,6 +6,10 @@ const result = await Bun.build({
       import.meta.dir,
       "client-smoke.ts",
     ),
+    join(
+      import.meta.dir,
+      "probe-client.ts",
+    ),
   ],
   target: "browser",
   format: "esm",
@@ -21,20 +25,27 @@ if (!result.success) {
   );
 }
 
-const output = result.outputs.at(0);
-
-if (output === undefined) {
-  throw new Error("Video segmentation benchmark produced no browser bundle.");
+if (result.outputs.length !== 2) {
+  throw new Error(
+    `Video segmentation benchmark produced ${result.outputs.length} browser bundles instead of two.`,
+  );
 }
 
-const source = await output.text();
+const sources = await Promise.all(
+  result.outputs.map(
+    (output) => output.text(),
+  ),
+);
+
+const combined = sources.join("\n");
 
 for (const expected of [
   "sam21-tiny",
   "edgetam",
   "The benchmark input has no video track.",
+  "Video model probe requires WebGPU.",
 ]) {
-  if (!source.includes(expected)) {
+  if (!combined.includes(expected)) {
     throw new Error(
       `Video segmentation bundle is missing ${expected}.`,
     );
