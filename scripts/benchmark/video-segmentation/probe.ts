@@ -31,30 +31,34 @@ export type VideoModelProbeReport = {
   readonly graphs: readonly VideoModelProbeGraphReport[];
 };
 
+type GraphArtifact = VideoModelArtifact & {
+  readonly role: VideoModelGraphRole;
+};
+
 type LoadedGraph = {
-  readonly artifact: VideoModelArtifact & {
-    readonly role: VideoModelGraphRole;
-  };
+  readonly artifact: GraphArtifact;
   readonly bytes: Uint8Array;
   readonly response: Response;
   readonly downloadMs: number;
 };
 
+const isGraphArtifact = (
+  artifact: VideoModelArtifact,
+): artifact is GraphArtifact =>
+  artifact.role !== "constants";
+
 const graphArtifacts = (
   candidate: VideoSegmentationCandidate,
-): readonly LoadedGraph["artifact"][] =>
-  candidate.artifacts.flatMap((artifact) =>
-    artifact.role === "constants"
-      ? []
-      : [
-          artifact as LoadedGraph["artifact"],
-        ],
+): readonly GraphArtifact[] =>
+  candidate.artifacts.filter(
+    isGraphArtifact,
   );
 
 const fetchGraph = async (
   artifact: LoadedGraph["artifact"],
 ): Promise<LoadedGraph> => {
   const startedAt = performance.now();
+
   const response = await fetch(
     artifact.url,
     {
@@ -93,6 +97,7 @@ export const probeVideoSegmentationCandidate = async (
       globalThis.location.href,
     ),
   };
+
   ort.env.webgpu.powerPreference =
     "high-performance";
 
