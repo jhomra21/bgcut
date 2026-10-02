@@ -5,6 +5,7 @@ import {
 } from "bun:test";
 
 import {
+  addChannelBias,
   channelsToTokens,
   concatenateFloat32,
   temporalPositions,
@@ -14,6 +15,32 @@ import {
 describe(
   "video segmentation runtime helpers",
   () => {
+    test(
+      "adds a channel bias across a channel-first feature map",
+      () => {
+        expect([
+          ...addChannelBias(
+            new Float32Array([
+              1,
+              2,
+              3,
+              4,
+            ]),
+            2,
+            [
+              10,
+              20,
+            ],
+          ),
+        ]).toEqual([
+          11,
+          12,
+          23,
+          24,
+        ]);
+      },
+    );
+
     test(
       "round-trips channel-first features through token-major memory layout",
       () => {
