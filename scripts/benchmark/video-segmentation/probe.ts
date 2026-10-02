@@ -12,7 +12,7 @@ export type VideoModelProbeValueMetadata = {
   readonly name: string;
   readonly isTensor: boolean;
   readonly type: string | null;
-  readonly shape: readonly (number | string)[] | null;
+  readonly tensorDimensions: readonly (number | string)[] | null;
 };
 
 export type VideoModelProbeGraphReport = {
@@ -106,7 +106,7 @@ const metadataOf = (
             name: value.name,
             isTensor: true,
             type: value.type,
-            shape: [
+            tensorDimensions: [
               ...value.shape,
             ],
           }
@@ -114,13 +114,13 @@ const metadataOf = (
             name: value.name,
             isTensor: false,
             type: null,
-            shape: null,
+            tensorDimensions: null,
           },
   );
 
 const failedGraphReport = (
   artifact: GraphArtifact,
-  error: unknown,
+  message: string,
   loaded?: LoadedGraph,
 ): VideoModelProbeGraphReport => ({
   role: artifact.role,
@@ -143,10 +143,7 @@ const failedGraphReport = (
   sessionMs: null,
   inputs: [],
   outputs: [],
-  error:
-    error instanceof Error
-      ? error.message
-      : String(error),
+  error: message,
 });
 
 export const probeVideoSegmentationCandidate = async (
@@ -191,7 +188,9 @@ export const probeVideoSegmentationCandidate = async (
         graphs.push(
           failedGraphReport(
             artifact,
-            error,
+            error instanceof Error
+              ? error.message
+              : String(error),
           ),
         );
 
@@ -259,12 +258,7 @@ export const probeVideoSegmentationCandidate = async (
         graphs.push(
           failedGraphReport(
             artifact,
-            new Error(
-              `${candidate.label} ${artifact.role} could not create an ONNX Runtime WebGPU session. ${error instanceof Error ? error.message : String(error)}`,
-              {
-                cause: error,
-              },
-            ),
+            `${candidate.label} ${artifact.role} could not create an ONNX Runtime WebGPU session. ${error instanceof Error ? error.message : String(error)}`,
             loaded,
           ),
         );
