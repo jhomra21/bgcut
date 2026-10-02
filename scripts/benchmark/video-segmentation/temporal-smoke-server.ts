@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import {
   mkdir,
   writeFile,
@@ -176,16 +177,19 @@ const html = `<!doctype html>
 </html>
 `;
 
+const ResultEnvelopeSchema =
+  Schema.Struct({
+    candidate:
+      Schema.String,
+  });
+
 const safeCandidate = (
-  raw: unknown,
+  raw: string,
 ): string =>
-  typeof raw ===
-    "string"
-    ? raw.replace(
-        /[^a-z0-9-]/giu,
-        "_",
-      )
-    : "unknown";
+  raw.replace(
+    /[^a-z0-9-]/giu,
+    "_",
+  );
 
 const app =
   Bun.serve({
@@ -284,14 +288,16 @@ const app =
         const value =
           await request.json();
 
+        const envelope =
+          Schema.decodeUnknownSync(
+            ResultEnvelopeSchema,
+          )(
+            value,
+          );
+
         const candidate =
           safeCandidate(
-            (
-              value as {
-                candidate?:
-                  unknown;
-              }
-            ).candidate,
+            envelope.candidate,
           );
 
         const kind =
