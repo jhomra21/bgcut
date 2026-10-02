@@ -22,6 +22,12 @@ const ModelConstantsSchema = Schema.Struct({
         Schema.Number,
       ),
     ),
+  no_memory_embedding:
+    Schema.optional(
+      Schema.Array(
+        Schema.Number,
+      ),
+    ),
 });
 
 export type VideoModelConstants =
@@ -325,6 +331,63 @@ export const floatData = (
   }
 
   return tensor.data;
+};
+
+export const addChannelBias = (
+  channels: Float32Array,
+  channelCount: number,
+  bias: readonly number[],
+): Float32Array => {
+  if (
+    bias.length !==
+      channelCount ||
+    channels.length %
+      channelCount !==
+      0
+  ) {
+    throw new Error(
+      "Channel bias geometry does not match the feature tensor.",
+    );
+  }
+
+  const pixelsPerChannel =
+    channels.length /
+    channelCount;
+
+  const result =
+    channels.slice();
+
+  for (
+    let channel = 0;
+    channel <
+    channelCount;
+    channel += 1
+  ) {
+    const value =
+      bias[channel] ??
+      0;
+
+    const start =
+      channel *
+      pixelsPerChannel;
+
+    const end =
+      start +
+      pixelsPerChannel;
+
+    for (
+      let index = start;
+      index < end;
+      index += 1
+    ) {
+      result[index] =
+        (result[index] ??
+          0) +
+        value;
+    }
+  }
+
+  return result;
 };
 
 export const channelsToTokens = (
