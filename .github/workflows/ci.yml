@@ -17,24 +17,41 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
 
-
-  video-model-probe:
+  video-temporal-smoke:
     if: github.event_name == 'pull_request' && github.head_ref == 'research/video-segmentation-bakeoff'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - name: Probe SAM 2.1 Tiny and EdgeTAM with SwiftShader WebGPU
+      - name: Run two-frame EdgeTAM and SAM 2.1 temporal smoke
         shell: bash
         run: |
           set -euo pipefail
 
-          ROOT="$RUNNER_TEMP/video-model-probe"
+          ROOT="$RUNNER_TEMP/video-temporal-smoke"
           mkdir -p "$ROOT"
+
+          bun run benchmark:video-segmentation:temporal-smoke -- "$ROOT" 4189 >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4189/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
 
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
           if [[ -z "$CHROME" ]]; then
@@ -42,22 +59,11 @@ jobs:
             exit 1
           fi
 
-          probe_candidate() {
+          run_candidate() {
             local candidate="$1"
-            local port="$2"
-            local output="$ROOT/$candidate"
-            local status="infra-failure"
-            mkdir -p "$output"
-
-            bun run benchmark:video-segmentation:probe -- "$output" "$port" >"$output/server.log" 2>&1 &
-            local server_pid=$!
-
-            for _ in {1..60}; do
-              if curl --fail --silent "http://127.0.0.1:$port/" >/dev/null; then
-                break
-              fi
-              sleep 1
-            done
+            local result="$ROOT/$candidate-result.json"
+            local failure="$ROOT/$candidate-failure.json"
+            rm -f "$result" "$failure"
 
             "$CHROME" \
               --headless=new \
@@ -69,50 +75,50 @@ jobs:
               --enable-webgpu-developer-features \
               --use-gpu-in-tests \
               --enable-accelerated-2d-canvas \
-              "http://127.0.0.1:$port/?candidate=$candidate" >"$output/chrome.log" 2>&1 &
-            local chrome_pid=$!
+              "http://127.0.0.1:4189/?candidate=$candidate" >"$ROOT/$candidate-chrome.log" 2>&1 &
+            CHROME_PID=$!
 
-            for _ in {1..1500}; do
-              if [[ -f "$output/video-model-probe.json" ]]; then
-                if grep -q '"compatible": false' "$output/video-model-probe.json"; then
-                  status="model-failure"
-                else
-                  status="compatible"
-                fi
-                cat "$output/video-model-probe.json"
-                break
+            for _ in {1..2400}; do
+              if [[ -f "$result" ]]; then
+                cat "$result"
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 0
               fi
 
-              if [[ -f "$output/video-model-probe-failure.json" ]]; then
-                status="model-failure"
-                cat "$output/video-model-probe-failure.json" >&2
-                break
+              if [[ -f "$failure" ]]; then
+                cat "$failure" >&2
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 1
               fi
 
-              if ! kill -0 "$chrome_pid" 2>/dev/null; then
-                echo "Chrome exited before the $candidate probe completed." >&2
-                cat "$output/chrome.log" >&2 || true
-                break
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                echo "Chrome exited before the $candidate temporal smoke completed." >&2
+                cat "$ROOT/$candidate-chrome.log" >&2 || true
+                unset CHROME_PID
+                return 1
               fi
 
               sleep 1
             done
 
-            kill "$chrome_pid" 2>/dev/null || true
-            kill "$server_pid" 2>/dev/null || true
-
-            echo "$candidate $status" | tee "$output/status.txt"
+            echo "$candidate temporal smoke timed out." >&2
+            cat "$ROOT/server.log" >&2 || true
+            cat "$ROOT/$candidate-chrome.log" >&2 || true
+            kill "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+            return 1
           }
 
-          probe_candidate edgetam 4187
-          probe_candidate sam21-tiny 4188
+          failed=0
+          run_candidate edgetam || failed=1
+          run_candidate sam21-fp32 || failed=1
 
-          echo
-          echo "Video model compatibility results:"
-          cat "$ROOT"/*/status.txt
+          exit "$failed"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: video-model-probe
-          path: ${{ runner.temp }}/video-model-probe
+          name: video-temporal-smoke
+          path: ${{ runner.temp }}/video-temporal-smoke
           if-no-files-found: error
