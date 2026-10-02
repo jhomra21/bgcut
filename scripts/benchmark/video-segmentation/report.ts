@@ -12,7 +12,7 @@ const percentile = (
     return 0;
   }
 
-  const sorted = values.toSorted((a, b) => a - b);
+  const sorted = [...values].sort((a, b) => a - b);
 
   const index = Math.min(
     sorted.length - 1,
