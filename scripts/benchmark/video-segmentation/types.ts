@@ -4,7 +4,8 @@ export type VideoModelGraphRole =
   | "vision-encoder"
   | "mask-decoder"
   | "memory-attention"
-  | "memory-encoder";
+  | "memory-encoder"
+  | "pointer-tpos";
 
 export type VideoModelArtifact = {
   readonly role: VideoModelGraphRole | "constants";
