@@ -2,7 +2,6 @@ import { Schema } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
 
 import { resolveOrtWebGpuWasmUrl } from "../../../src/browser/ort-webgpu-runtime";
-import { normalizeRgbaToNchw } from "../../../src/shared/preprocess";
 
 import type {
   VideoModelArtifact,
@@ -37,6 +36,11 @@ export type VideoSessionMap =
       ort.InferenceSession
     >
   >;
+
+export type VideoPointPromptTensors = {
+  readonly points: ort.Tensor;
+  readonly labels: ort.Tensor;
+};
 
 const requireThreeChannels = (
   values: readonly number[],
@@ -243,65 +247,60 @@ export const frameToNchw =
         imageSize,
       );
 
-    const normalized =
-      normalizeRgbaToNchw(
-        image.data,
-        imageSize,
-        imageSize,
-      );
-
     const channelPixels =
       imageSize *
       imageSize;
 
     const result =
       new Float32Array(
-        normalized.length,
+        channelPixels *
+          3,
       );
 
     for (
-      let channel = 0;
-      channel < 3;
-      channel += 1
+      let pixel = 0;
+      pixel <
+      channelPixels;
+      pixel += 1
     ) {
-      const channelMean =
-        mean[channel] ??
-        0;
-
-      const channelStd =
-        std[channel] ??
-        1;
+      const source =
+        pixel * 4;
 
       for (
-        let pixel = 0;
-        pixel <
-        channelPixels;
-        pixel += 1
+        let channel = 0;
+        channel < 3;
+        channel += 1
       ) {
-        const index =
-          channel *
-            channelPixels +
-          pixel;
-
-        const imageNetNormalized =
-          normalized[index] ??
+        const channelMean =
+          mean[channel] ??
           0;
 
-        const original =
-          imageNetNormalized *
-            [
-              0.229,
-              0.224,
-              0.225,
-            ][channel]! +
-          [
-            0.485,
-            0.456,
-            0.406,
-          ][channel]!;
+        const channelStd =
+          std[channel] ??
+          1;
 
-        result[index] =
-          (original -
+        if (
+          channelStd === 0
+        ) {
+          throw new Error(
+            `image_std[${channel}] must be non-zero.`,
+          );
+        }
+
+        const value =
+          (image.data[
+            source +
+              channel
+          ] ??
+            0) /
+          255;
+
+        result[
+          channel *
+            channelPixels +
+            pixel
+        ] =
+          (value -
             channelMean) /
           channelStd;
       }
@@ -513,10 +512,7 @@ export const pointPromptTensors = (
         | 1;
     }[],
   imageSize: number,
-): {
-  readonly points: ort.Tensor;
-  readonly labels: ort.Tensor;
-} => {
+): VideoPointPromptTensors => {
   const pointValues =
     new Float32Array(
       points.length *
