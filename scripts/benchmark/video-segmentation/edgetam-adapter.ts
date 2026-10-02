@@ -22,15 +22,23 @@ import type {
 } from "./types";
 
 const FEATURE_CHANNELS = 256;
+
 const FEATURE_SIDE = 64;
+
 const FEATURE_TOKENS =
   FEATURE_SIDE *
   FEATURE_SIDE;
+
 const MEMORY_DIMENSION = 64;
+
 const MEMORY_TOKENS = 512;
+
 const MAX_RECENT = 6;
+
 const MAX_POINTERS = 16;
+
 const POINTER_DIMENSION = 256;
+
 const POINTER_TOKENS =
   POINTER_DIMENSION /
   MEMORY_DIMENSION;
@@ -70,6 +78,17 @@ type StoredMemory = {
   readonly positions:
     Float32Array;
   readonly pointer:
+    Float32Array;
+};
+
+type EdgeMemoryAssembly = {
+  readonly spatial:
+    Float32Array;
+  readonly spatialPositions:
+    Float32Array;
+  readonly pointers:
+    Float32Array;
+  readonly pointerPositions:
     Float32Array;
 };
 
@@ -318,16 +337,7 @@ class EdgeMemoryBank {
 
   assemble(
     index: number,
-  ): {
-    readonly spatial:
-      Float32Array;
-    readonly spatialPositions:
-      Float32Array;
-    readonly pointers:
-      Float32Array;
-    readonly pointerPositions:
-      Float32Array;
-  } {
+  ): EdgeMemoryAssembly {
     const conditioning =
       this.#conditioning;
 
