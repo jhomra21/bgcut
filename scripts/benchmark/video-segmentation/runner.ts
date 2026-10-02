@@ -102,6 +102,7 @@ export const runVideoSegmentationBenchmark = async (
 
     try {
       const startedAt = performance.now();
+
       const mask = await adapter.seed(
         seed.frame,
         spec.prompt,
@@ -132,6 +133,7 @@ export const runVideoSegmentationBenchmark = async (
 
         try {
           const startedAt = performance.now();
+
           const mask = await adapter.track(
             decoded.frame,
             frameIndex,
