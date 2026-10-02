@@ -33,6 +33,7 @@ describe("video segmentation bake-off", () => {
       width: 2,
       height: 2,
     };
+
     const right = {
       logits: new Float32Array([1, -1, 1, -1]),
       width: 2,
