@@ -16,3 +16,94 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run check
+
+
+  video-model-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'research/video-segmentation-bakeoff'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Probe SAM 2.1 Tiny and EdgeTAM with SwiftShader WebGPU
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUTPUT="$RUNNER_TEMP/video-model-probe"
+          mkdir -p "$OUTPUT"
+
+          bun run benchmark:video-segmentation:probe -- "$OUTPUT" 4187 >"$OUTPUT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4187/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          if [[ -z "$CHROME" ]]; then
+            echo "Chrome/Chromium is not installed on this runner." >&2
+            exit 1
+          fi
+
+          "$CHROME" \
+            --headless=new \
+            --no-sandbox \
+            --enable-unsafe-webgpu \
+            --use-webgpu-adapter=swiftshader \
+            --enable-features=Vulkan \
+            --use-angle=vulkan \
+            --use-vulkan=swiftshader \
+            --disable-vulkan-surface \
+            --disable-gpu-blocklist \
+            --disable-gpu-driver-bug-workarounds \
+            --enable-dawn-features=allow_unsafe_apis \
+            --disable-dawn-features=use_dxc \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4187/ >"$OUTPUT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..1500}; do
+            if [[ -f "$OUTPUT/video-model-probe.json" ]]; then
+              cat "$OUTPUT/video-model-probe.json"
+              exit 0
+            fi
+
+            if [[ -f "$OUTPUT/video-model-probe-failure.json" ]]; then
+              cat "$OUTPUT/video-model-probe-failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              echo "Chrome exited before the video model probe completed." >&2
+              cat "$OUTPUT/chrome.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Video model probe timed out." >&2
+          cat "$OUTPUT/server.log" >&2 || true
+          cat "$OUTPUT/chrome.log" >&2 || true
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-model-probe
+          path: ${{ runner.temp }}/video-model-probe
+          if-no-files-found: error
