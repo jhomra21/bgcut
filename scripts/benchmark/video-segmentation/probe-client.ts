@@ -24,9 +24,19 @@ const writeStatus = (
     `${message}\n`;
 };
 
+type ProbeFailure = {
+  readonly message: string;
+  readonly stack: string;
+};
+
+type ProbePostValue =
+  | VideoModelProbeReport
+  | readonly VideoModelProbeReport[]
+  | ProbeFailure;
+
 const postJson = async (
   path: string,
-  value: unknown,
+  value: ProbePostValue,
 ): Promise<void> => {
   const response =
     await fetch(
