@@ -103,6 +103,7 @@ export const probeVideoSegmentationCandidate = async (
 
   const sessions:
     ort.InferenceSession[] = [];
+
   const graphs:
     VideoModelProbeGraphReport[] = [];
 
@@ -127,19 +128,31 @@ export const probeVideoSegmentationCandidate = async (
       const sessionStartedAt =
         performance.now();
 
-      const session =
-        await ort.InferenceSession.create(
-          loaded.bytes,
+      let session:
+        ort.InferenceSession;
+
+      try {
+        session =
+          await ort.InferenceSession.create(
+            loaded.bytes,
+            {
+              executionProviders: [
+                {
+                  name: "webgpu",
+                },
+              ],
+              graphOptimizationLevel:
+                "all",
+            },
+          );
+      } catch (error) {
+        throw new Error(
+          `${candidate.label} ${artifact.role} could not create an ONNX Runtime WebGPU session. ${error instanceof Error ? error.message : String(error)}`,
           {
-            executionProviders: [
-              {
-                name: "webgpu",
-              },
-            ],
-            graphOptimizationLevel:
-              "all",
+            cause: error,
           },
         );
+      }
 
       const sessionMs =
         performance.now() -
