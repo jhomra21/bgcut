@@ -8,21 +8,31 @@ import type {
   VideoSegmentationCandidate,
 } from "./types";
 
+export type VideoModelProbeValueMetadata = {
+  readonly name: string;
+  readonly isTensor: boolean;
+  readonly type: string | null;
+  readonly shape: readonly (number | string)[] | null;
+};
+
 export type VideoModelProbeGraphReport = {
   readonly role: VideoModelGraphRole;
   readonly filename: string;
-  readonly resolvedUrl: string;
-  readonly bytes: number;
+  readonly compatible: boolean;
+  readonly resolvedUrl: string | null;
+  readonly bytes: number | null;
   readonly etag: string | null;
-  readonly downloadMs: number;
-  readonly sessionMs: number;
-  readonly inputNames: readonly string[];
-  readonly outputNames: readonly string[];
+  readonly downloadMs: number | null;
+  readonly sessionMs: number | null;
+  readonly inputs: readonly VideoModelProbeValueMetadata[];
+  readonly outputs: readonly VideoModelProbeValueMetadata[];
+  readonly error: string | null;
 };
 
 export type VideoModelProbeReport = {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly candidate: VideoSegmentationCandidate["id"];
+  readonly compatible: boolean;
   readonly userAgent: string;
   readonly generatedAt: string;
   readonly totalBytes: number;
@@ -55,7 +65,7 @@ const graphArtifacts = (
   );
 
 const fetchGraph = async (
-  artifact: LoadedGraph["artifact"],
+  artifact: GraphArtifact,
 ): Promise<LoadedGraph> => {
   const startedAt = performance.now();
 
@@ -85,6 +95,59 @@ const fetchGraph = async (
       startedAt,
   };
 };
+
+const metadataOf = (
+  metadata: readonly ort.InferenceSession.ValueMetadata[],
+): readonly VideoModelProbeValueMetadata[] =>
+  metadata.map(
+    (value) =>
+      value.isTensor
+        ? {
+            name: value.name,
+            isTensor: true,
+            type: value.type,
+            shape: [
+              ...value.shape,
+            ],
+          }
+        : {
+            name: value.name,
+            isTensor: false,
+            type: null,
+            shape: null,
+          },
+  );
+
+const failedGraphReport = (
+  artifact: GraphArtifact,
+  error: unknown,
+  loaded?: LoadedGraph,
+): VideoModelProbeGraphReport => ({
+  role: artifact.role,
+  filename: artifact.filename,
+  compatible: false,
+  resolvedUrl:
+    loaded?.response.url ??
+    null,
+  bytes:
+    loaded?.bytes.byteLength ??
+    null,
+  etag:
+    loaded?.response.headers.get(
+      "etag",
+    ) ??
+    null,
+  downloadMs:
+    loaded?.downloadMs ??
+    null,
+  sessionMs: null,
+  inputs: [],
+  outputs: [],
+  error:
+    error instanceof Error
+      ? error.message
+      : String(error),
+});
 
 export const probeVideoSegmentationCandidate = async (
   candidate: VideoSegmentationCandidate,
@@ -116,10 +179,24 @@ export const probeVideoSegmentationCandidate = async (
         `Downloading ${candidate.label} ${artifact.role}.`,
       );
 
-      const loaded =
-        await fetchGraph(
-          artifact,
+      let loaded:
+        LoadedGraph;
+
+      try {
+        loaded =
+          await fetchGraph(
+            artifact,
+          );
+      } catch (error) {
+        graphs.push(
+          failedGraphReport(
+            artifact,
+            error,
+          ),
         );
+
+        continue;
+      }
 
       onProgress?.(
         `Compiling ${candidate.label} ${artifact.role}.`,
@@ -128,11 +205,8 @@ export const probeVideoSegmentationCandidate = async (
       const sessionStartedAt =
         performance.now();
 
-      let session:
-        ort.InferenceSession;
-
       try {
-        session =
+        const session =
           await ort.InferenceSession.create(
             loaded.bytes,
             {
@@ -145,52 +219,67 @@ export const probeVideoSegmentationCandidate = async (
                 "all",
             },
           );
+
+        const sessionMs =
+          performance.now() -
+          sessionStartedAt;
+
+        sessions.push(
+          session,
+        );
+
+        graphs.push({
+          role:
+            artifact.role,
+          filename:
+            artifact.filename,
+          compatible: true,
+          resolvedUrl:
+            loaded.response.url,
+          bytes:
+            loaded.bytes.byteLength,
+          etag:
+            loaded.response.headers.get(
+              "etag",
+            ),
+          downloadMs:
+            loaded.downloadMs,
+          sessionMs,
+          inputs:
+            metadataOf(
+              session.inputMetadata,
+            ),
+          outputs:
+            metadataOf(
+              session.outputMetadata,
+            ),
+          error: null,
+        });
       } catch (error) {
-        throw new Error(
-          `${candidate.label} ${artifact.role} could not create an ONNX Runtime WebGPU session. ${error instanceof Error ? error.message : String(error)}`,
-          {
-            cause: error,
-          },
+        graphs.push(
+          failedGraphReport(
+            artifact,
+            new Error(
+              `${candidate.label} ${artifact.role} could not create an ONNX Runtime WebGPU session. ${error instanceof Error ? error.message : String(error)}`,
+              {
+                cause: error,
+              },
+            ),
+            loaded,
+          ),
         );
       }
-
-      const sessionMs =
-        performance.now() -
-        sessionStartedAt;
-
-      sessions.push(
-        session,
-      );
-
-      graphs.push({
-        role:
-          artifact.role,
-        filename:
-          artifact.filename,
-        resolvedUrl:
-          loaded.response.url,
-        bytes:
-          loaded.bytes.byteLength,
-        etag:
-          loaded.response.headers.get(
-            "etag",
-          ),
-        downloadMs:
-          loaded.downloadMs,
-        sessionMs,
-        inputNames: [
-          ...session.inputNames,
-        ],
-        outputNames: [
-          ...session.outputNames,
-        ],
-      });
     }
 
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       candidate:
         candidate.id,
+      compatible:
+        graphs.every(
+          (graph) =>
+            graph.compatible,
+        ),
       userAgent:
         navigator.userAgent,
       generatedAt:
@@ -199,21 +288,21 @@ export const probeVideoSegmentationCandidate = async (
         graphs.reduce(
           (sum, graph) =>
             sum +
-            graph.bytes,
+            (graph.bytes ?? 0),
           0,
         ),
       totalDownloadMs:
         graphs.reduce(
           (sum, graph) =>
             sum +
-            graph.downloadMs,
+            (graph.downloadMs ?? 0),
           0,
         ),
       totalSessionMs:
         graphs.reduce(
           (sum, graph) =>
             sum +
-            graph.sessionMs,
+            (graph.sessionMs ?? 0),
           0,
         ),
       graphs,
@@ -226,7 +315,7 @@ export const probeVideoSegmentationCandidate = async (
             await session.release();
           } catch {
             // The probe is already ending. A release failure must not hide
-            // the graph that failed to load or compile.
+            // a graph compatibility result.
           }
         },
       ),
