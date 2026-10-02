@@ -74,7 +74,11 @@ jobs:
 
             for _ in {1..1500}; do
               if [[ -f "$output/video-model-probe.json" ]]; then
-                status="compatible"
+                if grep -q '"compatible": false' "$output/video-model-probe.json"; then
+                  status="model-failure"
+                else
+                  status="compatible"
+                fi
                 cat "$output/video-model-probe.json"
                 break
               fi
