@@ -21,13 +21,19 @@ import type {
 } from "./types";
 
 const FEATURE_CHANNELS = 256;
+
 const MEMORY_DIMENSION = 64;
+
 const MEMORY_FRAMES = 7;
+
 const MAX_POINTERS = 16;
+
 const POINTER_DIMENSION = 256;
+
 const POINTER_TOKENS =
   POINTER_DIMENSION /
   MEMORY_DIMENSION;
+
 const RELIABLE_IOU = 0.25;
 
 type SamSessions = {
@@ -70,6 +76,15 @@ type StoredMemory = {
   readonly positions:
     Float32Array;
   readonly pointer:
+    Float32Array;
+};
+
+type SamMemoryAssembly = {
+  readonly memory:
+    Float32Array;
+  readonly memoryPositions:
+    Float32Array;
+  readonly normalizedPointerDiffs:
     Float32Array;
 };
 
@@ -239,14 +254,7 @@ class SamMemoryBank {
   assemble(
     index: number,
     totalFrames: number,
-  ): {
-    readonly memory:
-      Float32Array;
-    readonly memoryPositions:
-      Float32Array;
-    readonly normalizedPointerDiffs:
-      Float32Array;
-  } {
+  ): SamMemoryAssembly {
     const conditioning =
       this.#conditioning;
 
