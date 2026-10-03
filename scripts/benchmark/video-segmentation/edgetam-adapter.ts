@@ -140,6 +140,12 @@ type SelectedMask = {
   readonly iou: number;
   readonly objectScore:
     number | undefined;
+  readonly alternatives:
+    readonly {
+      readonly logits:
+        Float32Array;
+      readonly iou: number;
+    }[];
 };
 
 type TrackedMask = {
@@ -362,6 +368,28 @@ const selectBestMask = (
       0,
     objectScore:
       objectScores?.[0],
+    alternatives:
+      Array.from(
+        {
+          length:
+            scores.length,
+        },
+        (
+          _,
+          index,
+        ) => ({
+          logits:
+            masks.slice(
+              index *
+                stride,
+              (index + 1) *
+                stride,
+            ),
+          iou:
+            scores[index] ??
+            0,
+        }),
+      ),
   };
 };
 
@@ -1499,6 +1527,21 @@ export const createEdgeTamAdapter =
             selected.iou,
           objectScore:
             selected.objectScore,
+          alternatives:
+            selected.alternatives.map(
+              (alternative) => ({
+                logits:
+                  alternative.logits,
+                width:
+                  MASK_SIDE,
+                height:
+                  MASK_SIDE,
+                iou:
+                  alternative.iou,
+                objectScore:
+                  selected.objectScore,
+              }),
+            ),
         };
       },
 
