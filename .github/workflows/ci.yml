@@ -37,20 +37,21 @@ jobs:
           ROOT="$RUNNER_TEMP/video-quality-macos"
           DAVIS_ROOT="$RUNNER_TEMP/davis-2017-trainval"
           ARCHIVE="$RUNNER_TEMP/DAVIS-2017-trainval-480p.zip"
-          VAL_LIST="$DAVIS_ROOT/val.txt"
-          mkdir -p "$ROOT" "$DAVIS_ROOT"
+                    mkdir -p "$ROOT" "$DAVIS_ROOT"
 
           curl             --fail             --location             --retry 3             --output "$ARCHIVE"             "https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-trainval-480p.zip"
 
           printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
 
-          unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
+          TRAIN_LIST="$DAVIS_ROOT/train.txt"
+
+          unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/train.txt             | tr -d '\r'             > "$TRAIN_LIST"
 
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
 
             unzip -q               "$ARCHIVE"               "DAVIS/Annotations/480p/$fixture/*"               -d "$DAVIS_ROOT"
-          done < "$VAL_LIST"
+          done < "$TRAIN_LIST"
 
           DAVIS_ANNOTATION_ROOT="$DAVIS_ROOT/DAVIS/Annotations/480p"             bun run benchmark:video-segmentation:quality -- "$ROOT" 4191 >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
@@ -128,12 +129,13 @@ jobs:
 
           failed=0
 
-          # Freeze the selector exactly as validated on the seven-sequence
-          # development pass. This loop comes from DAVIS's official 2017 val.txt.
+          # Selector-development data only. Ground truth is allowed to choose
+          # the best frame-0 grid candidate here so the model-only features can
+          # be analyzed afterward. Validation is not used to tune this rule.
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
-            run_candidate "$fixture" edgetam grid-model || failed=1
-          done < "$VAL_LIST"
+            run_candidate "$fixture" edgetam grid-oracle || failed=1
+          done < "$TRAIN_LIST"
 
           exit "$failed"
 
