@@ -151,6 +151,8 @@ const html = `<!doctype html>
 
 const ResultEnvelopeSchema =
   Schema.Struct({
+    fixture:
+      Schema.String,
     candidate:
       Schema.String,
   });
@@ -272,6 +274,11 @@ const app =
             value,
           );
 
+        const fixture =
+          safeCandidate(
+            envelope.fixture,
+          );
+
         const candidate =
           safeCandidate(
             envelope.candidate,
@@ -286,7 +293,7 @@ const app =
         await writeFile(
           join(
             outputRoot,
-            `${candidate}-${kind}.json`,
+            `${fixture}-${candidate}-${kind}.json`,
           ),
           `${JSON.stringify(
             value,
