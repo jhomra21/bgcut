@@ -2,6 +2,10 @@ import {
   createVideoSegmentationAdapter,
 } from "./adapter";
 import {
+  createBiRefNetSeeder,
+  maskOverlapWithBiRefNet,
+} from "./birefnet-seed";
+import {
   VIDEO_SEGMENTATION_CANDIDATES,
 } from "./candidates";
 import {
@@ -24,6 +28,7 @@ import type {
 } from "./quality-fixture";
 
 import type {
+  VideoSegmentationAdapter,
   VideoSegmentationCandidate,
   VideoSegmentationMask,
 } from "./types";
@@ -34,7 +39,8 @@ type QualityCandidate =
 
 type QualitySeedMode =
   | "model"
-  | "oracle";
+  | "oracle"
+  | "birefnet";
 
 type GroundTruth = {
   readonly bitmap:
@@ -80,6 +86,21 @@ type QualityFrame = {
     number | null;
 };
 
+type AutomaticSeedQuality = {
+  readonly modelRevision: string;
+  readonly modelLoadMs: number;
+  readonly inferenceMs: number;
+  readonly groundTruthIou: number;
+  readonly groundTruthBoundaryF:
+    number;
+  readonly groundTruthJAndF:
+    number;
+  readonly proposalOverlaps:
+    readonly number[];
+  readonly selectedProposalOverlap:
+    number | null;
+};
+
 type QualityReport = {
   readonly schemaVersion: 1;
   readonly fixture:
@@ -92,6 +113,8 @@ type QualityReport = {
     QualitySeedMode;
   readonly proposalIndex:
     number | null;
+  readonly automaticSeed:
+    AutomaticSeedQuality | null;
   readonly model:
     string;
   readonly frameCount: number;
@@ -192,6 +215,7 @@ const seedModeFromLocation =
     ) {
       case "model":
       case "oracle":
+      case "birefnet":
         return mode;
 
       default:
@@ -728,13 +752,185 @@ const main =
       }
     }
 
-    const seedPoint =
+    let seedPoint =
       seedPointFromMask(
         groundTruth[0]!,
       );
 
     let proposalIndex:
       number | undefined;
+
+    let automaticSeed:
+      AutomaticSeedQuality | null =
+        null;
+
+    if (
+      seedMode ===
+      "birefnet"
+    ) {
+      const decoded =
+        await source.frameAt(
+          source.info.firstTimestamp,
+        );
+
+      if (
+        decoded ===
+        null
+      ) {
+        throw new Error(
+          "MediaBunny could not decode the DAVIS BiRefNet seed frame.",
+        );
+      }
+
+      const modelLoadStartedAt =
+        performance.now();
+
+      const seeder =
+        await createBiRefNetSeeder();
+
+      const modelLoadMs =
+        performance.now() -
+        modelLoadStartedAt;
+
+      let probe:
+        VideoSegmentationAdapter |
+        undefined;
+
+      try {
+        const inferenceStartedAt =
+          performance.now();
+
+        const seed =
+          await seeder.seed(
+            decoded.frame,
+          );
+
+        const inferenceMs =
+          performance.now() -
+          inferenceStartedAt;
+
+        seedPoint =
+          seed.point;
+
+        const matte:
+          VideoSegmentationMask = {
+            logits:
+              seed.logits,
+            width:
+              seed.width,
+            height:
+              seed.height,
+          };
+
+        const quality =
+          groundTruthMetrics(
+            matte,
+            groundTruth[0]!,
+          );
+
+        let proposalOverlaps:
+          number[] = [];
+
+        let selectedProposalOverlap:
+          number | null =
+            null;
+
+        if (
+          requested ===
+          "edgetam"
+        ) {
+          probe =
+            await createVideoSegmentationAdapter(
+              candidate,
+            );
+
+          const preview =
+            await probe.seed(
+              decoded.frame,
+              {
+                points: [
+                  {
+                    x:
+                      seedPoint.x,
+                    y:
+                      seedPoint.y,
+                    label: 1,
+                  },
+                ],
+              },
+              0,
+              QUALITY_FRAME_COUNT,
+            );
+
+          const proposals =
+            preview.alternatives ??
+            [preview];
+
+          proposalOverlaps =
+            proposals.map(
+              (proposal) =>
+                maskOverlapWithBiRefNet(
+                  seed,
+                  proposal,
+                ),
+            );
+
+          let bestIndex = 0;
+
+          for (
+            let index = 1;
+            index <
+            proposalOverlaps.length;
+            index += 1
+          ) {
+            if (
+              (proposalOverlaps[index] ??
+                Number.NEGATIVE_INFINITY) >
+              (proposalOverlaps[bestIndex] ??
+                Number.NEGATIVE_INFINITY)
+            ) {
+              bestIndex =
+                index;
+            }
+          }
+
+          proposalIndex =
+            bestIndex;
+
+          selectedProposalOverlap =
+            proposalOverlaps[
+              bestIndex
+            ] ??
+            null;
+        }
+
+        automaticSeed = {
+          modelRevision:
+            seed.modelRevision,
+          modelLoadMs,
+          inferenceMs,
+          groundTruthIou:
+            quality.iou,
+          groundTruthBoundaryF:
+            quality.boundaryF,
+          groundTruthJAndF:
+            quality.jAndF,
+          proposalOverlaps,
+          selectedProposalOverlap,
+        };
+      } finally {
+        decoded.close();
+
+        if (
+          probe !==
+          undefined
+        ) {
+          await probe.close();
+        }
+
+        await seeder.close();
+      }
+    }
 
     if (
       seedMode ===
@@ -1008,6 +1204,7 @@ const main =
         proposalIndex:
           proposalIndex ??
           null,
+        automaticSeed,
         model:
           candidate.repository,
         frameCount:

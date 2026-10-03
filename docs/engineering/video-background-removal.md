@@ -90,6 +90,22 @@ This is not a deployable automatic selection strategy and must not be reported a
 
 SAM 2.1's current Diffusion export returns one seed mask, so it has no equivalent proposal-selection diagnostic.
 
+### BiRefNet automatic seed
+
+The next product-shaped diagnostic uses bgcut's own pinned BiRefNet model instead of ground truth to decide what foreground means on frame 0. Ground truth is only used afterward to score the result.
+
+For this mode the benchmark:
+
+1. runs the production 512px BiRefNet graph on the first decoded video frame
+2. derives one positive point from the predicted foreground matte
+3. asks EdgeTAM for its normal multimask proposals at that point
+4. chooses the proposal with the highest overlap with the BiRefNet matte
+5. commits that proposal to the unchanged EdgeTAM temporal tracker
+
+This is deliberately different from the oracle diagnostic. It is a deployable automatic strategy: the only information used to choose the seed comes from the local models themselves. The first hardware pass is limited to `bmx-trees`, `car-shadow`, and `car-turn`, the three sequences that most clearly expose whether automatic foreground discovery can repair a weak one-point seed without hiding the result behind ground truth.
+
+The experiment uses the same pinned FP32 BiRefNet artifact Chrome uses in bgcut's normal WebGPU path. It is intentionally not a new model or a special video checkpoint.
+
 ## Memory ownership
 
 The two trackers have different host-side memory contracts and should not be forced into one tensor layout.

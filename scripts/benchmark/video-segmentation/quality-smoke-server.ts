@@ -13,6 +13,9 @@ import {
 } from "../../../src/shared/ort-assets";
 
 import {
+  proxyBiRefNetSeedModelRequest,
+} from "./birefnet-model-proxy";
+import {
   proxyVideoModelRequest,
 } from "./model-proxy";
 import {
@@ -178,6 +181,18 @@ const app =
         new URL(
           request.url,
         );
+
+      const biRefNetResponse =
+        await proxyBiRefNetSeedModelRequest(
+          request,
+        );
+
+      if (
+        biRefNetResponse !==
+        null
+      ) {
+        return biRefNetResponse;
+      }
 
       const modelResponse =
         await proxyVideoModelRequest(

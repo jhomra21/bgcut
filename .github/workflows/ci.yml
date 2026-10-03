@@ -203,6 +203,13 @@ jobs:
             run_candidate "$fixture" sam21-primary model || failed=1
           done
 
+          # Product-like automatic seed probe. These are the three sequences
+          # where a one-point EdgeTAM seed is most diagnostic: one ambiguous
+          # scene and the two largest model-ranking failures from the oracle run.
+          for fixture in bmx-trees car-shadow car-turn; do
+            run_candidate "$fixture" edgetam birefnet || failed=1
+          done
+
           exit "$failed"
 
       - uses: actions/upload-artifact@v4
