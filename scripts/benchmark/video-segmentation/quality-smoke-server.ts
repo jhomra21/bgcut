@@ -209,6 +209,11 @@ const app =
       const fixtureResponse =
         await proxyQualityFixtureRequest(
           request,
+          {
+            maskRoot:
+              process.env
+                .DAVIS_ANNOTATION_ROOT,
+          },
         );
 
       if (

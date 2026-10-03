@@ -10,53 +10,192 @@ const VIDEO_BASE =
 const MASK_BASE =
   `https://huggingface.co/datasets/AlonzoLeeeooo/DAVIS-Edit/resolve/${MASK_REVISION}/Annotations`;
 
+const fixture = (
+  id: string,
+  videoBytes?:
+    number,
+) => ({
+  label:
+    `DAVIS ${id}`,
+  videoBytes,
+});
+
 export const QUALITY_FIXTURES = {
-  blackswan: {
-    label:
-      "DAVIS blackswan",
-    videoBytes:
+  "bike-packing":
+    fixture(
+      "bike-packing",
+    ),
+  blackswan:
+    fixture(
+      "blackswan",
       1_402_975,
-  },
-  bear: {
-    label:
-      "DAVIS bear",
-    videoBytes:
-      2_015_436,
-  },
-  camel: {
-    label:
-      "DAVIS camel",
-    videoBytes:
-      2_139_134,
-  },
-  cows: {
-    label:
-      "DAVIS cows",
-    videoBytes:
-      3_309_913,
-  },
-  "bmx-trees": {
-    label:
-      "DAVIS bmx-trees",
-    videoBytes:
+    ),
+  "bmx-trees":
+    fixture(
+      "bmx-trees",
       2_510_103,
-  },
-  "car-shadow": {
-    label:
-      "DAVIS car-shadow",
-    videoBytes:
+    ),
+  breakdance:
+    fixture(
+      "breakdance",
+    ),
+  camel:
+    fixture(
+      "camel",
+      2_139_134,
+    ),
+  "car-roundabout":
+    fixture(
+      "car-roundabout",
+    ),
+  "car-shadow":
+    fixture(
+      "car-shadow",
       893_950,
-  },
-  "car-turn": {
-    label:
-      "DAVIS car-turn",
-    videoBytes:
+    ),
+  cows:
+    fixture(
+      "cows",
+      3_309_913,
+    ),
+  "dance-twirl":
+    fixture(
+      "dance-twirl",
+    ),
+  dog:
+    fixture(
+      "dog",
+    ),
+  "dogs-jump":
+    fixture(
+      "dogs-jump",
+    ),
+  "drift-chicane":
+    fixture(
+      "drift-chicane",
+    ),
+  "drift-straight":
+    fixture(
+      "drift-straight",
+    ),
+  goat:
+    fixture(
+      "goat",
+    ),
+  "gold-fish":
+    fixture(
+      "gold-fish",
+    ),
+  "horsejump-high":
+    fixture(
+      "horsejump-high",
+    ),
+  india:
+    fixture(
+      "india",
+    ),
+  judo:
+    fixture(
+      "judo",
+    ),
+  "kite-surf":
+    fixture(
+      "kite-surf",
+    ),
+  "lab-coat":
+    fixture(
+      "lab-coat",
+    ),
+  libby:
+    fixture(
+      "libby",
+    ),
+  loading:
+    fixture(
+      "loading",
+    ),
+  "mbike-trick":
+    fixture(
+      "mbike-trick",
+    ),
+  "motocross-jump":
+    fixture(
+      "motocross-jump",
+    ),
+  "paragliding-launch":
+    fixture(
+      "paragliding-launch",
+    ),
+  parkour:
+    fixture(
+      "parkour",
+    ),
+  pigs:
+    fixture(
+      "pigs",
+    ),
+  "scooter-black":
+    fixture(
+      "scooter-black",
+    ),
+  shooting:
+    fixture(
+      "shooting",
+    ),
+  soapbox:
+    fixture(
+      "soapbox",
+    ),
+
+  // Extra diagnostic sequences retained from the earlier seven-clip bake-off.
+  bear:
+    fixture(
+      "bear",
+      2_015_436,
+    ),
+  "car-turn":
+    fixture(
+      "car-turn",
       2_318_304,
-  },
+    ),
 } as const;
 
 export type QualityFixtureId =
   keyof typeof QUALITY_FIXTURES;
+
+export const DAVIS_2017_VALIDATION_FIXTURES = [
+  "bike-packing",
+  "blackswan",
+  "bmx-trees",
+  "breakdance",
+  "camel",
+  "car-roundabout",
+  "car-shadow",
+  "cows",
+  "dance-twirl",
+  "dog",
+  "dogs-jump",
+  "drift-chicane",
+  "drift-straight",
+  "goat",
+  "gold-fish",
+  "horsejump-high",
+  "india",
+  "judo",
+  "kite-surf",
+  "lab-coat",
+  "libby",
+  "loading",
+  "mbike-trick",
+  "motocross-jump",
+  "paragliding-launch",
+  "parkour",
+  "pigs",
+  "scooter-black",
+  "shooting",
+  "soapbox",
+] as const satisfies
+  readonly QualityFixtureId[];
 
 export const QUALITY_FRAME_COUNT =
   12;
@@ -64,7 +203,7 @@ export const QUALITY_FRAME_COUNT =
 export const QUALITY_FRAME_RATE =
   24;
 
-const isQualityFixtureId = (
+export const isQualityFixtureId = (
   value: string,
 ): value is QualityFixtureId =>
   Object.hasOwn(
@@ -169,9 +308,16 @@ export const qualityMaskRoute = (
     index,
   )}`;
 
+export type QualityFixtureProxyOptions = {
+  readonly maskRoot?:
+    string;
+};
+
 export const proxyQualityFixtureRequest =
   async (
     request: Request,
+    options:
+      QualityFixtureProxyOptions = {},
   ): Promise<Response | null> => {
     if (
       request.method !==
@@ -279,6 +425,43 @@ export const proxyQualityFixtureRequest =
         )
     ) {
       return null;
+    }
+
+    if (
+      options.maskRoot !==
+      undefined
+    ) {
+      const path =
+        `${options.maskRoot}/${id}/${filename}`;
+
+      const file =
+        Bun.file(
+          path,
+        );
+
+      if (
+        !(await file.exists())
+      ) {
+        throw new Error(
+          `DAVIS quality mask is missing at ${path}.`,
+        );
+      }
+
+      return new Response(
+        file,
+        {
+          headers: {
+            "content-type":
+              "image/png",
+            "cache-control":
+              "no-store",
+            "content-length":
+              String(
+                file.size,
+              ),
+          },
+        },
+      );
     }
 
     const bytes =

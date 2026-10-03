@@ -20,6 +20,7 @@ import {
   QUALITY_FIXTURES,
   QUALITY_FRAME_COUNT,
   QUALITY_FRAME_RATE,
+  isQualityFixtureId,
   qualityMaskRoute,
   qualityVideoRoute,
 } from "./quality-fixture";
@@ -303,23 +304,17 @@ const fixtureFromLocation =
       ) ??
       "";
 
-    switch (
-      fixture
+    if (
+      isQualityFixtureId(
+        fixture,
+      )
     ) {
-      case "blackswan":
-      case "bear":
-      case "camel":
-      case "cows":
-      case "bmx-trees":
-      case "car-shadow":
-      case "car-turn":
-        return fixture;
-
-      default:
-        throw new Error(
-          `Unknown quality fixture "${fixture}".`,
-        );
+      return fixture;
     }
+
+    throw new Error(
+      `Unknown quality fixture "${fixture}".`,
+    );
   };
 
 

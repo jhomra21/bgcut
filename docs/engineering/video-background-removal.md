@@ -58,17 +58,9 @@ The smoke is an execution and warm-latency check, not a quality benchmark.
 
 ## DAVIS quality benchmark
 
-Quality is measured separately on labeled DAVIS sequences. The current suite covers:
+Quality is measured separately on labeled DAVIS sequences. The original development suite contains seven clips chosen to exercise the two model families and seed-ranking failures. The current holdout is the official 30-sequence DAVIS 2017 validation split.
 
-- `blackswan`
-- `bear`
-- `camel`
-- `cows`
-- `bmx-trees`
-- `car-shadow`
-- `car-turn`
-
-For each sequence the benchmark uses the first 12 frames at 24 fps. It derives a positive seed point from the first ground-truth mask, then compares each predicted mask with the corresponding DAVIS annotation.
+For each sequence the benchmark uses the first 12 frames at 24 fps. Diagnostic known-point modes derive a positive seed point from the first ground-truth mask. Automatic `grid-model` does not: it selects from EdgeTAM's own 7×7 point-grid candidates, and the DAVIS annotation is read only afterward for scoring.
 
 The report records:
 
@@ -135,7 +127,9 @@ The candidate fingerprints show that simple consensus is not enough: large backg
 2. reject masks whose foreground touches the image frame
 3. choose the remaining mask with the highest stability score
 
-This selects the useful subject candidate on all three hard sequences. The next focused run applies that exact rule as `grid-model` across all seven DAVIS sequences. Ground truth is still loaded only to score the chosen result after selection.
+This selects the useful subject candidate on all three hard sequences. The frozen `grid-model` rule was then evaluated across the seven-sequence development set. It selected a usable foreground on all seven without consulting ground truth. Mean tracked IoU was 0.866 and mean tracked J&F was 0.869. On the same seven clips, the known-point Edge oracle averaged 0.863 tracked IoU, the original Edge model-ranked seed averaged 0.583, and SAM 2.1 Tiny averaged 0.721. The four clips not used to derive the selector also remained strong: blackswan 0.789, bear 0.961, camel 0.971, and cows 0.960 mean tracked IoU.
+
+Those seven clips are not enough to call the selector general. The next holdout uses the official DAVIS 2017 validation split: all 30 sequences from `ImageSets/2017/val.txt`, with the first 12 indexed annotation PNGs served directly from the official 480p train/val archive. The archive is verified against SHA-256 `e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492` before use. This matters because DAVIS 2017 validation includes multi-object clips; the current automatic path commits one mask, so this holdout should expose whether single-subject discovery must become multi-object union before productization.
 
 The oracle proposal runs also exposed a separate result: for all seven current DAVIS sequences, the best mask among the three masks returned at the known subject point was proposal 0. EdgeTAM's predicted-IoU ranking was the source of the catastrophic `car-shadow` and `car-turn` seed choices. This makes proposal 0 a strong ranking control once a subject point is already known, but it does not by itself solve automatic subject discovery.
 
