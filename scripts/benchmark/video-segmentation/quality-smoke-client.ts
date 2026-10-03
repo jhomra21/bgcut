@@ -8,6 +8,10 @@ import {
   openMediaBunnyVideoSource,
 } from "./media-source";
 import {
+  binaryMaskIou,
+  davisBoundaryF,
+} from "./quality-metrics";
+import {
   QUALITY_FIXTURES,
   QUALITY_FRAME_COUNT,
   QUALITY_FRAME_RATE,
@@ -45,6 +49,10 @@ type QualityFrame = {
   readonly timestamp: number;
   readonly inferenceMs: number;
   readonly groundTruthIou: number;
+  readonly groundTruthBoundaryF:
+    number;
+  readonly groundTruthJAndF:
+    number;
   readonly modelIou:
     number | null;
   readonly objectScore:
@@ -68,8 +76,15 @@ type QualityReport = {
     readonly y: number;
   };
   readonly seedIou: number;
+  readonly seedBoundaryF: number;
   readonly meanTrackedIou: number;
   readonly minTrackedIou: number;
+  readonly meanTrackedBoundaryF:
+    number;
+  readonly minTrackedBoundaryF:
+    number;
+  readonly meanTrackedJAndF:
+    number;
   readonly meanTrackedInferenceMs:
     number;
   readonly frames:
@@ -466,12 +481,16 @@ const seedPointFromMask = (
   };
 };
 
-const groundTruthIou = (
+const groundTruthMetrics = (
   prediction:
     VideoSegmentationMask,
   groundTruth:
     GroundTruth,
-): number => {
+): {
+  readonly iou: number;
+  readonly boundaryF: number;
+  readonly jAndF: number;
+} => {
   const rgba =
     rgbaFor(
       groundTruth,
@@ -479,9 +498,15 @@ const groundTruthIou = (
       prediction.height,
     );
 
-  let intersection = 0;
+  const predicted =
+    new Uint8Array(
+      prediction.logits.length,
+    );
 
-  let union = 0;
+  const expected =
+    new Uint8Array(
+      prediction.logits.length,
+    );
 
   for (
     let pixel = 0;
@@ -489,39 +514,48 @@ const groundTruthIou = (
     prediction.logits.length;
     pixel += 1
   ) {
-    const predicted =
+    predicted[pixel] =
       (prediction.logits[
         pixel
       ] ??
         0) >
-      0;
+      0
+        ? 1
+        : 0;
 
-    const expected =
+    expected[pixel] =
       isForeground(
         rgba,
         pixel,
-      );
-
-    if (
-      predicted &&
-      expected
-    ) {
-      intersection += 1;
-    }
-
-    if (
-      predicted ||
-      expected
-    ) {
-      union += 1;
-    }
+      )
+        ? 1
+        : 0;
   }
 
-  return union ===
-    0
-    ? 1
-    : intersection /
-      union;
+  const iou =
+    binaryMaskIou(
+      predicted,
+      expected,
+    );
+
+  const boundaryF =
+    davisBoundaryF(
+      predicted,
+      expected,
+      prediction.width,
+      prediction.height,
+    );
+
+  return {
+    iou,
+    boundaryF,
+    jAndF:
+      (
+        iou +
+        boundaryF
+      ) /
+      2,
+  };
 };
 
 const postJson = async (
@@ -720,6 +754,14 @@ const main =
                   QUALITY_FRAME_COUNT,
                 );
 
+          const quality =
+            groundTruthMetrics(
+              prediction,
+              groundTruth[
+                frameIndex
+              ]!,
+            );
+
           frames.push({
             frameIndex,
             timestamp:
@@ -728,12 +770,11 @@ const main =
               performance.now() -
               startedAt,
             groundTruthIou:
-              groundTruthIou(
-                prediction,
-                groundTruth[
-                  frameIndex
-                ]!,
-              ),
+              quality.iou,
+            groundTruthBoundaryF:
+              quality.boundaryF,
+            groundTruthJAndF:
+              quality.jAndF,
             modelIou:
               prediction.iou ??
               null,
@@ -783,6 +824,10 @@ const main =
           frames[0]
             ?.groundTruthIou ??
           0,
+        seedBoundaryF:
+          frames[0]
+            ?.groundTruthBoundaryF ??
+          0,
         meanTrackedIou:
           mean(
             tracked.map(
@@ -795,6 +840,27 @@ const main =
             ...tracked.map(
               (frame) =>
                 frame.groundTruthIou,
+            ),
+          ),
+        meanTrackedBoundaryF:
+          mean(
+            tracked.map(
+              (frame) =>
+                frame.groundTruthBoundaryF,
+            ),
+          ),
+        minTrackedBoundaryF:
+          Math.min(
+            ...tracked.map(
+              (frame) =>
+                frame.groundTruthBoundaryF,
+            ),
+          ),
+        meanTrackedJAndF:
+          mean(
+            tracked.map(
+              (frame) =>
+                frame.groundTruthJAndF,
             ),
           ),
         meanTrackedInferenceMs:
@@ -812,6 +878,9 @@ const main =
         QUALITY_FRAME_COUNT ||
       !Number.isFinite(
         report.meanTrackedIou,
+      ) ||
+      !Number.isFinite(
+        report.meanTrackedBoundaryF,
       )
     ) {
       throw new Error(
@@ -825,9 +894,11 @@ const main =
     );
 
     writeStatus(
-      `${report.fixtureLabel} quality passed: seed IoU ${report.seedIou.toFixed(
+      `${report.fixtureLabel} quality passed: tracked mean IoU ${report.meanTrackedIou.toFixed(
         4,
-      )}, tracked mean IoU ${report.meanTrackedIou.toFixed(
+      )}, boundary F ${report.meanTrackedBoundaryF.toFixed(
+        4,
+      )}, J&F ${report.meanTrackedJAndF.toFixed(
         4,
       )}.`,
     );
