@@ -48,6 +48,14 @@ export type VideoPointPrompt = {
 
 export type VideoSegmentationPrompt = {
   readonly points: readonly VideoPointPrompt[];
+  /**
+   * Optional multimask proposal to commit as the temporal seed.
+   *
+   * Omit it to use the model's recommended proposal. A UI can surface
+   * alternatives from the first seed result and rerun the seed with the
+   * proposal the user chose.
+   */
+  readonly proposalIndex?: number;
 };
 
 export type VideoSegmentationMaskAlternative = {
