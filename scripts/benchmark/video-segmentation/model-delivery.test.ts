@@ -25,7 +25,7 @@ describe(
         expect(
           source,
         ).toBe(
-          `${EDGETAM_RELEASE_BASE}/parameters.json`,
+          `${EDGETAM_RELEASE_BASE}/parameters.json.gz`,
         );
 
         expect(
