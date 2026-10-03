@@ -17,7 +17,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
 
-  video-primary-macos-smoke:
+  video-macos:
     if: github.event_name == 'pull_request' && github.head_ref == 'research/video-segmentation-bakeoff'
     runs-on: macos-26
     timeout-minutes: 30
@@ -27,6 +27,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+
       - name: Run EdgeTAM and SAM 2.1 on Metal WebGPU
         shell: bash
         run: |
@@ -112,23 +113,7 @@ jobs:
           run_candidate sam21-primary || failed=1
 
           exit "$failed"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: video-primary-macos-smoke
-          path: ${{ runner.temp }}/video-primary-macos-smoke
-          if-no-files-found: error
 
-  video-quality-macos:
-    if: github.event_name == 'pull_request' && github.head_ref == 'research/video-segmentation-bakeoff'
-    runs-on: macos-26
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-      - run: bun install --frozen-lockfile
       - name: Score EdgeTAM and SAM 2.1 on DAVIS sequences
         shell: bash
         run: |
@@ -219,6 +204,14 @@ jobs:
           done
 
           exit "$failed"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-primary-macos-smoke
+          path: ${{ runner.temp }}/video-primary-macos-smoke
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
