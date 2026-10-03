@@ -36,11 +36,6 @@ const ModelConstantsSchema = Schema.Struct({
     ),
 });
 
-type RawVideoModelConstants =
-  Schema.Schema.Type<
-    typeof ModelConstantsSchema
-  >;
-
 export type VideoModelConstants = {
   readonly image_mean:
     readonly [
