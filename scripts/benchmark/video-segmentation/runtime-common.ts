@@ -242,11 +242,8 @@ export const createVideoSession =
       });
     }
 
-    return ort.InferenceSession.create(
-      new Uint8Array(
-        await response.arrayBuffer(),
-      ),
-      {
+    const sessionOptions:
+      ort.InferenceSession.SessionOptions = {
         executionProviders: [
           {
             name: "webgpu",
@@ -254,13 +251,21 @@ export const createVideoSession =
         ],
         graphOptimizationLevel:
           "all",
-        ...(externalData.length >
-        0
-          ? {
-              externalData,
-            }
-          : {}),
-      },
+      };
+
+    if (
+      externalData.length >
+      0
+    ) {
+      sessionOptions.externalData =
+        externalData;
+    }
+
+    return ort.InferenceSession.create(
+      new Uint8Array(
+        await response.arrayBuffer(),
+      ),
+      sessionOptions,
     );
   };
 
