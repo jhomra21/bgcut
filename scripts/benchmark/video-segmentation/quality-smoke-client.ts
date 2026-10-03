@@ -28,6 +28,11 @@ type GroundTruth = {
   readonly height: number;
 };
 
+type QualitySeedPoint = {
+  readonly x: number;
+  readonly y: number;
+};
+
 type QualityFrame = {
   readonly frameIndex: number;
   readonly timestamp: number;
@@ -267,10 +272,7 @@ const isForeground = (
 const seedPointFromMask = (
   groundTruth:
     GroundTruth,
-): {
-  readonly x: number;
-  readonly y: number;
-} => {
+): QualitySeedPoint => {
   const rgba =
     rgbaFor(
       groundTruth,
@@ -569,6 +571,22 @@ const main =
         ),
       );
 
+    for (
+      const mask of
+      groundTruth
+    ) {
+      if (
+        mask.width !==
+          source.info.width ||
+        mask.height !==
+          source.info.height
+      ) {
+        throw new Error(
+          `DAVIS mask geometry ${mask.width}x${mask.height} does not match video geometry ${source.info.width}x${source.info.height}.`,
+        );
+      }
+    }
+
     const seedPoint =
       seedPointFromMask(
         groundTruth[0]!,
@@ -616,6 +634,24 @@ const main =
         }
 
         try {
+          const tolerance =
+            1 /
+              QUALITY_FRAME_RATE /
+              2 +
+            1e-3;
+
+          if (
+            Math.abs(
+              decoded.timestamp -
+                timestamp,
+            ) >
+            tolerance
+          ) {
+            throw new Error(
+              `DAVIS frame ${frameIndex} decoded at ${decoded.timestamp} instead of ${timestamp}.`,
+            );
+          }
+
           const startedAt =
             performance.now();
 
