@@ -775,6 +775,17 @@ export const createSam21Adapter =
           VideoSegmentationPrompt,
         frameIndex,
       ) {
+        if (
+          prompt.proposalIndex !==
+            undefined &&
+          prompt.proposalIndex !==
+            0
+        ) {
+          throw new Error(
+            "This SAM 2.1 export returns one seed proposal; only proposal 0 is available.",
+          );
+        }
+
         const vision =
           await encode(
             frame,
