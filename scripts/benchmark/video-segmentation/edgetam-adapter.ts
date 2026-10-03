@@ -1,17 +1,14 @@
+import { Schema } from "effect";
 import * as ort from "onnxruntime-web/webgpu";
 
 import {
-  addChannelBias,
+  artifactFor,
   channelsToTokens,
   closeVideoSessions,
-  concatenateFloat32,
   configureVideoOrt,
   createVideoSession,
-  fetchVideoModelConstants,
   floatData,
   frameToNchw,
-  pointPromptTensors,
-  temporalPositions,
   tokensToChannels,
 } from "./runtime-common";
 
@@ -30,24 +27,93 @@ const FEATURE_TOKENS =
   FEATURE_SIDE *
   FEATURE_SIDE;
 
+const MASK_SIDE = 256;
+
+const MEMORY_MASK_SIDE = 1024;
+
 const MEMORY_DIMENSION = 64;
 
-const MEMORY_TOKENS = 512;
+const MEMORY_ENTRY_TOKENS = 512;
 
-const MAX_RECENT = 6;
+const MEMORY_ENTRIES = 7;
 
-const MAX_POINTERS = 16;
+const RECENT_ENTRIES =
+  MEMORY_ENTRIES - 1;
 
 const POINTER_DIMENSION = 256;
 
-const POINTER_TOKENS =
+const POINTER_SPLITS =
   POINTER_DIMENSION /
   MEMORY_DIMENSION;
+
+const MAX_POINTERS = 16;
+
+const POINTER_TOKENS =
+  MAX_POINTERS *
+  POINTER_SPLITS;
+
+const MEMORY_TOKENS =
+  MEMORY_ENTRIES *
+    MEMORY_ENTRY_TOKENS +
+  POINTER_TOKENS;
+
+const POINTER_START =
+  MEMORY_ENTRIES *
+  MEMORY_ENTRY_TOKENS;
+
+const MASKED_KEY = -1e4;
+
+const NO_OBJECT_LOGIT = -1024;
+
+const IMAGENET_MEAN = [
+  0.485,
+  0.456,
+  0.406,
+] as const;
+
+const IMAGENET_STD = [
+  0.229,
+  0.224,
+  0.225,
+] as const;
+
+const EdgeParametersSchema =
+  Schema.Struct({
+    parameters:
+      Schema.Struct({
+        no_memory_embedding:
+          Schema.Array(
+            Schema.Number,
+          ),
+        memory_temporal_positional_encoding:
+          Schema.Array(
+            Schema.Number,
+          ),
+        no_object_pointer:
+          Schema.Array(
+            Schema.Number,
+          ),
+      }),
+    constants:
+      Schema.Struct({
+        sigmoid_scale_for_mem_enc:
+          Schema.Number,
+        sigmoid_bias_for_mem_enc:
+          Schema.Number,
+      }),
+  });
+
+type EdgeParameters =
+  Schema.Schema.Type<
+    typeof EdgeParametersSchema
+  >;
 
 type EdgeSessions = {
   readonly visionEncoder:
     ort.InferenceSession;
-  readonly maskDecoder:
+  readonly seedMaskDecoder:
+    ort.InferenceSession;
+  readonly trackedMaskDecoder:
     ort.InferenceSession;
   readonly memoryAttention:
     ort.InferenceSession;
@@ -56,40 +122,43 @@ type EdgeSessions = {
 };
 
 type EncodedFrame = {
-  readonly feats0: ort.Tensor;
-  readonly feats1: ort.Tensor;
-  readonly feats2: ort.Tensor;
-  readonly pos2: ort.Tensor;
-};
-
-type DecodedFrame = {
-  readonly mask:
-    VideoSegmentationMask;
-  readonly highResolution:
+  readonly fine0: ort.Tensor;
+  readonly fine1: ort.Tensor;
+  readonly top: ort.Tensor;
+  readonly rawTop:
     Float32Array;
-  readonly pointer:
-    Float32Array;
-  readonly objectScore: number;
-};
-
-type StoredMemory = {
-  readonly index: number;
   readonly tokens:
     Float32Array;
-  readonly positions:
+};
+
+type SelectedMask = {
+  readonly logits:
     Float32Array;
+  readonly iou: number;
+  readonly objectScore:
+    number | undefined;
+};
+
+type TrackedMask = {
+  readonly selected:
+    SelectedMask;
   readonly pointer:
+    Float32Array;
+};
+
+type MemoryEntry = {
+  readonly features:
+    Float32Array;
+  readonly positions:
     Float32Array;
 };
 
 type EdgeMemoryAssembly = {
-  readonly spatial:
+  readonly memory:
     Float32Array;
-  readonly spatialPositions:
+  readonly positions:
     Float32Array;
-  readonly pointers:
-    Float32Array;
-  readonly pointerPositions:
+  readonly keyMask:
     Float32Array;
 };
 
@@ -113,63 +182,87 @@ const requireTensor = (
   return tensor;
 };
 
-const squareSide = (
-  length: number,
+const requireLength = (
+  values: readonly number[],
+  expected: number,
   label: string,
-): number => {
-  const side =
-    Math.sqrt(length);
-
+): void => {
   if (
-    !Number.isInteger(
-      side,
-    )
+    values.length !==
+    expected
   ) {
     throw new Error(
-      `${label} is not square.`,
+      `EdgeTAM ${label} has ${values.length} values; expected ${expected}.`,
     );
   }
-
-  return side;
 };
 
-const selectCandidate = (
-  values: Float32Array,
-  candidateCount: number,
-  candidate: number,
-  label: string,
-): Float32Array => {
-  if (
-    candidateCount < 1 ||
-    values.length %
-      candidateCount !==
-      0
-  ) {
-    throw new Error(
-      `${label} cannot be split across ${candidateCount} candidates.`,
+const fetchParameters =
+  async (
+    candidate:
+      VideoSegmentationCandidate,
+  ): Promise<EdgeParameters> => {
+    const artifact =
+      artifactFor(
+        candidate,
+        "parameters",
+      );
+
+    const response =
+      await fetch(
+        artifact.url,
+        {
+          cache:
+            "force-cache",
+        },
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not fetch ${candidate.label} parameters: HTTP ${response.status}.`,
+      );
+    }
+
+    const parameters =
+      Schema.decodeUnknownSync(
+        EdgeParametersSchema,
+      )(
+        await response.json(),
+      );
+
+    requireLength(
+      parameters.parameters
+        .no_memory_embedding,
+      FEATURE_CHANNELS,
+      "no-memory embedding",
     );
-  }
 
-  const length =
-    values.length /
-    candidateCount;
+    requireLength(
+      parameters.parameters
+        .memory_temporal_positional_encoding,
+      MEMORY_ENTRIES *
+        MEMORY_DIMENSION,
+      "temporal position table",
+    );
 
-  return values.slice(
-    candidate *
-      length,
-    (candidate + 1) *
-      length,
-  );
-};
+    requireLength(
+      parameters.parameters
+        .no_object_pointer,
+      POINTER_DIMENSION,
+      "no-object pointer",
+    );
 
-const decodeMaskOutputs = (
+    return parameters;
+  };
+
+const selectBestMask = (
   outputs:
     Record<
       string,
       ort.Tensor
     >,
-): DecodedFrame => {
-  const iouScores =
+): SelectedMask => {
+  const scores =
     floatData(
       requireTensor(
         outputs,
@@ -179,7 +272,7 @@ const decodeMaskOutputs = (
     );
 
   if (
-    iouScores.length ===
+    scores.length ===
     0
   ) {
     throw new Error(
@@ -192,57 +285,121 @@ const decodeMaskOutputs = (
   for (
     let index = 1;
     index <
-    iouScores.length;
+    scores.length;
     index += 1
   ) {
     if (
-      (iouScores[index] ??
+      (scores[index] ??
         Number.NEGATIVE_INFINITY) >
-      (iouScores[best] ??
+      (scores[best] ??
         Number.NEGATIVE_INFINITY)
     ) {
       best = index;
     }
   }
 
-  const lowResolution =
-    selectCandidate(
-      floatData(
-        requireTensor(
-          outputs,
-          "pred_masks",
-        ),
-        "EdgeTAM pred_masks",
-      ),
-      iouScores.length,
-      best,
-      "EdgeTAM pred_masks",
-    );
-
-  const highResolution =
-    selectCandidate(
-      floatData(
-        requireTensor(
-          outputs,
-          "high_res_masks",
-        ),
-        "EdgeTAM high_res_masks",
-      ),
-      iouScores.length,
-      best,
-      "EdgeTAM high_res_masks",
-    );
-
-  const objectScores =
+  const masks =
     floatData(
       requireTensor(
         outputs,
-        "object_score_logits",
+        "pred_masks",
       ),
-      "EdgeTAM object_score_logits",
+      "EdgeTAM pred_masks",
     );
 
-  const pointerData =
+  if (
+    masks.length %
+      scores.length !==
+      0
+  ) {
+    throw new Error(
+      "EdgeTAM mask candidates do not match its IoU scores.",
+    );
+  }
+
+  const stride =
+    masks.length /
+    scores.length;
+
+  const side =
+    Math.sqrt(
+      stride,
+    );
+
+  if (
+    side !==
+    MASK_SIDE
+  ) {
+    throw new Error(
+      `EdgeTAM mask side was ${side}; expected ${MASK_SIDE}.`,
+    );
+  }
+
+  const objectScores =
+    outputs.object_score_logits ===
+    undefined
+      ? undefined
+      : floatData(
+          outputs.object_score_logits,
+          "EdgeTAM object_score_logits",
+        );
+
+  return {
+    logits:
+      masks.slice(
+        best *
+          stride,
+        (best + 1) *
+          stride,
+      ),
+    iou:
+      scores[best] ??
+      0,
+    objectScore:
+      objectScores?.[0],
+  };
+};
+
+const selectTrackedMask = (
+  outputs:
+    Record<
+      string,
+      ort.Tensor
+    >,
+): TrackedMask => {
+  const selected =
+    selectBestMask(
+      outputs,
+    );
+
+  const scores =
+    floatData(
+      requireTensor(
+        outputs,
+        "iou_scores",
+      ),
+      "EdgeTAM iou_scores",
+    );
+
+  let best = 0;
+
+  for (
+    let index = 1;
+    index <
+    scores.length;
+    index += 1
+  ) {
+    if (
+      (scores[index] ??
+        Number.NEGATIVE_INFINITY) >
+      (scores[best] ??
+        Number.NEGATIVE_INFINITY)
+    ) {
+      best = index;
+    }
+  }
+
+  const pointers =
     floatData(
       requireTensor(
         outputs,
@@ -252,73 +409,467 @@ const decodeMaskOutputs = (
     );
 
   if (
-    pointerData.length <
-    POINTER_DIMENSION
+    pointers.length !==
+    scores.length *
+      POINTER_DIMENSION
   ) {
     throw new Error(
-      "EdgeTAM object pointer is shorter than 256 values.",
+      "EdgeTAM object pointers do not match its mask candidates.",
     );
   }
 
   return {
-    mask: {
-      logits:
-        lowResolution,
-      width:
-        squareSide(
-          lowResolution.length,
-          "EdgeTAM low-resolution mask",
-        ),
-      height:
-        squareSide(
-          lowResolution.length,
-          "EdgeTAM low-resolution mask",
-        ),
-      iou:
-        iouScores[best] ??
-        0,
-      objectScore:
-        objectScores[0] ??
-        0,
-    },
-    highResolution,
+    selected,
     pointer:
-      pointerData.slice(
-        0,
-        POINTER_DIMENSION,
+      pointers.slice(
+        best *
+          POINTER_DIMENSION,
+        (best + 1) *
+          POINTER_DIMENSION,
       ),
-    objectScore:
-      objectScores[0] ??
-      0,
   };
 };
 
+const removeNoMemoryBias = (
+  channels: Float32Array,
+  bias: readonly number[],
+): Float32Array => {
+  if (
+    channels.length !==
+      FEATURE_CHANNELS *
+        FEATURE_TOKENS ||
+    bias.length !==
+      FEATURE_CHANNELS
+  ) {
+    throw new Error(
+      "EdgeTAM top feature geometry does not match the no-memory embedding.",
+    );
+  }
+
+  const result =
+    channels.slice();
+
+  for (
+    let channel = 0;
+    channel <
+    FEATURE_CHANNELS;
+    channel += 1
+  ) {
+    const value =
+      bias[channel] ??
+      0;
+
+    const start =
+      channel *
+      FEATURE_TOKENS;
+
+    const end =
+      start +
+      FEATURE_TOKENS;
+
+    for (
+      let index = start;
+      index < end;
+      index += 1
+    ) {
+      result[index] =
+        (result[index] ??
+          0) -
+        value;
+    }
+  }
+
+  return result;
+};
+
+const atMemoryResolution = (
+  field:
+    Float32Array,
+): Float32Array => {
+  if (
+    field.length !==
+    MASK_SIDE *
+      MASK_SIDE
+  ) {
+    throw new Error(
+      "EdgeTAM mask does not match the decoder resolution.",
+    );
+  }
+
+  const result =
+    new Float32Array(
+      MEMORY_MASK_SIDE *
+        MEMORY_MASK_SIDE,
+    );
+
+  const scale =
+    MASK_SIDE /
+    MEMORY_MASK_SIDE;
+
+  const low =
+    new Int32Array(
+      MEMORY_MASK_SIDE,
+    );
+
+  const high =
+    new Int32Array(
+      MEMORY_MASK_SIDE,
+    );
+
+  const fraction =
+    new Float32Array(
+      MEMORY_MASK_SIDE,
+    );
+
+  for (
+    let output = 0;
+    output <
+    MEMORY_MASK_SIDE;
+    output += 1
+  ) {
+    const source =
+      Math.max(
+        0,
+        scale *
+          (output + 0.5) -
+          0.5,
+      );
+
+    const floor =
+      Math.floor(
+        source,
+      );
+
+    low[output] =
+      floor;
+
+    high[output] =
+      Math.min(
+        floor + 1,
+        MASK_SIDE - 1,
+      );
+
+    fraction[output] =
+      source -
+      floor;
+  }
+
+  for (
+    let y = 0;
+    y <
+    MEMORY_MASK_SIDE;
+    y += 1
+  ) {
+    const top =
+      (low[y] ??
+        0) *
+      MASK_SIDE;
+
+    const bottom =
+      (high[y] ??
+        0) *
+      MASK_SIDE;
+
+    const down =
+      fraction[y] ??
+      0;
+
+    const into =
+      y *
+      MEMORY_MASK_SIDE;
+
+    for (
+      let x = 0;
+      x <
+      MEMORY_MASK_SIDE;
+      x += 1
+    ) {
+      const left =
+        low[x] ??
+        0;
+
+      const right =
+        high[x] ??
+        0;
+
+      const across =
+        fraction[x] ??
+        0;
+
+      const upperLeft =
+        field[
+          top +
+            left
+        ] ??
+        0;
+
+      const upper =
+        upperLeft +
+        (
+          (field[
+            top +
+              right
+          ] ??
+            0) -
+          upperLeft
+        ) *
+          across;
+
+      const lowerLeft =
+        field[
+          bottom +
+            left
+        ] ??
+        0;
+
+      const lower =
+        lowerLeft +
+        (
+          (field[
+            bottom +
+              right
+          ] ??
+            0) -
+          lowerLeft
+        ) *
+          across;
+
+      result[
+        into +
+          x
+      ] =
+        upper +
+        (lower -
+          upper) *
+          down;
+    }
+  }
+
+  return result;
+};
+
+const maskForMemory = (
+  logits:
+    Float32Array,
+  fromPrompt: boolean,
+  scale: number,
+  bias: number,
+): Float32Array => {
+  const result =
+    new Float32Array(
+      logits.length,
+    );
+
+  for (
+    let index = 0;
+    index <
+    logits.length;
+    index += 1
+  ) {
+    const value =
+      logits[index] ??
+      0;
+
+    const decided =
+      fromPrompt
+        ? value > 0
+          ? 1
+          : 0
+        : 1 /
+          (
+            1 +
+            Math.exp(
+              -value,
+            )
+          );
+
+    result[index] =
+      decided *
+        scale +
+      bias;
+  }
+
+  return result;
+};
+
+const visionPositionEncoding =
+  (): Float32Array => {
+    const features =
+      FEATURE_CHANNELS /
+      2;
+
+    const scale =
+      2 *
+      Math.PI;
+
+    const frequencies =
+      new Float32Array(
+        features,
+      );
+
+    for (
+      let index = 0;
+      index <
+      features;
+      index += 1
+    ) {
+      frequencies[index] =
+        10000 **
+        (
+          (
+            2 *
+            Math.floor(
+              index /
+                2,
+            )
+          ) /
+          features
+        );
+    }
+
+    const result =
+      new Float32Array(
+        FEATURE_TOKENS *
+          FEATURE_CHANNELS,
+      );
+
+    for (
+      let y = 0;
+      y <
+      FEATURE_SIDE;
+      y += 1
+    ) {
+      const down =
+        (
+          (y + 1) /
+          (
+            FEATURE_SIDE +
+            1e-6
+          )
+        ) *
+        scale;
+
+      for (
+        let x = 0;
+        x <
+        FEATURE_SIDE;
+        x += 1
+      ) {
+        const across =
+          (
+            (x + 1) /
+            (
+              FEATURE_SIDE +
+              1e-6
+            )
+          ) *
+          scale;
+
+        const token =
+          (
+            y *
+              FEATURE_SIDE +
+            x
+          ) *
+          FEATURE_CHANNELS;
+
+        for (
+          let index = 0;
+          index <
+          features;
+          index += 2
+        ) {
+          const first =
+            frequencies[index] ??
+            1;
+
+          const second =
+            frequencies[
+              index + 1
+            ] ??
+            1;
+
+          result[
+            token +
+              index
+          ] =
+            Math.sin(
+              down /
+                first,
+            );
+
+          result[
+            token +
+              index +
+              1
+          ] =
+            Math.cos(
+              down /
+                second,
+            );
+
+          result[
+            token +
+              features +
+              index
+          ] =
+            Math.sin(
+              across /
+                first,
+            );
+
+          result[
+            token +
+              features +
+              index +
+              1
+          ] =
+            Math.cos(
+              across /
+                second,
+            );
+        }
+      }
+    }
+
+    return result;
+  };
+
 class EdgeMemoryBank {
-  #conditioning:
-    StoredMemory |
+  #anchor:
+    MemoryEntry |
     undefined;
 
   #recent:
-    StoredMemory[] = [];
+    MemoryEntry[] = [];
 
-  constructor(
-    private readonly temporal:
-      readonly (
-        readonly number[]
-      )[],
-  ) {}
+  #anchorPointer:
+    Float32Array |
+    undefined;
+
+  #recentPointers:
+    Float32Array[] = [];
 
   condition(
-    memory: StoredMemory,
+    anchor:
+      MemoryEntry,
   ): void {
-    this.#conditioning =
-      memory;
+    this.#anchor =
+      anchor;
 
     this.#recent = [];
+
+    this.#anchorPointer =
+      undefined;
+
+    this.#recentPointers = [];
   }
 
   push(
-    memory: StoredMemory,
+    memory:
+      MemoryEntry,
+    pointer:
+      Float32Array,
   ): void {
     this.#recent.push(
       memory,
@@ -326,117 +877,213 @@ class EdgeMemoryBank {
 
     while (
       this.#recent.length >
-      MAX_RECENT
+      RECENT_ENTRIES
     ) {
       this.#recent.shift();
+    }
+
+    if (
+      this.#anchorPointer ===
+      undefined
+    ) {
+      this.#anchorPointer =
+        pointer;
+
+      return;
+    }
+
+    this.#recentPointers.push(
+      pointer,
+    );
+
+    while (
+      this.#recentPointers.length >
+      MAX_POINTERS - 1
+    ) {
+      this.#recentPointers.shift();
     }
   }
 
   rewind(): void {
     this.#recent = [];
+
+    this.#anchorPointer =
+      undefined;
+
+    this.#recentPointers = [];
   }
 
   assemble(
-    index: number,
+    temporal:
+      readonly number[],
   ): EdgeMemoryAssembly {
-    const conditioning =
-      this.#conditioning;
+    const anchor =
+      this.#anchor;
 
     if (
-      conditioning ===
-      undefined
+      anchor === undefined
     ) {
       throw new Error(
         "EdgeTAM memory has no conditioning frame.",
       );
     }
 
-    const blocks:
-      StoredMemory[] = [
-        conditioning,
-      ];
+    requireLength(
+      temporal,
+      MEMORY_ENTRIES *
+        MEMORY_DIMENSION,
+      "temporal position table",
+    );
 
-    const positions:
-      Float32Array[] = [
-        temporalPositions(
-          conditioning.positions,
-          this.temporal[
-            this.temporal.length -
-              1
-          ] ??
-            [],
+    const memory =
+      new Float32Array(
+        MEMORY_TOKENS *
           MEMORY_DIMENSION,
-        ),
-      ];
-
-    for (
-      const memory of
-      [...this.#recent].reverse()
-    ) {
-      const offset =
-        index -
-        memory.index;
-
-      if (
-        offset < 1 ||
-        offset >
-          MAX_RECENT
-      ) {
-        continue;
-      }
-
-      blocks.push(
-        memory,
       );
 
-      positions.push(
-        temporalPositions(
-          memory.positions,
-          this.temporal[
-            offset - 1
-          ] ??
-            [],
+    const positions =
+      new Float32Array(
+        MEMORY_TOKENS *
           MEMORY_DIMENSION,
-        ),
       );
-    }
 
-    const pointerMemories =
-      [
-        conditioning,
-        ...[...this.#recent].reverse(),
-      ].slice(
-        0,
-        MAX_POINTERS,
+    const keyMask =
+      new Float32Array(
+        MEMORY_TOKENS,
+      ).fill(
+        MASKED_KEY,
       );
+
+    const held = [
+      anchor,
+      ...this.#recent.slice(
+        -RECENT_ENTRIES,
+      ),
+    ];
+
+    held.forEach(
+      (
+        entry,
+        slot,
+      ) => {
+        const offset =
+          slot *
+          MEMORY_ENTRY_TOKENS *
+          MEMORY_DIMENSION;
+
+        memory.set(
+          entry.features,
+          offset,
+        );
+
+        const age =
+          slot === 0
+            ? MEMORY_ENTRIES - 1
+            : held.length -
+              slot -
+              1;
+
+        const temporalOffset =
+          Math.min(
+            age,
+            MEMORY_ENTRIES - 1,
+          ) *
+          MEMORY_DIMENSION;
+
+        for (
+          let token = 0;
+          token <
+          MEMORY_ENTRY_TOKENS;
+          token += 1
+        ) {
+          const into =
+            offset +
+            token *
+              MEMORY_DIMENSION;
+
+          for (
+            let channel = 0;
+            channel <
+            MEMORY_DIMENSION;
+            channel += 1
+          ) {
+            positions[
+              into +
+                channel
+            ] =
+              (entry.positions[
+                token *
+                  MEMORY_DIMENSION +
+                  channel
+              ] ??
+                0) +
+              (temporal[
+                temporalOffset +
+                  channel
+              ] ??
+                0);
+          }
+        }
+
+        keyMask.fill(
+          0,
+          slot *
+            MEMORY_ENTRY_TOKENS,
+          (slot + 1) *
+            MEMORY_ENTRY_TOKENS,
+        );
+      },
+    );
 
     const pointers =
-      concatenateFloat32(
-        pointerMemories.map(
-          (memory) =>
-            memory.pointer,
-        ),
+      this.#anchorPointer ===
+      undefined
+        ? []
+        : [
+            this.#anchorPointer,
+            ...[
+              ...this
+                .#recentPointers,
+            ].reverse(),
+          ];
+
+    pointers
+      .slice(
+        0,
+        MAX_POINTERS,
+      )
+      .forEach(
+        (
+          pointer,
+          index,
+        ) => {
+          const token =
+            POINTER_START +
+            index *
+              POINTER_SPLITS;
+
+          memory.set(
+            pointer.subarray(
+              0,
+              POINTER_DIMENSION,
+            ),
+            token *
+              MEMORY_DIMENSION,
+          );
+
+          keyMask.fill(
+            0,
+            token,
+            token +
+              POINTER_SPLITS,
+          );
+        },
       );
 
     return {
-      spatial:
-        concatenateFloat32(
-          blocks.map(
-            (memory) =>
-              memory.tokens,
-          ),
-        ),
-      spatialPositions:
-        concatenateFloat32(
-          positions,
-        ),
-      pointers,
-      pointerPositions:
-        new Float32Array(
-          pointerMemories.length *
-            POINTER_TOKENS *
-            MEMORY_DIMENSION,
-        ),
+      memory,
+      positions,
+      keyMask,
     };
   }
 }
@@ -451,18 +1098,49 @@ export const createEdgeTamAdapter =
   ): Promise<VideoSegmentationAdapter> => {
     configureVideoOrt();
 
-    const constants =
-      await fetchVideoModelConstants(
+    if (
+      candidate.inputSize !==
+      MEMORY_MASK_SIDE
+    ) {
+      throw new Error(
+        `EdgeTAM adapter expects ${MEMORY_MASK_SIDE}px input, received ${candidate.inputSize}px.`,
+      );
+    }
+
+    const parameters =
+      await fetchParameters(
         candidate,
       );
 
-    const roles =
-      [
-        "vision-encoder",
-        "mask-decoder",
-        "memory-attention",
-        "memory-encoder",
-      ] as const;
+    const noMemory =
+      parameters.parameters
+        .no_memory_embedding;
+
+    const temporal =
+      parameters.parameters
+        .memory_temporal_positional_encoding;
+
+    const noObjectPointer =
+      Float32Array.from(
+        parameters.parameters
+          .no_object_pointer,
+      );
+
+    const memoryScale =
+      parameters.constants
+        .sigmoid_scale_for_mem_enc;
+
+    const memoryBias =
+      parameters.constants
+        .sigmoid_bias_for_mem_enc;
+
+    const roles = [
+      "vision-encoder",
+      "mask-decoder",
+      "memory-attention",
+      "memory-encoder",
+      "tracked-mask-decoder",
+    ] as const;
 
     const loaded:
       ort.InferenceSession[] = [];
@@ -498,7 +1176,7 @@ export const createEdgeTamAdapter =
           await load(
             "vision-encoder",
           ),
-        maskDecoder:
+        seedMaskDecoder:
           await load(
             "mask-decoder",
           ),
@@ -509,6 +1187,10 @@ export const createEdgeTamAdapter =
         memoryEncoder:
           await load(
             "memory-encoder",
+          ),
+        trackedMaskDecoder:
+          await load(
+            "tracked-mask-decoder",
           ),
       };
     } catch (error) {
@@ -521,48 +1203,34 @@ export const createEdgeTamAdapter =
           loaded[2],
         "memory-encoder":
           loaded[3],
+        "tracked-mask-decoder":
+          loaded[4],
       });
 
       throw error;
     }
 
-    const noMemoryEmbedding =
-      constants
-        .no_memory_embedding;
-
-    if (
-      noMemoryEmbedding ===
-      undefined
-    ) {
-      throw new Error(
-        "EdgeTAM constants are missing no_memory_embedding.",
-      );
-    }
-
     const bank =
-      new EdgeMemoryBank(
-        constants
-          .memory_temporal_positional_encoding,
-      );
+      new EdgeMemoryBank();
+
+    const visionPositions =
+      visionPositionEncoding();
 
     const encode =
       async (
         frame: VideoFrame,
       ): Promise<EncodedFrame> => {
-        const pixels =
-          frameToNchw(
-            frame,
-            candidate.inputSize,
-            constants.image_mean,
-            constants.image_std,
-          );
-
         const outputs =
           await sessions.visionEncoder.run({
             pixel_values:
               new ort.Tensor(
                 "float32",
-                pixels,
+                frameToNchw(
+                  frame,
+                  candidate.inputSize,
+                  IMAGENET_MEAN,
+                  IMAGENET_STD,
+                ),
                 [
                   1,
                   3,
@@ -572,119 +1240,202 @@ export const createEdgeTamAdapter =
               ),
           });
 
+        const top =
+          requireTensor(
+            outputs,
+            "image_embeddings.2",
+          );
+
+        const rawTop =
+          removeNoMemoryBias(
+            floatData(
+              top,
+              "EdgeTAM image_embeddings.2",
+            ),
+            noMemory,
+          );
+
         return {
-          feats0:
+          fine0:
             requireTensor(
               outputs,
-              "feats0",
+              "image_embeddings.0",
             ),
-          feats1:
+          fine1:
             requireTensor(
               outputs,
-              "feats1",
+              "image_embeddings.1",
             ),
-          feats2:
-            requireTensor(
-              outputs,
-              "feats2",
-            ),
-          pos2:
-            requireTensor(
-              outputs,
-              "pos2",
+          top,
+          rawTop,
+          tokens:
+            channelsToTokens(
+              rawTop,
+              FEATURE_CHANNELS,
+              FEATURE_TOKENS,
             ),
         };
       };
 
-    const decode =
+    const seedDecode =
       async (
         vision:
           EncodedFrame,
-        conditioned:
-          ort.Tensor,
         prompt:
-          ReturnType<
-            typeof pointPromptTensors
-          >,
-      ): Promise<DecodedFrame> =>
-        decodeMaskOutputs(
-          await sessions.maskDecoder.run({
-            feats0:
-              vision.feats0,
-            feats1:
-              vision.feats1,
-            feats2:
-              conditioned,
+          VideoSegmentationPrompt,
+      ): Promise<SelectedMask> => {
+        const coordinates =
+          new Float32Array(
+            prompt.points.length *
+              2,
+          );
+
+        const labels =
+          new BigInt64Array(
+            prompt.points.length,
+          );
+
+        prompt.points.forEach(
+          (
+            point,
+            index,
+          ) => {
+            coordinates[
+              index * 2
+            ] =
+              point.x *
+              candidate.inputSize;
+
+            coordinates[
+              index * 2 +
+                1
+            ] =
+              point.y *
+              candidate.inputSize;
+
+            labels[index] =
+              BigInt(
+                point.label,
+              );
+          },
+        );
+
+        return selectBestMask(
+          await sessions.seedMaskDecoder.run({
+            "image_embeddings.0":
+              vision.fine0,
+            "image_embeddings.1":
+              vision.fine1,
+            "image_embeddings.2":
+              vision.top,
             input_points:
-              prompt.points,
+              new ort.Tensor(
+                "float32",
+                coordinates,
+                [
+                  1,
+                  1,
+                  prompt.points.length,
+                  2,
+                ],
+              ),
             input_labels:
-              prompt.labels,
+              new ort.Tensor(
+                "int64",
+                labels,
+                [
+                  1,
+                  1,
+                  prompt.points.length,
+                ],
+              ),
+            input_boxes:
+              new ort.Tensor(
+                "float32",
+                new Float32Array(
+                  0,
+                ),
+                [
+                  1,
+                  0,
+                  4,
+                ],
+              ),
           }),
         );
+      };
 
     const remember =
       async (
         vision:
           EncodedFrame,
-        decoded:
-          DecodedFrame,
-        index: number,
-        prompted: boolean,
-      ): Promise<StoredMemory> => {
+        mask:
+          Float32Array,
+        fromPrompt: boolean,
+      ): Promise<MemoryEntry> => {
+        const memoryMask =
+          maskForMemory(
+            atMemoryResolution(
+              mask,
+            ),
+            fromPrompt,
+            memoryScale,
+            memoryBias,
+          );
+
         const outputs =
           await sessions.memoryEncoder.run({
             vision_features:
-              vision.feats2,
-            pred_masks_high_res:
               new ort.Tensor(
                 "float32",
-                decoded.highResolution,
+                vision.rawTop,
                 [
                   1,
-                  1,
-                  candidate.inputSize,
-                  candidate.inputSize,
+                  FEATURE_CHANNELS,
+                  FEATURE_SIDE,
+                  FEATURE_SIDE,
                 ],
               ),
-            is_mask_from_pts:
+            mask_for_memory:
               new ort.Tensor(
-                "bool",
-                Uint8Array.of(
-                  prompted
-                    ? 1
-                    : 0,
-                ),
+                "float32",
+                memoryMask,
                 [
                   1,
+                  1,
+                  MEMORY_MASK_SIDE,
+                  MEMORY_MASK_SIDE,
                 ],
               ),
           });
 
-        const tokens =
+        const features =
           floatData(
             requireTensor(
               outputs,
-              "memory_tokens",
+              "memory_features",
             ),
-            "EdgeTAM memory_tokens",
+            "EdgeTAM memory_features",
           ).slice();
 
         const positions =
           floatData(
             requireTensor(
               outputs,
-              "memory_pos_enc",
+              "memory_positions",
             ),
-            "EdgeTAM memory_pos_enc",
+            "EdgeTAM memory_positions",
           ).slice();
 
+        const expected =
+          MEMORY_ENTRY_TOKENS *
+          MEMORY_DIMENSION;
+
         if (
-          tokens.length !==
-            MEMORY_TOKENS *
-              MEMORY_DIMENSION ||
+          features.length !==
+            expected ||
           positions.length !==
-            MEMORY_TOKENS *
-              MEMORY_DIMENSION
+            expected
         ) {
           throw new Error(
             "EdgeTAM memory encoder returned unexpected geometry.",
@@ -692,11 +1443,8 @@ export const createEdgeTamAdapter =
         }
 
         return {
-          index,
-          tokens,
+          features,
           positions,
-          pointer:
-            decoded.pointer,
         };
       };
 
@@ -705,213 +1453,194 @@ export const createEdgeTamAdapter =
 
       async seed(
         frame,
-        prompt:
-          VideoSegmentationPrompt,
-        frameIndex,
+        prompt,
       ) {
+        if (
+          prompt.points.length ===
+          0
+        ) {
+          throw new Error(
+            "EdgeTAM seed requires at least one point.",
+          );
+        }
+
         const vision =
           await encode(
             frame,
           );
 
-        const promptTensors =
-          pointPromptTensors(
-            prompt.points,
-            candidate.inputSize,
-          );
-
-        const decoded =
-          await decode(
+        const selected =
+          await seedDecode(
             vision,
-            new ort.Tensor(
-              "float32",
-              addChannelBias(
-                floatData(
-                  vision.feats2,
-                  "EdgeTAM feats2",
-                ),
-                FEATURE_CHANNELS,
-                noMemoryEmbedding,
-              ),
-              [
-                1,
-                FEATURE_CHANNELS,
-                FEATURE_SIDE,
-                FEATURE_SIDE,
-              ],
-            ),
-            promptTensors,
+            prompt,
           );
 
         bank.condition(
           await remember(
             vision,
-            decoded,
-            frameIndex,
+            selected.logits,
             true,
           ),
         );
 
-        return decoded.mask;
+        return {
+          logits:
+            selected.logits,
+          width:
+            MASK_SIDE,
+          height:
+            MASK_SIDE,
+          iou:
+            selected.iou,
+          objectScore:
+            selected.objectScore,
+        };
       },
 
       async track(
         frame,
-        frameIndex,
       ) {
         const vision =
           await encode(
             frame,
           );
 
-        const assembled =
+        const memory =
           bank.assemble(
-            frameIndex,
+            temporal,
           );
-
-        const currentFeatures =
-          channelsToTokens(
-            floatData(
-              vision.feats2,
-              "EdgeTAM feats2",
-            ),
-            FEATURE_CHANNELS,
-            FEATURE_TOKENS,
-          );
-
-        const currentPositions =
-          channelsToTokens(
-            floatData(
-              vision.pos2,
-              "EdgeTAM pos2",
-            ),
-            FEATURE_CHANNELS,
-            FEATURE_TOKENS,
-          );
-
-        const spatialRows =
-          assembled.spatial.length /
-          MEMORY_DIMENSION;
-
-        const pointerRows =
-          assembled.pointers.length /
-          MEMORY_DIMENSION;
 
         const attention =
           await sessions.memoryAttention.run({
-            current_vision_features:
+            vision_features:
               new ort.Tensor(
                 "float32",
-                currentFeatures,
+                vision.tokens,
                 [
                   FEATURE_TOKENS,
                   1,
                   FEATURE_CHANNELS,
                 ],
               ),
-            current_vision_position_embeddings:
+            vision_position_embeddings:
               new ort.Tensor(
                 "float32",
-                currentPositions,
+                visionPositions,
                 [
                   FEATURE_TOKENS,
                   1,
                   FEATURE_CHANNELS,
                 ],
               ),
-            spatial_memory:
+            memory:
               new ort.Tensor(
                 "float32",
-                assembled.spatial,
+                memory.memory,
                 [
-                  spatialRows,
+                  MEMORY_TOKENS,
                   1,
                   MEMORY_DIMENSION,
                 ],
               ),
-            spatial_memory_position_embeddings:
+            memory_position_embeddings:
               new ort.Tensor(
                 "float32",
-                assembled.spatialPositions,
+                memory.positions,
                 [
-                  spatialRows,
+                  MEMORY_TOKENS,
                   1,
                   MEMORY_DIMENSION,
                 ],
               ),
-            pointer_memory:
+            key_mask:
               new ort.Tensor(
                 "float32",
-                assembled.pointers,
+                memory.keyMask,
                 [
-                  pointerRows,
                   1,
-                  MEMORY_DIMENSION,
-                ],
-              ),
-            pointer_memory_position_embeddings:
-              new ort.Tensor(
-                "float32",
-                assembled.pointerPositions,
-                [
-                  pointerRows,
                   1,
-                  MEMORY_DIMENSION,
+                  1,
+                  MEMORY_TOKENS,
                 ],
               ),
           });
 
-        const conditionedTokens =
-          floatData(
-            requireTensor(
-              attention,
-              "conditioned_features",
-            ),
-            "EdgeTAM conditioned_features",
-          );
-
         const conditioned =
-          new ort.Tensor(
-            "float32",
-            tokensToChannels(
-              conditionedTokens,
-              FEATURE_CHANNELS,
-              FEATURE_TOKENS,
+          tokensToChannels(
+            floatData(
+              requireTensor(
+                attention,
+                "conditioned_features",
+              ),
+              "EdgeTAM conditioned_features",
             ),
-            [
-              1,
-              FEATURE_CHANNELS,
-              FEATURE_SIDE,
-              FEATURE_SIDE,
-            ],
+            FEATURE_CHANNELS,
+            FEATURE_TOKENS,
           );
 
         const decoded =
-          await decode(
-            vision,
-            conditioned,
-            pointPromptTensors(
-              [
-                {
-                  x: 0,
-                  y: 0,
-                  label: -1,
-                },
-              ],
-              candidate.inputSize,
-            ),
+          selectTrackedMask(
+            await sessions.trackedMaskDecoder.run({
+              "image_embeddings.0":
+                vision.fine0,
+              "image_embeddings.1":
+                vision.fine1,
+              "image_embeddings.2":
+                new ort.Tensor(
+                  "float32",
+                  conditioned,
+                  [
+                    1,
+                    FEATURE_CHANNELS,
+                    FEATURE_SIDE,
+                    FEATURE_SIDE,
+                  ],
+                ),
+            }),
           );
+
+        const objectScore =
+          decoded.selected
+            .objectScore ??
+          Number.NEGATIVE_INFINITY;
+
+        const present =
+          objectScore >
+          0;
+
+        const logits =
+          present
+            ? decoded.selected
+                .logits
+            : new Float32Array(
+                MASK_SIDE *
+                  MASK_SIDE,
+              ).fill(
+                NO_OBJECT_LOGIT,
+              );
 
         bank.push(
           await remember(
             vision,
-            decoded,
-            frameIndex,
+            logits,
             false,
           ),
+          present
+            ? decoded.pointer
+            : noObjectPointer,
         );
 
-        return decoded.mask;
+        return {
+          logits,
+          width:
+            MASK_SIDE,
+          height:
+            MASK_SIDE,
+          iou:
+            decoded.selected
+              .iou,
+          objectScore,
+        };
       },
 
       rewind() {
@@ -923,11 +1652,13 @@ export const createEdgeTamAdapter =
           "vision-encoder":
             sessions.visionEncoder,
           "mask-decoder":
-            sessions.maskDecoder,
+            sessions.seedMaskDecoder,
           "memory-attention":
             sessions.memoryAttention,
           "memory-encoder":
             sessions.memoryEncoder,
+          "tracked-mask-decoder":
+            sessions.trackedMaskDecoder,
         });
       },
     };
