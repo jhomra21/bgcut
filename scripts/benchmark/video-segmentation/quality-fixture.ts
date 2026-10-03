@@ -4,23 +4,55 @@ const VIDEO_REVISION =
 const MASK_REVISION =
   "3c33c32";
 
-const VIDEO_URL =
-  `https://huggingface.co/datasets/emirkisa/DAVIS-2017-480p-mp4/resolve/${VIDEO_REVISION}/blackswan_raw_24fps.mp4`;
+const VIDEO_BASE =
+  `https://huggingface.co/datasets/emirkisa/DAVIS-2017-480p-mp4/resolve/${VIDEO_REVISION}`;
 
 const MASK_BASE =
-  `https://huggingface.co/datasets/AlonzoLeeeooo/DAVIS-Edit/resolve/${MASK_REVISION}/Annotations/blackswan`;
+  `https://huggingface.co/datasets/AlonzoLeeeooo/DAVIS-Edit/resolve/${MASK_REVISION}/Annotations`;
 
-const VIDEO_BYTES =
-  1_402_975;
+export const QUALITY_FIXTURES = {
+  blackswan: {
+    label:
+      "DAVIS blackswan",
+    videoBytes:
+      1_402_975,
+  },
+  bear: {
+    label:
+      "DAVIS bear",
+    videoBytes:
+      2_015_436,
+  },
+  camel: {
+    label:
+      "DAVIS camel",
+    videoBytes:
+      2_139_134,
+  },
+  cows: {
+    label:
+      "DAVIS cows",
+    videoBytes:
+      3_309_913,
+  },
+} as const;
 
-const FRAME_COUNT =
+export type QualityFixtureId =
+  keyof typeof QUALITY_FIXTURES;
+
+export const QUALITY_FRAME_COUNT =
   12;
 
-const VIDEO_ROUTE =
-  "/quality/blackswan.mp4";
+export const QUALITY_FRAME_RATE =
+  24;
 
-const MASK_ROUTE_PREFIX =
-  "/quality/blackswan/";
+const isQualityFixtureId = (
+  value: string,
+): value is QualityFixtureId =>
+  Object.hasOwn(
+    QUALITY_FIXTURES,
+    value,
+  );
 
 const cache =
   new Map<
@@ -104,11 +136,20 @@ const frameFilename = (
     "0",
   )}.png`;
 
-export const QUALITY_FRAME_COUNT =
-  FRAME_COUNT;
+export const qualityVideoRoute = (
+  fixture:
+    QualityFixtureId,
+): string =>
+  `/quality/${fixture}.mp4`;
 
-export const QUALITY_FRAME_RATE =
-  24;
+export const qualityMaskRoute = (
+  fixture:
+    QualityFixtureId,
+  index: number,
+): string =>
+  `/quality/${fixture}/${frameFilename(
+    index,
+  )}`;
 
 export const proxyQualityFixtureRequest =
   async (
@@ -126,15 +167,37 @@ export const proxyQualityFixtureRequest =
         request.url,
       );
 
+    const videoMatch =
+      /^\/quality\/([a-z0-9-]+)\.mp4$/u.exec(
+        url.pathname,
+      );
+
     if (
-      url.pathname ===
-      VIDEO_ROUTE
+      videoMatch !==
+      null
     ) {
+      const id =
+        videoMatch[1] ??
+        "";
+
+      if (
+        !isQualityFixtureId(
+          id,
+        )
+      ) {
+        return null;
+      }
+
+      const fixture =
+        QUALITY_FIXTURES[
+          id
+        ];
+
       const bytes =
         await load(
-          "blackswan_raw_24fps.mp4",
-          VIDEO_URL,
-          VIDEO_BYTES,
+          `${id}_raw_24fps.mp4`,
+          `${VIDEO_BASE}/${id}_raw_24fps.mp4`,
+          fixture.videoBytes,
         );
 
       return new Response(
@@ -154,34 +217,36 @@ export const proxyQualityFixtureRequest =
       );
     }
 
+    const maskMatch =
+      /^\/quality\/([a-z0-9-]+)\/(\d{5})\.png$/u.exec(
+        url.pathname,
+      );
+
     if (
-      !url.pathname.startsWith(
-        MASK_ROUTE_PREFIX,
+      maskMatch ===
+      null
+    ) {
+      return null;
+    }
+
+    const id =
+      maskMatch[1] ??
+      "";
+
+    if (
+      !isQualityFixtureId(
+        id,
       )
     ) {
       return null;
     }
 
     const filename =
-      url.pathname.slice(
-        MASK_ROUTE_PREFIX.length,
-      );
-
-    const match =
-      /^(\d{5})\.png$/u.exec(
-        filename,
-      );
-
-    if (
-      match ===
-      null
-    ) {
-      return null;
-    }
+      `${maskMatch[2] ?? ""}.png`;
 
     const index =
       Number.parseInt(
-        match[1] ??
+        maskMatch[2] ??
           "",
         10,
       );
@@ -189,27 +254,19 @@ export const proxyQualityFixtureRequest =
     if (
       index < 0 ||
       index >=
-        FRAME_COUNT
-    ) {
-      return null;
-    }
-
-    const expected =
-      frameFilename(
-        index,
-      );
-
-    if (
-      expected !==
-      filename
+        QUALITY_FRAME_COUNT ||
+      filename !==
+        frameFilename(
+          index,
+        )
     ) {
       return null;
     }
 
     const bytes =
       await load(
-        filename,
-        `${MASK_BASE}/${filename}`,
+        `${id}/${filename}`,
+        `${MASK_BASE}/${id}/${filename}`,
       );
 
     return new Response(
