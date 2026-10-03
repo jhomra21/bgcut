@@ -105,8 +105,7 @@ export const configureVideoOrt = (): void => {
 export const artifactFor = (
   candidate: VideoSegmentationCandidate,
   role:
-    | VideoModelGraphRole
-    | "constants",
+    VideoModelArtifact["role"],
 ): VideoModelArtifact => {
   const artifact =
     candidate.artifacts.find(
@@ -204,6 +203,45 @@ export const createVideoSession =
       );
     }
 
+    const externalData:
+      {
+        readonly path: string;
+        readonly data:
+          Uint8Array<ArrayBuffer>;
+      }[] = [];
+
+    for (
+      const external of
+      artifact.externalData ??
+      []
+    ) {
+      const externalResponse =
+        await fetch(
+          external.url,
+          {
+            cache:
+              "force-cache",
+          },
+        );
+
+      if (
+        !externalResponse.ok
+      ) {
+        throw new Error(
+          `Could not fetch ${candidate.label} ${external.filename}: HTTP ${externalResponse.status}.`,
+        );
+      }
+
+      externalData.push({
+        path:
+          external.filename,
+        data:
+          new Uint8Array(
+            await externalResponse.arrayBuffer(),
+          ),
+      });
+    }
+
     return ort.InferenceSession.create(
       new Uint8Array(
         await response.arrayBuffer(),
@@ -216,6 +254,12 @@ export const createVideoSession =
         ],
         graphOptimizationLevel:
           "all",
+        ...(externalData.length >
+        0
+          ? {
+              externalData,
+            }
+          : {}),
       },
     );
   };
