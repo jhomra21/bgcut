@@ -8,8 +8,15 @@ import {
   openMediaBunnyVideoSource,
 } from "./media-source";
 import {
+  QUALITY_FIXTURES,
   QUALITY_FRAME_COUNT,
   QUALITY_FRAME_RATE,
+  qualityMaskRoute,
+  qualityVideoRoute,
+} from "./quality-fixture";
+
+import type {
+  QualityFixtureId,
 } from "./quality-fixture";
 
 import type {
@@ -47,7 +54,9 @@ type QualityFrame = {
 type QualityReport = {
   readonly schemaVersion: 1;
   readonly fixture:
-    "DAVIS blackswan";
+    QualityFixtureId;
+  readonly fixtureLabel:
+    string;
   readonly candidate:
     QualityCandidate;
   readonly model:
@@ -68,6 +77,8 @@ type QualityReport = {
 };
 
 type QualityFailure = {
+  readonly fixture:
+    QualityFixtureId;
   readonly candidate:
     QualityCandidate;
   readonly message: string;
@@ -130,6 +141,33 @@ const modelFor = (
         "sam21-tiny"
       ];
 
+const fixtureFromLocation =
+  (): QualityFixtureId => {
+    const fixture =
+      new URL(
+        globalThis.location.href,
+      ).searchParams.get(
+        "fixture",
+      ) ??
+      "";
+
+    switch (
+      fixture
+    ) {
+      case "blackswan":
+      case "bear":
+      case "camel":
+      case "cows":
+        return fixture;
+
+      default:
+        throw new Error(
+          `Unknown quality fixture "${fixture}".`,
+        );
+    }
+  };
+
+
 const mean = (
   values:
     readonly number[],
@@ -148,23 +186,16 @@ const mean = (
       ) /
       values.length;
 
-const maskUrl = (
-  index: number,
-): string =>
-  `/quality/blackswan/${index
-    .toString()
-    .padStart(
-      5,
-      "0",
-    )}.png`;
-
 const loadGroundTruth =
   async (
+    fixture:
+      QualityFixtureId,
     index: number,
   ): Promise<GroundTruth> => {
     const response =
       await fetch(
-        maskUrl(
+        qualityMaskRoute(
+          fixture,
           index,
         ),
         {
@@ -527,6 +558,9 @@ const main =
     const requested =
       candidateFromLocation();
 
+    const fixture =
+      fixtureFromLocation();
+
     const candidate =
       modelFor(
         requested,
@@ -534,7 +568,9 @@ const main =
 
     const videoResponse =
       await fetch(
-        "/quality/blackswan.mp4",
+        qualityVideoRoute(
+          fixture,
+        ),
         {
           cache:
             "force-cache",
@@ -566,6 +602,7 @@ const main =
             index,
           ) =>
             loadGroundTruth(
+              fixture,
               index,
             ),
         ),
@@ -726,8 +763,11 @@ const main =
     const report:
       QualityReport = {
         schemaVersion: 1,
-        fixture:
-          "DAVIS blackswan",
+        fixture,
+        fixtureLabel:
+          QUALITY_FIXTURES[
+            fixture
+          ].label,
         candidate:
           requested,
         model:
@@ -782,7 +822,7 @@ const main =
     );
 
     writeStatus(
-      `DAVIS quality passed: seed IoU ${report.seedIou.toFixed(
+      `${report.fixtureLabel} quality passed: seed IoU ${report.seedIou.toFixed(
         4,
       )}, tracked mean IoU ${report.meanTrackedIou.toFixed(
         4,
@@ -798,6 +838,15 @@ void main().catch(
           return candidateFromLocation();
         } catch {
           return "edgetam" as const;
+        }
+      })();
+
+    const fixture =
+      (() => {
+        try {
+          return fixtureFromLocation();
+        } catch {
+          return "blackswan" as const;
         }
       })();
 
@@ -819,6 +868,7 @@ void main().catch(
     void postJson(
       "/failure",
       {
+        fixture,
         candidate:
           requested,
         message:
