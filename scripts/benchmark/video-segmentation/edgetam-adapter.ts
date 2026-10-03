@@ -272,6 +272,7 @@ const selectBestMask = (
       string,
       ort.Tensor
     >,
+  proposalIndex?: number,
 ): SelectedMask => {
   const scores =
     floatData(
@@ -293,19 +294,40 @@ const selectBestMask = (
 
   let best = 0;
 
-  for (
-    let index = 1;
-    index <
-    scores.length;
-    index += 1
+  if (
+    proposalIndex !==
+    undefined
   ) {
     if (
-      (scores[index] ??
-        Number.NEGATIVE_INFINITY) >
-      (scores[best] ??
-        Number.NEGATIVE_INFINITY)
+      !Number.isInteger(
+        proposalIndex,
+      ) ||
+      proposalIndex < 0 ||
+      proposalIndex >=
+        scores.length
     ) {
-      best = index;
+      throw new Error(
+        `EdgeTAM seed proposal ${proposalIndex} is outside the ${scores.length} returned proposals.`,
+      );
+    }
+
+    best =
+      proposalIndex;
+  } else {
+    for (
+      let index = 1;
+      index <
+      scores.length;
+      index += 1
+    ) {
+      if (
+        (scores[index] ??
+          Number.NEGATIVE_INFINITY) >
+        (scores[best] ??
+          Number.NEGATIVE_INFINITY)
+      ) {
+        best = index;
+      }
     }
   }
 
@@ -1395,6 +1417,7 @@ export const createEdgeTamAdapter =
                 ],
               ),
           }),
+          prompt.proposalIndex,
         );
       };
 
