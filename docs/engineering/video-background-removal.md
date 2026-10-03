@@ -123,6 +123,10 @@ The next diagnostic removes BiRefNet from the hard cases. EdgeTAM encodes frame 
 
 Ground truth chooses the best candidate only for this diagnostic. The purpose is to answer one question before inventing a selector: does an automatic EdgeTAM point grid contain the correct foreground mask at all? If it does, automatic video background removal becomes a ranking problem. If it does not, denser sampling or a different foreground-discovery model is required.
 
+The 4×4 pass found the `car-shadow` subject cleanly: its best grid seed reached 0.947 IoU and the unchanged tracker reached 0.978 mean tracked IoU. It did not cover the other two targets closely enough. `bmx-trees` peaked at 0.152 seed IoU, while `car-turn` had no overlapping seed candidate. Their known diagnostic seed points sit near (0.537, 0.520) and (0.879, 0.539), respectively; the 4×4 cell centers were too coarse.
+
+The follow-up uses a 7×7 uniform grid. It also records mask bounding-box geometry, centroid, frame-edge contact, edge-pixel fraction, and a compact 32×32 binary fingerprint for every candidate. Those fingerprints let the artifact be clustered offline by mask overlap, so a deployable ranking rule can be derived from model-only agreement rather than another ground-truth-tuned score.
+
 The oracle proposal runs also exposed a separate result: for all seven current DAVIS sequences, the best mask among the three masks returned at the known subject point was proposal 0. EdgeTAM's predicted-IoU ranking was the source of the catastrophic `car-shadow` and `car-turn` seed choices. This makes proposal 0 a strong ranking control once a subject point is already known, but it does not by itself solve automatic subject discovery.
 
 ## Memory ownership

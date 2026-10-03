@@ -120,6 +120,16 @@ type GridDiscoveryCandidate = {
     number | null;
   readonly stability: number;
   readonly areaFraction: number;
+  readonly bboxAreaFraction:
+    number;
+  readonly centroid:
+    QualitySeedPoint | null;
+  readonly touchesFrame:
+    boolean;
+  readonly edgePixelFraction:
+    number;
+  readonly fingerprint32:
+    string;
   readonly groundTruthIou: number;
   readonly groundTruthBoundaryF:
     number;
@@ -728,6 +738,262 @@ const maskAreaFraction = (
     mask.logits.length;
 };
 
+type MaskGeometry = {
+  readonly bboxAreaFraction:
+    number;
+  readonly centroid:
+    QualitySeedPoint | null;
+  readonly touchesFrame:
+    boolean;
+  readonly edgePixelFraction:
+    number;
+};
+
+const maskGeometry = (
+  mask:
+    VideoSegmentationMask,
+): MaskGeometry => {
+  let foreground = 0;
+
+  let edgePixels = 0;
+
+  let minX =
+    mask.width;
+
+  let minY =
+    mask.height;
+
+  let maxX = -1;
+
+  let maxY = -1;
+
+  let sumX = 0;
+
+  let sumY = 0;
+
+  for (
+    let y = 0;
+    y <
+    mask.height;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x <
+      mask.width;
+      x += 1
+    ) {
+      if (
+        (mask.logits[
+          y *
+            mask.width +
+            x
+        ] ??
+          Number.NEGATIVE_INFINITY) <=
+        0
+      ) {
+        continue;
+      }
+
+      foreground += 1;
+
+      sumX += x;
+
+      sumY += y;
+
+      minX =
+        Math.min(
+          minX,
+          x,
+        );
+
+      minY =
+        Math.min(
+          minY,
+          y,
+        );
+
+      maxX =
+        Math.max(
+          maxX,
+          x,
+        );
+
+      maxY =
+        Math.max(
+          maxY,
+          y,
+        );
+
+      if (
+        x === 0 ||
+        y === 0 ||
+        x ===
+          mask.width - 1 ||
+        y ===
+          mask.height - 1
+      ) {
+        edgePixels += 1;
+      }
+    }
+  }
+
+  if (
+    foreground ===
+    0
+  ) {
+    return {
+      bboxAreaFraction: 0,
+      centroid: null,
+      touchesFrame:
+        false,
+      edgePixelFraction: 0,
+    };
+  }
+
+  const bboxPixels =
+    (
+      maxX -
+      minX +
+      1
+    ) *
+    (
+      maxY -
+      minY +
+      1
+    );
+
+  return {
+    bboxAreaFraction:
+      bboxPixels /
+      (
+        mask.width *
+        mask.height
+      ),
+    centroid: {
+      x:
+        sumX /
+        foreground /
+        Math.max(
+          1,
+          mask.width - 1,
+        ),
+      y:
+        sumY /
+        foreground /
+        Math.max(
+          1,
+          mask.height - 1,
+        ),
+    },
+    touchesFrame:
+      minX === 0 ||
+      minY === 0 ||
+      maxX ===
+        mask.width - 1 ||
+      maxY ===
+        mask.height - 1,
+    edgePixelFraction:
+      edgePixels /
+      foreground,
+  };
+};
+
+const maskFingerprint32 = (
+  mask:
+    VideoSegmentationMask,
+): string => {
+  const side = 32;
+
+  const bytes =
+    new Uint8Array(
+      side *
+        side /
+        8,
+    );
+
+  for (
+    let y = 0;
+    y <
+    side;
+    y += 1
+  ) {
+    const sourceY =
+      Math.min(
+        mask.height - 1,
+        Math.floor(
+          (
+            (y + 0.5) /
+            side
+          ) *
+            mask.height,
+        ),
+      );
+
+    for (
+      let x = 0;
+      x <
+      side;
+      x += 1
+    ) {
+      const sourceX =
+        Math.min(
+          mask.width - 1,
+          Math.floor(
+            (
+              (x + 0.5) /
+              side
+            ) *
+              mask.width,
+          ),
+        );
+
+      if (
+        (mask.logits[
+          sourceY *
+            mask.width +
+            sourceX
+        ] ??
+          Number.NEGATIVE_INFINITY) <=
+        0
+      ) {
+        continue;
+      }
+
+      const bit =
+        y *
+          side +
+        x;
+
+      bytes[
+        bit >>
+          3
+      ] |=
+        128 >>
+        (
+          bit &
+          7
+        );
+    }
+  }
+
+  let binary = "";
+
+  for (
+    const byte of
+    bytes
+  ) {
+    binary +=
+      String.fromCharCode(
+        byte,
+      );
+  }
+
+  return btoa(
+    binary,
+  );
+};
+
 const discoveryGrid = (
   pointsPerSide: number,
 ): readonly QualitySeedPoint[] => {
@@ -1131,7 +1397,7 @@ const main =
           );
         }
 
-        const pointsPerSide = 4;
+        const pointsPerSide = 7;
 
         const points =
           discoveryGrid(
@@ -1158,6 +1424,11 @@ const main =
                   groundTruth[0]!,
                 );
 
+              const geometry =
+                maskGeometry(
+                  discovery.mask,
+                );
+
               return {
                 point: {
                   x:
@@ -1176,6 +1447,18 @@ const main =
                   ),
                 areaFraction:
                   maskAreaFraction(
+                    discovery.mask,
+                  ),
+                bboxAreaFraction:
+                  geometry.bboxAreaFraction,
+                centroid:
+                  geometry.centroid,
+                touchesFrame:
+                  geometry.touchesFrame,
+                edgePixelFraction:
+                  geometry.edgePixelFraction,
+                fingerprint32:
+                  maskFingerprint32(
                     discovery.mask,
                   ),
                 groundTruthIou:

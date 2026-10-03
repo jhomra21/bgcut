@@ -198,16 +198,10 @@ jobs:
           }
 
           failed=0
-          for fixture in blackswan bear camel cows bmx-trees car-shadow car-turn; do
-            run_candidate "$fixture" edgetam model || failed=1
-            run_candidate "$fixture" edgetam oracle || failed=1
-            run_candidate "$fixture" sam21-primary model || failed=1
-          done
 
-          # Automatic point-grid discovery diagnostic. Ground truth selects
-          # only the best candidate after EdgeTAM has generated all masks; this
-          # answers whether the target subject exists in an automatic grid at all
-          # before product ranking heuristics are introduced.
+          # Focused automatic point-grid discovery iteration. The full
+          # EdgeTAM/SAM baseline and oracle matrix passed on the parent commit;
+          # this head changes only discovery diagnostics.
           for fixture in bmx-trees car-shadow car-turn; do
             run_candidate "$fixture" edgetam grid-oracle || failed=1
           done
