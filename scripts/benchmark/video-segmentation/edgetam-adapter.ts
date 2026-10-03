@@ -12,10 +12,13 @@ import {
   tokensToChannels,
 } from "./runtime-common";
 
+import {
+  browserVideoModelUrl,
+} from "./model-delivery";
+
 import type {
   VideoSegmentationAdapter,
   VideoSegmentationCandidate,
-  VideoSegmentationMask,
   VideoSegmentationPrompt,
 } from "./types";
 
@@ -210,7 +213,9 @@ const fetchParameters =
 
     const response =
       await fetch(
-        artifact.url,
+        browserVideoModelUrl(
+          artifact.url,
+        ),
         {
           cache:
             "force-cache",
