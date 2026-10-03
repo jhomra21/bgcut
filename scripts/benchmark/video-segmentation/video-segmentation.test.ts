@@ -91,7 +91,8 @@ describe("video segmentation bake-off", () => {
   });
 
   test("summarizes inference timing without mixing decode time into tracked FPS", () => {
-    const summary = summarizeVideoSegmentationFrames([
+    const summary = summarizeVideoSegmentationFrames(
+      [
       {
         frameIndex: 0,
         timestamp: 0,
@@ -112,13 +113,20 @@ describe("video segmentation bake-off", () => {
         modelIou: 0.88,
         objectScore: 0.95,
       },
-    ]);
+      ],
+      0,
+    );
 
     expect(summary.meanDecodeMs).toBe(5);
     expect(summary.meanInferenceMs).toBe(25);
     expect(summary.p50InferenceMs).toBe(20);
     expect(summary.p95InferenceMs).toBe(30);
-    expect(summary.trackedFps).toBe(40);
+    expect(summary.meanTrackedInferenceMs).toBe(30);
+    expect(summary.p50TrackedInferenceMs).toBe(30);
+    expect(summary.p95TrackedInferenceMs).toBe(30);
+    expect(summary.trackedFps).toBeCloseTo(
+      1000 / 30,
+    );
     expect(summary.meanTemporalMaskIou).toBe(0.8);
   });
 });
