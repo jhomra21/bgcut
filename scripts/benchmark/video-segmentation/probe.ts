@@ -262,25 +262,29 @@ export const probeVideoSegmentationCandidate = async (
         performance.now();
 
       try {
+        const sessionOptions:
+          ort.InferenceSession.SessionOptions = {
+            executionProviders: [
+              {
+                name: "webgpu",
+              },
+            ],
+            graphOptimizationLevel:
+              "all",
+          };
+
+        if (
+          loaded.externalData.length >
+          0
+        ) {
+          sessionOptions.externalData =
+            loaded.externalData;
+        }
+
         const session =
           await ort.InferenceSession.create(
             loaded.bytes,
-            {
-              executionProviders: [
-                {
-                  name: "webgpu",
-                },
-              ],
-              graphOptimizationLevel:
-                "all",
-              ...(loaded.externalData.length >
-              0
-                ? {
-                    externalData:
-                      loaded.externalData,
-                  }
-                : {}),
-            },
+            sessionOptions,
           );
 
         const sessionMs =
