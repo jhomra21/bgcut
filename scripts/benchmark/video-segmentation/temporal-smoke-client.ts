@@ -32,6 +32,8 @@ type TemporalSmokeResult = {
     VideoSegmentationBenchmarkReport;
 };
 
+const SMOKE_FRAMES = 6;
+
 type TemporalSmokeFailure = {
   readonly candidate:
     TemporalSmokeCandidate;
@@ -137,12 +139,12 @@ const verifyReport = (
 ): void => {
   if (
     report.frames.length !==
-      2 ||
+      SMOKE_FRAMES ||
     report.decodedFrames !==
-      2
+      SMOKE_FRAMES
   ) {
     throw new Error(
-      `Temporal smoke expected two decoded masks, received ${report.frames.length} reports from ${report.decodedFrames} decoded frames.`,
+      `Temporal smoke expected ${SMOKE_FRAMES} decoded masks, received ${report.frames.length} reports from ${report.decodedFrames} decoded frames.`,
     );
   }
 
@@ -221,8 +223,9 @@ const main =
           source,
           createVideoSegmentationAdapter,
           {
-            sampleFps: 2,
-            maxFrames: 2,
+            sampleFps: 6,
+            maxFrames:
+              SMOKE_FRAMES,
             seedIndex: 0,
             prompt: {
               points: [
@@ -253,9 +256,11 @@ const main =
       writeStatus(
         `Temporal smoke passed: seed ${report.frames[0]?.inferenceMs.toFixed(
           1,
-        )} ms, tracked ${report.frames[1]?.inferenceMs.toFixed(
+        )} ms, warm tracked p50 ${report.summary.p50TrackedInferenceMs.toFixed(
           1,
-        )} ms.`,
+        )} ms, tracked FPS ${report.summary.trackedFps.toFixed(
+          2,
+        )}.`,
       );
     } finally {
       source.close();
