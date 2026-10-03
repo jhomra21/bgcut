@@ -137,6 +137,9 @@ export type VideoSegmentationBenchmarkReport = {
     readonly meanInferenceMs: number;
     readonly p50InferenceMs: number;
     readonly p95InferenceMs: number;
+    readonly meanTrackedInferenceMs: number;
+    readonly p50TrackedInferenceMs: number;
+    readonly p95TrackedInferenceMs: number;
     readonly trackedFps: number;
     readonly meanTemporalMaskIou: number | null;
   };
