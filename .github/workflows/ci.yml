@@ -122,3 +122,106 @@ jobs:
           name: video-temporal-smoke
           path: ${{ runner.temp }}/video-temporal-smoke
           if-no-files-found: error
+
+
+  video-primary-macos-smoke:
+    if: github.event_name == 'pull_request' && github.head_ref == 'research/video-segmentation-bakeoff'
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Run actual EdgeTAM and SAM 2.1 candidates on Metal WebGPU
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-primary-macos-smoke"
+          mkdir -p "$ROOT"
+
+          bun run benchmark:video-segmentation:temporal-smoke -- "$ROOT" 4190 >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4190/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          run_candidate() {
+            local candidate="$1"
+            local result="$ROOT/$candidate-result.json"
+            local failure="$ROOT/$candidate-failure.json"
+            rm -f "$result" "$failure"
+
+            "$CHROME" \
+              --headless=new \
+              --enable-unsafe-webgpu \
+              --disable-gpu-blocklist \
+              --enable-webgpu-developer-features \
+              --use-gpu-in-tests \
+              "http://127.0.0.1:4190/?candidate=$candidate" >"$ROOT/$candidate-chrome.log" 2>&1 &
+            CHROME_PID=$!
+
+            for _ in {1..900}; do
+              if [[ -f "$result" ]]; then
+                cat "$result"
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 0
+              fi
+
+              if [[ -f "$failure" ]]; then
+                cat "$failure" >&2
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 1
+              fi
+
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                echo "Chrome exited before the $candidate Metal smoke completed." >&2
+                cat "$ROOT/$candidate-chrome.log" >&2 || true
+                unset CHROME_PID
+                return 1
+              fi
+
+              sleep 1
+            done
+
+            echo "$candidate Metal smoke timed out." >&2
+            cat "$ROOT/server.log" >&2 || true
+            cat "$ROOT/$candidate-chrome.log" >&2 || true
+            kill "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+            return 1
+          }
+
+          failed=0
+          run_candidate edgetam || failed=1
+          run_candidate sam21-primary || failed=1
+
+          exit "$failed"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-primary-macos-smoke
+          path: ${{ runner.temp }}/video-primary-macos-smoke
+          if-no-files-found: error
