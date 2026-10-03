@@ -3,15 +3,30 @@ export type VideoSegmentationCandidateId = "sam21-tiny" | "edgetam";
 export type VideoModelGraphRole =
   | "vision-encoder"
   | "mask-decoder"
+  | "tracked-mask-decoder"
   | "memory-attention"
   | "memory-encoder"
   | "pointer-tpos";
 
-export type VideoModelArtifact = {
-  readonly role: VideoModelGraphRole | "constants";
+export type VideoModelAuxiliaryRole =
+  | "constants"
+  | "parameters";
+
+export type VideoModelExternalData = {
   readonly filename: string;
   readonly url: string;
   readonly reportedSizeMb?: number;
+};
+
+export type VideoModelArtifact = {
+  readonly role:
+    | VideoModelGraphRole
+    | VideoModelAuxiliaryRole;
+  readonly filename: string;
+  readonly url: string;
+  readonly reportedSizeMb?: number;
+  readonly externalData?:
+    readonly VideoModelExternalData[];
 };
 
 export type VideoSegmentationCandidate = {
