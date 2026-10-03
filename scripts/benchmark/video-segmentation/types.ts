@@ -50,13 +50,19 @@ export type VideoSegmentationPrompt = {
   readonly points: readonly VideoPointPrompt[];
 };
 
-export type VideoSegmentationMask = {
+export type VideoSegmentationMaskAlternative = {
   readonly logits: Float32Array;
   readonly width: number;
   readonly height: number;
   readonly iou?: number;
   readonly objectScore?: number;
 };
+
+export type VideoSegmentationMask =
+  VideoSegmentationMaskAlternative & {
+    readonly alternatives?:
+      readonly VideoSegmentationMaskAlternative[];
+  };
 
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
