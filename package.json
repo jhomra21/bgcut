@@ -61,7 +61,7 @@
     "test": "bun test",
     "package:dry-run": "npm pack --dry-run",
     "package:smoke": "bun run scripts/package/smoke.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-strategy:bundle-check && bun run benchmark:browser-fp16-model:bundle-check && bun run benchmark:browser-fp16-model:six:bundle-check && bun run benchmark:browser-fp16-model:six:session-check && bun run benchmark:browser-production-model:bundle-check && bun run benchmark:browser-reference-resume:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run benchmark:browser-strategy:bundle-check && bun run benchmark:browser-fp16-model:bundle-check && bun run benchmark:browser-fp16-model:six:bundle-check && bun run benchmark:browser-fp16-model:six:session-check && bun run benchmark:browser-production-model:bundle-check && bun run benchmark:browser-reference-resume:bundle-check && bun run benchmark:video-segmentation:bundle-check && bun run build && bun run package:dry-run && bun run package:smoke",
     "cloudflare:deploy": "bun run model:webgpu:prepare && bun run cloudflare:model:remote && bun run cloudflare:runtime:remote && bunx wrangler@4.135.0 deploy",
     "cloudflare:preview": "bunx wrangler@4.135.0 preview",
     "cloudflare:model:remote": "bun run scripts/cloudflare/upload-model.ts",
@@ -87,7 +87,11 @@
     "benchmark:browser-production-model:bundle-check": "bun run scripts/benchmark/browser-production-model-e2e.ts --build-only",
     "benchmark:browser-reference-resume": "bun run scripts/benchmark/browser-reference-resume-server.ts",
     "benchmark:browser-reference-resume:e2e": "bun run scripts/benchmark/browser-reference-resume-e2e.ts",
-    "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts"
+    "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts",
+    "benchmark:video-segmentation:bundle-check": "bun run scripts/benchmark/video-segmentation/bundle-check.ts",
+    "benchmark:video-segmentation:probe": "bun run scripts/benchmark/video-segmentation/probe-server.ts",
+    "benchmark:video-segmentation:temporal-smoke": "bun run scripts/benchmark/video-segmentation/temporal-smoke-server.ts",
+    "benchmark:video-segmentation:quality": "bun run scripts/benchmark/video-segmentation/quality-smoke-server.ts"
   },
   "dependencies": {
     "effect": "4.0.0",
@@ -101,6 +105,7 @@
     "@solidjs/web": "2.0.0-rc.11",
     "@types/bun": "1.4.2",
     "@typescript/lib-dom": "npm:@types/web@0.0.356",
+    "mediabunny": "1.61.0",
     "oxlint": "1.83.0",
     "solid-js": "2.0.0-rc.11",
     "typegpu": "0.12.5",
