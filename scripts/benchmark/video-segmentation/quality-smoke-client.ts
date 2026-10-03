@@ -44,6 +44,12 @@ type QualitySeedPoint = {
   readonly y: number;
 };
 
+type GroundTruthMetrics = {
+  readonly iou: number;
+  readonly boundaryF: number;
+  readonly jAndF: number;
+};
+
 type QualityFrame = {
   readonly frameIndex: number;
   readonly timestamp: number;
@@ -486,11 +492,7 @@ const groundTruthMetrics = (
     VideoSegmentationMask,
   groundTruth:
     GroundTruth,
-): {
-  readonly iou: number;
-  readonly boundaryF: number;
-  readonly jAndF: number;
-} => {
+): GroundTruthMetrics => {
   const rgba =
     rgbaFor(
       groundTruth,
