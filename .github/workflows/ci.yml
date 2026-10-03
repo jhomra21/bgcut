@@ -29,7 +29,7 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
 
-      - name: Validate frozen EdgeTAM union on DAVIS 2017 validation
+      - name: Probe BiRefNet foreground prior on DAVIS failures
         shell: bash
         run: |
           set -euo pipefail
@@ -44,14 +44,30 @@ jobs:
           printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
 
           VAL_LIST="$DAVIS_ROOT/val.txt"
+          FOCUS_LIST="$DAVIS_ROOT/bi-refnet-focus.txt"
 
           unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
+
+          cat > "$FOCUS_LIST" <<'EOF'
+horsejump-high
+drift-chicane
+soapbox
+shooting
+loading
+bike-packing
+scooter-black
+libby
+parkour
+breakdance
+dance-twirl
+motocross-jump
+EOF
 
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
 
             unzip -q               "$ARCHIVE"               "DAVIS/Annotations/480p/$fixture/*"               -d "$DAVIS_ROOT"
-          done < "$VAL_LIST"
+          done < "$FOCUS_LIST"
 
           DAVIS_ANNOTATION_ROOT="$DAVIS_ROOT/DAVIS/Annotations/480p"             bun run benchmark:video-segmentation:quality -- "$ROOT" 4191 >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
@@ -129,12 +145,13 @@ jobs:
 
           failed=0
 
-          # Validation-only frozen-union check. The selected variant was fixed
-          # from the 60-sequence training split before this run.
+          # Semantic-prior probe on the validation failures. BiRefNet uses only
+          # the decoded frame; DAVIS annotations score its matte and the EdgeTAM
+          # track after selection.
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
-            run_candidate "$fixture" edgetam grid-oracle || failed=1
-          done < "$VAL_LIST"
+            run_candidate "$fixture" edgetam birefnet || failed=1
+          done < "$FOCUS_LIST"
 
           exit "$failed"
 

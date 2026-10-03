@@ -155,7 +155,15 @@ The best training rule is frozen as `s0.5-i0-a0.002-e1`:
 
 Across the 60-sequence training split, that fixed rule averaged 0.406 frame-0 IoU and 0.441 frame-0 J&F while keeping about 4.5 masks per clip. Stricter model-IoU thresholds, larger area floors, and higher stability thresholds all reduced mean J&F.
 
-The next run uses the untouched 30-sequence DAVIS 2017 validation split. The report still includes the full diagnostic grid for auditability, but `frozenUnion` names the training-selected rule explicitly so validation interpretation cannot switch variants after seeing the holdout.
+The frozen rule was then evaluated unchanged on the untouched 30-sequence DAVIS 2017 validation split. It reached 0.478 mean frame-0 IoU and 0.502 mean frame-0 J&F while retaining six masks per clip on average. That is a real seed improvement over the area-weighted single-mask selector's 0.455 / 0.482, but it is not large enough to justify multiplying temporal tracker state yet. Three validation clips still produced no accepted masks at all, and several others unioned stable distractors rather than the annotated foreground.
+
+The same 7×7 candidate pool has substantially more headroom: the grid oracle reaches 0.596 mean frame-0 IoU and 0.662 mean frame-0 J&F on validation, then 0.637 mean tracked IoU and 0.687 mean tracked J&F. A small linear ranker trained only on candidate geometry, stability, predicted IoU, centroid and proposal index did not close that gap; it reached 0.467 seed J&F on validation. The remaining selector problem therefore needs semantic foreground information, not another geometric coefficient.
+
+### BiRefNet as a semantic prior
+
+bgcut already owns a semantic foreground model: BiRefNet. It costs no new model family for the product, and the earlier `car-shadow` probe showed that when its frame-0 matte is confident it can select the correct EdgeTAM proposal and preserve excellent temporal tracking.
+
+The next focused hardware pass runs the existing BiRefNet-to-Edge path on twelve validation failures: `horsejump-high`, `drift-chicane`, `soapbox`, `shooting`, `loading`, `bike-packing`, `scooter-black`, `libby`, `parkour`, `breakdance`, `dance-twirl`, and `motocross-jump`. The report separately records BiRefNet's own frame-0 ground-truth score, whether it produced any positive pixels, and the resulting EdgeTAM track. This is a diagnostic for a hybrid policy, not a new tuned selector.
 
 ## Memory ownership
 
