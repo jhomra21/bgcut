@@ -145,6 +145,9 @@ const KNOWN_VIDEO_BYTES:
       2_318_304,
   };
 
+// SAFETY: every entry is created directly from ALL_QUALITY_FIXTURES,
+// so the resulting record contains exactly one QualityFixture for every
+// QualityFixtureId and no keys outside that union.
 export const QUALITY_FIXTURES =
   Object.fromEntries(
     ALL_QUALITY_FIXTURES.map(
