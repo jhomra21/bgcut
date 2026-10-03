@@ -48,20 +48,20 @@ jobs:
 
           unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
 
-          cat > "$FOCUS_LIST" <<'EOF'
-horsejump-high
-drift-chicane
-soapbox
-shooting
-loading
-bike-packing
-scooter-black
-libby
-parkour
-breakdance
-dance-twirl
-motocross-jump
-EOF
+          printf '%s\n' \
+            horsejump-high \
+            drift-chicane \
+            soapbox \
+            shooting \
+            loading \
+            bike-packing \
+            scooter-black \
+            libby \
+            parkour \
+            breakdance \
+            dance-twirl \
+            motocross-jump \
+            > "$FOCUS_LIST"
 
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
