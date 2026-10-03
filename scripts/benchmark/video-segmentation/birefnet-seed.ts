@@ -44,6 +44,11 @@ export type BiRefNetSeed = {
   readonly height: number;
   readonly point:
     BiRefNetSeedPoint;
+  readonly maxLogit: number;
+  readonly positiveFraction:
+    number;
+  readonly usedFallbackPoint:
+    boolean;
   readonly modelRevision:
     string;
 };
@@ -55,10 +60,20 @@ export type BiRefNetSeeder = {
   close(): Promise<void>;
 };
 
-const pointFromLogits = (
+type BiRefNetPointAnalysis = {
+  readonly point:
+    BiRefNetSeedPoint;
+  readonly maxLogit: number;
+  readonly positiveFraction:
+    number;
+  readonly usedFallbackPoint:
+    boolean;
+};
+
+const analyzeLogits = (
   logits:
     Float32Array,
-): BiRefNetSeedPoint => {
+): BiRefNetPointAnalysis => {
   let minX =
     MODEL_INPUT_SIZE;
 
@@ -69,19 +84,24 @@ const pointFromLogits = (
 
   let maxY = -1;
 
+  let positivePixels = 0;
+
+  let maxLogit =
+    Number.NEGATIVE_INFINITY;
+
+  let maxLogitX = 0;
+
+  let maxLogitY = 0;
+
   for (
     let pixel = 0;
     pixel <
     logits.length;
     pixel += 1
   ) {
-    if (
-      (logits[pixel] ??
-        Number.NEGATIVE_INFINITY) <=
-      0
-    ) {
-      continue;
-    }
+    const logit =
+      logits[pixel] ??
+      Number.NEGATIVE_INFINITY;
 
     const x =
       pixel %
@@ -92,6 +112,28 @@ const pointFromLogits = (
         pixel /
           MODEL_INPUT_SIZE,
       );
+
+    if (
+      logit >
+      maxLogit
+    ) {
+      maxLogit =
+        logit;
+
+      maxLogitX = x;
+
+      maxLogitY = y;
+    }
+
+    if (
+      logit <=
+      0
+    ) {
+      continue;
+    }
+
+    positivePixels +=
+      1;
 
     minX =
       Math.min(
@@ -119,12 +161,41 @@ const pointFromLogits = (
   }
 
   if (
-    maxX < minX ||
-    maxY < minY
+    !Number.isFinite(
+      maxLogit,
+    )
   ) {
     throw new Error(
-      "BiRefNet returned no foreground pixels for the seed frame.",
+      "BiRefNet returned no finite seed logits.",
     );
+  }
+
+  if (
+    positivePixels ===
+    0
+  ) {
+    return {
+      point: {
+        x:
+          maxLogitX /
+          Math.max(
+            1,
+            MODEL_INPUT_SIZE -
+              1,
+          ),
+        y:
+          maxLogitY /
+          Math.max(
+            1,
+            MODEL_INPUT_SIZE -
+              1,
+          ),
+      },
+      maxLogit,
+      positiveFraction: 0,
+      usedFallbackPoint:
+        true,
+    };
   }
 
   const centerX =
@@ -195,20 +266,28 @@ const pointFromLogits = (
   }
 
   return {
-    x:
-      bestX /
-      Math.max(
-        1,
-        MODEL_INPUT_SIZE -
+    point: {
+      x:
+        bestX /
+        Math.max(
           1,
-      ),
-    y:
-      bestY /
-      Math.max(
-        1,
-        MODEL_INPUT_SIZE -
+          MODEL_INPUT_SIZE -
+            1,
+        ),
+      y:
+        bestY /
+        Math.max(
           1,
-      ),
+          MODEL_INPUT_SIZE -
+            1,
+        ),
+    },
+    maxLogit,
+    positiveFraction:
+      positivePixels /
+      logits.length,
+    usedFallbackPoint:
+      false,
   };
 };
 
@@ -301,6 +380,99 @@ export const maskOverlapWithBiRefNet =
           union +=
             1;
         }
+      }
+    }
+
+    return union ===
+      0
+      ? 1
+      : intersection /
+          union;
+  };
+
+export const softMaskOverlapWithBiRefNet =
+  (
+    seed:
+      BiRefNetSeed,
+    mask:
+      VideoSegmentationMask,
+  ): number => {
+    let intersection = 0;
+
+    let union = 0;
+
+    for (
+      let y = 0;
+      y <
+      mask.height;
+      y += 1
+    ) {
+      const seedY =
+        Math.min(
+          seed.height - 1,
+          Math.floor(
+            (
+              (y + 0.5) /
+              mask.height
+            ) *
+              seed.height,
+          ),
+        );
+
+      for (
+        let x = 0;
+        x <
+        mask.width;
+        x += 1
+      ) {
+        const seedX =
+          Math.min(
+            seed.width - 1,
+            Math.floor(
+              (
+                (x + 0.5) /
+                mask.width
+              ) *
+                seed.width,
+            ),
+          );
+
+        const probability =
+          1 /
+          (
+            1 +
+            Math.exp(
+              -(
+                seed.logits[
+                  seedY *
+                    seed.width +
+                    seedX
+                ] ??
+                Number.NEGATIVE_INFINITY
+              ),
+            )
+          );
+
+        const foreground =
+          (mask.logits[
+            y *
+              mask.width +
+              x
+          ] ??
+            Number.NEGATIVE_INFINITY) >
+          0
+            ? 1
+            : 0;
+
+        intersection +=
+          probability *
+          foreground;
+
+        union +=
+          probability +
+          foreground -
+          probability *
+            foreground;
       }
     }
 
@@ -436,6 +608,11 @@ export const createBiRefNetSeeder =
             );
           }
 
+          const analysis =
+            analyzeLogits(
+              logits,
+            );
+
           return {
             logits,
             width:
@@ -443,9 +620,13 @@ export const createBiRefNetSeeder =
             height:
               MODEL_INPUT_SIZE,
             point:
-              pointFromLogits(
-                logits,
-              ),
+              analysis.point,
+            maxLogit:
+              analysis.maxLogit,
+            positiveFraction:
+              analysis.positiveFraction,
+            usedFallbackPoint:
+              analysis.usedFallbackPoint,
             modelRevision:
               MODEL_REVISION,
           };

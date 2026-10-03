@@ -106,6 +106,10 @@ This is deliberately different from the oracle diagnostic. It is a deployable au
 
 The experiment uses the same pinned FP32 BiRefNet artifact Chrome uses in bgcut's normal WebGPU path. It is intentionally not a new model or a special video checkpoint.
 
+The first hardware pass exposed two different cases. On `car-shadow`, BiRefNet produced a 0.981-IoU frame-0 matte, selected Edge proposal 0 with 0.971 overlap, and the tracker reached 0.979 mean tracked IoU. That is effectively the same result as the ground-truth oracle without using ground truth to choose the seed.
+
+On `bmx-trees` and `car-turn`, the production 0.5 BiRefNet threshold produced no foreground pixels. Treating that as a fatal error threw away useful relative model confidence. The follow-up keeps the normal binary-matte behavior whenever any pixel is above 0.5. Only when none are does it use the maximum-logit pixel as the positive prompt and rank Edge proposals with soft BiRefNet probability IoU. The report records the maximum logit, positive-pixel fraction, fallback use, and ranking metric so this behavior stays visible.
+
 ## Memory ownership
 
 The two trackers have different host-side memory contracts and should not be forced into one tensor layout.

@@ -4,6 +4,7 @@ import {
 import {
   createBiRefNetSeeder,
   maskOverlapWithBiRefNet,
+  softMaskOverlapWithBiRefNet,
 } from "./birefnet-seed";
 import {
   VIDEO_SEGMENTATION_CANDIDATES,
@@ -90,6 +91,14 @@ type AutomaticSeedQuality = {
   readonly modelRevision: string;
   readonly modelLoadMs: number;
   readonly inferenceMs: number;
+  readonly maxLogit: number;
+  readonly positiveFraction:
+    number;
+  readonly usedFallbackPoint:
+    boolean;
+  readonly selectionMetric:
+    "binary-iou" |
+    "soft-iou";
   readonly groundTruthIou: number;
   readonly groundTruthBoundaryF:
     number;
@@ -752,10 +761,21 @@ const main =
       }
     }
 
-    let seedPoint =
-      seedPointFromMask(
-        groundTruth[0]!,
-      );
+    let seedPoint:
+      QualitySeedPoint = {
+        x: 0.5,
+        y: 0.5,
+      };
+
+    if (
+      seedMode !==
+      "birefnet"
+    ) {
+      seedPoint =
+        seedPointFromMask(
+          groundTruth[0]!,
+        );
+    }
 
     let proposalIndex:
       number | undefined;
@@ -866,13 +886,22 @@ const main =
             preview.alternatives ??
             [preview];
 
+          const useSoftOverlap =
+            seed.positiveFraction ===
+            0;
+
           proposalOverlaps =
             proposals.map(
               (proposal) =>
-                maskOverlapWithBiRefNet(
-                  seed,
-                  proposal,
-                ),
+                useSoftOverlap
+                  ? softMaskOverlapWithBiRefNet(
+                      seed,
+                      proposal,
+                    )
+                  : maskOverlapWithBiRefNet(
+                      seed,
+                      proposal,
+                    ),
             );
 
           let bestIndex = 0;
@@ -909,6 +938,17 @@ const main =
             seed.modelRevision,
           modelLoadMs,
           inferenceMs,
+          maxLogit:
+            seed.maxLogit,
+          positiveFraction:
+            seed.positiveFraction,
+          usedFallbackPoint:
+            seed.usedFallbackPoint,
+          selectionMetric:
+            seed.positiveFraction ===
+              0
+              ? "soft-iou"
+              : "binary-iou",
           groundTruthIou:
             quality.iou,
           groundTruthBoundaryF:
