@@ -89,6 +89,12 @@ export type VideoSegmentationAdapter = {
     frameIndex: number,
     totalFrames: number,
   ): Promise<VideoSegmentationMask>;
+  seedMask?(
+    frame: VideoFrame,
+    mask: VideoSegmentationMaskAlternative,
+    frameIndex: number,
+    totalFrames: number,
+  ): Promise<VideoSegmentationMask>;
   track(
     frame: VideoFrame,
     frameIndex: number,

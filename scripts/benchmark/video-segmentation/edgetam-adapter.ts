@@ -704,6 +704,172 @@ const atMemoryResolution = (
   return result;
 };
 
+const resizeMaskLogits = (
+  mask: {
+    readonly logits:
+      Float32Array;
+    readonly width: number;
+    readonly height: number;
+  },
+  width: number,
+  height: number,
+): Float32Array => {
+  if (
+    mask.width < 1 ||
+    mask.height < 1 ||
+    mask.logits.length !==
+      mask.width *
+        mask.height
+  ) {
+    throw new Error(
+      "EdgeTAM direct seed mask has invalid geometry.",
+    );
+  }
+
+  if (
+    mask.width ===
+      width &&
+    mask.height ===
+      height
+  ) {
+    return mask.logits.slice();
+  }
+
+  const result =
+    new Float32Array(
+      width *
+        height,
+    );
+
+  const scaleX =
+    mask.width /
+    width;
+
+  const scaleY =
+    mask.height /
+    height;
+
+  for (
+    let y = 0;
+    y < height;
+    y += 1
+  ) {
+    const sourceY =
+      Math.max(
+        0,
+        scaleY *
+          (y + 0.5) -
+          0.5,
+      );
+
+    const y0 =
+      Math.floor(
+        sourceY,
+      );
+
+    const y1 =
+      Math.min(
+        y0 + 1,
+        mask.height - 1,
+      );
+
+    const fy =
+      sourceY -
+      y0;
+
+    for (
+      let x = 0;
+      x < width;
+      x += 1
+    ) {
+      const sourceX =
+        Math.max(
+          0,
+          scaleX *
+            (x + 0.5) -
+            0.5,
+        );
+
+      const x0 =
+        Math.floor(
+          sourceX,
+        );
+
+      const x1 =
+        Math.min(
+          x0 + 1,
+          mask.width - 1,
+        );
+
+      const fx =
+        sourceX -
+        x0;
+
+      const topLeft =
+        mask.logits[
+          y0 *
+            mask.width +
+            x0
+        ] ??
+        0;
+
+      const topRight =
+        mask.logits[
+          y0 *
+            mask.width +
+            x1
+        ] ??
+        0;
+
+      const bottomLeft =
+        mask.logits[
+          y1 *
+            mask.width +
+            x0
+        ] ??
+        0;
+
+      const bottomRight =
+        mask.logits[
+          y1 *
+            mask.width +
+            x1
+        ] ??
+        0;
+
+      const top =
+        topLeft +
+        (
+          topRight -
+          topLeft
+        ) *
+          fx;
+
+      const bottom =
+        bottomLeft +
+        (
+          bottomRight -
+          bottomLeft
+        ) *
+          fx;
+
+      result[
+        y *
+          width +
+          x
+      ] =
+        top +
+        (
+          bottom -
+          top
+        ) *
+          fy;
+    }
+  }
+
+  return result;
+};
+
 const maskForMemory = (
   logits:
     Float32Array,
@@ -1566,6 +1732,39 @@ export const createEdgeTamAdapter =
                   selected.objectScore,
               }),
             ),
+        };
+      },
+
+      async seedMask(
+        frame,
+        mask,
+      ) {
+        const vision =
+          await encode(
+            frame,
+          );
+
+        const logits =
+          resizeMaskLogits(
+            mask,
+            MASK_SIDE,
+            MASK_SIDE,
+          );
+
+        bank.condition(
+          await remember(
+            vision,
+            logits,
+            true,
+          ),
+        );
+
+        return {
+          logits,
+          width:
+            MASK_SIDE,
+          height:
+            MASK_SIDE,
         };
       },
 

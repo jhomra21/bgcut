@@ -163,7 +163,9 @@ The same 7×7 candidate pool has substantially more headroom: the grid oracle re
 
 bgcut already owns a semantic foreground model: BiRefNet. It costs no new model family for the product, and the earlier `car-shadow` probe showed that when its frame-0 matte is confident it can select the correct EdgeTAM proposal and preserve excellent temporal tracking.
 
-The next focused hardware pass runs the existing BiRefNet-to-Edge path on twelve validation failures: `horsejump-high`, `drift-chicane`, `soapbox`, `shooting`, `loading`, `bike-packing`, `scooter-black`, `libby`, `parkour`, `breakdance`, `dance-twirl`, and `motocross-jump`. The report separately records BiRefNet's own frame-0 ground-truth score, whether it produced any positive pixels, and the resulting EdgeTAM track. This is a diagnostic for a hybrid policy, not a new tuned selector.
+The focused twelve-clip pass split cleanly. BiRefNet returned no positive pixels on eight failures. On the four clips where it did return foreground, its semantic matte was strong: `breakdance` 0.812 frame-0 J&F, `dance-twirl` 0.858, `libby` 0.918, and `shooting` 0.946. The existing point/proposal handoff preserved that quality only on `breakdance`; it threw most of the semantic signal away on the other three.
+
+The next four-clip diagnostic therefore bypasses EdgeTAM's first-frame point decoder. The BiRefNet 512px logits are resized to EdgeTAM's 256px seed-mask geometry and sent directly through EdgeTAM's existing memory encoder. From frame 1 onward the normal EdgeTAM memory attention and tracked decoder are unchanged. This is benchmark-only adapter work and does not change bgcut's public API.
 
 ## Memory ownership
 

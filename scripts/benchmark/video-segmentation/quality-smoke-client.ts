@@ -43,6 +43,7 @@ type QualitySeedMode =
   | "model"
   | "oracle"
   | "birefnet"
+  | "birefnet-direct"
   | "grid-oracle"
   | "grid-model";
 
@@ -101,7 +102,8 @@ type AutomaticSeedQuality = {
     boolean;
   readonly selectionMetric:
     "binary-iou" |
-    "soft-iou";
+    "soft-iou" |
+    "direct-memory";
   readonly groundTruthIou: number;
   readonly groundTruthBoundaryF:
     number;
@@ -298,6 +300,7 @@ const seedModeFromLocation =
       case "model":
       case "oracle":
       case "birefnet":
+      case "birefnet-direct":
       case "grid-oracle":
       case "grid-model":
         return mode;
@@ -1324,7 +1327,9 @@ const main =
         seedMode ===
           "grid-oracle" ||
         seedMode ===
-          "grid-model"
+          "grid-model" ||
+        seedMode ===
+          "birefnet-direct"
       ) &&
       requested !==
         "edgetam"
@@ -1407,6 +1412,8 @@ const main =
       seedMode !==
         "birefnet" &&
       seedMode !==
+        "birefnet-direct" &&
+      seedMode !==
         "grid-oracle" &&
       seedMode !==
         "grid-model"
@@ -1428,9 +1435,15 @@ const main =
       GridDiscoveryQuality | null =
         null;
 
+    let directSeedMask:
+      VideoSegmentationMask | null =
+        null;
+
     if (
       seedMode ===
-      "birefnet"
+        "birefnet" ||
+      seedMode ===
+        "birefnet-direct"
     ) {
       const decoded =
         await source.frameAt(
@@ -1500,6 +1513,21 @@ const main =
             null;
 
         if (
+          seedMode ===
+          "birefnet-direct"
+        ) {
+          if (
+            seed.positiveFraction <=
+            0
+          ) {
+            throw new Error(
+              "BiRefNet direct seed requires a non-empty foreground matte.",
+            );
+          }
+
+          directSeedMask =
+            matte;
+        } else if (
           requested ===
           "edgetam"
         ) {
@@ -1589,10 +1617,13 @@ const main =
           usedFallbackPoint:
             seed.usedFallbackPoint,
           selectionMetric:
-            seed.positiveFraction ===
-              0
-              ? "soft-iou"
-              : "binary-iou",
+            seedMode ===
+              "birefnet-direct"
+              ? "direct-memory"
+              : seed.positiveFraction ===
+                  0
+                ? "soft-iou"
+                : "binary-iou",
           groundTruthIou:
             quality.iou,
           groundTruthBoundaryF:
@@ -2013,31 +2044,61 @@ const main =
           const startedAt =
             performance.now();
 
-          const prediction =
+          let prediction:
+            VideoSegmentationMask;
+
+          if (
+            frameIndex ===
+              0 &&
+            directSeedMask !==
+              null
+          ) {
+            if (
+              adapter.seedMask ===
+              undefined
+            ) {
+              throw new Error(
+                "The selected video adapter does not support direct mask seeding.",
+              );
+            }
+
+            prediction =
+              await adapter.seedMask(
+                decoded.frame,
+                directSeedMask,
+                0,
+                QUALITY_FRAME_COUNT,
+              );
+          } else if (
             frameIndex ===
             0
-              ? await adapter.seed(
-                  decoded.frame,
-                  {
-                    points: [
-                      {
-                        x:
-                          seedPoint.x,
-                        y:
-                          seedPoint.y,
-                        label: 1,
-                      },
-                    ],
-                    proposalIndex,
-                  },
-                  0,
-                  QUALITY_FRAME_COUNT,
-                )
-              : await adapter.track(
-                  decoded.frame,
-                  frameIndex,
-                  QUALITY_FRAME_COUNT,
-                );
+          ) {
+            prediction =
+              await adapter.seed(
+                decoded.frame,
+                {
+                  points: [
+                    {
+                      x:
+                        seedPoint.x,
+                      y:
+                        seedPoint.y,
+                      label: 1,
+                    },
+                  ],
+                  proposalIndex,
+                },
+                0,
+                QUALITY_FRAME_COUNT,
+              );
+          } else {
+            prediction =
+              await adapter.track(
+                decoded.frame,
+                frameIndex,
+                QUALITY_FRAME_COUNT,
+              );
+          }
 
           const quality =
             groundTruthMetrics(
