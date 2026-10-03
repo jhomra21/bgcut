@@ -134,6 +134,32 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      - name: Inspect EdgeTAM constants structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent \
+            "https://huggingface.co/jax-image-tools/edgetam-video-onnx/resolve/8ca3d3e/constants.json" \
+            | python3 -c '
+          import json, sys
+          value = json.load(sys.stdin)
+          def describe(name, item, depth=0):
+              prefix = "  " * depth
+              if isinstance(item, dict):
+                  print(f"{prefix}{name}: object keys={sorted(item.keys())}")
+                  for key, child in item.items():
+                      describe(key, child, depth + 1)
+              elif isinstance(item, list):
+                  dims = []
+                  cursor = item
+                  while isinstance(cursor, list):
+                      dims.append(len(cursor))
+                      cursor = cursor[0] if cursor else None
+                  print(f"{prefix}{name}: list dims={dims}")
+              else:
+                  print(f"{prefix}{name}: {type(item).__name__}")
+          describe("constants", value)
+          '
       - name: Run actual EdgeTAM and SAM 2.1 candidates on Metal WebGPU
         shell: bash
         run: |
