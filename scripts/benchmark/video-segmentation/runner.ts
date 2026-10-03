@@ -166,7 +166,11 @@ export const runVideoSegmentationBenchmark = async (
       decodedFrames,
       seedFrame: spec.seedIndex,
       frames,
-      summary: summarizeVideoSegmentationFrames(frames),
+      summary:
+        summarizeVideoSegmentationFrames(
+          frames,
+          spec.seedIndex,
+        ),
     };
   } finally {
     await adapter.close();
