@@ -10,12 +10,18 @@ import type {
 } from "./types";
 
 const ModelConstantsSchema = Schema.Struct({
-  image_mean: Schema.Array(
-    Schema.Number,
-  ),
-  image_std: Schema.Array(
-    Schema.Number,
-  ),
+  image_mean:
+    Schema.optional(
+      Schema.Array(
+        Schema.Number,
+      ),
+    ),
+  image_std:
+    Schema.optional(
+      Schema.Array(
+        Schema.Number,
+      ),
+    ),
   memory_temporal_positional_encoding:
     Schema.Array(
       Schema.Array(
@@ -137,12 +143,20 @@ export const fetchVideoModelConstants =
       ...decoded,
       image_mean:
         requireThreeChannels(
-          decoded.image_mean,
+          decoded.image_mean ?? [
+            0.485,
+            0.456,
+            0.406,
+          ],
           "image_mean",
         ),
       image_std:
         requireThreeChannels(
-          decoded.image_std,
+          decoded.image_std ?? [
+            0.229,
+            0.224,
+            0.225,
+          ],
           "image_std",
         ),
     };
