@@ -32,6 +32,10 @@ type QualityCandidate =
   | "edgetam"
   | "sam21-primary";
 
+type QualitySeedMode =
+  | "model"
+  | "oracle";
+
 type GroundTruth = {
   readonly bitmap:
     ImageBitmap;
@@ -84,6 +88,10 @@ type QualityReport = {
     string;
   readonly candidate:
     QualityCandidate;
+  readonly seedMode:
+    QualitySeedMode;
+  readonly proposalIndex:
+    number | null;
   readonly model:
     string;
   readonly frameCount: number;
@@ -119,6 +127,8 @@ type QualityFailure = {
     QualityFixtureId;
   readonly candidate:
     QualityCandidate;
+  readonly seedMode:
+    QualitySeedMode;
   readonly message: string;
   readonly stack: string;
 };
@@ -163,6 +173,30 @@ const candidateFromLocation =
       default:
         throw new Error(
           `Unknown quality candidate "${candidate}".`,
+        );
+    }
+  };
+
+const seedModeFromLocation =
+  (): QualitySeedMode => {
+    const mode =
+      new URL(
+        globalThis.location.href,
+      ).searchParams.get(
+        "seedMode",
+      ) ??
+      "model";
+
+    switch (
+      mode
+    ) {
+      case "model":
+      case "oracle":
+        return mode;
+
+      default:
+        throw new Error(
+          `Unknown quality seed mode "${mode}".`,
         );
     }
   };
@@ -617,6 +651,20 @@ const main =
     const fixture =
       fixtureFromLocation();
 
+    const seedMode =
+      seedModeFromLocation();
+
+    if (
+      seedMode ===
+        "oracle" &&
+      requested !==
+        "edgetam"
+    ) {
+      throw new Error(
+        "Oracle seed mode is only used to diagnose EdgeTAM multimask selection.",
+      );
+    }
+
     const candidate =
       modelFor(
         requested,
@@ -684,6 +732,93 @@ const main =
       seedPointFromMask(
         groundTruth[0]!,
       );
+
+    let proposalIndex:
+      number | undefined;
+
+    if (
+      seedMode ===
+      "oracle"
+    ) {
+      const decoded =
+        await source.frameAt(
+          source.info.firstTimestamp,
+        );
+
+      if (
+        decoded ===
+        null
+      ) {
+        throw new Error(
+          "MediaBunny could not decode the DAVIS oracle seed frame.",
+        );
+      }
+
+      const probe =
+        await createVideoSegmentationAdapter(
+          candidate,
+        );
+
+      try {
+        const preview =
+          await probe.seed(
+            decoded.frame,
+            {
+              points: [
+                {
+                  x:
+                    seedPoint.x,
+                  y:
+                    seedPoint.y,
+                  label: 1,
+                },
+              ],
+            },
+            0,
+            QUALITY_FRAME_COUNT,
+          );
+
+        const proposals =
+          preview.alternatives ??
+          [preview];
+
+        let bestIndex = 0;
+
+        let bestQuality =
+          Number.NEGATIVE_INFINITY;
+
+        proposals.forEach(
+          (
+            proposal,
+            index,
+          ) => {
+            const quality =
+              groundTruthMetrics(
+                proposal,
+                groundTruth[0]!,
+              ).jAndF;
+
+            if (
+              quality >
+              bestQuality
+            ) {
+              bestQuality =
+                quality;
+
+              bestIndex =
+                index;
+            }
+          },
+        );
+
+        proposalIndex =
+          bestIndex;
+      } finally {
+        decoded.close();
+
+        await probe.close();
+      }
+    }
 
     const loadStartedAt =
       performance.now();
@@ -766,6 +901,7 @@ const main =
                         label: 1,
                       },
                     ],
+                    proposalIndex,
                   },
                   0,
                   QUALITY_FRAME_COUNT,
@@ -868,6 +1004,10 @@ const main =
           ].label,
         candidate:
           requested,
+        seedMode,
+        proposalIndex:
+          proposalIndex ??
+          null,
         model:
           candidate.repository,
         frameCount:
@@ -969,7 +1109,7 @@ const main =
     );
 
     writeStatus(
-      `${report.fixtureLabel} quality passed: tracked mean IoU ${report.meanTrackedIou.toFixed(
+      `${report.fixtureLabel} ${report.seedMode} seed quality passed: tracked mean IoU ${report.meanTrackedIou.toFixed(
         4,
       )}, boundary F ${report.meanTrackedBoundaryF.toFixed(
         4,
@@ -999,6 +1139,15 @@ void main().catch(
         }
       })();
 
+    const seedMode =
+      (() => {
+        try {
+          return seedModeFromLocation();
+        } catch {
+          return "model" as const;
+        }
+      })();
+
     const parsed =
       error instanceof Error
         ? error
@@ -1020,6 +1169,7 @@ void main().catch(
         fixture,
         candidate:
           requested,
+        seedMode,
         message:
           parsed.message,
         stack:
