@@ -26,6 +26,14 @@ export const EDGETAM_RELEASE_FILES = {
 export type EdgeTamReleaseFile =
   keyof typeof EDGETAM_RELEASE_FILES;
 
+const isEdgeTamReleaseFile = (
+  filename: string,
+): filename is EdgeTamReleaseFile =>
+  Object.hasOwn(
+    EDGETAM_RELEASE_FILES,
+    filename,
+  );
+
 const PROXY_PREFIX =
   `/video-model/${EDGETAM_RELEASE}/`;
 
@@ -50,8 +58,7 @@ export const browserVideoModelUrl = (
       );
 
     if (
-      Object.hasOwn(
-        EDGETAM_RELEASE_FILES,
+      isEdgeTamReleaseFile(
         filename,
       )
     ) {
@@ -78,10 +85,9 @@ export const edgeTamProxyFilename = (
       PROXY_PREFIX.length,
     );
 
-  return Object.hasOwn(
-    EDGETAM_RELEASE_FILES,
+  return isEdgeTamReleaseFile(
     filename,
   )
-    ? filename as EdgeTamReleaseFile
+    ? filename
     : null;
 };
