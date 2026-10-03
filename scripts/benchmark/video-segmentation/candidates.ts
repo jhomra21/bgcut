@@ -4,45 +4,92 @@ import type {
   VideoSegmentationCandidateId,
 } from "./types";
 
-const EDGETAM_REVISION =
-  "8ca3d3e";
+const EDGETAM_RELEASE =
+  "edgetam-v1";
 
-const edgeTamArtifacts = (): readonly VideoModelArtifact[] => {
-  const base =
-    `https://huggingface.co/jax-image-tools/edgetam-video-onnx/resolve/${EDGETAM_REVISION}`;
+const EDGETAM_RELEASE_BASE =
+  `https://github.com/twinkling-reality/rotyl/releases/download/${EDGETAM_RELEASE}`;
 
-  return [
-    {
-      role: "vision-encoder",
-      filename: "vision_encoder.onnx",
-      url: `${base}/vision_encoder.onnx`,
-      reportedSizeMb: 18.9,
-    },
-    {
-      role: "mask-decoder",
-      filename: "mask_decoder.onnx",
-      url: `${base}/mask_decoder.onnx`,
-      reportedSizeMb: 17.0,
-    },
-    {
-      role: "memory-attention",
-      filename: "memory_attention.onnx",
-      url: `${base}/memory_attention.onnx`,
-      reportedSizeMb: 19.9,
-    },
-    {
-      role: "memory-encoder",
-      filename: "memory_encoder.onnx",
-      url: `${base}/memory_encoder.onnx`,
-      reportedSizeMb: 6.4,
-    },
-    {
-      role: "constants",
-      filename: "constants.json",
-      url: `${base}/constants.json`,
-    },
-  ];
-};
+const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
+  {
+    role: "vision-encoder",
+    filename:
+      "vision_encoder_fp16.onnx",
+    url:
+      `${EDGETAM_RELEASE_BASE}/vision_encoder_fp16.onnx`,
+    reportedSizeMb:
+      0.167617,
+    externalData: [
+      {
+        filename:
+          "vision_encoder_fp16.onnx_data",
+        url:
+          `${EDGETAM_RELEASE_BASE}/vision_encoder_fp16.onnx_data`,
+        reportedSizeMb:
+          9.739536,
+      },
+    ],
+  },
+  {
+    role: "mask-decoder",
+    filename:
+      "prompt_encoder_mask_decoder_fp16.onnx",
+    url:
+      `${EDGETAM_RELEASE_BASE}/prompt_encoder_mask_decoder_fp16.onnx`,
+    reportedSizeMb:
+      0.229799,
+    externalData: [
+      {
+        filename:
+          "prompt_encoder_mask_decoder_fp16.onnx_data",
+        url:
+          `${EDGETAM_RELEASE_BASE}/prompt_encoder_mask_decoder_fp16.onnx_data`,
+        reportedSizeMb:
+          10.454016,
+      },
+    ],
+  },
+  {
+    role:
+      "memory-attention",
+    filename:
+      "memory_attention_shared_fp16.onnx",
+    url:
+      `${EDGETAM_RELEASE_BASE}/memory_attention_shared_fp16.onnx`,
+    reportedSizeMb:
+      12.049526,
+  },
+  {
+    role:
+      "memory-encoder",
+    filename:
+      "memory_encoder.onnx",
+    url:
+      `${EDGETAM_RELEASE_BASE}/memory_encoder.onnx`,
+    reportedSizeMb:
+      6.691119,
+  },
+  {
+    role:
+      "tracked-mask-decoder",
+    filename:
+      "tracked_mask_decoder_fp16.onnx",
+    url:
+      `${EDGETAM_RELEASE_BASE}/tracked_mask_decoder_fp16.onnx`,
+    reportedSizeMb:
+      11.013652,
+  },
+  {
+    role:
+      "parameters",
+    filename:
+      "parameters.json",
+    url:
+      `${EDGETAM_RELEASE_BASE}/parameters.json`,
+    reportedSizeMb:
+      0.026913,
+  },
+];
 
 const sam21TinyArtifacts = (): readonly VideoModelArtifact[] => {
   const base =
@@ -102,14 +149,16 @@ export const VIDEO_SEGMENTATION_CANDIDATES = {
   },
   edgetam: {
     id: "edgetam",
-    label: "EdgeTAM 1024",
+    label: "EdgeTAM 1024 fp16",
     family: "EdgeTAM",
     inputSize: 1024,
     license: "Apache-2.0",
     repository:
-      `jax-image-tools/edgetam-video-onnx@${EDGETAM_REVISION}`,
-    baseModel: "facebook/EdgeTAM",
-    artifacts: edgeTamArtifacts(),
+      "twinkling-reality/rotyl release edgetam-v1@49c98e5909101775bac257210601715a03bb22d0",
+    baseModel:
+      "facebook/EdgeTAM",
+    artifacts:
+      edgeTamArtifacts(),
   },
 } as const satisfies Readonly<Record<VideoSegmentationCandidateId, VideoSegmentationCandidate>>;
 
@@ -117,6 +166,22 @@ export const reportedModelSizeMb = (
   candidate: VideoSegmentationCandidate,
 ): number =>
   candidate.artifacts.reduce(
-    (total, artifact) => total + (artifact.reportedSizeMb ?? 0),
+    (total, artifact) =>
+      total +
+      (artifact.reportedSizeMb ??
+        0) +
+      (
+        artifact.externalData ??
+        []
+      ).reduce(
+        (
+          externalTotal,
+          external,
+        ) =>
+          externalTotal +
+          (external.reportedSizeMb ??
+            0),
+        0,
+      ),
     0,
   );
