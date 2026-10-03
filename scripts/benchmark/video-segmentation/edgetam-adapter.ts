@@ -19,6 +19,7 @@ import {
 import type {
   VideoSegmentationAdapter,
   VideoSegmentationCandidate,
+  VideoSegmentationDiscovery,
   VideoSegmentationPrompt,
 } from "./types";
 
@@ -1566,6 +1567,68 @@ export const createEdgeTamAdapter =
               }),
             ),
         };
+      },
+
+      async discover(
+        frame,
+        points,
+      ) {
+        if (
+          points.length ===
+          0
+        ) {
+          return [];
+        }
+
+        const vision =
+          await encode(
+            frame,
+          );
+
+        const discovered:
+          VideoSegmentationDiscovery[] =
+            [];
+
+        for (
+          const point of
+          points
+        ) {
+          const selected =
+            await seedDecode(
+              vision,
+              {
+                points: [
+                  point,
+                ],
+              },
+            );
+
+          selected.alternatives.forEach(
+            (
+              alternative,
+              proposalIndex,
+            ) => {
+              discovered.push({
+                point,
+                proposalIndex,
+                mask: {
+                  logits:
+                    alternative.logits,
+                  width:
+                    MASK_SIDE,
+                  height:
+                    MASK_SIDE,
+                  iou:
+                    alternative.iou,
+                  objectScore:
+                    selected.objectScore,
+                },
+              });
+            },
+          );
+        }
+
+        return discovered;
       },
 
       async track(

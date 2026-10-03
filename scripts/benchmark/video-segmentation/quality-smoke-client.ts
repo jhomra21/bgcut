@@ -41,7 +41,8 @@ type QualityCandidate =
 type QualitySeedMode =
   | "model"
   | "oracle"
-  | "birefnet";
+  | "birefnet"
+  | "grid-oracle";
 
 type GroundTruth = {
   readonly bitmap:
@@ -110,6 +111,29 @@ type AutomaticSeedQuality = {
     number | null;
 };
 
+type GridDiscoveryCandidate = {
+  readonly point:
+    QualitySeedPoint;
+  readonly proposalIndex:
+    number;
+  readonly modelIou:
+    number | null;
+  readonly stability: number;
+  readonly areaFraction: number;
+  readonly groundTruthIou: number;
+  readonly groundTruthBoundaryF:
+    number;
+  readonly groundTruthJAndF:
+    number;
+};
+
+type GridDiscoveryQuality = {
+  readonly pointsPerSide: number;
+  readonly candidateCount: number;
+  readonly candidates:
+    readonly GridDiscoveryCandidate[];
+};
+
 type QualityReport = {
   readonly schemaVersion: 1;
   readonly fixture:
@@ -124,6 +148,8 @@ type QualityReport = {
     number | null;
   readonly automaticSeed:
     AutomaticSeedQuality | null;
+  readonly gridDiscovery:
+    GridDiscoveryQuality | null;
   readonly model:
     string;
   readonly frameCount: number;
@@ -225,6 +251,7 @@ const seedModeFromLocation =
       case "model":
       case "oracle":
       case "birefnet":
+      case "grid-oracle":
         return mode;
 
       default:
@@ -644,6 +671,95 @@ const groundTruthMetrics = (
   };
 };
 
+const stabilityScore = (
+  mask:
+    VideoSegmentationMask,
+  offset = 1,
+): number => {
+  let intersection = 0;
+
+  let union = 0;
+
+  for (
+    const logit of
+    mask.logits
+  ) {
+    if (
+      logit >
+      offset
+    ) {
+      intersection += 1;
+    }
+
+    if (
+      logit >
+      -offset
+    ) {
+      union += 1;
+    }
+  }
+
+  return union ===
+    0
+    ? 1
+    : intersection /
+        union;
+};
+
+const maskAreaFraction = (
+  mask:
+    VideoSegmentationMask,
+): number => {
+  let foreground = 0;
+
+  for (
+    const logit of
+    mask.logits
+  ) {
+    if (
+      logit >
+      0
+    ) {
+      foreground += 1;
+    }
+  }
+
+  return foreground /
+    mask.logits.length;
+};
+
+const discoveryGrid = (
+  pointsPerSide: number,
+): readonly QualitySeedPoint[] => {
+  const points:
+    QualitySeedPoint[] = [];
+
+  for (
+    let y = 0;
+    y <
+    pointsPerSide;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x <
+      pointsPerSide;
+      x += 1
+    ) {
+      points.push({
+        x:
+          (x + 0.5) /
+          pointsPerSide,
+        y:
+          (y + 0.5) /
+          pointsPerSide,
+      });
+    }
+  }
+
+  return points;
+};
+
 const postJson = async (
   path: string,
   value:
@@ -688,13 +804,17 @@ const main =
       seedModeFromLocation();
 
     if (
-      seedMode ===
-        "oracle" &&
+      (
+        seedMode ===
+          "oracle" ||
+        seedMode ===
+          "grid-oracle"
+      ) &&
       requested !==
         "edgetam"
     ) {
       throw new Error(
-        "Oracle seed mode is only used to diagnose EdgeTAM multimask selection.",
+        "Oracle seed modes are only used to diagnose EdgeTAM seed selection.",
       );
     }
 
@@ -769,7 +889,9 @@ const main =
 
     if (
       seedMode !==
-      "birefnet"
+        "birefnet" &&
+      seedMode !==
+        "grid-oracle"
     ) {
       seedPoint =
         seedPointFromMask(
@@ -782,6 +904,10 @@ const main =
 
     let automaticSeed:
       AutomaticSeedQuality | null =
+        null;
+
+    let gridDiscovery:
+      GridDiscoveryQuality | null =
         null;
 
     if (
@@ -969,6 +1095,148 @@ const main =
         }
 
         await seeder.close();
+      }
+    }
+
+    if (
+      seedMode ===
+      "grid-oracle"
+    ) {
+      const decoded =
+        await source.frameAt(
+          source.info.firstTimestamp,
+        );
+
+      if (
+        decoded ===
+        null
+      ) {
+        throw new Error(
+          "MediaBunny could not decode the DAVIS grid-discovery seed frame.",
+        );
+      }
+
+      const probe =
+        await createVideoSegmentationAdapter(
+          candidate,
+        );
+
+      try {
+        if (
+          probe.discover ===
+          undefined
+        ) {
+          throw new Error(
+            "The selected video adapter does not expose automatic seed discovery.",
+          );
+        }
+
+        const pointsPerSide = 4;
+
+        const points =
+          discoveryGrid(
+            pointsPerSide,
+          );
+
+        const discoveries =
+          await probe.discover(
+            decoded.frame,
+            points.map(
+              (point) => ({
+                ...point,
+                label: 1 as const,
+              }),
+            ),
+          );
+
+        const candidates =
+          discoveries.map(
+            (discovery) => {
+              const quality =
+                groundTruthMetrics(
+                  discovery.mask,
+                  groundTruth[0]!,
+                );
+
+              return {
+                point: {
+                  x:
+                    discovery.point.x,
+                  y:
+                    discovery.point.y,
+                },
+                proposalIndex:
+                  discovery.proposalIndex,
+                modelIou:
+                  discovery.mask.iou ??
+                  null,
+                stability:
+                  stabilityScore(
+                    discovery.mask,
+                  ),
+                areaFraction:
+                  maskAreaFraction(
+                    discovery.mask,
+                  ),
+                groundTruthIou:
+                  quality.iou,
+                groundTruthBoundaryF:
+                  quality.boundaryF,
+                groundTruthJAndF:
+                  quality.jAndF,
+              };
+            },
+          );
+
+        if (
+          candidates.length ===
+          0
+        ) {
+          throw new Error(
+            "EdgeTAM grid discovery returned no seed candidates.",
+          );
+        }
+
+        let best = 0;
+
+        for (
+          let index = 1;
+          index <
+          candidates.length;
+          index += 1
+        ) {
+          if (
+            (candidates[index]
+              ?.groundTruthJAndF ??
+              Number.NEGATIVE_INFINITY) >
+            (candidates[best]
+              ?.groundTruthJAndF ??
+              Number.NEGATIVE_INFINITY)
+          ) {
+            best =
+              index;
+          }
+        }
+
+        const selected =
+          candidates[best]!;
+
+        seedPoint =
+          selected.point;
+
+        proposalIndex =
+          selected.proposalIndex;
+
+        gridDiscovery = {
+          pointsPerSide,
+          candidateCount:
+            candidates.length,
+          candidates,
+        };
+      } finally {
+        decoded.close();
+
+        await probe.close();
       }
     }
 
@@ -1245,6 +1513,7 @@ const main =
           proposalIndex ??
           null,
         automaticSeed,
+        gridDiscovery,
         model:
           candidate.repository,
         frameCount:

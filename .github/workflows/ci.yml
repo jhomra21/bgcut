@@ -204,11 +204,12 @@ jobs:
             run_candidate "$fixture" sam21-primary model || failed=1
           done
 
-          # Product-like automatic seed probe. These are the three sequences
-          # where a one-point EdgeTAM seed is most diagnostic: one ambiguous
-          # scene and the two largest model-ranking failures from the oracle run.
+          # Automatic point-grid discovery diagnostic. Ground truth selects
+          # only the best candidate after EdgeTAM has generated all masks; this
+          # answers whether the target subject exists in an automatic grid at all
+          # before product ranking heuristics are introduced.
           for fixture in bmx-trees car-shadow car-turn; do
-            run_candidate "$fixture" edgetam birefnet || failed=1
+            run_candidate "$fixture" edgetam grid-oracle || failed=1
           done
 
           exit "$failed"

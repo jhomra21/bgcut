@@ -72,6 +72,15 @@ export type VideoSegmentationMask =
       readonly VideoSegmentationMaskAlternative[];
   };
 
+export type VideoSegmentationDiscovery = {
+  readonly point:
+    VideoPointPrompt;
+  readonly proposalIndex:
+    number;
+  readonly mask:
+    VideoSegmentationMaskAlternative;
+};
+
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
   seed(
@@ -85,6 +94,13 @@ export type VideoSegmentationAdapter = {
     frameIndex: number,
     totalFrames: number,
   ): Promise<VideoSegmentationMask>;
+  discover?(
+    frame: VideoFrame,
+    points:
+      readonly VideoPointPrompt[],
+  ): Promise<
+    readonly VideoSegmentationDiscovery[]
+  >;
   rewind(): void;
   close(): Promise<void>;
 };

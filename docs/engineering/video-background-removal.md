@@ -108,7 +108,22 @@ The experiment uses the same pinned FP32 BiRefNet artifact Chrome uses in bgcut'
 
 The first hardware pass exposed two different cases. On `car-shadow`, BiRefNet produced a 0.981-IoU frame-0 matte, selected Edge proposal 0 with 0.971 overlap, and the tracker reached 0.979 mean tracked IoU. That is effectively the same result as the ground-truth oracle without using ground truth to choose the seed.
 
-On `bmx-trees` and `car-turn`, the production 0.5 BiRefNet threshold produced no foreground pixels. Treating that as a fatal error threw away useful relative model confidence. The follow-up keeps the normal binary-matte behavior whenever any pixel is above 0.5. Only when none are does it use the maximum-logit pixel as the positive prompt and rank Edge proposals with soft BiRefNet probability IoU. The report records the maximum logit, positive-pixel fraction, fallback use, and ranking metric so this behavior stays visible.
+On `bmx-trees` and `car-turn`, the production 0.5 BiRefNet threshold produced no foreground pixels. A follow-up retained relative confidence by using the maximum-logit pixel and soft-probability overlap. That did not rescue either clip. Their maximum logits were about -10, meaning BiRefNet was confidently predicting background everywhere rather than merely missing the 0.5 cutoff. On `car-turn` the soft-overlap fallback selected proposal 2 even though proposal 0 was the strong object mask. That fallback is therefore diagnostic evidence, not a product strategy.
+
+### Automatic point-grid discovery
+
+The next diagnostic removes BiRefNet from the hard cases. EdgeTAM encodes frame 0 once, then evaluates a 4×4 grid of positive point prompts and keeps all three masks returned at every point. For every candidate the report records:
+
+- prompt point
+- proposal index
+- model IoU estimate
+- stability under ±1 logit thresholds
+- foreground area fraction
+- ground-truth IoU, boundary F, and J&F
+
+Ground truth chooses the best candidate only for this diagnostic. The purpose is to answer one question before inventing a selector: does an automatic EdgeTAM point grid contain the correct foreground mask at all? If it does, automatic video background removal becomes a ranking problem. If it does not, denser sampling or a different foreground-discovery model is required.
+
+The oracle proposal runs also exposed a separate result: for all seven current DAVIS sequences, the best mask among the three masks returned at the known subject point was proposal 0. EdgeTAM's predicted-IoU ranking was the source of the catastrophic `car-shadow` and `car-turn` seed choices. This makes proposal 0 a strong ranking control once a subject point is already known, but it does not by itself solve automatic subject discovery.
 
 ## Memory ownership
 
