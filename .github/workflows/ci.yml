@@ -164,8 +164,9 @@ jobs:
           run_candidate() {
             local fixture="$1"
             local candidate="$2"
-            local result="$ROOT/$fixture-$candidate-result.json"
-            local failure="$ROOT/$fixture-$candidate-failure.json"
+            local seed_mode="$3"
+            local result="$ROOT/$fixture-$candidate-$seed_mode-result.json"
+            local failure="$ROOT/$fixture-$candidate-$seed_mode-failure.json"
             rm -f "$result" "$failure"
 
             "$CHROME" \
@@ -174,7 +175,7 @@ jobs:
               --disable-gpu-blocklist \
               --enable-webgpu-developer-features \
               --use-gpu-in-tests \
-              "http://127.0.0.1:4191/?candidate=$candidate&fixture=$fixture" >"$ROOT/$fixture-$candidate-chrome.log" 2>&1 &
+              "http://127.0.0.1:4191/?candidate=$candidate&fixture=$fixture&seedMode=$seed_mode" >"$ROOT/$fixture-$candidate-$seed_mode-chrome.log" 2>&1 &
             CHROME_PID=$!
 
             for _ in {1..1200}; do
@@ -193,8 +194,8 @@ jobs:
               fi
 
               if ! kill -0 "$CHROME_PID" 2>/dev/null; then
-                echo "Chrome exited before the $fixture $candidate DAVIS run completed." >&2
-                cat "$ROOT/$fixture-$candidate-chrome.log" >&2 || true
+                echo "Chrome exited before the $fixture $candidate $seed_mode DAVIS run completed." >&2
+                cat "$ROOT/$fixture-$candidate-$seed_mode-chrome.log" >&2 || true
                 unset CHROME_PID
                 return 1
               fi
@@ -202,9 +203,9 @@ jobs:
               sleep 1
             done
 
-            echo "$fixture $candidate DAVIS run timed out." >&2
+            echo "$fixture $candidate $seed_mode DAVIS run timed out." >&2
             cat "$ROOT/server.log" >&2 || true
-            cat "$ROOT/$fixture-$candidate-chrome.log" >&2 || true
+            cat "$ROOT/$fixture-$candidate-$seed_mode-chrome.log" >&2 || true
             kill "$CHROME_PID" 2>/dev/null || true
             unset CHROME_PID
             return 1
@@ -212,8 +213,9 @@ jobs:
 
           failed=0
           for fixture in blackswan bear camel cows bmx-trees car-shadow car-turn; do
-            run_candidate "$fixture" edgetam || failed=1
-            run_candidate "$fixture" sam21-primary || failed=1
+            run_candidate "$fixture" edgetam model || failed=1
+            run_candidate "$fixture" edgetam oracle || failed=1
+            run_candidate "$fixture" sam21-primary model || failed=1
           done
 
           exit "$failed"
