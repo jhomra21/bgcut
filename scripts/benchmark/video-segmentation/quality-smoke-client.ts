@@ -50,6 +50,17 @@ type GroundTruthMetrics = {
   readonly jAndF: number;
 };
 
+type SeedAlternativeQuality = {
+  readonly modelIou:
+    number | null;
+  readonly groundTruthIou:
+    number;
+  readonly groundTruthBoundaryF:
+    number;
+  readonly groundTruthJAndF:
+    number;
+};
+
 type QualityFrame = {
   readonly frameIndex: number;
   readonly timestamp: number;
@@ -83,6 +94,12 @@ type QualityReport = {
   };
   readonly seedIou: number;
   readonly seedBoundaryF: number;
+  readonly seedAlternatives:
+    readonly SeedAlternativeQuality[];
+  readonly bestSeedAlternativeIou:
+    number;
+  readonly bestSeedAlternativeJAndF:
+    number;
   readonly meanTrackedIou: number;
   readonly minTrackedIou: number;
   readonly meanTrackedBoundaryF:
@@ -683,6 +700,9 @@ const main =
     const frames:
       QualityFrame[] = [];
 
+    let seedAlternatives:
+      SeedAlternativeQuality[] = [];
+
     try {
       for (
         let frameIndex = 0;
@@ -764,6 +784,38 @@ const main =
               ]!,
             );
 
+          if (
+            frameIndex ===
+              0 &&
+            prediction.alternatives !==
+              undefined
+          ) {
+            seedAlternatives =
+              prediction.alternatives.map(
+                (
+                  alternative,
+                ) => {
+                  const alternativeQuality =
+                    groundTruthMetrics(
+                      alternative,
+                      groundTruth[0]!,
+                    );
+
+                  return {
+                    modelIou:
+                      alternative.iou ??
+                      null,
+                    groundTruthIou:
+                      alternativeQuality.iou,
+                    groundTruthBoundaryF:
+                      alternativeQuality.boundaryF,
+                    groundTruthJAndF:
+                      alternativeQuality.jAndF,
+                  };
+                },
+              );
+          }
+
           frames.push({
             frameIndex,
             timestamp:
@@ -830,6 +882,27 @@ const main =
           frames[0]
             ?.groundTruthBoundaryF ??
           0,
+        seedAlternatives,
+        bestSeedAlternativeIou:
+          Math.max(
+            frames[0]
+              ?.groundTruthIou ??
+              0,
+            ...seedAlternatives.map(
+              (alternative) =>
+                alternative.groundTruthIou,
+            ),
+          ),
+        bestSeedAlternativeJAndF:
+          Math.max(
+            frames[0]
+              ?.groundTruthJAndF ??
+              0,
+            ...seedAlternatives.map(
+              (alternative) =>
+                alternative.groundTruthJAndF,
+            ),
+          ),
         meanTrackedIou:
           mean(
             tracked.map(
