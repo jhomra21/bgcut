@@ -1,5 +1,4 @@
 import {
-  EDGETAM_RELEASE,
   edgeTamReleaseUrl,
 } from "./model-delivery";
 
