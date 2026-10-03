@@ -141,7 +141,7 @@ type GridDiscoveryCandidate = {
 
 type GridDiscoverySelector =
   | "oracle-j-and-f"
-  | "proposal0-nonedge-stability";
+  | "proposal0-nonedge-stability-area";
 
 type GridDiscoveryQuality = {
   readonly pointsPerSide: number;
@@ -1501,7 +1501,7 @@ const main =
           "grid-model"
         ) {
           selector =
-            "proposal0-nonedge-stability";
+            "proposal0-nonedge-stability-area";
 
           const eligible =
             candidates
@@ -1539,9 +1539,17 @@ const main =
                 current,
               ) =>
                 current.candidate
-                  .stability >
+                  .stability *
+                  Math.sqrt(
+                    current.candidate
+                      .areaFraction,
+                  ) >
                 selected.candidate
-                  .stability
+                  .stability *
+                  Math.sqrt(
+                    selected.candidate
+                      .areaFraction,
+                  )
                   ? current
                   : selected,
             ).index;
