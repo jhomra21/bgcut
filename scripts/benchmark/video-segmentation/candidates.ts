@@ -1,14 +1,13 @@
+import {
+  EDGETAM_RELEASE,
+  edgeTamReleaseUrl,
+} from "./model-delivery";
+
 import type {
   VideoModelArtifact,
   VideoSegmentationCandidate,
   VideoSegmentationCandidateId,
 } from "./types";
-
-const EDGETAM_RELEASE =
-  "edgetam-v1";
-
-const EDGETAM_RELEASE_BASE =
-  `https://github.com/twinkling-reality/rotyl/releases/download/${EDGETAM_RELEASE}`;
 
 const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
   {
@@ -16,7 +15,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
     filename:
       "vision_encoder_fp16.onnx",
     url:
-      `${EDGETAM_RELEASE_BASE}/vision_encoder_fp16.onnx`,
+      edgeTamReleaseUrl("vision_encoder_fp16.onnx"),
     reportedSizeMb:
       0.167617,
     externalData: [
@@ -24,7 +23,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
         filename:
           "vision_encoder_fp16.onnx_data",
         url:
-          `${EDGETAM_RELEASE_BASE}/vision_encoder_fp16.onnx_data`,
+          edgeTamReleaseUrl("vision_encoder_fp16.onnx_data"),
         reportedSizeMb:
           9.739536,
       },
@@ -35,7 +34,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
     filename:
       "prompt_encoder_mask_decoder_fp16.onnx",
     url:
-      `${EDGETAM_RELEASE_BASE}/prompt_encoder_mask_decoder_fp16.onnx`,
+      edgeTamReleaseUrl("prompt_encoder_mask_decoder_fp16.onnx"),
     reportedSizeMb:
       0.229799,
     externalData: [
@@ -43,7 +42,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
         filename:
           "prompt_encoder_mask_decoder_fp16.onnx_data",
         url:
-          `${EDGETAM_RELEASE_BASE}/prompt_encoder_mask_decoder_fp16.onnx_data`,
+          edgeTamReleaseUrl("prompt_encoder_mask_decoder_fp16.onnx_data"),
         reportedSizeMb:
           10.454016,
       },
@@ -55,7 +54,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
     filename:
       "memory_attention_shared_fp16.onnx",
     url:
-      `${EDGETAM_RELEASE_BASE}/memory_attention_shared_fp16.onnx`,
+      edgeTamReleaseUrl("memory_attention_shared_fp16.onnx"),
     reportedSizeMb:
       12.049526,
   },
@@ -65,7 +64,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
     filename:
       "memory_encoder.onnx",
     url:
-      `${EDGETAM_RELEASE_BASE}/memory_encoder.onnx`,
+      edgeTamReleaseUrl("memory_encoder.onnx"),
     reportedSizeMb:
       6.691119,
   },
@@ -75,7 +74,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
     filename:
       "tracked_mask_decoder_fp16.onnx",
     url:
-      `${EDGETAM_RELEASE_BASE}/tracked_mask_decoder_fp16.onnx`,
+      edgeTamReleaseUrl("tracked_mask_decoder_fp16.onnx"),
     reportedSizeMb:
       11.013652,
   },
@@ -85,7 +84,7 @@ const edgeTamArtifacts = (): readonly VideoModelArtifact[] => [
     filename:
       "parameters.json",
     url:
-      `${EDGETAM_RELEASE_BASE}/parameters.json`,
+      edgeTamReleaseUrl("parameters.json"),
     reportedSizeMb:
       0.026913,
   },
