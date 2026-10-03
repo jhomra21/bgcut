@@ -3,6 +3,10 @@ import * as ort from "onnxruntime-web/webgpu";
 
 import { resolveOrtWebGpuWasmUrl } from "../../../src/browser/ort-webgpu-runtime";
 
+import {
+  browserVideoModelUrl,
+} from "./model-delivery";
+
 import type {
   VideoModelArtifact,
   VideoModelGraphRole,
@@ -134,7 +138,9 @@ export const fetchVideoModelConstants =
 
     const response =
       await fetch(
-        artifact.url,
+        browserVideoModelUrl(
+          artifact.url,
+        ),
         {
           cache:
             "force-cache",
@@ -190,7 +196,9 @@ export const createVideoSession =
 
     const response =
       await fetch(
-        artifact.url,
+        browserVideoModelUrl(
+          artifact.url,
+        ),
         {
           cache:
             "force-cache",
@@ -217,7 +225,9 @@ export const createVideoSession =
     ) {
       const externalResponse =
         await fetch(
-          external.url,
+          browserVideoModelUrl(
+            external.url,
+          ),
           {
             cache:
               "force-cache",
