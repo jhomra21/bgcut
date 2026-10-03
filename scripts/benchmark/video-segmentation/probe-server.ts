@@ -11,6 +11,10 @@ import {
   ORT_WEBGPU_WASM_PUBLIC_PATH,
 } from "../../../src/shared/ort-assets";
 
+import {
+  proxyVideoModelRequest,
+} from "./model-proxy";
+
 const outputArgument =
   process.argv[2];
 
@@ -136,6 +140,18 @@ const app =
         new URL(
           request.url,
         );
+
+      const modelResponse =
+        await proxyVideoModelRequest(
+          request,
+        );
+
+      if (
+        modelResponse !==
+        null
+      ) {
+        return modelResponse;
+      }
 
       if (
         request.method ===
