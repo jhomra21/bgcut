@@ -35,6 +35,24 @@ export const QUALITY_FIXTURES = {
     videoBytes:
       3_309_913,
   },
+  "bmx-trees": {
+    label:
+      "DAVIS bmx-trees",
+    videoBytes:
+      2_510_103,
+  },
+  "car-shadow": {
+    label:
+      "DAVIS car-shadow",
+    videoBytes:
+      893_950,
+  },
+  "car-turn": {
+    label:
+      "DAVIS car-turn",
+    videoBytes:
+      2_318_304,
+  },
 } as const;
 
 export type QualityFixtureId =
