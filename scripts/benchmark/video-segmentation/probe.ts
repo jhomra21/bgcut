@@ -48,6 +48,12 @@ type GraphArtifact = VideoModelArtifact & {
 type LoadedGraph = {
   readonly artifact: GraphArtifact;
   readonly bytes: Uint8Array;
+  readonly externalData:
+    readonly {
+      readonly path: string;
+      readonly data: Uint8Array;
+    }[];
+  readonly totalBytes: number;
   readonly response: Response;
   readonly downloadMs: number;
 };
@@ -55,7 +61,10 @@ type LoadedGraph = {
 const isGraphArtifact = (
   artifact: VideoModelArtifact,
 ): artifact is GraphArtifact =>
-  artifact.role !== "constants";
+  artifact.role !==
+    "constants" &&
+  artifact.role !==
+    "parameters";
 
 const graphArtifacts = (
   candidate: VideoSegmentationCandidate,
@@ -86,9 +95,57 @@ const fetchGraph = async (
     await response.arrayBuffer(),
   );
 
+  const externalData:
+    {
+      readonly path: string;
+      readonly data: Uint8Array;
+    }[] = [];
+
+  let totalBytes =
+    bytes.byteLength;
+
+  for (
+    const external of
+    artifact.externalData ??
+    []
+  ) {
+    const externalResponse =
+      await fetch(
+        external.url,
+        {
+          cache:
+            "force-cache",
+        },
+      );
+
+    if (
+      !externalResponse.ok
+    ) {
+      throw new Error(
+        `Could not download ${external.filename}: HTTP ${externalResponse.status}.`,
+      );
+    }
+
+    const data =
+      new Uint8Array(
+        await externalResponse.arrayBuffer(),
+      );
+
+    totalBytes +=
+      data.byteLength;
+
+    externalData.push({
+      path:
+        external.filename,
+      data,
+    });
+  }
+
   return {
     artifact,
     bytes,
+    externalData,
+    totalBytes,
     response,
     downloadMs:
       performance.now() -
@@ -130,7 +187,7 @@ const failedGraphReport = (
     loaded?.response.url ??
     null,
   bytes:
-    loaded?.bytes.byteLength ??
+    loaded?.totalBytes ??
     null,
   etag:
     loaded?.response.headers.get(
@@ -216,6 +273,13 @@ export const probeVideoSegmentationCandidate = async (
               ],
               graphOptimizationLevel:
                 "all",
+              ...(loaded.externalData.length >
+              0
+                ? {
+                    externalData:
+                      loaded.externalData,
+                  }
+                : {}),
             },
           );
 
@@ -236,7 +300,7 @@ export const probeVideoSegmentationCandidate = async (
           resolvedUrl:
             loaded.response.url,
           bytes:
-            loaded.bytes.byteLength,
+            loaded.totalBytes,
           etag:
             loaded.response.headers.get(
               "etag",
