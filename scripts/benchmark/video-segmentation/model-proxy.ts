@@ -1,4 +1,8 @@
 import {
+  gunzipSync,
+} from "node:zlib";
+
+import {
   EDGETAM_RELEASE_FILES,
   edgeTamProxyFilename,
   edgeTamReleaseUrl,
@@ -44,22 +48,36 @@ const loadReleaseFile =
           );
         }
 
-        const bytes =
+        const compressed =
           new Uint8Array(
             await response.arrayBuffer(),
+          );
+
+        const inflated =
+          gunzipSync(
+            compressed,
+          );
+
+        const bytes =
+          new Uint8Array(
+            inflated.buffer.slice(
+              inflated.byteOffset,
+              inflated.byteOffset +
+                inflated.byteLength,
+            ),
           );
 
         const expected =
           EDGETAM_RELEASE_FILES[
             filename
-          ];
+          ].rawBytes;
 
         if (
           bytes.byteLength !==
           expected
         ) {
           throw new Error(
-            `EdgeTAM release file ${filename} was ${bytes.byteLength} bytes; expected ${expected}.`,
+            `EdgeTAM release file ${filename} was ${bytes.byteLength} bytes after decompression; expected ${expected}.`,
           );
         }
 
