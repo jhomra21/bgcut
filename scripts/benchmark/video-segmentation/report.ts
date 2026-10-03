@@ -81,9 +81,22 @@ export const binaryMaskIou = (
 
 export const summarizeVideoSegmentationFrames = (
   frames: readonly VideoSegmentationFrameReport[],
+  seedFrame: number,
 ): VideoSegmentationBenchmarkReport["summary"] => {
   const decode = frames.map((frame) => frame.decodeMs);
   const inference = frames.map((frame) => frame.inferenceMs);
+
+  const trackedInference =
+    frames
+      .filter(
+        (frame) =>
+          frame.frameIndex !==
+          seedFrame,
+      )
+      .map(
+        (frame) =>
+          frame.inferenceMs,
+      );
 
   const temporalIou = frames.flatMap((frame) =>
     frame.temporalMaskIou === null
@@ -91,20 +104,40 @@ export const summarizeVideoSegmentationFrames = (
       : [frame.temporalMaskIou],
   );
 
-  const totalInferenceMs = inference.reduce(
-    (sum, duration) => sum + duration,
-    0,
-  );
+  const totalTrackedInferenceMs =
+    trackedInference.reduce(
+      (sum, duration) =>
+        sum +
+        duration,
+      0,
+    );
 
   return {
     meanDecodeMs: mean(decode),
     meanInferenceMs: mean(inference),
     p50InferenceMs: percentile(inference, 0.5),
     p95InferenceMs: percentile(inference, 0.95),
+    meanTrackedInferenceMs:
+      mean(
+        trackedInference,
+      ),
+    p50TrackedInferenceMs:
+      percentile(
+        trackedInference,
+        0.5,
+      ),
+    p95TrackedInferenceMs:
+      percentile(
+        trackedInference,
+        0.95,
+      ),
     trackedFps:
-      totalInferenceMs === 0
+      totalTrackedInferenceMs ===
+      0
         ? 0
-        : (frames.length * 1000) / totalInferenceMs,
+        : (trackedInference.length *
+            1000) /
+          totalTrackedInferenceMs,
     meanTemporalMaskIou:
       temporalIou.length === 0
         ? null
