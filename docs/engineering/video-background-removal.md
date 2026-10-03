@@ -127,6 +127,16 @@ The 4×4 pass found the `car-shadow` subject cleanly: its best grid seed reached
 
 The follow-up uses a 7×7 uniform grid. It also records mask bounding-box geometry, centroid, frame-edge contact, edge-pixel fraction, and a compact 32×32 binary fingerprint for every candidate. Those fingerprints let the artifact be clustered offline by mask overlap, so a deployable ranking rule can be derived from model-only agreement rather than another ground-truth-tuned score.
 
+The 7×7 grid contains a useful subject mask on all three hard sequences. `car-shadow` reaches 0.970 seed IoU and 0.979 mean tracked IoU. `car-turn` reaches 0.883 seed IoU and 0.955 mean tracked IoU. On `bmx-trees`, the grid contains a proposal-0 mask at (0.5, 0.5) with 0.447 seed IoU, essentially matching the known-point oracle's 0.452.
+
+The candidate fingerprints show that simple consensus is not enough: large background regions recur at many prompt points and dominate overlap clusters. A smaller model-only rule works on all three hard cases without ground truth:
+
+1. consider only proposal 0
+2. reject masks whose foreground touches the image frame
+3. choose the remaining mask with the highest stability score
+
+This selects the useful subject candidate on all three hard sequences. The next focused run applies that exact rule as `grid-model` across all seven DAVIS sequences. Ground truth is still loaded only to score the chosen result after selection.
+
 The oracle proposal runs also exposed a separate result: for all seven current DAVIS sequences, the best mask among the three masks returned at the known subject point was proposal 0. EdgeTAM's predicted-IoU ranking was the source of the catastrophic `car-shadow` and `car-turn` seed choices. This makes proposal 0 a strong ranking control once a subject point is already known, but it does not by itself solve automatic subject discovery.
 
 ## Memory ownership

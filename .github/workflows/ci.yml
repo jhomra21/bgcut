@@ -199,11 +199,11 @@ jobs:
 
           failed=0
 
-          # Focused automatic point-grid discovery iteration. The full
-          # EdgeTAM/SAM baseline and oracle matrix passed on the parent commit;
-          # this head changes only discovery diagnostics.
-          for fixture in bmx-trees car-shadow car-turn; do
-            run_candidate "$fixture" edgetam grid-oracle || failed=1
+          # Product-like automatic discovery selector. It uses only EdgeTAM
+          # output geometry and stability: proposal 0, reject masks touching
+          # the frame, then choose the most stable remaining candidate.
+          for fixture in blackswan bear camel cows bmx-trees car-shadow car-turn; do
+            run_candidate "$fixture" edgetam grid-model || failed=1
           done
 
           exit "$failed"

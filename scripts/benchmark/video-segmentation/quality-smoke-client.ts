@@ -42,7 +42,8 @@ type QualitySeedMode =
   | "model"
   | "oracle"
   | "birefnet"
-  | "grid-oracle";
+  | "grid-oracle"
+  | "grid-model";
 
 type GroundTruth = {
   readonly bitmap:
@@ -137,9 +138,17 @@ type GridDiscoveryCandidate = {
     number;
 };
 
+type GridDiscoverySelector =
+  | "oracle-j-and-f"
+  | "proposal0-nonedge-stability";
+
 type GridDiscoveryQuality = {
   readonly pointsPerSide: number;
   readonly candidateCount: number;
+  readonly selector:
+    GridDiscoverySelector;
+  readonly selectedCandidate:
+    number;
   readonly candidates:
     readonly GridDiscoveryCandidate[];
 };
@@ -262,6 +271,7 @@ const seedModeFromLocation =
       case "oracle":
       case "birefnet":
       case "grid-oracle":
+      case "grid-model":
         return mode;
 
       default:
@@ -1074,7 +1084,9 @@ const main =
         seedMode ===
           "oracle" ||
         seedMode ===
-          "grid-oracle"
+          "grid-oracle" ||
+        seedMode ===
+          "grid-model"
       ) &&
       requested !==
         "edgetam"
@@ -1157,7 +1169,9 @@ const main =
       seedMode !==
         "birefnet" &&
       seedMode !==
-        "grid-oracle"
+        "grid-oracle" &&
+      seedMode !==
+        "grid-model"
     ) {
       seedPoint =
         seedPointFromMask(
@@ -1366,7 +1380,9 @@ const main =
 
     if (
       seedMode ===
-      "grid-oracle"
+        "grid-oracle" ||
+      seedMode ===
+        "grid-model"
     ) {
       const decoded =
         await source.frameAt(
@@ -1482,22 +1498,79 @@ const main =
 
         let best = 0;
 
-        for (
-          let index = 1;
-          index <
-          candidates.length;
-          index += 1
+        let selector:
+          GridDiscoverySelector;
+
+        if (
+          seedMode ===
+          "grid-model"
         ) {
+          selector =
+            "proposal0-nonedge-stability";
+
+          const eligible =
+            candidates
+              .map(
+                (
+                  candidate,
+                  index,
+                ) => ({
+                  candidate,
+                  index,
+                }),
+              )
+              .filter(
+                ({ candidate }) =>
+                  candidate
+                    .proposalIndex ===
+                    0 &&
+                  !candidate
+                    .touchesFrame,
+              );
+
           if (
-            (candidates[index]
-              ?.groundTruthJAndF ??
-              Number.NEGATIVE_INFINITY) >
-            (candidates[best]
-              ?.groundTruthJAndF ??
-              Number.NEGATIVE_INFINITY)
+            eligible.length ===
+            0
           ) {
-            best =
-              index;
+            throw new Error(
+              "EdgeTAM grid discovery found no non-edge proposal-0 subject candidate.",
+            );
+          }
+
+          best =
+            eligible.reduce(
+              (
+                selected,
+                current,
+              ) =>
+                current.candidate
+                  .stability >
+                selected.candidate
+                  .stability
+                  ? current
+                  : selected,
+            ).index;
+        } else {
+          selector =
+            "oracle-j-and-f";
+
+          for (
+            let index = 1;
+            index <
+            candidates.length;
+            index += 1
+          ) {
+            if (
+              (candidates[index]
+                ?.groundTruthJAndF ??
+                Number.NEGATIVE_INFINITY) >
+              (candidates[best]
+                ?.groundTruthJAndF ??
+                Number.NEGATIVE_INFINITY)
+            ) {
+              best =
+                index;
+            }
           }
         }
 
@@ -1514,6 +1587,9 @@ const main =
           pointsPerSide,
           candidateCount:
             candidates.length,
+          selector,
+          selectedCandidate:
+            best,
           candidates,
         };
       } finally {
