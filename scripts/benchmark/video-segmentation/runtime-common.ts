@@ -36,10 +36,31 @@ const ModelConstantsSchema = Schema.Struct({
     ),
 });
 
-export type VideoModelConstants =
+type RawVideoModelConstants =
   Schema.Schema.Type<
     typeof ModelConstantsSchema
   >;
+
+export type VideoModelConstants = {
+  readonly image_mean:
+    readonly [
+      number,
+      number,
+      number,
+    ];
+  readonly image_std:
+    readonly [
+      number,
+      number,
+      number,
+    ];
+  readonly memory_temporal_positional_encoding:
+    readonly (
+      readonly number[]
+    )[];
+  readonly no_memory_embedding?:
+    readonly number[];
+};
 
 export type VideoSessionMap =
   Partial<
