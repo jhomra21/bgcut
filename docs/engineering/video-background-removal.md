@@ -1,71 +1,145 @@
 # Video background removal research
 
-This work is experimental. It does not change the public bgcut browser, CLI, or Node.js contract.
+This work is experimental. It does not change bgcut's public browser, CLI, or Node.js API.
 
 ## Goal
 
-Find a local video segmentation path that can follow one foreground subject through a clip without uploading source frames. MediaBunny owns container parsing and frame decoding. ONNX Runtime WebGPU owns model inference. A later bgcut UI can use Solid without putting model or decoder state in components.
+Find a fully local video segmentation path that can follow a foreground subject through a clip without uploading source frames.
 
-The first bake-off compares two full temporal models:
+MediaBunny owns demuxing and frame decoding. ONNX Runtime WebGPU owns model inference. The benchmark keeps those layers separate so media decode time, model load time, seed inference, and tracked-frame inference can be measured independently.
 
-- SAM 2.1 Tiny through `jax-image-tools/sam21-tiny-video-onnx`
-- EdgeTAM through `jax-image-tools/edgetam-video-onnx`
+## Current candidates
 
-Both exports use 1024 x 1024 model input and the same four ONNX graph roles: vision encoder, mask decoder, memory attention, and memory encoder. Both leave the temporal memory bank in JavaScript. That makes this the cleanest first comparison because the export shape does not favor one model.
+The deployable bake-off now compares:
 
-The model repositories are research inputs, not release artifacts. Their current `main` files must be pinned by revision, byte size, and SHA-256 before any bgcut release can depend on them.
+- **SAM 2.1 Tiny 512 fp16** from Diffusion Studio's pinned temporal ONNX export.
+- **EdgeTAM 1024 fp16** from Rotyl's immutable `edgetam-v1` release.
 
-## Why there are two rounds
+Both are Apache-2.0 model paths and both run through ONNX Runtime WebGPU in the browser.
 
-The first round answers which model architecture is a better tracker under the same export conditions.
+The EdgeTAM lane is self-contained rather than mixing independently exported artifacts. Its release includes the fp16 vision and prompt decoders, memory attention, memory encoder, tracked-frame decoder, and the learned host parameters required by the memory bank. The benchmark fetches Rotyl's explicit `.gz` release assets through a same-origin test proxy, inflates them, verifies their raw byte lengths, and hands ONNX Runtime the original model filenames.
 
-If SAM 2.1 Tiny remains competitive, a second round will test Diffusion Studio's 512 px fp16 SAM 2.1 Tiny export. That export is much smaller than the 1024 fp32-style comparison artifact and is closer to bgcut's current 512 px image pipeline. Mixing it into round one would make model architecture and export optimization impossible to separate.
+The earlier `jax-image-tools/edgetam-video-onnx` package remains useful as a reference export, but it is not the deployable EdgeTAM candidate. Its published `constants.json` contains geometry and configuration metadata, not every learned host parameter needed for a faithful standalone tracker.
 
-## Benchmark seam
+## Adapter contract
 
-Each model adapter has the same small interface:
+Each candidate implements the same boundary:
 
-1. load
-2. seed one decoded `VideoFrame` with point prompts
-3. track later `VideoFrame` objects
-4. rewind when backward tracking is added
-5. close every session and GPU resource it owns
+1. load model sessions
+2. encode and seed a decoded `VideoFrame` from point prompts
+3. expose seed alternatives when the model returns them
+4. optionally commit a specific seed proposal
+5. track later `VideoFrame` objects using temporal memory
+6. rewind temporal state
+7. close every owned session and resource
 
-The benchmark runner does not know ONNX tensor names or memory-bank rules. The adapter does not know how the file was demuxed.
+The seed prompt has an optional `proposalIndex`. Omitting it uses the model's recommended proposal. Supplying one lets a caller commit a different multimask proposal. This matters for EdgeTAM because a strong mask can exist among its returned proposals even when the model's own IoU ranking chooses another one.
 
-MediaBunny provides the frame-source adapter. The benchmark asks it for the same timestamps for both candidates.
+The benchmark seam is deliberately below UI code. A future Solid interface can show proposals and correction controls without owning model state.
 
-## Measurements
+## Performance smoke
 
-Every run records:
+The Metal acceptance job runs both deployable candidates in headless Chrome on GitHub's Apple-silicon macOS runner.
 
-- reported model download size
+The smoke uses one seed plus five tracked frames and records:
+
+- reported model size
 - model/session load time
-- decoded frame count
-- decode latency per requested frame
-- seed and tracked inference latency
-- p50 and p95 inference latency
-- inference-only tracked FPS
-- model IoU/object-presence values when the graph provides them
-- foreground area per frame
-- binary IoU against the previous tracked mask as a simple temporal-change signal
+- MediaBunny frame decode latency
+- seed inference latency
+- tracked-frame mean, p50, and p95 inference latency
+- tracked inference-only FPS
+- model IoU/object-presence outputs
+- mask-area and temporal-change diagnostics
 
-The last metric is not a quality score. A moving subject should change its mask. It is useful only beside the same clip, timestamps, and prompt.
+Seed time is excluded from `trackedFps`.
 
-Quality gates need labeled clips. The next stage will add short fixtures that cover a person, hair or thin edges, fast motion, partial occlusion, full occlusion and re-entry, and a similarly colored foreground/background. Candidate masks will be compared with the same reference mattes.
+The smoke is an execution and warm-latency check, not a quality benchmark.
+
+## DAVIS quality benchmark
+
+Quality is measured separately on labeled DAVIS sequences. The current suite covers:
+
+- `blackswan`
+- `bear`
+- `camel`
+- `cows`
+- `bmx-trees`
+- `car-shadow`
+- `car-turn`
+
+For each sequence the benchmark uses the first 12 frames at 24 fps. It derives a positive seed point from the first ground-truth mask, then compares each predicted mask with the corresponding DAVIS annotation.
+
+The report records:
+
+- seed IoU
+- seed boundary F
+- all exposed seed alternatives and their ground-truth scores
+- mean and minimum tracked IoU
+- mean and minimum tracked boundary F
+- mean tracked J&F
+- tracked inference latency
+
+The boundary score follows the DAVIS-style contour metric with a tolerance based on image diagonal.
+
+### Seed-ranking diagnostic
+
+EdgeTAM is also run in an **oracle seed** diagnostic mode. That mode uses frame-0 ground truth only to choose the best proposal among the masks EdgeTAM already returned for the same user prompt, then runs the normal temporal tracker unchanged.
+
+This is not a deployable automatic selection strategy and must not be reported as product quality. Its purpose is narrower: separate seed-proposal ranking failures from temporal-tracking failures. If the corrected-seed run improves sharply, the product problem is proposal selection/correction. If it does not, the temporal tracker is the limiting factor.
+
+SAM 2.1's current Diffusion export returns one seed mask, so it has no equivalent proposal-selection diagnostic.
+
+## Memory ownership
+
+The two trackers have different host-side memory contracts and should not be forced into one tensor layout.
+
+### EdgeTAM
+
+The EdgeTAM host:
+
+- removes the vision encoder's learned no-memory embedding before tracked memory attention
+- keeps the user-conditioned anchor memory for the whole track
+- keeps up to six recent spatial memories beside the anchor
+- builds the fixed seven-entry memory tensor plus object-pointer block
+- applies the learned temporal position table to spatial memory
+- leaves pointer temporal positions at zero for this checkpoint
+- uses the tracked-frame decoder that exposes `object_pointer`
+- substitutes the learned no-object pointer on absent frames
+- does not train the memory bank on a normal predicted mask when the model says the object is absent
+
+### SAM 2.1
+
+The SAM lane follows the Diffusion temporal export contract, including its no-memory feature, temporal memory positions, pointer-position graph, object pointer, and memory encoder.
+
+The benchmark treats these as model-specific adapter details. The runner only sees decoded frames and masks.
+
+## Model delivery
+
+Research model sources are pinned. The benchmark does not depend on mutable model-repository `main` branches.
+
+Before any video path can ship as part of bgcut, the selected assets need the same release discipline as the existing image model:
+
+- immutable versioned model manifest
+- byte length and SHA-256 for every artifact
+- same-origin delivery
+- cache validation
+- documented upstream revisions and licenses
+- browser compatibility checks
+- failure behavior for unsupported WebGPU environments
 
 ## Player and preview
 
-MediaBunny remains the media layer. Its player example is a behavior reference for playback timing, iterator cancellation, seeking, audio-clock synchronization, volume, fullscreen, and decoded-frame pooling. bgcut will implement its own Solid controls and state.
+MediaBunny remains the media layer. Its player example is a behavior reference for playback timing, iterator cancellation, seeking, audio-clock synchronization, volume, fullscreen, and decoded-frame pooling.
 
-Preview and tracking should share decoded media infrastructure but not one mutable playback loop. Tracking must be able to run faster or slower than realtime without fighting the user's preview playhead.
+Preview and tracking should share decoded-media infrastructure but not one mutable playback loop. Tracking must be free to run faster or slower than realtime without fighting the user's preview playhead.
 
 ## References used
 
-- Diffusion Studio `packages/sam2`: working SAM 2.1 video tracking with MediaBunny and ONNX Runtime WebGPU.
-- Diffusion Studio object-mask UI: Solid prompt and correction workflow.
+- Diffusion Studio `packages/sam2`: working SAM 2.1 temporal tracking with MediaBunny and ONNX Runtime WebGPU.
+- Diffusion Studio object-mask UI: prompt and correction workflow.
+- Rotyl EdgeTAM release and tracker: complete EdgeTAM graph/parameter ownership and validated host-side memory arithmetic.
 - MediaBunny media-player example: local playback and seek behavior.
-- WebSAM EdgeTAM video engine: memory-bank ownership, backpressure, cancellation, and frame-stream design.
 - gpuix-solid MediaBunny work: future native VideoToolbox and decoded-frame presentation path.
 
-Reference implementations are studied for behavior and ownership. bgcut reimplements what it needs rather than copying source.
+Reference implementations are used to verify behavior, graph contracts, and ownership. bgcut keeps its own benchmark and product boundaries.
