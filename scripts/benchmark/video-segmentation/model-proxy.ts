@@ -53,18 +53,22 @@ const loadReleaseFile =
             await response.arrayBuffer(),
           );
 
-        const inflated =
-          gunzipSync(
-            compressed,
-          );
+        const isGzip =
+          compressed[0] ===
+            0x1f &&
+          compressed[1] ===
+            0x8b;
+
+        const decoded =
+          isGzip
+            ? gunzipSync(
+                compressed,
+              )
+            : compressed;
 
         const bytes =
-          new Uint8Array(
-            inflated.buffer.slice(
-              inflated.byteOffset,
-              inflated.byteOffset +
-                inflated.byteLength,
-            ),
+          Uint8Array.from(
+            decoded,
           );
 
         const expected =
