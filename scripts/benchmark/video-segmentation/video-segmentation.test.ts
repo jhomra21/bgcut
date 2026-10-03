@@ -29,6 +29,43 @@ describe("video segmentation bake-off", () => {
           artifact.role === "pointer-tpos",
       ),
     ).toBe(false);
+    expect(
+      edge.artifacts.some(
+        (artifact) =>
+          artifact.role ===
+          "tracked-mask-decoder",
+      ),
+    ).toBe(true);
+    expect(
+      edge.artifacts.some(
+        (artifact) =>
+          artifact.role ===
+            "parameters" &&
+          artifact.filename ===
+            "parameters.json",
+      ),
+    ).toBe(true);
+    expect(
+      edge.artifacts
+        .filter(
+          (artifact) =>
+            artifact.externalData !==
+            undefined,
+        )
+        .flatMap(
+          (artifact) =>
+            artifact.externalData ??
+            [],
+        ),
+    ).toHaveLength(2);
+    expect(
+      reportedModelSizeMb(
+        edge,
+      ),
+    ).toBeCloseTo(
+      50.372178,
+      6,
+    );
     expect(sam.license).toBe("Apache-2.0");
     expect(edge.license).toBe("Apache-2.0");
     expect(reportedModelSizeMb(edge)).toBeLessThan(
