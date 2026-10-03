@@ -43,7 +43,7 @@ jobs:
 
           printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
 
-          VAL_LIST="$DAVIS_ROOT/train.txt"
+          VAL_LIST="$DAVIS_ROOT/val.txt"
 
           unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
 
