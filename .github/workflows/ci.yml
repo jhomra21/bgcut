@@ -29,7 +29,7 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
 
-      - name: Validate automatic EdgeTAM selector on DAVIS 2017
+      - name: Score EdgeTAM union candidates on DAVIS 2017 training
         shell: bash
         run: |
           set -euo pipefail
@@ -43,15 +43,15 @@ jobs:
 
           printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
 
-          VAL_LIST="$DAVIS_ROOT/val.txt"
+          TRAIN_LIST="$DAVIS_ROOT/train.txt"
 
-          unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
+          unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/train.txt             | tr -d '\r'             > "$TRAIN_LIST"
 
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
 
             unzip -q               "$ARCHIVE"               "DAVIS/Annotations/480p/$fixture/*"               -d "$DAVIS_ROOT"
-          done < "$VAL_LIST"
+          done < "$TRAIN_LIST"
 
           DAVIS_ANNOTATION_ROOT="$DAVIS_ROOT/DAVIS/Annotations/480p"             bun run benchmark:video-segmentation:quality -- "$ROOT" 4191 >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
@@ -129,12 +129,12 @@ jobs:
 
           failed=0
 
-          # This selector was chosen from the official training split only.
-          # Validation annotations score the frozen choice after selection.
+          # Training-only union search. Ground truth scores each fixed
+          # model-only union rule after the candidates are generated.
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
-            run_candidate "$fixture" edgetam grid-model || failed=1
-          done < "$VAL_LIST"
+            run_candidate "$fixture" edgetam grid-oracle || failed=1
+          done < "$TRAIN_LIST"
 
           exit "$failed"
 

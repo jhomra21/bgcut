@@ -143,6 +143,26 @@ type GridDiscoverySelector =
   | "oracle-j-and-f"
   | "proposal0-nonedge-stability-area";
 
+type GridUnionVariantQuality = {
+  readonly id: string;
+  readonly minStability:
+    number;
+  readonly minModelIou:
+    number;
+  readonly minAreaFraction:
+    number;
+  readonly rejectFrameEdge:
+    boolean;
+  readonly selectedCount:
+    number;
+  readonly groundTruthIou:
+    number;
+  readonly groundTruthBoundaryF:
+    number;
+  readonly groundTruthJAndF:
+    number;
+};
+
 type GridDiscoveryQuality = {
   readonly pointsPerSide: number;
   readonly candidateCount: number;
@@ -150,6 +170,8 @@ type GridDiscoveryQuality = {
     GridDiscoverySelector;
   readonly selectedCandidate:
     number;
+  readonly unionVariants:
+    readonly GridUnionVariantQuality[];
   readonly candidates:
     readonly GridDiscoveryCandidate[];
 };
@@ -999,6 +1021,222 @@ const maskFingerprint32 = (
   );
 };
 
+const unionMasks = (
+  masks:
+    readonly VideoSegmentationMask[],
+): VideoSegmentationMask => {
+  if (
+    masks.length ===
+    0
+  ) {
+    return {
+      logits:
+        new Float32Array(
+          256 *
+            256,
+        ).fill(
+          -1,
+        ),
+      width: 256,
+      height: 256,
+    };
+  }
+
+  const first =
+    masks[0]!;
+
+  const logits =
+    new Float32Array(
+      first.logits.length,
+    ).fill(
+      -1,
+    );
+
+  for (
+    const mask of
+    masks
+  ) {
+    if (
+      mask.width !==
+        first.width ||
+      mask.height !==
+        first.height ||
+      mask.logits.length !==
+        first.logits.length
+    ) {
+      throw new Error(
+        "EdgeTAM union candidates do not share mask geometry.",
+      );
+    }
+
+    for (
+      let index = 0;
+      index <
+      mask.logits.length;
+      index += 1
+    ) {
+      if (
+        (mask.logits[
+          index
+        ] ??
+          Number.NEGATIVE_INFINITY) >
+        0
+      ) {
+        logits[index] =
+          1;
+      }
+    }
+  }
+
+  return {
+    logits,
+    width:
+      first.width,
+    height:
+      first.height,
+  };
+};
+
+const gridUnionVariants = (
+  discoveries:
+    readonly {
+      readonly point: {
+        readonly x: number;
+        readonly y: number;
+        readonly label: 0 | 1;
+      };
+      readonly proposalIndex:
+        number;
+      readonly mask:
+        VideoSegmentationMask;
+    }[],
+  candidates:
+    readonly GridDiscoveryCandidate[],
+  groundTruth:
+    GroundTruth,
+): readonly GridUnionVariantQuality[] => {
+  const results:
+    GridUnionVariantQuality[] = [];
+
+  const stabilityThresholds = [
+    0,
+    0.5,
+    0.7,
+    0.85,
+  ] as const;
+
+  const modelIouThresholds = [
+    0,
+    0.25,
+    0.5,
+  ] as const;
+
+  const areaThresholds = [
+    0.002,
+    0.01,
+  ] as const;
+
+  const edgePolicies = [
+    false,
+    true,
+  ] as const;
+
+  for (
+    const minStability of
+    stabilityThresholds
+  ) {
+    for (
+      const minModelIou of
+      modelIouThresholds
+    ) {
+      for (
+        const minAreaFraction of
+        areaThresholds
+      ) {
+        for (
+          const rejectFrameEdge of
+          edgePolicies
+        ) {
+          const selected:
+            VideoSegmentationMask[] =
+              [];
+
+          candidates.forEach(
+            (
+              candidate,
+              index,
+            ) => {
+              const discovery =
+                discoveries[
+                  index
+                ];
+
+              if (
+                discovery ===
+                  undefined ||
+                candidate
+                  .proposalIndex !==
+                  0 ||
+                candidate
+                  .stability <
+                  minStability ||
+                (candidate
+                  .modelIou ??
+                  Number.NEGATIVE_INFINITY) <
+                  minModelIou ||
+                candidate
+                  .areaFraction <
+                  minAreaFraction ||
+                candidate
+                  .areaFraction >
+                  0.6 ||
+                (
+                  rejectFrameEdge &&
+                  candidate
+                    .touchesFrame
+                )
+              ) {
+                return;
+              }
+
+              selected.push(
+                discovery.mask,
+              );
+            },
+          );
+
+          const quality =
+            groundTruthMetrics(
+              unionMasks(
+                selected,
+              ),
+              groundTruth,
+            );
+
+          results.push({
+            id:
+              `s${minStability}-i${minModelIou}-a${minAreaFraction}-e${rejectFrameEdge ? 1 : 0}`,
+            minStability,
+            minModelIou,
+            minAreaFraction,
+            rejectFrameEdge,
+            selectedCount:
+              selected.length,
+            groundTruthIou:
+              quality.iou,
+            groundTruthBoundaryF:
+              quality.boundaryF,
+            groundTruthJAndF:
+              quality.jAndF,
+          });
+        }
+      }
+    }
+  }
+
+  return results;
+};
+
 const discoveryGrid = (
   pointsPerSide: number,
 ): readonly QualitySeedPoint[] => {
@@ -1593,6 +1831,15 @@ const main =
           selector,
           selectedCandidate:
             best,
+          unionVariants:
+            seedMode ===
+            "grid-oracle"
+              ? gridUnionVariants(
+                  discoveries,
+                  candidates,
+                  groundTruth[0]!,
+                )
+              : [],
           candidates,
         };
       } finally {

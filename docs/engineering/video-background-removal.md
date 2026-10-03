@@ -135,6 +135,10 @@ That validation result turned candidate ranking back into the active problem. Se
 
 The training data supports a small change rather than a learned ranker. Keep proposal 0, reject masks that touch the frame, then rank the rest by `stability * sqrt(areaFraction)`. On alternating 30-sequence training halves, this rule reached 0.465 and 0.505 mean frame-0 J&F. Pure stability averaged 0.395 across the 60 training sequences. Allowing frame-touching masks or switching away from proposal 0 was substantially worse. The next validation run freezes this rule exactly; validation scores do not change its coefficients or filters.
 
+The frozen area-weighted selector improved the official 30-sequence validation split to 0.475 mean tracked IoU and 0.504 mean tracked J&F, up from 0.395 / 0.418 for pure stability. That confirms the training-derived anti-tiny-mask term generalizes, but single-mask selection still leaves a large gap on multi-object foregrounds.
+
+The next training-only diagnostic evaluates 48 fixed proposal-0 union rules on frame 0. The rules vary minimum stability, predicted IoU, foreground area, and frame-edge rejection, then OR every accepted mask. Duplicate discoveries do not hurt a union, so this stage deliberately avoids another ranking heuristic. After one union rule is chosen from training, EdgeTAM can be conditioned directly from the union matte and temporally evaluated on validation.
+
 The oracle proposal runs also exposed a separate result: for all seven current DAVIS sequences, the best mask among the three masks returned at the known subject point was proposal 0. EdgeTAM's predicted-IoU ranking was the source of the catastrophic `car-shadow` and `car-turn` seed choices. This makes proposal 0 a strong ranking control once a subject point is already known, but it does not by itself solve automatic subject discovery.
 
 ## Memory ownership
