@@ -32,15 +32,18 @@ const PIXEL_COUNT =
   MODEL_INPUT_SIZE *
   MODEL_INPUT_SIZE;
 
+export type BiRefNetSeedPoint = {
+  readonly x: number;
+  readonly y: number;
+};
+
 export type BiRefNetSeed = {
   readonly logits:
     Float32Array;
   readonly width: number;
   readonly height: number;
-  readonly point: {
-    readonly x: number;
-    readonly y: number;
-  };
+  readonly point:
+    BiRefNetSeedPoint;
   readonly modelRevision:
     string;
 };
@@ -55,10 +58,7 @@ export type BiRefNetSeeder = {
 const pointFromLogits = (
   logits:
     Float32Array,
-): {
-  readonly x: number;
-  readonly y: number;
-} => {
+): BiRefNetSeedPoint => {
   let minX =
     MODEL_INPUT_SIZE;
 
