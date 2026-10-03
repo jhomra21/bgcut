@@ -141,6 +141,22 @@ The next training-only diagnostic evaluates 48 fixed proposal-0 union rules on f
 
 The oracle proposal runs also exposed a separate result: for all seven current DAVIS sequences, the best mask among the three masks returned at the known subject point was proposal 0. EdgeTAM's predicted-IoU ranking was the source of the catastrophic `car-shadow` and `car-turn` seed choices. This makes proposal 0 a strong ranking control once a subject point is already known, but it does not by itself solve automatic subject discovery.
 
+### Multi-object union search
+
+The single-mask validation failure is not solved by retuning one mask. A training-only search on all 60 DAVIS 2017 training sequences therefore scored fixed unions of proposal-0 masks across stability, model-IoU, area, and frame-edge filters.
+
+The best training rule is frozen as `s0.5-i0-a0.002-e1`:
+
+- stability at least 0.5
+- no minimum EdgeTAM model-IoU score
+- foreground area at least 0.2% of the frame
+- reject masks that touch the frame edge
+- union every surviving proposal-0 mask
+
+Across the 60-sequence training split, that fixed rule averaged 0.406 frame-0 IoU and 0.441 frame-0 J&F while keeping about 4.5 masks per clip. Stricter model-IoU thresholds, larger area floors, and higher stability thresholds all reduced mean J&F.
+
+The next run uses the untouched 30-sequence DAVIS 2017 validation split. The report still includes the full diagnostic grid for auditability, but `frozenUnion` names the training-selected rule explicitly so validation interpretation cannot switch variants after seeing the holdout.
+
 ## Memory ownership
 
 The two trackers have different host-side memory contracts and should not be forced into one tensor layout.

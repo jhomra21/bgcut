@@ -143,6 +143,9 @@ type GridDiscoverySelector =
   | "oracle-j-and-f"
   | "proposal0-nonedge-stability-area";
 
+const FROZEN_GRID_UNION_VARIANT_ID =
+  "s0.5-i0-a0.002-e1";
+
 type GridUnionVariantQuality = {
   readonly id: string;
   readonly minStability:
@@ -172,6 +175,8 @@ type GridDiscoveryQuality = {
     number;
   readonly unionVariants:
     readonly GridUnionVariantQuality[];
+  readonly frozenUnion:
+    GridUnionVariantQuality | null;
   readonly candidates:
     readonly GridDiscoveryCandidate[];
 };
@@ -1824,6 +1829,16 @@ const main =
         proposalIndex =
           selected.proposalIndex;
 
+        const unionVariants =
+          seedMode ===
+          "grid-oracle"
+            ? gridUnionVariants(
+                discoveries,
+                candidates,
+                groundTruth[0]!,
+              )
+            : [];
+
         gridDiscovery = {
           pointsPerSide,
           candidateCount:
@@ -1831,15 +1846,14 @@ const main =
           selector,
           selectedCandidate:
             best,
-          unionVariants:
-            seedMode ===
-            "grid-oracle"
-              ? gridUnionVariants(
-                  discoveries,
-                  candidates,
-                  groundTruth[0]!,
-                )
-              : [],
+          unionVariants,
+          frozenUnion:
+            unionVariants.find(
+              (variant) =>
+                variant.id ===
+                FROZEN_GRID_UNION_VARIANT_ID,
+            ) ??
+            null,
           candidates,
         };
       } finally {
