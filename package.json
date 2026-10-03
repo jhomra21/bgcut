@@ -90,7 +90,8 @@
     "benchmark:browser-reference-resume:bundle-check": "bun run scripts/benchmark/browser-reference-resume-bundle-check.ts",
     "benchmark:video-segmentation:bundle-check": "bun run scripts/benchmark/video-segmentation/bundle-check.ts",
     "benchmark:video-segmentation:probe": "bun run scripts/benchmark/video-segmentation/probe-server.ts",
-    "benchmark:video-segmentation:temporal-smoke": "bun run scripts/benchmark/video-segmentation/temporal-smoke-server.ts"
+    "benchmark:video-segmentation:temporal-smoke": "bun run scripts/benchmark/video-segmentation/temporal-smoke-server.ts",
+    "benchmark:video-segmentation:quality": "bun run scripts/benchmark/video-segmentation/quality-smoke-server.ts"
   },
   "dependencies": {
     "effect": "4.0.0",
