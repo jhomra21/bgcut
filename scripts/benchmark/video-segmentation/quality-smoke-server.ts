@@ -155,6 +155,8 @@ const ResultEnvelopeSchema =
       Schema.String,
     candidate:
       Schema.String,
+    seedMode:
+      Schema.String,
   });
 
 const safeCandidate = (
@@ -284,6 +286,11 @@ const app =
             envelope.candidate,
           );
 
+        const seedMode =
+          safeCandidate(
+            envelope.seedMode,
+          );
+
         const kind =
           url.pathname ===
             "/result"
@@ -293,7 +300,7 @@ const app =
         await writeFile(
           join(
             outputRoot,
-            `${fixture}-${candidate}-${kind}.json`,
+            `${fixture}-${candidate}-${seedMode}-${kind}.json`,
           ),
           `${JSON.stringify(
             value,
