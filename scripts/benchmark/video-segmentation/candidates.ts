@@ -4,9 +4,12 @@ import type {
   VideoSegmentationCandidateId,
 } from "./types";
 
+const EDGETAM_REVISION =
+  "8ca3d3e";
+
 const edgeTamArtifacts = (): readonly VideoModelArtifact[] => {
   const base =
-    "https://huggingface.co/jax-image-tools/edgetam-video-onnx/resolve/main";
+    `https://huggingface.co/jax-image-tools/edgetam-video-onnx/resolve/${EDGETAM_REVISION}`;
 
   return [
     {
@@ -103,7 +106,8 @@ export const VIDEO_SEGMENTATION_CANDIDATES = {
     family: "EdgeTAM",
     inputSize: 1024,
     license: "Apache-2.0",
-    repository: "jax-image-tools/edgetam-video-onnx",
+    repository:
+      `jax-image-tools/edgetam-video-onnx@${EDGETAM_REVISION}`,
     baseModel: "facebook/EdgeTAM",
     artifacts: edgeTamArtifacts(),
   },
