@@ -87,16 +87,15 @@ export const summarizeVideoSegmentationFrames = (
   const inference = frames.map((frame) => frame.inferenceMs);
 
   const trackedInference =
-    frames
-      .filter(
-        (frame) =>
-          frame.frameIndex !==
-          seedFrame,
-      )
-      .map(
-        (frame) =>
-          frame.inferenceMs,
-      );
+    frames.flatMap(
+      (frame) =>
+        frame.frameIndex ===
+        seedFrame
+          ? []
+          : [
+              frame.inferenceMs,
+            ],
+    );
 
   const temporalIou = frames.flatMap((frame) =>
     frame.temporalMaskIou === null
