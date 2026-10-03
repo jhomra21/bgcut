@@ -211,7 +211,7 @@ jobs:
           }
 
           failed=0
-          for fixture in blackswan bear camel cows; do
+          for fixture in blackswan bear camel cows bmx-trees car-shadow car-turn; do
             run_candidate "$fixture" edgetam || failed=1
             run_candidate "$fixture" sam21-primary || failed=1
           done
