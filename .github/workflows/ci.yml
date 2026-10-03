@@ -60,9 +60,10 @@ jobs:
           fi
 
           run_candidate() {
-            local candidate="$1"
-            local result="$ROOT/$candidate-result.json"
-            local failure="$ROOT/$candidate-failure.json"
+            local fixture="$1"
+            local candidate="$2"
+            local result="$ROOT/$fixture-$candidate-result.json"
+            local failure="$ROOT/$fixture-$candidate-failure.json"
             rm -f "$result" "$failure"
 
             "$CHROME" \
@@ -91,7 +92,7 @@ jobs:
 
               if ! kill -0 "$CHROME_PID" 2>/dev/null; then
                 echo "Chrome exited before the $candidate Metal smoke completed." >&2
-                cat "$ROOT/$candidate-chrome.log" >&2 || true
+                cat "$ROOT/$fixture-$candidate-chrome.log" >&2 || true
                 unset CHROME_PID
                 return 1
               fi
@@ -101,15 +102,17 @@ jobs:
 
             echo "$candidate Metal smoke timed out." >&2
             cat "$ROOT/server.log" >&2 || true
-            cat "$ROOT/$candidate-chrome.log" >&2 || true
+            cat "$ROOT/$fixture-$candidate-chrome.log" >&2 || true
             kill "$CHROME_PID" 2>/dev/null || true
             unset CHROME_PID
             return 1
           }
 
           failed=0
-          run_candidate edgetam || failed=1
-          run_candidate sam21-primary || failed=1
+          for fixture in blackswan bear camel cows; do
+            run_candidate "$fixture" edgetam || failed=1
+            run_candidate "$fixture" sam21-primary || failed=1
+          done
 
           exit "$failed"
       - uses: actions/upload-artifact@v4
@@ -130,7 +133,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - name: Score EdgeTAM and SAM 2.1 on DAVIS blackswan
+      - name: Score EdgeTAM and SAM 2.1 on DAVIS sequences
         shell: bash
         run: |
           set -euo pipefail
@@ -174,7 +177,7 @@ jobs:
               --disable-gpu-blocklist \
               --enable-webgpu-developer-features \
               --use-gpu-in-tests \
-              "http://127.0.0.1:4191/?candidate=$candidate" >"$ROOT/$candidate-chrome.log" 2>&1 &
+              "http://127.0.0.1:4191/?candidate=$candidate&fixture=$fixture" >"$ROOT/$fixture-$candidate-chrome.log" 2>&1 &
             CHROME_PID=$!
 
             for _ in {1..1200}; do
@@ -193,8 +196,8 @@ jobs:
               fi
 
               if ! kill -0 "$CHROME_PID" 2>/dev/null; then
-                echo "Chrome exited before the $candidate DAVIS run completed." >&2
-                cat "$ROOT/$candidate-chrome.log" >&2 || true
+                echo "Chrome exited before the $fixture $candidate DAVIS run completed." >&2
+                cat "$ROOT/$fixture-$candidate-chrome.log" >&2 || true
                 unset CHROME_PID
                 return 1
               fi
@@ -202,9 +205,9 @@ jobs:
               sleep 1
             done
 
-            echo "$candidate DAVIS run timed out." >&2
+            echo "$fixture $candidate DAVIS run timed out." >&2
             cat "$ROOT/server.log" >&2 || true
-            cat "$ROOT/$candidate-chrome.log" >&2 || true
+            cat "$ROOT/$fixture-$candidate-chrome.log" >&2 || true
             kill "$CHROME_PID" 2>/dev/null || true
             unset CHROME_PID
             return 1
