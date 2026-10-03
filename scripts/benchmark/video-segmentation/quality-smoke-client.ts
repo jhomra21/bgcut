@@ -158,6 +158,9 @@ const fixtureFromLocation =
       case "bear":
       case "camel":
       case "cows":
+      case "bmx-trees":
+      case "car-shadow":
+      case "car-turn":
         return fixture;
 
       default:
