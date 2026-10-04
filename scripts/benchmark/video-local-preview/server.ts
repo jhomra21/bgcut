@@ -12,10 +12,10 @@ import {
 } from "../../../src/shared/ort-assets";
 import {
   proxyBiRefNetSeedModelRequest,
-} from "../benchmark/video-segmentation/birefnet-model-proxy";
+} from "../video-segmentation/birefnet-model-proxy";
 import {
   proxyVideoModelRequest,
-} from "../benchmark/video-segmentation/model-proxy";
+} from "../video-segmentation/model-proxy";
 
 const MEDIABUNNY_REVISION =
   "1dd3971ffaf3f95b30b1ca9205fc8378df699352";
