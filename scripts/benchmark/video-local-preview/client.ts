@@ -462,17 +462,23 @@ const promptPointFromMask = async (
   }
 };
 
-const promptPointsByObject = async (
+const promptSeparatedPoints = async (
   fixture:
     FixtureId,
   frameIndex: number,
-  count: number,
 ): Promise<
-  readonly {
-    readonly x: number;
-    readonly y: number;
-    readonly label: 1;
-  }[]
+  readonly [
+    {
+      readonly x: number;
+      readonly y: number;
+      readonly label: 1;
+    },
+    {
+      readonly x: number;
+      readonly y: number;
+      readonly label: 1;
+    },
+  ]
 > => {
   const response =
     await fetch(
@@ -487,7 +493,7 @@ const promptPointsByObject = async (
     !response.ok
   ) {
     throw new Error(
-      `Could not load ${fixture} object mask: HTTP ${response.status}.`,
+      `Could not load ${fixture} foreground mask: HTTP ${response.status}.`,
     );
   }
 
@@ -521,7 +527,7 @@ const promptPointsByObject = async (
       null
     ) {
       throw new Error(
-        "Could not inspect the DAVIS object mask.",
+        "Could not inspect the DAVIS foreground mask.",
       );
     }
 
@@ -539,18 +545,11 @@ const promptPointsByObject = async (
         canvas.height,
       ).data;
 
-    const objects =
-      new Map<
-        string,
-        {
-          readonly red: number;
-          readonly green: number;
-          readonly blue: number;
-          count: number;
-          sumX: number;
-          sumY: number;
-        }
-      >();
+    const foreground:
+      number[] = [];
+
+    let sumX = 0;
+    let sumY = 0;
 
     for (
       let y = 0;
@@ -572,216 +571,352 @@ const promptPointsByObject = async (
           ) *
           4;
 
-        const red =
-          pixels[offset] ??
-          0;
-
-        const green =
-          pixels[
-            offset +
-              1
-          ] ??
-          0;
-
-        const blue =
-          pixels[
-            offset +
-              2
-          ] ??
-          0;
-
-        const alpha =
-          pixels[
-            offset +
-              3
-          ] ??
-          0;
-
-        if (
-          alpha ===
-            0 ||
+        const visible =
           (
-            red ===
-              0 &&
-            green ===
-              0 &&
-            blue ===
+            pixels[
+              offset +
+                3
+            ] ??
+            0
+          ) >
+            0 &&
+          (
+            (
+              pixels[
+                offset
+              ] ??
               0
-          )
-        ) {
-          continue;
-        }
-
-        const key =
-          `${red},${green},${blue}`;
-
-        const existing =
-          objects.get(
-            key,
+            ) >
+              0 ||
+            (
+              pixels[
+                offset +
+                  1
+              ] ??
+              0
+            ) >
+              0 ||
+            (
+              pixels[
+                offset +
+                  2
+              ] ??
+              0
+            ) >
+              0
           );
 
         if (
-          existing ===
-          undefined
+          !visible
         ) {
-          objects.set(
-            key,
-            {
-              red,
-              green,
-              blue,
-              count: 1,
-              sumX: x,
-              sumY: y,
-            },
-          );
-
           continue;
         }
 
-        existing.count +=
-          1;
-        existing.sumX +=
-          x;
-        existing.sumY +=
-          y;
+        foreground.push(
+          y *
+            canvas.width +
+            x,
+        );
+
+        sumX += x;
+        sumY += y;
       }
     }
 
-    const selected =
-      [...objects.values()]
-        .filter(
-          (object) =>
-            object.count >
-            16,
-        )
-        .sort(
-          (
-            left,
-            right,
-          ) =>
-            right.count -
-            left.count,
-        )
-        .slice(
-          0,
-          count,
-        );
-
     if (
-      selected.length <
-      count
+      foreground.length <
+      32
     ) {
       throw new Error(
-        `${fixture} frame ${frameIndex} exposed only ${selected.length} labeled foreground objects; expected ${count}.`,
+        `${fixture} frame ${frameIndex} does not contain enough foreground for two separated prompts.`,
       );
     }
 
-    return selected.map(
-      (object) => {
-        const centerX =
-          object.sumX /
-          object.count;
+    const centerX =
+      sumX /
+      foreground.length;
 
-        const centerY =
-          object.sumY /
-          object.count;
+    const centerY =
+      sumY /
+      foreground.length;
 
-        let bestX = 0;
-        let bestY = 0;
+    const farthestFrom = (
+      x: number,
+      y: number,
+    ): {
+      readonly x: number;
+      readonly y: number;
+    } => {
+      let selectedX = 0;
+      let selectedY = 0;
+      let selectedDistance =
+        Number.NEGATIVE_INFINITY;
 
-        let bestDistance =
-          Number.POSITIVE_INFINITY;
+      for (
+        const packed of
+        foreground
+      ) {
+        const pointX =
+          packed %
+          canvas.width;
 
-        for (
-          let y = 0;
-          y <
-          canvas.height;
-          y += 1
+        const pointY =
+          Math.floor(
+            packed /
+            canvas.width,
+          );
+
+        const distance =
+          (
+            pointX -
+            x
+          ) **
+            2 +
+          (
+            pointY -
+            y
+          ) **
+            2;
+
+        if (
+          distance >
+          selectedDistance
         ) {
-          for (
-            let x = 0;
-            x <
-            canvas.width;
-            x += 1
-          ) {
-            const offset =
-              (
-                y *
-                  canvas.width +
-                x
-              ) *
-              4;
+          selectedDistance =
+            distance;
+          selectedX =
+            pointX;
+          selectedY =
+            pointY;
+        }
+      }
 
-            if (
-              (
-                pixels[
-                  offset
-                ] ??
-                0
-              ) !==
-                object.red ||
-              (
-                pixels[
-                  offset +
-                    1
-                ] ??
-                0
-              ) !==
-                object.green ||
-              (
-                pixels[
-                  offset +
-                    2
-                ] ??
-                0
-              ) !==
-                object.blue
-            ) {
-              continue;
-            }
+      return {
+        x:
+          selectedX,
+        y:
+          selectedY,
+      };
+    };
 
-            const distance =
-              (
-                x -
-                centerX
-              ) **
-                2 +
-              (
-                y -
-                centerY
-              ) **
-                2;
+    const firstAnchor =
+      farthestFrom(
+        centerX,
+        centerY,
+      );
 
-            if (
-              distance <
-              bestDistance
-            ) {
-              bestDistance =
-                distance;
-              bestX = x;
-              bestY = y;
-            }
-          }
+    const secondAnchor =
+      farthestFrom(
+        firstAnchor.x,
+        firstAnchor.y,
+      );
+
+    const clusterA = {
+      count: 0,
+      sumX: 0,
+      sumY: 0,
+    };
+
+    const clusterB = {
+      count: 0,
+      sumX: 0,
+      sumY: 0,
+    };
+
+    for (
+      const packed of
+      foreground
+    ) {
+      const x =
+        packed %
+        canvas.width;
+
+      const y =
+        Math.floor(
+          packed /
+          canvas.width,
+        );
+
+      const distanceA =
+        (
+          x -
+          firstAnchor.x
+        ) **
+          2 +
+        (
+          y -
+          firstAnchor.y
+        ) **
+          2;
+
+      const distanceB =
+        (
+          x -
+          secondAnchor.x
+        ) **
+          2 +
+        (
+          y -
+          secondAnchor.y
+        ) **
+          2;
+
+      const cluster =
+        distanceA <=
+        distanceB
+          ? clusterA
+          : clusterB;
+
+      cluster.count +=
+        1;
+      cluster.sumX +=
+        x;
+      cluster.sumY +=
+        y;
+    }
+
+    if (
+      clusterA.count <
+        16 ||
+      clusterB.count <
+        16
+    ) {
+      throw new Error(
+        `${fixture} frame ${frameIndex} could not be split into two useful foreground regions.`,
+      );
+    }
+
+    const representative = (
+      cluster: {
+        readonly count: number;
+        readonly sumX: number;
+        readonly sumY: number;
+      },
+      anchor: {
+        readonly x: number;
+        readonly y: number;
+      },
+    ) => {
+      const centerX =
+        cluster.sumX /
+        cluster.count;
+
+      const centerY =
+        cluster.sumY /
+        cluster.count;
+
+      let selectedX =
+        anchor.x;
+
+      let selectedY =
+        anchor.y;
+
+      let selectedDistance =
+        Number.POSITIVE_INFINITY;
+
+      for (
+        const packed of
+        foreground
+      ) {
+        const x =
+          packed %
+          canvas.width;
+
+        const y =
+          Math.floor(
+            packed /
+            canvas.width,
+          );
+
+        const anchorDistance =
+          (
+            x -
+            anchor.x
+          ) **
+            2 +
+          (
+            y -
+            anchor.y
+          ) **
+            2;
+
+        const otherAnchor =
+          anchor ===
+          firstAnchor
+            ? secondAnchor
+            : firstAnchor;
+
+        const otherDistance =
+          (
+            x -
+            otherAnchor.x
+          ) **
+            2 +
+          (
+            y -
+            otherAnchor.y
+          ) **
+            2;
+
+        if (
+          anchorDistance >
+          otherDistance
+        ) {
+          continue;
         }
 
-        return {
-          x:
-            (
-              bestX +
-              0.5
-            ) /
-            canvas.width,
-          y:
-            (
-              bestY +
-              0.5
-            ) /
-            canvas.height,
-          label: 1 as const,
-        };
-      },
-    );
+        const distance =
+          (
+            x -
+            centerX
+          ) **
+            2 +
+          (
+            y -
+            centerY
+          ) **
+            2;
+
+        if (
+          distance <
+          selectedDistance
+        ) {
+          selectedDistance =
+            distance;
+          selectedX =
+            x;
+          selectedY =
+            y;
+        }
+      }
+
+      return {
+        x:
+          (
+            selectedX +
+            0.5
+          ) /
+          canvas.width,
+        y:
+          (
+            selectedY +
+            0.5
+          ) /
+          canvas.height,
+        label: 1 as const,
+      };
+    };
+
+    return [
+      representative(
+        clusterA,
+        firstAnchor,
+      ),
+      representative(
+        clusterB,
+        secondAnchor,
+      ),
+    ];
   } finally {
     bitmap.close();
   }
@@ -836,10 +971,9 @@ const runFixture = async (
   const multiObjectPoints =
     fixture ===
     "bmx-trees"
-      ? await promptPointsByObject(
+      ? await promptSeparatedPoints(
           fixture,
           11,
-          2,
         )
       : undefined;
 
@@ -851,15 +985,41 @@ const runFixture = async (
           (
             point,
             index,
-          ) => ({
-            id:
-              `subject-${index + 1}`,
-            prompt: {
-              points: [
-                point,
-              ],
-            },
-          }),
+          ) => {
+            const other =
+              multiObjectPoints[
+                index ===
+                  0
+                  ? 1
+                  : 0
+              ];
+
+            if (
+              other ===
+              undefined
+            ) {
+              throw new Error(
+                "Multi-subject acceptance requires two separated prompts.",
+              );
+            }
+
+            return {
+              id:
+                `subject-${index + 1}`,
+              prompt: {
+                points: [
+                  point,
+                  {
+                    x:
+                      other.x,
+                    y:
+                      other.y,
+                    label: 0,
+                  },
+                ],
+              },
+            };
+          },
         );
 
   const promptedFixture =
