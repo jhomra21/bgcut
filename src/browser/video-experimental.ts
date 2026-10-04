@@ -696,14 +696,6 @@ export const removeVideoBackgroundExperimental =
         source.info.duration,
       );
 
-    let seedKind:
-      ExperimentalVideoResult[
-        "seed"
-      ] =
-        prompted
-          ? "sam21-prompt"
-          : "edgetam-grid";
-
     const selectedSeedIndex =
       seedFrameIndex(
         timestamps,
