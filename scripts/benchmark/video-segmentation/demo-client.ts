@@ -911,7 +911,9 @@ const run = async () => {
             );
         } else if (
           index ===
-          0
+            0 &&
+          choice.kind ===
+            "edge-grid"
         ) {
           prediction =
             await adapter.seed(
