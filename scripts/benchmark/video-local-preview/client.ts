@@ -9,14 +9,23 @@ import {
   removeVideoBackgroundExperimental,
 } from "../../../src/browser/video-experimental";
 
+const FIXTURES = [
+  "bear",
+  "bmx-trees",
+  "color-run",
+] as const;
+
+type FixtureId =
+  typeof FIXTURES[number];
+
 type PreviewFailure = {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly message: string;
   readonly stack: string;
 };
 
-type PreviewReport = {
-  readonly schemaVersion: 1;
+type PreviewCase = {
+  readonly fixture: FixtureId;
   readonly blobBytes: number;
   readonly width: number;
   readonly height: number;
@@ -26,6 +35,12 @@ type PreviewReport = {
   readonly seed: string;
   readonly transparentPixels: number;
   readonly opaqueOrPartialPixels: number;
+};
+
+type PreviewReport = {
+  readonly schemaVersion: 2;
+  readonly cases:
+    readonly PreviewCase[];
 };
 
 type PreviewPost =
@@ -196,97 +211,118 @@ const verifyAlpha = async (
   }
 };
 
+const runFixture = async (
+  fixture:
+    FixtureId,
+): Promise<PreviewCase> => {
+  const response =
+    await fetch(
+      `/quality/${fixture}.mp4`,
+      {
+        cache:
+          "no-store",
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `Could not load ${fixture}: HTTP ${response.status}.`,
+    );
+  }
+
+  const file =
+    new File(
+      [
+        await response.blob(),
+      ],
+      `${fixture}.mp4`,
+      {
+        type:
+          "video/mp4",
+      },
+    );
+
+  const result =
+    await removeVideoBackgroundExperimental(
+      file,
+    );
+
+  if (
+    result.blob.size <
+    1_000
+  ) {
+    throw new Error(
+      `${fixture} WebM is unexpectedly small at ${result.blob.size} bytes.`,
+    );
+  }
+
+  const alpha =
+    await verifyAlpha(
+      result.blob,
+    );
+
+  const outputResponse =
+    await fetch(
+      `/output/${fixture}.webm`,
+      {
+        method: "POST",
+        body:
+          result.blob,
+      },
+    );
+
+  if (
+    !outputResponse.ok
+  ) {
+    throw new Error(
+      await outputResponse.text(),
+    );
+  }
+
+  return {
+    fixture,
+    blobBytes:
+      result.blob.size,
+    width:
+      result.width,
+    height:
+      result.height,
+    frameCount:
+      result.frameCount,
+    duration:
+      result.duration,
+    sampleFps:
+      result.sampleFps,
+    seed:
+      result.seed,
+    ...alpha,
+  };
+};
+
 const main =
   async () => {
-    const response =
-      await fetch(
-        "/fixture.mp4",
-        {
-          cache:
-            "no-store",
-        },
-      );
+    const cases:
+      PreviewCase[] = [];
 
-    if (
-      !response.ok
+    for (
+      const fixture of
+      FIXTURES
     ) {
-      throw new Error(
-        `Could not load preview fixture: HTTP ${response.status}.`,
+      cases.push(
+        await runFixture(
+          fixture,
+        ),
       );
     }
-
-    const fixture =
-      new File(
-        [
-          await response.blob(),
-        ],
-        "fixture.mp4",
-        {
-          type:
-            "video/mp4",
-        },
-      );
-
-    const result =
-      await removeVideoBackgroundExperimental(
-        fixture,
-      );
-
-    if (
-      result.blob.size <
-      1_000
-    ) {
-      throw new Error(
-        `Transparent WebM is unexpectedly small at ${result.blob.size} bytes.`,
-      );
-    }
-
-    const alpha =
-      await verifyAlpha(
-        result.blob,
-      );
-
-    const outputResponse =
-      await fetch(
-        "/output.webm",
-        {
-          method: "POST",
-          body:
-            result.blob,
-        },
-      );
-
-    if (
-      !outputResponse.ok
-    ) {
-      throw new Error(
-        await outputResponse.text(),
-      );
-    }
-
-    const report:
-      PreviewReport = {
-        schemaVersion: 1,
-        blobBytes:
-          result.blob.size,
-        width:
-          result.width,
-        height:
-          result.height,
-        frameCount:
-          result.frameCount,
-        duration:
-          result.duration,
-        sampleFps:
-          result.sampleFps,
-        seed:
-          result.seed,
-        ...alpha,
-      };
 
     await postJson(
       "/result",
-      report,
+      {
+        schemaVersion: 2,
+        cases,
+      },
     );
   };
 
@@ -302,7 +338,7 @@ void main().catch(
     void postJson(
       "/failure",
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         message:
           parsed.message,
         stack:
