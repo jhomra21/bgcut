@@ -5,6 +5,10 @@ import {
   onCleanup,
 } from "solid-js";
 
+import {
+  isSafariUserAgent,
+} from "../../browser/webgpu-session-strategy";
+
 type VideoModule =
   typeof import(
     "../../browser/video-experimental"
@@ -127,6 +131,13 @@ const seedLabel = (
 };
 
 export const VideoLab = () => {
+  const safari =
+    typeof navigator !==
+      "undefined" &&
+    isSafariUserAgent(
+      navigator.userAgent,
+    );
+
   const [
     state,
     setState,
@@ -993,13 +1004,26 @@ export const VideoLab = () => {
       >
         {(result) => (
           <div class="video-lab-result">
-            <video
-              class="video-lab-video checkerboard"
-              src={result.url}
-              controls
-              loop
-              playsinline
-            />
+            <Show
+              when={
+                !safari
+              }
+              fallback={
+                <div class="video-lab-safari-preview-note checkerboard">
+                  <span>
+                    Safari does not preview transparent WebM correctly. The checkerboard frame above shows the transparency result; the downloaded WebM keeps its alpha.
+                  </span>
+                </div>
+              }
+            >
+              <video
+                class="video-lab-video checkerboard"
+                src={result.url}
+                controls
+                loop
+                playsinline
+              />
+            </Show>
             <div class="video-lab-result-row">
               <span>
                 {result.width}×{result.height} · {result.frameCount} frames · {result.sampleFps} fps · {seedLabel(result.seed)}
