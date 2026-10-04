@@ -12,7 +12,7 @@ import {
 const FIXTURES = [
   "bear",
   "bmx-trees",
-  "breakdance",
+  "color-run",
 ] as const;
 
 type FixtureId =
@@ -835,7 +835,7 @@ const runFixture = async (
 
   const breakdancePoints =
     fixture ===
-    "breakdance"
+    "color-run"
       ? await promptPointsByObject(
           fixture,
           11,
@@ -866,7 +866,7 @@ const runFixture = async (
     fixture ===
       "bear" ||
     fixture ===
-      "breakdance";
+      "color-run";
 
   const result =
     await removeVideoBackgroundExperimental(
@@ -895,7 +895,7 @@ const runFixture = async (
 
   if (
     fixture ===
-      "breakdance" &&
+      "color-run" &&
     result.seed !==
       "sam21-subjects"
   ) {
