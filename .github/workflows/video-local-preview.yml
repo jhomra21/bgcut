@@ -131,7 +131,7 @@ jobs:
               cat "$ROOT/result.json"
               test -s "$ROOT/bear.webm"
               test -s "$ROOT/bmx-trees.webm"
-              test -s "$ROOT/breakdance.webm"
+              test -s "$ROOT/color-run.webm"
               exit 0
             fi
 
