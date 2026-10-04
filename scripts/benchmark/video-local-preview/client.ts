@@ -214,6 +214,7 @@ const verifyAlpha = async (
 const promptPointFromMask = async (
   fixture:
     FixtureId,
+  frameIndex: number,
 ): Promise<{
   readonly x: number;
   readonly y: number;
@@ -221,7 +222,7 @@ const promptPointFromMask = async (
 }> => {
   const response =
     await fetch(
-      `/quality/${fixture}/00000.png`,
+      `/quality/${fixture}/${frameIndex.toString().padStart(5, "0")}.png`,
       {
         cache:
           "no-store",
@@ -501,6 +502,7 @@ const runFixture = async (
           points: [
             await promptPointFromMask(
               fixture,
+              11,
             ),
           ],
         }
@@ -511,6 +513,12 @@ const runFixture = async (
       file,
       {
         prompt,
+        seedTimeSeconds:
+          fixture ===
+          "bear"
+            ? 11 /
+              24
+            : undefined,
       },
     );
 
@@ -522,6 +530,17 @@ const runFixture = async (
   ) {
     throw new Error(
       `Prompted bear case used ${result.seed} instead of SAM 2.1.`,
+    );
+  }
+
+  if (
+    fixture ===
+      "bear" &&
+    result.frameCount <
+      20
+  ) {
+    throw new Error(
+      `Prompted bear case encoded only ${result.frameCount} frames after selecting a later seed frame.`,
     );
   }
 
