@@ -704,10 +704,291 @@ export const removeVideoBackgroundExperimental =
           ? "sam21-prompt"
           : "edgetam-grid";
 
-    let frameIndex = 0;
+    const selectedSeedIndex =
+      seedFrameIndex(
+        timestamps,
+        source.info.firstTimestamp,
+        options.seedTimeSeconds,
+      );
+
+    const masks:
+      (
+        VideoSegmentationMask |
+        undefined
+      )[] =
+        new Array(
+          timestamps.length,
+        );
+
+    let seedKind:
+      ExperimentalVideoResult[
+        "seed"
+      ] =
+        prompted
+          ? "sam21-prompt"
+          : "edgetam-grid";
+
+    let encodedFrames = 0;
 
     try {
+      const seedTimestamp =
+        timestamps[
+          selectedSeedIndex
+        ];
+
+      if (
+        seedTimestamp ===
+        undefined
+      ) {
+        throw new Error(
+          "The selected video frame is outside the sampled clip.",
+        );
+      }
+
+      const seedFrame =
+        await source.frameAt(
+          seedTimestamp,
+        );
+
+      if (
+        seedFrame ===
+        null
+      ) {
+        throw new Error(
+          "The selected video frame could not be decoded.",
+        );
+      }
+
+      try {
+        progress(
+          options,
+          {
+            stage:
+              "seeding",
+            message:
+              prompted
+                ? `Selecting subject at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`
+                : `Finding foreground at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`,
+            progress:
+              0.2,
+            frameIndex:
+              selectedSeedIndex,
+            frameCount:
+              timestamps.length,
+          },
+        );
+
+        let seedMask:
+          VideoSegmentationMask;
+
+        if (
+          options.prompt !==
+          undefined
+        ) {
+          seedMask =
+            await segmenter.seed(
+              seedFrame.frame,
+              options.prompt,
+              selectedSeedIndex,
+              timestamps.length,
+            );
+
+          seedKind =
+            "sam21-prompt";
+        } else {
+          if (
+            biRefNet ===
+            undefined
+          ) {
+            throw new Error(
+              "Automatic video foreground discovery is unavailable.",
+            );
+          }
+
+          const semantic =
+            await biRefNet.seed(
+              seedFrame.frame,
+            );
+
+          if (
+            semantic
+              .positiveFraction >
+            0
+          ) {
+            if (
+              segmenter.seedMask ===
+              undefined
+            ) {
+              throw new Error(
+                "EdgeTAM cannot accept the BiRefNet foreground matte.",
+              );
+            }
+
+            seedMask =
+              await segmenter.seedMask(
+                seedFrame.frame,
+                semantic,
+                selectedSeedIndex,
+                timestamps.length,
+              );
+
+            seedKind =
+              "birefnet-direct";
+          } else {
+            if (
+              segmenter.discover ===
+                undefined ||
+              segmenter.seedMask ===
+                undefined
+            ) {
+              throw new Error(
+                "EdgeTAM automatic foreground discovery is unavailable.",
+              );
+            }
+
+            const discoveries =
+              await segmenter.discover(
+                seedFrame.frame,
+                discoveryGrid(),
+              );
+
+            const selected =
+              selectDiscovery(
+                discoveries,
+              );
+
+            seedMask =
+              await segmenter.seedMask(
+                seedFrame.frame,
+                selected.mask,
+                selectedSeedIndex,
+                timestamps.length,
+              );
+
+            seedKind =
+              "edgetam-grid";
+          }
+        }
+
+        masks[
+          selectedSeedIndex
+        ] =
+          seedMask;
+      } finally {
+        seedFrame.close();
+      }
+
+      let trackedFrames = 1;
+
+      const trackFrame =
+        async (
+          frameIndex: number,
+          direction:
+            "before" |
+            "after",
+        ) => {
+          const timestamp =
+            timestamps[
+              frameIndex
+            ];
+
+          if (
+            timestamp ===
+            undefined
+          ) {
+            return;
+          }
+
+          const decoded =
+            await source.frameAt(
+              timestamp,
+            );
+
+          if (
+            decoded ===
+            null
+          ) {
+            return;
+          }
+
+          try {
+            progress(
+              options,
+              {
+                stage:
+                  "tracking",
+                message:
+                  `Tracking ${direction} selected frame · ${frameIndex + 1} of ${timestamps.length}…`,
+                progress:
+                  0.2 +
+                  (
+                    trackedFrames /
+                    Math.max(
+                      1,
+                      timestamps.length,
+                    )
+                  ) *
+                    0.55,
+                frameIndex,
+                frameCount:
+                  timestamps.length,
+              },
+            );
+
+            masks[
+              frameIndex
+            ] =
+              await segmenter.track(
+                decoded.frame,
+                frameIndex,
+                timestamps.length,
+              );
+
+            trackedFrames +=
+              1;
+          } finally {
+            decoded.close();
+          }
+        };
+
+      for (
+        let frameIndex =
+          selectedSeedIndex +
+          1;
+        frameIndex <
+        timestamps.length;
+        frameIndex += 1
+      ) {
+        await trackFrame(
+          frameIndex,
+          "after",
+        );
+      }
+
+      if (
+        selectedSeedIndex >
+        0
+      ) {
+        segmenter.rewind();
+
+        for (
+          let frameIndex =
+            selectedSeedIndex -
+            1;
+          frameIndex >=
+          0;
+          frameIndex -= 1
+        ) {
+          await trackFrame(
+            frameIndex,
+            "before",
+          );
+        }
+      }
+
       await output.start();
+
+      let frameIndex = 0;
 
       for await (
         const decoded of
@@ -715,149 +996,26 @@ export const removeVideoBackgroundExperimental =
           timestamps,
         )
       ) {
+        const mask =
+          masks[
+            frameIndex
+          ];
+
         if (
           decoded ===
-          null
+            null ||
+          mask ===
+            undefined
         ) {
+          decoded?.close();
+
           frameIndex +=
             1;
+
           continue;
         }
 
         try {
-          progress(
-            options,
-            {
-              stage:
-                frameIndex ===
-                0
-                  ? "seeding"
-                  : "tracking",
-              message:
-                frameIndex ===
-                0
-                  ? "Finding foreground…"
-                  : `Tracking frame ${frameIndex + 1} of ${timestamps.length}…`,
-              progress:
-                0.2 +
-                (
-                  frameIndex /
-                  Math.max(
-                    1,
-                    timestamps.length,
-                  )
-                ) *
-                  0.7,
-              frameIndex,
-              frameCount:
-                timestamps.length,
-            },
-          );
-
-          let mask:
-            VideoSegmentationMask;
-
-          if (
-            frameIndex ===
-            0
-          ) {
-            if (
-              options.prompt !==
-              undefined
-            ) {
-              mask =
-                await segmenter.seed(
-                  decoded.frame,
-                  options.prompt,
-                  0,
-                  timestamps.length,
-                );
-
-              seedKind =
-                "sam21-prompt";
-            } else {
-              if (
-                biRefNet ===
-                undefined
-              ) {
-                throw new Error(
-                  "Automatic video foreground discovery is unavailable.",
-                );
-              }
-
-              const semantic =
-                await biRefNet.seed(
-                  decoded.frame,
-                );
-
-              if (
-                semantic
-                  .positiveFraction >
-                0
-              ) {
-                if (
-                  segmenter.seedMask ===
-                  undefined
-                ) {
-                  throw new Error(
-                    "EdgeTAM cannot accept the BiRefNet foreground matte.",
-                  );
-                }
-
-                mask =
-                  await segmenter.seedMask(
-                    decoded.frame,
-                    semantic,
-                    0,
-                    timestamps.length,
-                  );
-
-                seedKind =
-                  "birefnet-direct";
-              } else {
-                if (
-                  segmenter.discover ===
-                    undefined ||
-                  segmenter.seedMask ===
-                    undefined
-                ) {
-                  throw new Error(
-                    "EdgeTAM automatic foreground discovery is unavailable.",
-                  );
-                }
-
-                const discoveries =
-                  await segmenter.discover(
-                    decoded.frame,
-                    discoveryGrid(),
-                  );
-
-                const selected =
-                  selectDiscovery(
-                    discoveries,
-                  );
-
-                mask =
-                  await segmenter.seedMask(
-                    decoded.frame,
-                    selected.mask,
-                    0,
-                    timestamps.length,
-                  );
-
-                seedKind =
-                  "edgetam-grid";
-              }
-            }
-          } else {
-            mask =
-              await segmenter.track(
-                decoded.frame,
-                frameIndex,
-                timestamps.length,
-              );
-          }
-
           context.clearRect(
             0,
             0,
@@ -890,22 +1048,20 @@ export const removeVideoBackgroundExperimental =
           progress(
             options,
             {
-              stage: "encoding",
+              stage:
+                "encoding",
               message:
                 `Encoding frame ${frameIndex + 1} of ${timestamps.length}…`,
               progress:
-                0.2 +
+                0.76 +
                 (
-                  (
-                    frameIndex +
-                    0.75
-                  ) /
+                  frameIndex /
                   Math.max(
                     1,
                     timestamps.length,
                   )
                 ) *
-                  0.7,
+                  0.18,
               frameIndex,
               frameCount:
                 timestamps.length,
@@ -913,17 +1069,29 @@ export const removeVideoBackgroundExperimental =
           );
 
           await outputSource.add(
-            frameIndex /
+            encodedFrames /
               SAMPLE_FPS,
             1 /
               SAMPLE_FPS,
           );
+
+          encodedFrames +=
+            1;
         } finally {
           decoded.close();
         }
 
         frameIndex +=
           1;
+      }
+
+      if (
+        encodedFrames ===
+        0
+      ) {
+        throw new Error(
+          "No video frames were available to encode.",
+        );
       }
 
       outputSource.close();
@@ -934,7 +1102,7 @@ export const removeVideoBackgroundExperimental =
           stage: "encoding",
           message:
             "Finalizing transparent WebM…",
-          progress: 0.94,
+          progress: 0.95,
         },
       );
 
@@ -978,9 +1146,9 @@ export const removeVideoBackgroundExperimental =
         height:
           canvas.height,
         frameCount:
-          frameIndex,
+          encodedFrames,
         duration:
-          frameIndex /
+          encodedFrames /
           SAMPLE_FPS,
         sampleFps:
           SAMPLE_FPS,
