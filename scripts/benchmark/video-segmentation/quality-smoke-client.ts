@@ -44,6 +44,7 @@ type QualitySeedMode =
   | "oracle"
   | "birefnet"
   | "birefnet-direct"
+  | "hybrid"
   | "grid-oracle"
   | "grid-model";
 
@@ -103,7 +104,8 @@ type AutomaticSeedQuality = {
   readonly selectionMetric:
     "binary-iou" |
     "soft-iou" |
-    "direct-memory";
+    "direct-memory" |
+    "grid-fallback";
   readonly groundTruthIou: number;
   readonly groundTruthBoundaryF:
     number;
@@ -301,6 +303,7 @@ const seedModeFromLocation =
       case "oracle":
       case "birefnet":
       case "birefnet-direct":
+      case "hybrid":
       case "grid-oracle":
       case "grid-model":
         return mode;
@@ -1329,7 +1332,9 @@ const main =
         seedMode ===
           "grid-model" ||
         seedMode ===
-          "birefnet-direct"
+          "birefnet-direct" ||
+        seedMode ===
+          "hybrid"
       ) &&
       requested !==
         "edgetam"
@@ -1414,6 +1419,8 @@ const main =
       seedMode !==
         "birefnet-direct" &&
       seedMode !==
+        "hybrid" &&
+      seedMode !==
         "grid-oracle" &&
       seedMode !==
         "grid-model"
@@ -1439,11 +1446,16 @@ const main =
       VideoSegmentationMask | null =
         null;
 
+    let useGridFallback =
+      false;
+
     if (
       seedMode ===
         "birefnet" ||
       seedMode ===
-        "birefnet-direct"
+        "birefnet-direct" ||
+      seedMode ===
+        "hybrid"
     ) {
       const decoded =
         await source.frameAt(
@@ -1527,6 +1539,20 @@ const main =
 
           directSeedMask =
             matte;
+        } else if (
+          seedMode ===
+          "hybrid"
+        ) {
+          if (
+            seed.positiveFraction >
+            0
+          ) {
+            directSeedMask =
+              matte;
+          } else {
+            useGridFallback =
+              true;
+          }
         } else if (
           requested ===
           "edgetam"
@@ -1618,12 +1644,21 @@ const main =
             seed.usedFallbackPoint,
           selectionMetric:
             seedMode ===
-              "birefnet-direct"
+              "birefnet-direct" ||
+            (
+              seedMode ===
+                "hybrid" &&
+              seed.positiveFraction >
+                0
+            )
               ? "direct-memory"
-              : seed.positiveFraction ===
-                  0
-                ? "soft-iou"
-                : "binary-iou",
+              : seedMode ===
+                  "hybrid"
+                ? "grid-fallback"
+                : seed.positiveFraction ===
+                    0
+                  ? "soft-iou"
+                  : "binary-iou",
           groundTruthIou:
             quality.iou,
           groundTruthBoundaryF:
@@ -1651,7 +1686,12 @@ const main =
       seedMode ===
         "grid-oracle" ||
       seedMode ===
-        "grid-model"
+        "grid-model" ||
+      (
+        seedMode ===
+          "hybrid" &&
+        useGridFallback
+      )
     ) {
       const decoded =
         await source.frameAt(
@@ -1772,7 +1812,9 @@ const main =
 
         if (
           seedMode ===
-          "grid-model"
+            "grid-model" ||
+          seedMode ===
+            "hybrid"
         ) {
           selector =
             "proposal0-nonedge-stability-area";

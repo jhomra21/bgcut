@@ -165,7 +165,25 @@ bgcut already owns a semantic foreground model: BiRefNet. It costs no new model 
 
 The focused twelve-clip pass split cleanly. BiRefNet returned no positive pixels on eight failures. On the four clips where it did return foreground, its semantic matte was strong: `breakdance` 0.812 frame-0 J&F, `dance-twirl` 0.858, `libby` 0.918, and `shooting` 0.946. The existing point/proposal handoff preserved that quality only on `breakdance`; it threw most of the semantic signal away on the other three.
 
-The next four-clip diagnostic therefore bypasses EdgeTAM's first-frame point decoder. The BiRefNet 512px logits are resized to EdgeTAM's 256px seed-mask geometry and sent directly through EdgeTAM's existing memory encoder. From frame 1 onward the normal EdgeTAM memory attention and tracked decoder are unchanged. This is benchmark-only adapter work and does not change bgcut's public API.
+The direct-matte experiment succeeds on all four semantic-positive failures. After the 512×512 BiRefNet logits are bilinearly resampled to EdgeTAM's 256×256 decoder mask grid, seed quality is effectively unchanged and temporal tracking is strong:
+
+- `breakdance`: 0.869 mean tracked IoU / 0.872 J&F
+- `dance-twirl`: 0.909 / 0.932
+- `libby`: 0.930 / 0.962
+- `shooting`: 0.950 / 0.935
+
+This is a large recovery over the click bridge on the same clips. `dance-twirl` moves from 0.021 to 0.909 tracked IoU, `libby` from 0.256 to 0.930, and `shooting` from 0.105 to 0.950. The experiment confirms that EdgeTAM's temporal memory can carry a high-quality external foreground matte; the lossy step was turning that matte back into one point.
+
+### Automatic hybrid policy
+
+The next validation policy is fixed before seeing the new 30-sequence result:
+
+1. run bgcut's local BiRefNet on frame 0
+2. if BiRefNet has any positive foreground pixels, resample that matte and condition EdgeTAM memory directly
+3. if BiRefNet abstains, run EdgeTAM's 7×7 discovery grid and choose proposal 0 among non-edge masks by `stability * sqrt(areaFraction)`
+4. track the selected seed with the unchanged EdgeTAM temporal memory path
+
+Ground truth is used only after selection for scoring. This is the first full product-shaped automatic policy in the research branch: both branches are deployable local model paths and neither branch consults DAVIS annotations to decide what to track.
 
 ## Memory ownership
 

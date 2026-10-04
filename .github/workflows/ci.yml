@@ -29,7 +29,7 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
 
-      - name: Track directly from BiRefNet matte on DAVIS positives
+      - name: Validate automatic BiRefNet EdgeTAM hybrid on DAVIS 2017
         shell: bash
         run: |
           set -euo pipefail
@@ -44,22 +44,14 @@ jobs:
           printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
 
           VAL_LIST="$DAVIS_ROOT/val.txt"
-          FOCUS_LIST="$DAVIS_ROOT/bi-refnet-focus.txt"
 
           unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
-
-          printf '%s\n' \
-            breakdance \
-            dance-twirl \
-            libby \
-            shooting \
-            > "$FOCUS_LIST"
 
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
 
             unzip -q               "$ARCHIVE"               "DAVIS/Annotations/480p/$fixture/*"               -d "$DAVIS_ROOT"
-          done < "$FOCUS_LIST"
+          done < "$VAL_LIST"
 
           DAVIS_ANNOTATION_ROOT="$DAVIS_ROOT/DAVIS/Annotations/480p"             bun run benchmark:video-segmentation:quality -- "$ROOT" 4191 >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
@@ -137,12 +129,13 @@ jobs:
 
           failed=0
 
-          # Direct semantic seed probe. BiRefNet's frame-0 matte conditions
-          # EdgeTAM memory directly; the point/multimask decoder is bypassed.
+          # Product-shaped automatic policy. A positive BiRefNet matte seeds
+          # EdgeTAM memory directly. If BiRefNet abstains, EdgeTAM falls back to
+          # the frozen 7x7 proposal-0 stability*sqrt(area) selector.
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
-            run_candidate "$fixture" edgetam birefnet-direct || failed=1
-          done < "$FOCUS_LIST"
+            run_candidate "$fixture" edgetam hybrid || failed=1
+          done < "$VAL_LIST"
 
           exit "$failed"
 
