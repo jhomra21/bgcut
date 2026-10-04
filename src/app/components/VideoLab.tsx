@@ -1,4 +1,5 @@
 import {
+  For,
   Show,
   createSignal,
   onCleanup,
@@ -9,10 +10,26 @@ type VideoModule =
     "../../browser/video-experimental"
   );
 
+type PromptMode =
+  | "keep"
+  | "exclude";
+
+type PromptPoint = {
+  readonly x: number;
+  readonly y: number;
+  readonly label: 0 | 1;
+};
+
 type VideoState =
   | {
       readonly status:
         "empty";
+    }
+  | {
+      readonly status:
+        "selecting";
+      readonly fileName:
+        string;
     }
   | {
       readonly status:
@@ -44,8 +61,9 @@ type VideoState =
       readonly sampleFps:
         number;
       readonly seed:
-        "birefnet-direct" |
-        "edgetam-grid";
+        | "sam21-prompt"
+        | "birefnet-direct"
+        | "edgetam-grid";
     }
   | {
       readonly status:
@@ -88,6 +106,26 @@ const transparentName = (
   return `${base || "video"}-transparent.webm`;
 };
 
+const seedLabel = (
+  seed:
+    | "sam21-prompt"
+    | "birefnet-direct"
+    | "edgetam-grid",
+): string => {
+  switch (
+    seed
+  ) {
+    case "sam21-prompt":
+      return "selected subject";
+
+    case "birefnet-direct":
+      return "automatic subject";
+
+    case "edgetam-grid":
+      return "automatic fallback";
+  }
+};
+
 export const VideoLab = () => {
   const [
     state,
@@ -97,33 +135,91 @@ export const VideoLab = () => {
       status: "empty",
     });
 
+  const [
+    selectedFile,
+    setSelectedFile,
+  ] =
+    createSignal<
+      File |
+      undefined
+    >();
+
+  const [
+    selectionUrl,
+    setSelectionUrl,
+  ] =
+    createSignal<
+      string |
+      undefined
+    >();
+
+  const [
+    promptMode,
+    setPromptMode,
+  ] =
+    createSignal<PromptMode>(
+      "keep",
+    );
+
+  const [
+    points,
+    setPoints,
+  ] =
+    createSignal<
+      readonly PromptPoint[]
+    >([]);
+
   let input:
     HTMLInputElement |
+    undefined;
+
+  let selectionVideo:
+    HTMLVideoElement |
     undefined;
 
   let preview:
     HTMLCanvasElement |
     undefined;
 
-  let activeUrl:
+  let activeResultUrl:
     string |
     undefined;
 
   let version = 0;
 
-  const clearUrl = () => {
-    if (
-      activeUrl !==
-      undefined
-    ) {
-      URL.revokeObjectURL(
-        activeUrl,
-      );
+  const clearResultUrl =
+    () => {
+      if (
+        activeResultUrl !==
+        undefined
+      ) {
+        URL.revokeObjectURL(
+          activeResultUrl,
+        );
 
-      activeUrl =
-        undefined;
-    }
-  };
+        activeResultUrl =
+          undefined;
+      }
+    };
+
+  const clearSelectionUrl =
+    () => {
+      const url =
+        selectionUrl();
+
+      if (
+        url !==
+        undefined
+      ) {
+        URL.revokeObjectURL(
+          url,
+        );
+
+        setSelectionUrl(
+          undefined,
+        );
+      }
+    };
 
   const ready = () => {
     const current =
@@ -134,6 +230,10 @@ export const VideoLab = () => {
       ? current
       : undefined;
   };
+
+  const selecting = () =>
+    state().status ===
+    "selecting";
 
   const processingState =
     () => {
@@ -162,12 +262,81 @@ export const VideoLab = () => {
       processingState() !==
       undefined;
 
-  const run = (
+  const positivePoints =
+    () =>
+      points().filter(
+        (point) =>
+          point.label ===
+          1,
+      ).length;
+
+  const chooseFile = (
     file: File,
   ) => {
+    version += 1;
+    clearResultUrl();
+    clearSelectionUrl();
+
+    setSelectedFile(
+      file,
+    );
+
+    setPoints(
+      [],
+    );
+
+    setPromptMode(
+      "keep",
+    );
+
+    setSelectionUrl(
+      URL.createObjectURL(
+        file,
+      ),
+    );
+
+    setState({
+      status:
+        "selecting",
+      fileName:
+        file.name,
+    });
+  };
+
+  const run = (
+    prompt?:
+      {
+        readonly points:
+          readonly PromptPoint[];
+      },
+  ) => {
+    const file =
+      selectedFile();
+
     if (
+      file ===
+      undefined ||
       processing()
     ) {
+      return;
+    }
+
+    if (
+      prompt !==
+        undefined &&
+      !prompt.points.some(
+        (point) =>
+          point.label ===
+          1,
+      )
+    ) {
+      setState({
+        status:
+          "error",
+        message:
+          "Click the subject you want to keep before removing the background.",
+      });
+
       return;
     }
 
@@ -176,7 +345,7 @@ export const VideoLab = () => {
     const runVersion =
       version;
 
-    clearUrl();
+    clearResultUrl();
 
     setState({
       status:
@@ -184,7 +353,10 @@ export const VideoLab = () => {
       fileName:
         file.name,
       message:
-        "Preparing local video removal…",
+        prompt ===
+        undefined
+          ? "Finding a subject automatically…"
+          : "Loading SAM 2.1 for your selected subject…",
       progress: 0,
     });
 
@@ -194,6 +366,7 @@ export const VideoLab = () => {
           video.removeVideoBackgroundExperimental(
             file,
             {
+              prompt,
               onProgress:
                 (
                   update,
@@ -242,15 +415,30 @@ export const VideoLab = () => {
                       canvas.height;
                   }
 
-                  preview
-                    .getContext(
+                  const context =
+                    preview.getContext(
                       "2d",
-                    )
-                    ?.drawImage(
-                      canvas,
-                      0,
-                      0,
                     );
+
+                  if (
+                    context ===
+                    null
+                  ) {
+                    return;
+                  }
+
+                  context.clearRect(
+                    0,
+                    0,
+                    preview.width,
+                    preview.height,
+                  );
+
+                  context.drawImage(
+                    canvas,
+                    0,
+                    0,
+                  );
                 },
             },
           ),
@@ -264,7 +452,7 @@ export const VideoLab = () => {
             return;
           }
 
-          activeUrl =
+          activeResultUrl =
             URL.createObjectURL(
               result.blob,
             );
@@ -275,7 +463,7 @@ export const VideoLab = () => {
             fileName:
               file.name,
             url:
-              activeUrl,
+              activeResultUrl,
             downloadName:
               transparentName(
                 file.name,
@@ -319,6 +507,102 @@ export const VideoLab = () => {
       );
   };
 
+  const editSelection =
+    () => {
+      const file =
+        selectedFile();
+
+      if (
+        file ===
+        undefined
+      ) {
+        return;
+      }
+
+      version += 1;
+      clearResultUrl();
+
+      setState({
+        status:
+          "selecting",
+        fileName:
+          file.name,
+      });
+    };
+
+  const handleSelectionClick =
+    (
+      event:
+        MouseEvent,
+    ) => {
+      const target =
+        event.currentTarget;
+
+      if (
+        !(
+          target instanceof
+          HTMLElement
+        )
+      ) {
+        return;
+      }
+
+      const bounds =
+        target.getBoundingClientRect();
+
+      if (
+        bounds.width <=
+          0 ||
+        bounds.height <=
+          0
+      ) {
+        return;
+      }
+
+      const x =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            (
+              event.clientX -
+              bounds.left
+            ) /
+              bounds.width,
+          ),
+        );
+
+      const y =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            (
+              event.clientY -
+              bounds.top
+            ) /
+              bounds.height,
+          ),
+        );
+
+      setPoints(
+        (
+          current,
+        ) => [
+          ...current,
+          {
+            x,
+            y,
+            label:
+              promptMode() ===
+              "keep"
+                ? 1
+                : 0,
+          },
+        ],
+      );
+    };
+
   const handleInput = (
     event: Event,
   ) => {
@@ -345,7 +629,7 @@ export const VideoLab = () => {
       file !==
         undefined
     ) {
-      run(
+      chooseFile(
         file,
       );
     }
@@ -368,7 +652,7 @@ export const VideoLab = () => {
       file !==
         undefined
     ) {
-      run(
+      chooseFile(
         file,
       );
     }
@@ -377,7 +661,8 @@ export const VideoLab = () => {
   onCleanup(
     () => {
       version += 1;
-      clearUrl();
+      clearResultUrl();
+      clearSelectionUrl();
     },
   );
 
@@ -401,7 +686,7 @@ export const VideoLab = () => {
       </div>
 
       <p class="video-lab-copy">
-        Uses fp16 BiRefNet for semantic foreground discovery, EdgeTAM for temporal tracking, and MediaBunny for local decoding and transparent VP9/WebM export.
+        Choose the subject you want to keep, then SAM 2.1 tracks it through the video. You can still try automatic selection when a quick result matters more than precise control.
       </p>
 
       <input
@@ -418,33 +703,247 @@ export const VideoLab = () => {
         }
       />
 
-      <button
-        class="video-lab-drop"
-        type="button"
-        disabled={
-          processing()
-        }
-        onClick={() =>
-          input?.click()
-        }
-        onDragOver={(
-          event,
-        ) =>
-          event.preventDefault()
-        }
-        onDrop={
-          handleDrop
+      <Show
+        when={
+          state().status ===
+          "empty"
         }
       >
-        <strong>
-          {processing()
-            ? "Processing locally…"
-            : "Choose or drop a short video"}
-        </strong>
-        <span>
-          Nothing is uploaded.
-        </span>
-      </button>
+        <button
+          class="video-lab-drop"
+          type="button"
+          onClick={() =>
+            input?.click()
+          }
+          onDragOver={(
+            event,
+          ) =>
+            event.preventDefault()
+          }
+          onDrop={
+            handleDrop
+          }
+        >
+          <strong>
+            Choose or drop a short video
+          </strong>
+          <span>
+            Nothing is uploaded.
+          </span>
+        </button>
+      </Show>
+
+      <Show
+        when={
+          selecting()
+        }
+      >
+        <div class="video-lab-selection">
+          <div class="video-lab-selection-head">
+            <div>
+              <strong>
+                Select what stays
+              </strong>
+              <span>
+                Click the subject you want to keep. Add exclude points when background or nearby objects get included.
+              </span>
+            </div>
+            <button
+              class="text-button"
+              type="button"
+              onClick={() =>
+                input?.click()
+              }
+            >
+              Change video
+            </button>
+          </div>
+
+          <div class="video-lab-selection-frame">
+            <video
+              ref={(element) => {
+                selectionVideo =
+                  element;
+              }}
+              src={
+                selectionUrl()
+              }
+              muted
+              playsinline
+              preload="auto"
+              onLoadedData={() => {
+                selectionVideo?.pause();
+
+                if (
+                  selectionVideo !==
+                    undefined &&
+                  selectionVideo.currentTime !==
+                    0
+                ) {
+                  selectionVideo.currentTime =
+                    0;
+                }
+              }}
+            />
+            <button
+              class="video-lab-selection-surface"
+              type="button"
+              aria-label="Add a selection point"
+              onClick={
+                handleSelectionClick
+              }
+            />
+            <For each={points()}>
+              {(point) => (
+                <span
+                  class={
+                    point.label ===
+                    1
+                      ? "video-lab-point is-keep"
+                      : "video-lab-point is-exclude"
+                  }
+                  style={{
+                    left:
+                      `${point.x * 100}%`,
+                    top:
+                      `${point.y * 100}%`,
+                  }}
+                  aria-hidden="true"
+                >
+                  {point.label ===
+                  1
+                    ? "+"
+                    : "−"}
+                </span>
+              )}
+            </For>
+          </div>
+
+          <div class="video-lab-selection-toolbar">
+            <div
+              class="video-lab-prompt-modes"
+              role="group"
+              aria-label="Selection point type"
+            >
+              <button
+                class="text-button"
+                classList={{
+                  "is-active":
+                    promptMode() ===
+                    "keep",
+                }}
+                type="button"
+                aria-pressed={
+                  promptMode() ===
+                  "keep"
+                }
+                onClick={() =>
+                  setPromptMode(
+                    "keep",
+                  )
+                }
+              >
+                Keep
+              </button>
+              <button
+                class="text-button"
+                classList={{
+                  "is-active":
+                    promptMode() ===
+                    "exclude",
+                }}
+                type="button"
+                aria-pressed={
+                  promptMode() ===
+                  "exclude"
+                }
+                onClick={() =>
+                  setPromptMode(
+                    "exclude",
+                  )
+                }
+              >
+                Exclude
+              </button>
+            </div>
+
+            <div class="video-lab-selection-actions">
+              <button
+                class="text-button"
+                type="button"
+                disabled={
+                  points().length ===
+                  0
+                }
+                onClick={() =>
+                  setPoints(
+                    (
+                      current,
+                    ) =>
+                      current.slice(
+                        0,
+                        -1,
+                      ),
+                  )
+                }
+              >
+                Undo
+              </button>
+              <button
+                class="text-button"
+                type="button"
+                disabled={
+                  points().length ===
+                  0
+                }
+                onClick={() =>
+                  setPoints(
+                    [],
+                  )
+                }
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div class="video-lab-selection-footer">
+            <span>
+              {positivePoints() ===
+              0
+                ? "Add at least one Keep point."
+                : `${positivePoints()} keep point${positivePoints() === 1 ? "" : "s"} · ${points().length - positivePoints()} exclude`}
+            </span>
+            <div class="video-lab-selection-actions">
+              <button
+                class="text-button"
+                type="button"
+                onClick={() =>
+                  run()
+                }
+              >
+                Auto select
+              </button>
+              <button
+                class="download-button"
+                type="button"
+                disabled={
+                  positivePoints() ===
+                  0
+                }
+                onClick={() =>
+                  run({
+                    points:
+                      points(),
+                  })
+                }
+              >
+                Remove background
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
 
       <Show
         keyed
@@ -469,8 +968,9 @@ export const VideoLab = () => {
 
       <Show
         when={
-          state().status !==
-          "empty"
+          processing() ||
+          state().status ===
+            "ready"
         }
       >
         <div class="video-lab-preview checkerboard">
@@ -498,19 +998,30 @@ export const VideoLab = () => {
             />
             <div class="video-lab-result-row">
               <span>
-                {result.width}×{result.height} · {result.frameCount} frames · {result.sampleFps} fps · seed {result.seed}
+                {result.width}×{result.height} · {result.frameCount} frames · {result.sampleFps} fps · {seedLabel(result.seed)}
               </span>
-              <a
-                class="download-button"
-                href={
-                  result.url
-                }
-                download={
-                  result.downloadName
-                }
-              >
-                Download WebM
-              </a>
+              <div class="video-lab-selection-actions">
+                <button
+                  class="text-button"
+                  type="button"
+                  onClick={
+                    editSelection
+                  }
+                >
+                  Change subject
+                </button>
+                <a
+                  class="download-button"
+                  href={
+                    result.url
+                  }
+                  download={
+                    result.downloadName
+                  }
+                >
+                  Download WebM
+                </a>
+              </div>
             </div>
           </div>
         )}
@@ -523,11 +1034,29 @@ export const VideoLab = () => {
         }
       >
         {(message) => (
-          <div
-            class="error-card"
-            role="alert"
-          >
-            {message}
+          <div class="video-lab-error">
+            <div
+              class="error-card"
+              role="alert"
+            >
+              {message}
+            </div>
+            <Show
+              when={
+                selectedFile() !==
+                undefined
+              }
+            >
+              <button
+                class="text-button"
+                type="button"
+                onClick={
+                  editSelection
+                }
+              >
+                Back to subject selection
+              </button>
+            </Show>
           </div>
         )}
       </Show>
