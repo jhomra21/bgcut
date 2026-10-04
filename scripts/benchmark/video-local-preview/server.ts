@@ -16,15 +16,9 @@ import {
 import {
   proxyVideoModelRequest,
 } from "../video-segmentation/model-proxy";
-
-const MEDIABUNNY_REVISION =
-  "1dd3971ffaf3f95b30b1ca9205fc8378df699352";
-
-const FIXTURE_URL =
-  `https://raw.githubusercontent.com/Vanilagy/mediabunny/${MEDIABUNNY_REVISION}/test/public/rotate-buck-bunny.mp4`;
-
-const FIXTURE_BYTES =
-  675_899;
+import {
+  proxyQualityFixtureRequest,
+} from "../video-segmentation/quality-fixture";
 
 const outputArgument =
   process.argv[2];
@@ -70,33 +64,6 @@ await mkdir(
     recursive: true,
   },
 );
-
-const fixtureResponse =
-  await fetch(
-    FIXTURE_URL,
-  );
-
-if (
-  !fixtureResponse.ok
-) {
-  throw new Error(
-    `Could not fetch MediaBunny fixture: HTTP ${fixtureResponse.status}.`,
-  );
-}
-
-const fixture =
-  new Uint8Array(
-    await fixtureResponse.arrayBuffer(),
-  );
-
-if (
-  fixture.byteLength !==
-  FIXTURE_BYTES
-) {
-  throw new Error(
-    `MediaBunny fixture was ${fixture.byteLength} bytes instead of ${FIXTURE_BYTES}.`,
-  );
-}
 
 const build =
   await Bun.build({
@@ -178,6 +145,13 @@ const html =
   </body>
 </html>`;
 
+const outputMatch = (
+  pathname: string,
+): RegExpExecArray | null =>
+  /^\/output\/([a-z0-9-]+)\.webm$/u.exec(
+    pathname,
+  );
+
 const app =
   Bun.serve({
     hostname:
@@ -214,6 +188,18 @@ const app =
         null
       ) {
         return edge;
+      }
+
+      const quality =
+        await proxyQualityFixtureRequest(
+          request,
+        );
+
+      if (
+        quality !==
+        null
+      ) {
+        return quality;
       }
 
       if (
@@ -254,25 +240,6 @@ const app =
         request.method ===
           "GET" &&
         url.pathname ===
-          "/fixture.mp4"
-      ) {
-        return new Response(
-          fixture,
-          {
-            headers: {
-              "content-type":
-                "video/mp4",
-              "cache-control":
-                "no-store",
-            },
-          },
-        );
-      }
-
-      if (
-        request.method ===
-          "GET" &&
-        url.pathname ===
           ORT_WEBGPU_WASM_PUBLIC_PATH
       ) {
         return new Response(
@@ -288,16 +255,36 @@ const app =
         );
       }
 
+      const output =
+        outputMatch(
+          url.pathname,
+        );
+
       if (
         request.method ===
           "POST" &&
-        url.pathname ===
-          "/output.webm"
+        output !==
+          null
       ) {
+        const fixture =
+          output[1];
+
+        if (
+          fixture ===
+          undefined
+        ) {
+          return new Response(
+            "Invalid output path.",
+            {
+              status: 400,
+            },
+          );
+        }
+
         await writeFile(
           join(
             outputRoot,
-            "transparent.webm",
+            `${fixture}.webm`,
           ),
           new Uint8Array(
             await request.arrayBuffer(),
