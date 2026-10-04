@@ -836,6 +836,8 @@ export const VideoLab = () => {
                 aria-pressed={
                   promptMode() ===
                   "keep"
+                    ? "true"
+                    : "false"
                 }
                 onClick={() =>
                   setPromptMode(
@@ -856,6 +858,8 @@ export const VideoLab = () => {
                 aria-pressed={
                   promptMode() ===
                   "exclude"
+                    ? "true"
+                    : "false"
                 }
                 onClick={() =>
                   setPromptMode(
