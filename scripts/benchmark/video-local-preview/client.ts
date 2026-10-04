@@ -211,6 +211,255 @@ const verifyAlpha = async (
   }
 };
 
+const promptPointFromMask = async (
+  fixture:
+    FixtureId,
+): Promise<{
+  readonly x: number;
+  readonly y: number;
+  readonly label: 1;
+}> => {
+  const response =
+    await fetch(
+      `/quality/${fixture}/00000.png`,
+      {
+        cache:
+          "no-store",
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `Could not load ${fixture} seed mask: HTTP ${response.status}.`,
+    );
+  }
+
+  const bitmap =
+    await createImageBitmap(
+      await response.blob(),
+    );
+
+  try {
+    const canvas =
+      document.createElement(
+        "canvas",
+      );
+
+    canvas.width =
+      bitmap.width;
+    canvas.height =
+      bitmap.height;
+
+    const context =
+      canvas.getContext(
+        "2d",
+        {
+          willReadFrequently:
+            true,
+        },
+      );
+
+    if (
+      context ===
+      null
+    ) {
+      throw new Error(
+        "Could not inspect the DAVIS seed mask.",
+      );
+    }
+
+    context.drawImage(
+      bitmap,
+      0,
+      0,
+    );
+
+    const pixels =
+      context.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      ).data;
+
+    let count = 0;
+    let sumX = 0;
+    let sumY = 0;
+
+    for (
+      let y = 0;
+      y <
+      canvas.height;
+      y += 1
+    ) {
+      for (
+        let x = 0;
+        x <
+        canvas.width;
+        x += 1
+      ) {
+        const offset =
+          (
+            y *
+              canvas.width +
+            x
+          ) *
+          4;
+
+        const foreground =
+          (
+            pixels[
+              offset
+            ] ??
+            0
+          ) >
+            0 ||
+          (
+            pixels[
+              offset +
+                1
+            ] ??
+            0
+          ) >
+            0 ||
+          (
+            pixels[
+              offset +
+                2
+            ] ??
+            0
+          ) >
+            0;
+
+        if (
+          foreground
+        ) {
+          count += 1;
+          sumX += x;
+          sumY += y;
+        }
+      }
+    }
+
+    if (
+      count ===
+      0
+    ) {
+      throw new Error(
+        `${fixture} seed mask contains no foreground.`,
+      );
+    }
+
+    const centerX =
+      sumX /
+      count;
+
+    const centerY =
+      sumY /
+      count;
+
+    let bestX = 0;
+    let bestY = 0;
+    let bestDistance =
+      Number.POSITIVE_INFINITY;
+
+    for (
+      let y = 0;
+      y <
+      canvas.height;
+      y += 1
+    ) {
+      for (
+        let x = 0;
+        x <
+        canvas.width;
+        x += 1
+      ) {
+        const offset =
+          (
+            y *
+              canvas.width +
+            x
+          ) *
+          4;
+
+        const foreground =
+          (
+            pixels[
+              offset
+            ] ??
+            0
+          ) >
+            0 ||
+          (
+            pixels[
+              offset +
+                1
+            ] ??
+            0
+          ) >
+            0 ||
+          (
+            pixels[
+              offset +
+                2
+            ] ??
+            0
+          ) >
+            0;
+
+        if (
+          !foreground
+        ) {
+          continue;
+        }
+
+        const distance =
+          (
+            x -
+            centerX
+          ) **
+            2 +
+          (
+            y -
+            centerY
+          ) **
+            2;
+
+        if (
+          distance <
+          bestDistance
+        ) {
+          bestDistance =
+            distance;
+          bestX = x;
+          bestY = y;
+        }
+      }
+    }
+
+    return {
+      x:
+        (
+          bestX +
+          0.5
+        ) /
+        canvas.width,
+      y:
+        (
+          bestY +
+          0.5
+        ) /
+        canvas.height,
+      label: 1,
+    };
+  } finally {
+    bitmap.close();
+  }
+};
+
 const runFixture = async (
   fixture:
     FixtureId,
@@ -244,10 +493,36 @@ const runFixture = async (
       },
     );
 
+  const prompt =
+    fixture ===
+    "bear"
+      ? {
+          points: [
+            await promptPointFromMask(
+              fixture,
+            ),
+          ],
+        }
+      : undefined;
+
   const result =
     await removeVideoBackgroundExperimental(
       file,
+      {
+        prompt,
+      },
     );
+
+  if (
+    fixture ===
+      "bear" &&
+    result.seed !==
+      "sam21-prompt"
+  ) {
+    throw new Error(
+      `Prompted bear case used ${result.seed} instead of SAM 2.1.`,
+    );
+  }
 
   if (
     result.blob.size <
