@@ -2,30 +2,74 @@ import {
   MODEL_PUBLIC_PATH,
   MODEL_RELEASE_URL,
   MODEL_SIZE_BYTES,
+  WEBGPU_MODEL_PUBLIC_PATH,
+  WEBGPU_MODEL_RELEASE_URL,
+  WEBGPU_MODEL_SIZE_BYTES,
 } from "../../../src/shared/model-config";
 
-let cached:
-  Promise<
-    Uint8Array<ArrayBuffer>
-  > |
-  undefined;
+type BiRefNetModelSource = {
+  readonly releaseUrl: string;
+  readonly sizeBytes: number;
+};
+
+const sources =
+  new Map<
+    string,
+    BiRefNetModelSource
+  >([
+    [
+      MODEL_PUBLIC_PATH,
+      {
+        releaseUrl:
+          MODEL_RELEASE_URL,
+        sizeBytes:
+          MODEL_SIZE_BYTES,
+      },
+    ],
+    [
+      WEBGPU_MODEL_PUBLIC_PATH,
+      {
+        releaseUrl:
+          WEBGPU_MODEL_RELEASE_URL,
+        sizeBytes:
+          WEBGPU_MODEL_SIZE_BYTES,
+      },
+    ],
+  ]);
+
+const cached =
+  new Map<
+    string,
+    Promise<
+      Uint8Array<ArrayBuffer>
+    >
+  >();
 
 const loadModel =
-  async (): Promise<
+  async (
+    path: string,
+    source:
+      BiRefNetModelSource,
+  ): Promise<
     Uint8Array<ArrayBuffer>
   > => {
+    const existing =
+      cached.get(
+        path,
+      );
+
     if (
-      cached !==
+      existing !==
       undefined
     ) {
-      return cached;
+      return existing;
     }
 
     const pending =
       (async () => {
         const response =
           await fetch(
-            MODEL_RELEASE_URL,
+            source.releaseUrl,
           );
 
         if (
@@ -43,24 +87,27 @@ const loadModel =
 
         if (
           bytes.byteLength !==
-          MODEL_SIZE_BYTES
+          source.sizeBytes
         ) {
           throw new Error(
-            `BiRefNet seed model was ${bytes.byteLength} bytes; expected ${MODEL_SIZE_BYTES}.`,
+            `BiRefNet seed model was ${bytes.byteLength} bytes; expected ${source.sizeBytes}.`,
           );
         }
 
         return bytes;
       })();
 
-    cached =
-      pending;
+    cached.set(
+      path,
+      pending,
+    );
 
     try {
       return await pending;
     } catch (error) {
-      cached =
-        undefined;
+      cached.delete(
+        path,
+      );
 
       throw error;
     }
@@ -82,15 +129,23 @@ export const proxyBiRefNetSeedModelRequest =
         request.url,
       );
 
+    const source =
+      sources.get(
+        url.pathname,
+      );
+
     if (
-      url.pathname !==
-      MODEL_PUBLIC_PATH
+      source ===
+      undefined
     ) {
       return null;
     }
 
     const bytes =
-      await loadModel();
+      await loadModel(
+        url.pathname,
+        source,
+      );
 
     return new Response(
       bytes,

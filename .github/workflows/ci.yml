@@ -29,7 +29,7 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
 
-      - name: Validate automatic BiRefNet EdgeTAM hybrid on DAVIS 2017
+      - name: Validate FP16 BiRefNet EdgeTAM hybrid on DAVIS 2017
         shell: bash
         run: |
           set -euo pipefail
@@ -129,12 +129,11 @@ jobs:
 
           failed=0
 
-          # Product-shaped automatic policy. A positive BiRefNet matte seeds
-          # EdgeTAM memory directly. If BiRefNet abstains, EdgeTAM falls back to
-          # the frozen 7x7 proposal-0 stability*sqrt(area) selector.
+          # Same product-shaped hybrid policy as the validated FP32 run, but
+          # with bgcut's pinned 98.6 MB WebGPU FP16 BiRefNet artifact.
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
-            run_candidate "$fixture" edgetam hybrid || failed=1
+            run_candidate "$fixture" edgetam hybrid-fp16 || failed=1
           done < "$VAL_LIST"
 
           exit "$failed"

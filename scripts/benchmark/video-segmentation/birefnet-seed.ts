@@ -4,6 +4,8 @@ import {
   MODEL_INPUT_SIZE,
   MODEL_PUBLIC_PATH,
   MODEL_REVISION,
+  WEBGPU_MODEL_PUBLIC_PATH,
+  WEBGPU_MODEL_REVISION,
 } from "../../../src/shared/model-config";
 
 import {
@@ -52,6 +54,10 @@ export type BiRefNetSeed = {
   readonly modelRevision:
     string;
 };
+
+export type BiRefNetSeedPrecision =
+  | "fp32"
+  | "fp16";
 
 export type BiRefNetSeeder = {
   seed(
@@ -484,12 +490,28 @@ export const softMaskOverlapWithBiRefNet =
   };
 
 export const createBiRefNetSeeder =
-  async (): Promise<BiRefNetSeeder> => {
+  async (
+    precision:
+      BiRefNetSeedPrecision =
+        "fp32",
+  ): Promise<BiRefNetSeeder> => {
     configureVideoOrt();
+
+    const modelPath =
+      precision ===
+      "fp16"
+        ? WEBGPU_MODEL_PUBLIC_PATH
+        : MODEL_PUBLIC_PATH;
+
+    const modelRevision =
+      precision ===
+      "fp16"
+        ? WEBGPU_MODEL_REVISION
+        : MODEL_REVISION;
 
     const response =
       await fetch(
-        MODEL_PUBLIC_PATH,
+        modelPath,
         {
           cache:
             "force-cache",
@@ -627,8 +649,7 @@ export const createBiRefNetSeeder =
               analysis.positiveFraction,
             usedFallbackPoint:
               analysis.usedFallbackPoint,
-            modelRevision:
-              MODEL_REVISION,
+            modelRevision,
           };
         } finally {
           input.dispose();

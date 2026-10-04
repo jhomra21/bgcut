@@ -45,6 +45,7 @@ type QualitySeedMode =
   | "birefnet"
   | "birefnet-direct"
   | "hybrid"
+  | "hybrid-fp16"
   | "grid-oracle"
   | "grid-model";
 
@@ -304,6 +305,7 @@ const seedModeFromLocation =
       case "birefnet":
       case "birefnet-direct":
       case "hybrid":
+      case "hybrid-fp16":
       case "grid-oracle":
       case "grid-model":
         return mode;
@@ -1421,6 +1423,8 @@ const main =
       seedMode !==
         "hybrid" &&
       seedMode !==
+        "hybrid-fp16" &&
+      seedMode !==
         "grid-oracle" &&
       seedMode !==
         "grid-model"
@@ -1455,7 +1459,9 @@ const main =
       seedMode ===
         "birefnet-direct" ||
       seedMode ===
-        "hybrid"
+        "hybrid" ||
+      seedMode ===
+        "hybrid-fp16"
     ) {
       const decoded =
         await source.frameAt(
@@ -1475,7 +1481,12 @@ const main =
         performance.now();
 
       const seeder =
-        await createBiRefNetSeeder();
+        await createBiRefNetSeeder(
+          seedMode ===
+          "hybrid-fp16"
+            ? "fp16"
+            : "fp32",
+        );
 
       const modelLoadMs =
         performance.now() -
@@ -1541,7 +1552,9 @@ const main =
             matte;
         } else if (
           seedMode ===
-          "hybrid"
+            "hybrid" ||
+          seedMode ===
+            "hybrid-fp16"
         ) {
           if (
             seed.positiveFraction >
@@ -1646,14 +1659,22 @@ const main =
             seedMode ===
               "birefnet-direct" ||
             (
-              seedMode ===
-                "hybrid" &&
+              (
+                seedMode ===
+                  "hybrid" ||
+                seedMode ===
+                  "hybrid-fp16"
+              ) &&
               seed.positiveFraction >
                 0
             )
               ? "direct-memory"
-              : seedMode ===
-                  "hybrid"
+              : (
+                  seedMode ===
+                    "hybrid" ||
+                  seedMode ===
+                    "hybrid-fp16"
+                )
                 ? "grid-fallback"
                 : seed.positiveFraction ===
                     0
@@ -1688,8 +1709,12 @@ const main =
       seedMode ===
         "grid-model" ||
       (
-        seedMode ===
-          "hybrid" &&
+        (
+          seedMode ===
+            "hybrid" ||
+          seedMode ===
+            "hybrid-fp16"
+        ) &&
         useGridFallback
       )
     ) {

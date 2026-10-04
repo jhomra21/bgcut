@@ -185,6 +185,10 @@ The next validation policy is fixed before seeing the new 30-sequence result:
 
 Ground truth is used only after selection for scoring. This is the first full product-shaped automatic policy in the research branch: both branches are deployable local model paths and neither branch consults DAVIS annotations to decide what to track.
 
+The full 30-sequence validation run confirms the hybrid. Mean tracked IoU rises to 0.572 and mean tracked J&F to 0.603, up from 0.475 / 0.504 for the frozen Edge-only selector. BiRefNet produced foreground on 17 of 30 sequences; those direct-matte tracks averaged 0.827 IoU and 0.847 J&F. The 13 BiRefNet-abstain sequences used the Edge grid fallback and averaged 0.239 / 0.284. The same candidate pool's grid oracle is still higher at 0.637 / 0.687, so the remaining quality gap is concentrated in semantic discovery on BiRefNet-abstain clips rather than EdgeTAM temporal propagation.
+
+The next optimization changes precision, not policy. bgcut's pinned browser FP16 BiRefNet artifact is 98,572,669 bytes versus 195,872,736 bytes for FP32. EdgeTAM's complete fp16 temporal stack is about 60 MB, so FP16 BiRefNet would reduce the combined local model payload from roughly 256 MB to roughly 159 MB. The quality benchmark now reruns the exact same 30-sequence hybrid with the FP16 BiRefNet graph; no selector thresholds or fallback rules change.
+
 ## Memory ownership
 
 The two trackers have different host-side memory contracts and should not be forced into one tensor layout.
