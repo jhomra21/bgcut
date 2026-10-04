@@ -24,6 +24,12 @@ type PromptPoint = {
   readonly label: 0 | 1;
 };
 
+type SubjectSelection = {
+  readonly id: string;
+  readonly points:
+    readonly PromptPoint[];
+};
+
 type VideoState =
   | {
       readonly status:
@@ -66,6 +72,7 @@ type VideoState =
         number;
       readonly seed:
         | "sam21-prompt"
+        | "sam21-subjects"
         | "birefnet-direct"
         | "edgetam-grid";
     }
@@ -113,6 +120,7 @@ const transparentName = (
 const seedLabel = (
   seed:
     | "sam21-prompt"
+    | "sam21-subjects"
     | "birefnet-direct"
     | "edgetam-grid",
 ): string => {
@@ -121,6 +129,9 @@ const seedLabel = (
   ) {
     case "sam21-prompt":
       return "selected subject";
+
+    case "sam21-subjects":
+      return "selected subjects";
 
     case "birefnet-direct":
       return "automatic subject";
@@ -132,6 +143,9 @@ const seedLabel = (
 
 const MAX_SELECTION_SECONDS =
   15;
+
+const MAX_SUBJECTS =
+  4;
 
 const formatVideoTime = (
   seconds: number,
@@ -233,12 +247,26 @@ export const VideoLab = () => {
     );
 
   const [
-    points,
-    setPoints,
+    subjects,
+    setSubjects,
   ] =
     createSignal<
-      readonly PromptPoint[]
-    >([]);
+      readonly SubjectSelection[]
+    >([
+      {
+        id:
+          "subject-1",
+        points: [],
+      },
+    ]);
+
+  const [
+    activeSubjectId,
+    setActiveSubjectId,
+  ] =
+    createSignal(
+      "subject-1",
+    );
 
   let input:
     HTMLInputElement |
@@ -257,6 +285,77 @@ export const VideoLab = () => {
     undefined;
 
   let version = 0;
+
+  let subjectSequence = 1;
+
+  const resetSubjects =
+    () => {
+      subjectSequence = 1;
+
+      setSubjects([
+        {
+          id:
+            "subject-1",
+          points: [],
+        },
+      ]);
+
+      setActiveSubjectId(
+        "subject-1",
+      );
+    };
+
+  const activeSubject =
+    () =>
+      subjects().find(
+        (subject) =>
+          subject.id ===
+          activeSubjectId(),
+      );
+
+  const points =
+    () =>
+      activeSubject()
+        ?.points ??
+      [];
+
+  const setPoints = (
+    update:
+      | readonly PromptPoint[]
+      | ((
+          current:
+            readonly PromptPoint[],
+        ) =>
+          readonly PromptPoint[]),
+  ) => {
+    const id =
+      activeSubjectId();
+
+    setSubjects(
+      (current) =>
+        current.map(
+          (subject) => {
+            if (
+              subject.id !==
+              id
+            ) {
+              return subject;
+            }
+
+            return {
+              ...subject,
+              points:
+                typeof update ===
+                "function"
+                  ? update(
+                      subject.points,
+                    )
+                  : update,
+            };
+          },
+        ),
+    );
+  };
 
   const clearResultUrl =
     () => {
