@@ -2458,6 +2458,16 @@ figure {
   color: var(--background-primary);
 }
 
+.video-lab-point.is-other-subject {
+  opacity: 0.58;
+}
+
+.video-lab-point.is-active-subject {
+  box-shadow:
+    0 0 0 2px var(--background-surface),
+    0 0 0 3px var(--border-strong);
+}
+
 .video-lab-scrubber {
   display: grid;
   gap: 7px;
@@ -2474,6 +2484,27 @@ figure {
   gap: 12px;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.video-lab-subjects {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.video-lab-subject-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.video-lab-subject-tabs .text-button.is-active {
+  border-color: var(--background-inverse);
+  background: var(--background-inverse);
+  color: var(--text-inverse);
 }
 
 .video-lab-selection-toolbar {
@@ -2595,7 +2626,17 @@ figure {
     flex-direction: column;
   }
 
-  .video-lab-selection-actions {
+  .video-lab-selection-actions,
+  .video-lab-subjects {
+    width: 100%;
+  }
+
+  .video-lab-subjects {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .video-lab-subject-tabs {
     width: 100%;
   }
 
