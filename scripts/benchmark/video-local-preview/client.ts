@@ -7,7 +7,7 @@ import {
 
 import {
   removeVideoBackgroundExperimental,
-} from "../../src/browser/video-experimental";
+} from "../../../src/browser/video-experimental";
 
 type PreviewReport = {
   readonly schemaVersion: 1;
