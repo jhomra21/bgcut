@@ -2291,8 +2291,8 @@ const main =
             });
 
             if (
-              reseed.positiveFraction >
-              0
+              reseed.maxLogit >=
+              5
             ) {
               if (
                 adapter.seedMask ===
