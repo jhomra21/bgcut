@@ -777,15 +777,11 @@ export const createSam21Adapter =
         };
       };
 
-    return {
-      candidate,
-
-      async seed(
-        frame,
+    const validatePrompt =
+      (
         prompt:
           VideoSegmentationPrompt,
-        frameIndex,
-      ) {
+      ) => {
         if (
           prompt.proposalIndex !==
             undefined &&
@@ -796,11 +792,22 @@ export const createSam21Adapter =
             "This SAM 2.1 export returns one seed proposal; only proposal 0 is available.",
           );
         }
+      };
 
-        const vision =
-          await encode(
-            frame,
-          );
+    const seedWithBank =
+      async (
+        vision: SamVision,
+        targetBank:
+          SamMemoryBank,
+        prompt:
+          VideoSegmentationPrompt,
+        frameIndex: number,
+      ): Promise<
+        VideoSegmentationMask
+      > => {
+        validatePrompt(
+          prompt,
+        );
 
         const decoded =
           await decode(
@@ -812,7 +819,7 @@ export const createSam21Adapter =
             ),
           );
 
-        bank.condition(
+        targetBank.condition(
           await remember(
             vision,
             decoded,
@@ -822,20 +829,20 @@ export const createSam21Adapter =
         );
 
         return decoded.mask;
-      },
+      };
 
-      async track(
-        frame,
-        frameIndex,
-        totalFrames,
-      ) {
-        const vision =
-          await encode(
-            frame,
-          );
-
+    const trackWithBank =
+      async (
+        vision: SamVision,
+        targetBank:
+          SamMemoryBank,
+        frameIndex: number,
+        totalFrames: number,
+      ): Promise<
+        VideoSegmentationMask
+      > => {
         const assembled =
-          bank.assemble(
+          targetBank.assemble(
             frameIndex,
             totalFrames,
           );
@@ -963,7 +970,7 @@ export const createSam21Adapter =
             0) >=
             RELIABLE_IOU
         ) {
-          bank.push(
+          targetBank.push(
             await remember(
               vision,
               decoded,
@@ -974,13 +981,166 @@ export const createSam21Adapter =
         }
 
         return decoded.mask;
+      };
+
+    return {
+      candidate,
+
+      async seed(
+        frame,
+        prompt:
+          VideoSegmentationPrompt,
+        frameIndex,
+      ) {
+        return seedWithBank(
+          await encode(
+            frame,
+          ),
+          bank,
+          prompt,
+          frameIndex,
+        );
+      },
+
+      async track(
+        frame,
+        frameIndex,
+        totalFrames,
+      ) {
+        return trackWithBank(
+          await encode(
+            frame,
+          ),
+          bank,
+          frameIndex,
+          totalFrames,
+        );
+      },
+
+      async seedSubjects(
+        frame,
+        subjects:
+          readonly VideoSegmentationSubjectPrompt[],
+        frameIndex,
+      ) {
+        if (
+          subjects.length ===
+          0
+        ) {
+          throw new Error(
+            "SAM 2.1 multi-subject tracking requires at least one subject.",
+          );
+        }
+
+        const identifiers =
+          new Set(
+            subjects.map(
+              (subject) =>
+                subject.id,
+            ),
+          );
+
+        if (
+          identifiers.size !==
+          subjects.length
+        ) {
+          throw new Error(
+            "SAM 2.1 subject identifiers must be unique.",
+          );
+        }
+
+        const vision =
+          await encode(
+            frame,
+          );
+
+        subjectBanks.clear();
+
+        const masks:
+          VideoSegmentationMask[] =
+            [];
+
+        for (
+          const subject of
+          subjects
+        ) {
+          const subjectBank =
+            createBank();
+
+          subjectBanks.set(
+            subject.id,
+            subjectBank,
+          );
+
+          masks.push(
+            await seedWithBank(
+              vision,
+              subjectBank,
+              subject.prompt,
+              frameIndex,
+            ),
+          );
+        }
+
+        return masks;
+      },
+
+      async trackSubjects(
+        frame,
+        frameIndex,
+        totalFrames,
+      ) {
+        if (
+          subjectBanks.size ===
+          0
+        ) {
+          throw new Error(
+            "SAM 2.1 has no seeded subjects to track.",
+          );
+        }
+
+        const vision =
+          await encode(
+            frame,
+          );
+
+        const masks:
+          VideoSegmentationMask[] =
+            [];
+
+        for (
+          const subjectBank of
+          subjectBanks.values()
+        ) {
+          masks.push(
+            await trackWithBank(
+              vision,
+              subjectBank,
+              frameIndex,
+              totalFrames,
+            ),
+          );
+        }
+
+        return masks;
       },
 
       rewind() {
         bank.rewind();
       },
 
+      rewindSubjects() {
+        for (
+          const subjectBank of
+          subjectBanks.values()
+        ) {
+          subjectBank.rewind();
+        }
+      },
+
       async close() {
+        subjectBanks.clear();
+
         await closeVideoSessions({
           "vision-encoder":
             sessions.visionEncoder,
@@ -995,4 +1155,5 @@ export const createSam21Adapter =
         });
       },
     };
+
   };
