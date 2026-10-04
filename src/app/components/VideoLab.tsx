@@ -130,6 +130,42 @@ const seedLabel = (
   }
 };
 
+const MAX_SELECTION_SECONDS =
+  15;
+
+const formatVideoTime = (
+  seconds: number,
+): string => {
+  const safe =
+    Number.isFinite(
+      seconds,
+    )
+      ? Math.max(
+          0,
+          seconds,
+        )
+      : 0;
+
+  const minutes =
+    Math.floor(
+      safe /
+      60,
+    );
+
+  const remainder =
+    Math.floor(
+      safe %
+      60,
+    );
+
+  return `${minutes}:${remainder
+    .toString()
+    .padStart(
+      2,
+      "0",
+    )}`;
+};
+
 export const VideoLab = () => {
   const safari =
     typeof navigator !==
@@ -163,6 +199,22 @@ export const VideoLab = () => {
       string |
       undefined
     >();
+
+  const [
+    selectionTime,
+    setSelectionTime,
+  ] =
+    createSignal(
+      0,
+    );
+
+  const [
+    selectionDuration,
+    setSelectionDuration,
+  ] =
+    createSignal(
+      0,
+    );
 
   const [
     promptMode,
@@ -296,6 +348,14 @@ export const VideoLab = () => {
       [],
     );
 
+    setSelectionTime(
+      0,
+    );
+
+    setSelectionDuration(
+      0,
+    );
+
     setPromptMode(
       "keep",
     );
@@ -378,6 +438,8 @@ export const VideoLab = () => {
             file,
             {
               prompt,
+              seedTimeSeconds:
+                selectionTime(),
               onProgress:
                 (
                   update,
@@ -540,6 +602,44 @@ export const VideoLab = () => {
           file.name,
       });
     };
+
+  const scrubSelection = (
+    value: number,
+  ) => {
+    const video =
+      selectionVideo;
+
+    if (
+      video ===
+      undefined
+    ) {
+      return;
+    }
+
+    const duration =
+      selectionDuration();
+
+    const time =
+      Math.min(
+        duration,
+        Math.max(
+          0,
+          value,
+        ),
+      );
+
+    video.pause();
+    video.currentTime =
+      time;
+
+    setSelectionTime(
+      time,
+    );
+
+    setPoints(
+      [],
+    );
+  };
 
   const handleSelectionClick =
     (
