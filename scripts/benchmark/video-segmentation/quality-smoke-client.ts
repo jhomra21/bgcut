@@ -46,6 +46,7 @@ type QualitySeedMode =
   | "birefnet-direct"
   | "hybrid"
   | "hybrid-fp16"
+  | "hybrid-fp16-reseed-train"
   | "grid-oracle"
   | "grid-model";
 
@@ -91,6 +92,27 @@ type QualityFrame = {
     number | null;
   readonly objectScore:
     number | null;
+};
+
+type ReseedAttempt = {
+  readonly frameIndex: number;
+  readonly inferenceMs: number;
+  readonly maxLogit: number;
+  readonly positiveFraction:
+    number;
+  readonly groundTruthIou:
+    number;
+  readonly groundTruthBoundaryF:
+    number;
+  readonly groundTruthJAndF:
+    number;
+};
+
+type ReseedQuality = {
+  readonly selectedFrameIndex:
+    number | null;
+  readonly attempts:
+    readonly ReseedAttempt[];
 };
 
 type AutomaticSeedQuality = {
@@ -202,6 +224,8 @@ type QualityReport = {
     AutomaticSeedQuality | null;
   readonly gridDiscovery:
     GridDiscoveryQuality | null;
+  readonly reseed:
+    ReseedQuality | null;
   readonly model:
     string;
   readonly frameCount: number;
@@ -306,6 +330,7 @@ const seedModeFromLocation =
       case "birefnet-direct":
       case "hybrid":
       case "hybrid-fp16":
+      case "hybrid-fp16-reseed-train":
       case "grid-oracle":
       case "grid-model":
         return mode;
@@ -1453,6 +1478,20 @@ const main =
     let useGridFallback =
       false;
 
+    let retainedSeeder:
+      Awaited<
+        ReturnType<
+          typeof createBiRefNetSeeder
+        >
+      > |
+      null = null;
+
+    const reseedAttempts:
+      ReseedAttempt[] = [];
+
+    let reseedFrameIndex:
+      number | null = null;
+
     if (
       seedMode ===
         "birefnet" ||
@@ -1461,7 +1500,9 @@ const main =
       seedMode ===
         "hybrid" ||
       seedMode ===
-        "hybrid-fp16"
+        "hybrid-fp16" ||
+      seedMode ===
+        "hybrid-fp16-reseed-train"
     ) {
       const decoded =
         await source.frameAt(
@@ -1482,11 +1523,23 @@ const main =
 
       const seeder =
         await createBiRefNetSeeder(
-          seedMode ===
-          "hybrid-fp16"
+          (
+            seedMode ===
+              "hybrid-fp16" ||
+            seedMode ===
+              "hybrid-fp16-reseed-train"
+          )
             ? "fp16"
             : "fp32",
         );
+
+      if (
+        seedMode ===
+        "hybrid-fp16-reseed-train"
+      ) {
+        retainedSeeder =
+          seeder;
+      }
 
       const modelLoadMs =
         performance.now() -
@@ -1554,7 +1607,9 @@ const main =
           seedMode ===
             "hybrid" ||
           seedMode ===
-            "hybrid-fp16"
+            "hybrid-fp16" ||
+          seedMode ===
+            "hybrid-fp16-reseed-train"
         ) {
           if (
             seed.positiveFraction >
@@ -1663,7 +1718,9 @@ const main =
                 seedMode ===
                   "hybrid" ||
                 seedMode ===
-                  "hybrid-fp16"
+                  "hybrid-fp16" ||
+                seedMode ===
+                  "hybrid-fp16-reseed-train"
               ) &&
               seed.positiveFraction >
                 0
@@ -1673,7 +1730,9 @@ const main =
                   seedMode ===
                     "hybrid" ||
                   seedMode ===
-                    "hybrid-fp16"
+                    "hybrid-fp16" ||
+                  seedMode ===
+                    "hybrid-fp16-reseed-train"
                 )
                 ? "grid-fallback"
                 : seed.positiveFraction ===
@@ -1699,7 +1758,12 @@ const main =
           await probe.close();
         }
 
-        await seeder.close();
+        if (
+          retainedSeeder !==
+          seeder
+        ) {
+          await seeder.close();
+        }
       }
     }
 
@@ -1713,7 +1777,9 @@ const main =
           seedMode ===
             "hybrid" ||
           seedMode ===
-            "hybrid-fp16"
+            "hybrid-fp16" ||
+          seedMode ===
+            "hybrid-fp16-reseed-train"
         ) &&
         useGridFallback
       )
@@ -1841,7 +1907,9 @@ const main =
           seedMode ===
             "hybrid" ||
           seedMode ===
-            "hybrid-fp16"
+            "hybrid-fp16" ||
+          seedMode ===
+            "hybrid-fp16-reseed-train"
         ) {
           selector =
             "proposal0-nonedge-stability-area";
@@ -2167,6 +2235,92 @@ const main =
                 0,
                 QUALITY_FRAME_COUNT,
               );
+          } else if (
+            seedMode ===
+              "hybrid-fp16-reseed-train" &&
+            useGridFallback &&
+            retainedSeeder !==
+              null &&
+            reseedFrameIndex ===
+              null
+          ) {
+            const reseedStartedAt =
+              performance.now();
+
+            const reseed =
+              await retainedSeeder.seed(
+                decoded.frame,
+              );
+
+            const reseedInferenceMs =
+              performance.now() -
+              reseedStartedAt;
+
+            const reseedMatte:
+              VideoSegmentationMask = {
+                logits:
+                  reseed.logits,
+                width:
+                  reseed.width,
+                height:
+                  reseed.height,
+              };
+
+            const reseedGroundTruth =
+              groundTruthMetrics(
+                reseedMatte,
+                groundTruth[
+                  frameIndex
+                ]!,
+              );
+
+            reseedAttempts.push({
+              frameIndex,
+              inferenceMs:
+                reseedInferenceMs,
+              maxLogit:
+                reseed.maxLogit,
+              positiveFraction:
+                reseed.positiveFraction,
+              groundTruthIou:
+                reseedGroundTruth.iou,
+              groundTruthBoundaryF:
+                reseedGroundTruth.boundaryF,
+              groundTruthJAndF:
+                reseedGroundTruth.jAndF,
+            });
+
+            if (
+              reseed.positiveFraction >
+              0
+            ) {
+              if (
+                adapter.seedMask ===
+                undefined
+              ) {
+                throw new Error(
+                  "The selected video adapter does not support forward re-seeding from a direct mask.",
+                );
+              }
+
+              prediction =
+                await adapter.seedMask(
+                  decoded.frame,
+                  reseedMatte,
+                  frameIndex,
+                  QUALITY_FRAME_COUNT,
+                );
+
+              reseedFrameIndex =
+                frameIndex;
+            } else {
+              prediction =
+                await adapter.track(
+                  decoded.frame,
+                  frameIndex,
+                  QUALITY_FRAME_COUNT,
+                );
+            }
           } else {
             prediction =
               await adapter.track(
@@ -2243,6 +2397,13 @@ const main =
     } finally {
       await adapter.close();
 
+      if (
+        retainedSeeder !==
+        null
+      ) {
+        await retainedSeeder.close();
+      }
+
       source.close();
 
       for (
@@ -2274,6 +2435,16 @@ const main =
           null,
         automaticSeed,
         gridDiscovery,
+        reseed:
+          seedMode ===
+          "hybrid-fp16-reseed-train"
+            ? {
+                selectedFrameIndex:
+                  reseedFrameIndex,
+                attempts:
+                  reseedAttempts,
+              }
+            : null,
         model:
           candidate.repository,
         frameCount:
