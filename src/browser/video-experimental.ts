@@ -525,6 +525,7 @@ const seedFrameIndex = (
     );
 
   let selected = 0;
+
   let selectedDistance =
     Math.abs(
       (
@@ -708,8 +709,11 @@ export const removeVideoBackgroundExperimental =
         VideoSegmentationMask |
         undefined
       )[] =
-        new Array(
-          timestamps.length,
+        Array.from(
+          {
+            length:
+              timestamps.length,
+          },
         );
 
     let seedKind:
