@@ -16,3 +16,131 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run check
+
+  video-macos:
+    if: github.event_name == 'pull_request' && github.head_ref == 'research/video-segmentation-bakeoff'
+    needs: check
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Validate FP16 BiRefNet EdgeTAM hybrid on DAVIS 2017
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-quality-macos"
+          DAVIS_ROOT="$RUNNER_TEMP/davis-2017-trainval"
+          ARCHIVE="$RUNNER_TEMP/DAVIS-2017-trainval-480p.zip"
+                    mkdir -p "$ROOT" "$DAVIS_ROOT"
+
+          curl             --fail             --location             --retry 3             --output "$ARCHIVE"             "https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-trainval-480p.zip"
+
+          printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
+
+          VAL_LIST="$DAVIS_ROOT/val.txt"
+
+          unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/val.txt             | tr -d '\r'             > "$VAL_LIST"
+
+          while IFS= read -r fixture; do
+            [[ -n "$fixture" ]] || continue
+
+            unzip -q               "$ARCHIVE"               "DAVIS/Annotations/480p/$fixture/*"               -d "$DAVIS_ROOT"
+          done < "$VAL_LIST"
+
+          DAVIS_ANNOTATION_ROOT="$DAVIS_ROOT/DAVIS/Annotations/480p"             bun run benchmark:video-segmentation:quality -- "$ROOT" 4191 >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4191/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          run_candidate() {
+            local fixture="$1"
+            local candidate="$2"
+            local seed_mode="$3"
+            local result="$ROOT/$fixture-$candidate-$seed_mode-result.json"
+            local failure="$ROOT/$fixture-$candidate-$seed_mode-failure.json"
+            rm -f "$result" "$failure"
+
+            "$CHROME" \
+              --headless=new \
+              --enable-unsafe-webgpu \
+              --disable-gpu-blocklist \
+              --enable-webgpu-developer-features \
+              --use-gpu-in-tests \
+              "http://127.0.0.1:4191/?candidate=$candidate&fixture=$fixture&seedMode=$seed_mode" >"$ROOT/$fixture-$candidate-$seed_mode-chrome.log" 2>&1 &
+            CHROME_PID=$!
+
+            for _ in {1..1200}; do
+              if [[ -f "$result" ]]; then
+                cat "$result"
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 0
+              fi
+
+              if [[ -f "$failure" ]]; then
+                cat "$failure" >&2
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 1
+              fi
+
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                echo "Chrome exited before the $fixture $candidate $seed_mode DAVIS run completed." >&2
+                cat "$ROOT/$fixture-$candidate-$seed_mode-chrome.log" >&2 || true
+                unset CHROME_PID
+                return 1
+              fi
+
+              sleep 1
+            done
+
+            echo "$fixture $candidate $seed_mode DAVIS run timed out." >&2
+            cat "$ROOT/server.log" >&2 || true
+            cat "$ROOT/$fixture-$candidate-$seed_mode-chrome.log" >&2 || true
+            kill "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+            return 1
+          }
+
+          failed=0
+
+          # Same product-shaped hybrid policy as the validated FP32 run, but
+          # with bgcut's pinned 98.6 MB WebGPU FP16 BiRefNet artifact.
+          while IFS= read -r fixture; do
+            [[ -n "$fixture" ]] || continue
+            run_candidate "$fixture" edgetam hybrid-fp16 || failed=1
+          done < "$VAL_LIST"
+
+          exit "$failed"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-quality-macos
+          path: ${{ runner.temp }}/video-quality-macos
+          if-no-files-found: error
