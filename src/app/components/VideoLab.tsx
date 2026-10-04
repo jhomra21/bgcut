@@ -1,5 +1,5 @@
 import {
-  For,
+  Index,
   Show,
   createSignal,
   onCleanup,
@@ -217,6 +217,14 @@ export const VideoLab = () => {
     );
 
   const [
+    selectionFrameReady,
+    setSelectionFrameReady,
+  ] =
+    createSignal(
+      false,
+    );
+
+  const [
     promptMode,
     setPromptMode,
   ] =
@@ -354,6 +362,10 @@ export const VideoLab = () => {
 
     setSelectionDuration(
       0,
+    );
+
+    setSelectionFrameReady(
+      false,
     );
 
     setPromptMode(
@@ -595,6 +607,10 @@ export const VideoLab = () => {
       version += 1;
       clearResultUrl();
 
+      setSelectionFrameReady(
+        false,
+      );
+
       setState({
         status:
           "selecting",
@@ -641,11 +657,24 @@ export const VideoLab = () => {
     );
   };
 
-  const handleSelectionClick =
+  const handleSelectionPointer =
     (
       event:
-        MouseEvent,
+        PointerEvent,
     ) => {
+      if (
+        !event.isPrimary ||
+        (
+          event.pointerType ===
+            "mouse" &&
+          event.button !==
+            0
+        )
+      ) {
+        return;
+      }
+
+      event.preventDefault();
       const target =
         event.currentTarget;
 
@@ -882,7 +911,12 @@ export const VideoLab = () => {
               muted
               playsinline
               preload="auto"
-              onLoadedData={() => {
+              class={
+                selectionFrameReady()
+                  ? "is-ready"
+                  : ""
+              }
+              onLoadedMetadata={() => {
                 const video =
                   selectionVideo;
 
@@ -915,46 +949,97 @@ export const VideoLab = () => {
                     selectionTime(),
                   );
 
-                video.currentTime =
-                  time;
-
                 setSelectionTime(
                   time,
                 );
+
+                if (
+                  Math.abs(
+                    video.currentTime -
+                    time,
+                  ) >
+                  0.001
+                ) {
+                  video.currentTime =
+                    time;
+                }
+              }}
+              onLoadedData={() => {
+                if (
+                  selectionTime() <=
+                  0.001
+                ) {
+                  setSelectionFrameReady(
+                    true,
+                  );
+                }
+              }}
+              onSeeked={() => {
+                const video =
+                  selectionVideo;
+
+                if (
+                  video ===
+                  undefined
+                ) {
+                  return;
+                }
+
+                if (
+                  Math.abs(
+                    video.currentTime -
+                    selectionTime(),
+                  ) <=
+                  0.04
+                ) {
+                  setSelectionFrameReady(
+                    true,
+                  );
+                }
               }}
             />
-            <button
-              class="video-lab-selection-surface"
-              type="button"
-              aria-label="Add a selection point"
-              onClick={
-                handleSelectionClick
+            <Show
+              when={
+                selectionFrameReady()
               }
-            />
-            <For each={points()}>
-              {(point) => (
-                <span
-                  class={
-                    point.label ===
+              fallback={
+                <div class="video-lab-selection-loading">
+                  Restoring selected frame…
+                </div>
+              }
+            >
+              <div
+                class="video-lab-selection-surface"
+                aria-label="Add a selection point"
+                onPointerDown={
+                  handleSelectionPointer
+                }
+              />
+              <Index each={points()}>
+                {(point) => (
+                  <span
+                    class={
+                      point().label ===
+                      1
+                        ? "video-lab-point is-keep"
+                        : "video-lab-point is-exclude"
+                    }
+                    style={{
+                      left:
+                        `${point().x * 100}%`,
+                      top:
+                        `${point().y * 100}%`,
+                    }}
+                    aria-hidden="true"
+                  >
+                    {point().label ===
                     1
-                      ? "video-lab-point is-keep"
-                      : "video-lab-point is-exclude"
-                  }
-                  style={{
-                    left:
-                      `${point.x * 100}%`,
-                    top:
-                      `${point.y * 100}%`,
-                  }}
-                  aria-hidden="true"
-                >
-                  {point.label ===
-                  1
-                    ? "+"
-                    : "−"}
-                </span>
-              )}
-            </For>
+                      ? "+"
+                      : "−"}
+                  </span>
+                )}
+              </Index>
+            </Show>
           </div>
 
           <div class="video-lab-scrubber">
