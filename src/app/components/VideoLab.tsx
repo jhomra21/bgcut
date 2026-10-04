@@ -135,10 +135,32 @@ export const VideoLab = () => {
       : undefined;
   };
 
+  const processingState =
+    () => {
+      const current =
+        state();
+
+      return current.status ===
+        "processing"
+        ? current
+        : undefined;
+    };
+
+  const errorMessage =
+    () => {
+      const current =
+        state();
+
+      return current.status ===
+        "error"
+        ? current.message
+        : undefined;
+    };
+
   const processing =
     () =>
-      state().status ===
-      "processing";
+      processingState() !==
+      undefined;
 
   const run = (
     file: File,
@@ -425,30 +447,24 @@ export const VideoLab = () => {
       </button>
 
       <Show
+        keyed
         when={
-          state().status ===
-          "processing"
+          processingState()
         }
       >
-        <div class="video-lab-progress">
-          <progress
-            max="1"
-            value={
-              state().status ===
-              "processing"
-                ? state()
-                    .progress
-                : 0
-            }
-          />
-          <span>
-            {state().status ===
-            "processing"
-              ? state()
-                  .message
-              : ""}
-          </span>
-        </div>
+        {(current) => (
+          <div class="video-lab-progress">
+            <progress
+              max="1"
+              value={
+                current.progress
+              }
+            />
+            <span>
+              {current.message}
+            </span>
+          </div>
+        )}
       </Show>
 
       <Show
@@ -501,21 +517,19 @@ export const VideoLab = () => {
       </Show>
 
       <Show
+        keyed
         when={
-          state().status ===
-          "error"
+          errorMessage()
         }
       >
-        <div
-          class="error-card"
-          role="alert"
-        >
-          {state().status ===
-          "error"
-            ? state()
-                .message
-            : ""}
-        </div>
+        {(message) => (
+          <div
+            class="error-card"
+            role="alert"
+          >
+            {message}
+          </div>
+        )}
       </Show>
     </section>
   );
