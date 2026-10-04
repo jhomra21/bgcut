@@ -856,7 +856,7 @@ export const VideoLab = () => {
                 Select what stays
               </strong>
               <span>
-                Click the subject you want to keep. Add exclude points when background or nearby objects get included.
+                Scrub to a useful frame, then click the subject you want to keep. Add exclude points when background or nearby objects get included.
               </span>
             </div>
             <button
@@ -883,17 +883,44 @@ export const VideoLab = () => {
               playsinline
               preload="auto"
               onLoadedData={() => {
-                selectionVideo?.pause();
+                const video =
+                  selectionVideo;
 
                 if (
-                  selectionVideo !==
-                    undefined &&
-                  selectionVideo.currentTime !==
-                    0
+                  video ===
+                  undefined
                 ) {
-                  selectionVideo.currentTime =
-                    0;
+                  return;
                 }
+
+                video.pause();
+
+                const duration =
+                  Number.isFinite(
+                    video.duration,
+                  )
+                    ? Math.min(
+                        video.duration,
+                        MAX_SELECTION_SECONDS,
+                      )
+                    : MAX_SELECTION_SECONDS;
+
+                setSelectionDuration(
+                  duration,
+                );
+
+                const time =
+                  Math.min(
+                    duration,
+                    selectionTime(),
+                  );
+
+                video.currentTime =
+                  time;
+
+                setSelectionTime(
+                  time,
+                );
               }}
             />
             <button
@@ -928,6 +955,41 @@ export const VideoLab = () => {
                 </span>
               )}
             </For>
+          </div>
+
+          <div class="video-lab-scrubber">
+            <input
+              type="range"
+              min="0"
+              max={
+                selectionDuration()
+              }
+              step="0.01"
+              value={
+                selectionTime()
+              }
+              aria-label="Choose subject frame"
+              onInput={(
+                event,
+              ) =>
+                scrubSelection(
+                  event.currentTarget
+                    .valueAsNumber,
+                )
+              }
+            />
+            <div class="video-lab-scrubber-meta">
+              <span>
+                {formatVideoTime(
+                  selectionTime(),
+                )} / {formatVideoTime(
+                  selectionDuration(),
+                )}
+              </span>
+              <span>
+                Pick the frame where your subject is easiest to identify.
+              </span>
+            </div>
           </div>
 
           <div class="video-lab-selection-toolbar">
