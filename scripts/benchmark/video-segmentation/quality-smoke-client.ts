@@ -1505,6 +1505,12 @@ const main =
         requested,
       );
 
+    const requestedFrameCount =
+      seedMode ===
+      "birefnet-saliency-train"
+        ? 1
+        : QUALITY_FRAME_COUNT;
+
     const videoResponse =
       await fetch(
         qualityVideoRoute(
@@ -1534,7 +1540,7 @@ const main =
         Array.from(
           {
             length:
-              QUALITY_FRAME_COUNT,
+              requestedFrameCount,
           },
           (
             _,
@@ -1696,6 +1702,11 @@ const main =
             null;
 
         if (
+          seedMode ===
+          "birefnet-saliency-train"
+        ) {
+          // Training only records BiRefNet's relative semantic field.
+        } else if (
           seedMode ===
           "birefnet-direct"
         ) {
