@@ -1839,7 +1839,9 @@ const main =
           seedMode ===
             "grid-model" ||
           seedMode ===
-            "hybrid"
+            "hybrid" ||
+          seedMode ===
+            "hybrid-fp16"
         ) {
           selector =
             "proposal0-nonedge-stability-area";
@@ -1894,7 +1896,10 @@ const main =
                   ? current
                   : selected,
             ).index;
-        } else {
+        } else if (
+          seedMode ===
+          "grid-oracle"
+        ) {
           selector =
             "oracle-j-and-f";
 
@@ -1916,6 +1921,10 @@ const main =
                 index;
             }
           }
+        } else {
+          throw new Error(
+            `Seed mode "${seedMode}" reached grid discovery without a declared selector.`,
+          );
         }
 
         const selected =
