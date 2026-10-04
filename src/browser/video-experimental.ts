@@ -27,9 +27,17 @@ import type {
 } from "../../scripts/benchmark/video-segmentation/types";
 
 const SAMPLE_FPS = 6;
+
 const MAX_DURATION_SECONDS = 15;
+
 const MAX_OUTPUT_SIDE = 1280;
+
 const GRID_POINTS_PER_SIDE = 7;
+
+type VideoOutputSize = {
+  readonly width: number;
+  readonly height: number;
+};
 
 export type ExperimentalVideoProgress = {
   readonly stage:
@@ -304,10 +312,7 @@ const selectDiscovery = (
 const outputSize = (
   width: number,
   height: number,
-): {
-  readonly width: number;
-  readonly height: number;
-} => {
+): VideoOutputSize => {
   const scale =
     Math.min(
       1,
