@@ -826,12 +826,12 @@ export const VideoLab = () => {
               aria-label="Selection point type"
             >
               <button
-                class="text-button"
-                classList={{
-                  "is-active":
-                    promptMode() ===
-                    "keep",
-                }}
+                class={
+                  promptMode() ===
+                  "keep"
+                    ? "text-button is-active"
+                    : "text-button"
+                }
                 type="button"
                 aria-pressed={
                   promptMode() ===
@@ -846,12 +846,12 @@ export const VideoLab = () => {
                 Keep
               </button>
               <button
-                class="text-button"
-                classList={{
-                  "is-active":
-                    promptMode() ===
-                    "exclude",
-                }}
+                class={
+                  promptMode() ===
+                  "exclude"
+                    ? "text-button is-active"
+                    : "text-button"
+                }
                 type="button"
                 aria-pressed={
                   promptMode() ===
