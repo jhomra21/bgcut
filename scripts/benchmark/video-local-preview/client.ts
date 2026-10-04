@@ -1017,7 +1017,7 @@ const runFixture = async (
                       other.x,
                     y:
                       other.y,
-                    label: 0,
+                    label: 0 as const,
                   },
                 ],
               },
