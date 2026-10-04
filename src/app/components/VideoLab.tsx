@@ -319,14 +319,9 @@ export const VideoLab = () => {
         ?.points ??
       [];
 
-  const setPoints = (
-    update:
-      | readonly PromptPoint[]
-      | ((
-          current:
-            readonly PromptPoint[],
-        ) =>
-          readonly PromptPoint[]),
+  const replacePoints = (
+    nextPoints:
+      readonly PromptPoint[],
   ) => {
     const id =
       activeSubjectId();
@@ -334,25 +329,43 @@ export const VideoLab = () => {
     setSubjects(
       (current) =>
         current.map(
-          (subject) => {
-            if (
-              subject.id !==
-              id
-            ) {
-              return subject;
-            }
+          (subject) =>
+            subject.id ===
+            id
+              ? {
+                  ...subject,
+                  points:
+                    nextPoints,
+                }
+              : subject,
+        ),
+    );
+  };
 
-            return {
-              ...subject,
-              points:
-                typeof update ===
-                "function"
-                  ? update(
+  const updatePoints = (
+    update: (
+      current:
+        readonly PromptPoint[],
+    ) =>
+      readonly PromptPoint[],
+  ) => {
+    const id =
+      activeSubjectId();
+
+    setSubjects(
+      (current) =>
+        current.map(
+          (subject) =>
+            subject.id ===
+            id
+              ? {
+                  ...subject,
+                  points:
+                    update(
                       subject.points,
-                    )
-                  : update,
-            };
-          },
+                    ),
+                }
+              : subject,
         ),
     );
   };
@@ -508,7 +521,7 @@ export const VideoLab = () => {
         current.length <=
         1
       ) {
-        setPoints(
+        replacePoints(
           [],
         );
 
@@ -939,7 +952,7 @@ export const VideoLab = () => {
           ),
         );
 
-      setPoints(
+      updatePoints(
         (
           current,
         ) => [
@@ -1439,7 +1452,7 @@ export const VideoLab = () => {
                   0
                 }
                 onClick={() =>
-                  setPoints(
+                  updatePoints(
                     (
                       current,
                     ) =>
@@ -1460,7 +1473,7 @@ export const VideoLab = () => {
                   0
                 }
                 onClick={() =>
-                  setPoints(
+                  replacePoints(
                     [],
                   )
                 }
