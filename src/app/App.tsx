@@ -25,6 +25,7 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { applySiteMetadata } from "./site-metadata";
 import { TermsPage } from "./pages/TermsPage";
 import { ToolIndexPage, TransparencyCheckerPage } from "./pages/ToolPage";
+import { VideoLab } from "./components/VideoLab";
 
 const PageContent = (props: { readonly page: SitePage }) => {
   const intentPage = () => isIntentPage(props.page) ? props.page : undefined;
@@ -89,6 +90,7 @@ const App = (props: AppProps = {}) => {
           <LocalAppHeader />
         </div>
         <HomePage />
+        <VideoLab />
       </div>
     );
   }
