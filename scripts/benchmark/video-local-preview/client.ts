@@ -11,8 +11,8 @@ import {
 
 const FIXTURES = [
   "bear",
+  "car-shadow",
   "bmx-trees",
-  "color-run",
 ] as const;
 
 type FixtureId =
@@ -833,9 +833,9 @@ const runFixture = async (
         }
       : undefined;
 
-  const breakdancePoints =
+  const multiObjectPoints =
     fixture ===
-    "color-run"
+    "bmx-trees"
       ? await promptPointsByObject(
           fixture,
           11,
@@ -844,10 +844,10 @@ const runFixture = async (
       : undefined;
 
   const subjects =
-    breakdancePoints ===
+    multiObjectPoints ===
     undefined
       ? undefined
-      : breakdancePoints.map(
+      : multiObjectPoints.map(
           (
             point,
             index,
@@ -866,7 +866,7 @@ const runFixture = async (
     fixture ===
       "bear" ||
     fixture ===
-      "color-run";
+      "bmx-trees";
 
   const result =
     await removeVideoBackgroundExperimental(
@@ -895,12 +895,12 @@ const runFixture = async (
 
   if (
     fixture ===
-      "color-run" &&
+      "bmx-trees" &&
     result.seed !==
       "sam21-subjects"
   ) {
     throw new Error(
-      `Multi-subject breakdance case used ${result.seed} instead of shared SAM 2.1 subject tracking.`,
+      `Multi-subject bmx-trees case used ${result.seed} instead of shared SAM 2.1 subject tracking.`,
     );
   }
 
