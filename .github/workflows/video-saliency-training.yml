@@ -1,0 +1,121 @@
+name: video saliency training
+
+on:
+  push:
+    branches:
+      - research/video-birefnet-saliency-training
+
+jobs:
+  saliency:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+
+      - name: Collect BiRefNet saliency on DAVIS 2017 training
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-saliency-training"
+          DAVIS_ROOT="$RUNNER_TEMP/davis-2017-trainval"
+          ARCHIVE="$RUNNER_TEMP/DAVIS-2017-trainval-480p.zip"
+          TRAIN_LIST="$DAVIS_ROOT/train.txt"
+          mkdir -p "$ROOT" "$DAVIS_ROOT"
+
+          curl             --fail             --location             --retry 3             --output "$ARCHIVE"             "https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-trainval-480p.zip"
+
+          printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
+
+          unzip -p             "$ARCHIVE"             DAVIS/ImageSets/2017/train.txt             | tr -d '\r'             > "$TRAIN_LIST"
+
+          while IFS= read -r fixture; do
+            [[ -n "$fixture" ]] || continue
+
+            unzip -q               "$ARCHIVE"               "DAVIS/Annotations/480p/$fixture/00000.png"               -d "$DAVIS_ROOT"
+          done < "$TRAIN_LIST"
+
+          DAVIS_ANNOTATION_ROOT="$DAVIS_ROOT/DAVIS/Annotations/480p"             bun run benchmark:video-segmentation:quality -- "$ROOT" 4191 >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4191/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          run_fixture() {
+            local fixture="$1"
+            local result="$ROOT/$fixture-edgetam-birefnet-saliency-train-result.json"
+            local failure="$ROOT/$fixture-edgetam-birefnet-saliency-train-failure.json"
+            rm -f "$result" "$failure"
+
+            "$CHROME"               --headless=new               --enable-unsafe-webgpu               --disable-gpu-blocklist               --enable-webgpu-developer-features               --use-gpu-in-tests               "http://127.0.0.1:4191/?candidate=edgetam&fixture=$fixture&seedMode=birefnet-saliency-train" >"$ROOT/$fixture-chrome.log" 2>&1 &
+            CHROME_PID=$!
+
+            for _ in {1..600}; do
+              if [[ -f "$result" ]]; then
+                cat "$result"
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 0
+              fi
+
+              if [[ -f "$failure" ]]; then
+                cat "$failure" >&2
+                kill "$CHROME_PID" 2>/dev/null || true
+                unset CHROME_PID
+                return 1
+              fi
+
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                echo "Chrome exited before $fixture saliency completed." >&2
+                cat "$ROOT/$fixture-chrome.log" >&2 || true
+                unset CHROME_PID
+                return 1
+              fi
+
+              sleep 1
+            done
+
+            echo "$fixture saliency run timed out." >&2
+            kill "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+            return 1
+          }
+
+          failed=0
+
+          while IFS= read -r fixture; do
+            [[ -n "$fixture" ]] || continue
+            run_fixture "$fixture" || failed=1
+          done < "$TRAIN_LIST"
+
+          exit "$failed"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-saliency-training
+          path: ${{ runner.temp }}/video-saliency-training
+          if-no-files-found: error
