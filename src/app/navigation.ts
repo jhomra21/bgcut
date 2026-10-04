@@ -13,6 +13,7 @@ const PAGE_BY_PATH = new Map(
 );
 
 export const isLocalRuntime = (): boolean =>
+  import.meta.env.DEV ||
   document.querySelector(LOCAL_RUNTIME_META_SELECTOR) !== null;
 
 export type Navigate = (page: SitePage) => void;
