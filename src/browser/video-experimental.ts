@@ -24,6 +24,7 @@ import type {
   VideoSegmentationDiscovery,
   VideoSegmentationMask,
   VideoSegmentationMaskAlternative,
+  VideoSegmentationPrompt,
 } from "../../scripts/benchmark/video-segmentation/types";
 
 const SAMPLE_FPS = 6;
@@ -60,11 +61,14 @@ export type ExperimentalVideoResult = {
   readonly duration: number;
   readonly sampleFps: number;
   readonly seed:
+    | "sam21-prompt"
     | "birefnet-direct"
     | "edgetam-grid";
 };
 
 export type ExperimentalVideoOptions = {
+  readonly prompt?:
+    VideoSegmentationPrompt;
   readonly onProgress?: (
     progress:
       ExperimentalVideoProgress,
@@ -580,22 +584,34 @@ export const removeVideoBackgroundExperimental =
       outputSource,
     );
 
-    const biRefNet =
-      await createBiRefNetSeeder(
-        "fp16",
-      );
+    const prompted =
+      options.prompt !==
+      undefined;
 
-    const edge =
+    const biRefNet =
+      prompted
+        ? undefined
+        : await createBiRefNetSeeder(
+            "fp16",
+          );
+
+    const segmenter =
       await createVideoSegmentationAdapter(
-        VIDEO_SEGMENTATION_CANDIDATES
-          .edgetam,
+        prompted
+          ? VIDEO_SEGMENTATION_CANDIDATES[
+              "sam21-tiny"
+            ]
+          : VIDEO_SEGMENTATION_CANDIDATES
+              .edgetam,
         (value) => {
           progress(
             options,
             {
               stage: "loading",
               message:
-                "Loading EdgeTAM…",
+                prompted
+                  ? "Loading SAM 2.1…"
+                  : "Loading EdgeTAM…",
               progress:
                 Math.min(
                   0.18,
@@ -617,7 +633,9 @@ export const removeVideoBackgroundExperimental =
       ExperimentalVideoResult[
         "seed"
       ] =
-        "edgetam-grid";
+        prompted
+          ? "sam21-prompt"
+          : "edgetam-grid";
 
     let frameIndex = 0;
 
@@ -676,72 +694,97 @@ export const removeVideoBackgroundExperimental =
             frameIndex ===
             0
           ) {
-            const semantic =
-              await biRefNet.seed(
-                decoded.frame,
-              );
-
             if (
-              semantic
-                .positiveFraction >
-              0
+              options.prompt !==
+              undefined
             ) {
+              mask =
+                await segmenter.seed(
+                  decoded.frame,
+                  options.prompt,
+                  0,
+                  timestamps.length,
+                );
+
+              seedKind =
+                "sam21-prompt";
+            } else {
               if (
-                edge.seedMask ===
+                biRefNet ===
                 undefined
               ) {
                 throw new Error(
-                  "EdgeTAM cannot accept the BiRefNet foreground matte.",
+                  "Automatic video foreground discovery is unavailable.",
                 );
               }
 
-              mask =
-                await edge.seedMask(
+              const semantic =
+                await biRefNet.seed(
                   decoded.frame,
-                  semantic,
-                  0,
-                  timestamps.length,
                 );
 
-              seedKind =
-                "birefnet-direct";
-            } else {
               if (
-                edge.discover ===
-                  undefined ||
-                edge.seedMask ===
-                  undefined
+                semantic
+                  .positiveFraction >
+                0
               ) {
-                throw new Error(
-                  "EdgeTAM automatic foreground discovery is unavailable.",
-                );
+                if (
+                  segmenter.seedMask ===
+                  undefined
+                ) {
+                  throw new Error(
+                    "EdgeTAM cannot accept the BiRefNet foreground matte.",
+                  );
+                }
+
+                mask =
+                  await segmenter.seedMask(
+                    decoded.frame,
+                    semantic,
+                    0,
+                    timestamps.length,
+                  );
+
+                seedKind =
+                  "birefnet-direct";
+              } else {
+                if (
+                  segmenter.discover ===
+                    undefined ||
+                  segmenter.seedMask ===
+                    undefined
+                ) {
+                  throw new Error(
+                    "EdgeTAM automatic foreground discovery is unavailable.",
+                  );
+                }
+
+                const discoveries =
+                  await segmenter.discover(
+                    decoded.frame,
+                    discoveryGrid(),
+                  );
+
+                const selected =
+                  selectDiscovery(
+                    discoveries,
+                  );
+
+                mask =
+                  await segmenter.seedMask(
+                    decoded.frame,
+                    selected.mask,
+                    0,
+                    timestamps.length,
+                  );
+
+                seedKind =
+                  "edgetam-grid";
               }
-
-              const discoveries =
-                await edge.discover(
-                  decoded.frame,
-                  discoveryGrid(),
-                );
-
-              const selected =
-                selectDiscovery(
-                  discoveries,
-                );
-
-              mask =
-                await edge.seedMask(
-                  decoded.frame,
-                  selected.mask,
-                  0,
-                  timestamps.length,
-                );
-
-              seedKind =
-                "edgetam-grid";
             }
           } else {
             mask =
-              await edge.track(
+              await segmenter.track(
                 decoded.frame,
                 frameIndex,
                 timestamps.length,
@@ -878,8 +921,8 @@ export const removeVideoBackgroundExperimental =
           seedKind,
       };
     } finally {
-      await edge.close();
-      await biRefNet.close();
+      await segmenter.close();
+      await biRefNet?.close();
       source.close();
     }
   };
