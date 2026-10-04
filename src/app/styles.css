@@ -2522,6 +2522,28 @@ figure {
   background-size: 16px 16px;
 }
 
+.video-lab-safari-preview-note {
+  width: 100%;
+  min-height: 180px;
+  margin-top: 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+.video-lab-safari-preview-note span {
+  max-width: 540px;
+  border-radius: 8px;
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .video-lab-result {
   margin-top: 16px;
 }
