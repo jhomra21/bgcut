@@ -129,7 +129,9 @@ jobs:
           for _ in {1..900}; do
             if [[ -f "$ROOT/result.json" ]]; then
               cat "$ROOT/result.json"
-              test -s "$ROOT/transparent.webm"
+              test -s "$ROOT/bear.webm"
+              test -s "$ROOT/bmx-trees.webm"
+              test -s "$ROOT/color-run.webm"
               exit 0
             fi
 
