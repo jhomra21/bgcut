@@ -6,6 +6,10 @@ import {
   maskOverlapWithBiRefNet,
   softMaskOverlapWithBiRefNet,
 } from "./birefnet-seed";
+
+import type {
+  BiRefNetSeed,
+} from "./birefnet-seed";
 import {
   VIDEO_SEGMENTATION_CANDIDATES,
 } from "./candidates";
@@ -46,6 +50,7 @@ type QualitySeedMode =
   | "birefnet-direct"
   | "hybrid"
   | "hybrid-fp16"
+  | "birefnet-saliency-train"
   | "grid-oracle"
   | "grid-model";
 
@@ -93,6 +98,13 @@ type QualityFrame = {
     number | null;
 };
 
+type RelativeSaliencyFingerprint = {
+  readonly topFraction: number;
+  readonly threshold: number;
+  readonly fingerprint32:
+    string;
+};
+
 type AutomaticSeedQuality = {
   readonly modelRevision: string;
   readonly modelLoadMs: number;
@@ -116,6 +128,8 @@ type AutomaticSeedQuality = {
     readonly number[];
   readonly selectedProposalOverlap:
     number | null;
+  readonly relativeSaliency:
+    readonly RelativeSaliencyFingerprint[];
 };
 
 type GridDiscoveryCandidate = {
@@ -306,6 +320,7 @@ const seedModeFromLocation =
       case "birefnet-direct":
       case "hybrid":
       case "hybrid-fp16":
+      case "birefnet-saliency-train":
       case "grid-oracle":
       case "grid-model":
         return mode;
@@ -1250,6 +1265,143 @@ const gridUnionVariants = (
   return results;
 };
 
+const RELATIVE_SALIENCY_FRACTIONS = [
+  0.005,
+  0.01,
+  0.02,
+  0.05,
+  0.1,
+  0.2,
+] as const;
+
+const relativeSaliencyFingerprints = (
+  seed:
+    BiRefNetSeed,
+): readonly RelativeSaliencyFingerprint[] => {
+  const sorted =
+    seed.logits.slice();
+
+  sorted.sort();
+
+  const side = 32;
+
+  return RELATIVE_SALIENCY_FRACTIONS.map(
+    (topFraction) => {
+      const thresholdIndex =
+        Math.max(
+          0,
+          Math.min(
+            sorted.length - 1,
+            Math.floor(
+              (
+                1 -
+                topFraction
+              ) *
+                sorted.length,
+            ),
+          ),
+        );
+
+      const threshold =
+        sorted[
+          thresholdIndex
+        ] ??
+        seed.maxLogit;
+
+      const bytes =
+        new Uint8Array(
+          side *
+            side /
+            8,
+        );
+
+      for (
+        let y = 0;
+        y < side;
+        y += 1
+      ) {
+        const sourceY =
+          Math.min(
+            seed.height - 1,
+            Math.floor(
+              (
+                (y + 0.5) /
+                side
+              ) *
+                seed.height,
+            ),
+          );
+
+        for (
+          let x = 0;
+          x < side;
+          x += 1
+        ) {
+          const sourceX =
+            Math.min(
+              seed.width - 1,
+              Math.floor(
+                (
+                  (x + 0.5) /
+                  side
+                ) *
+                  seed.width,
+              ),
+            );
+
+          if (
+            (seed.logits[
+              sourceY *
+                seed.width +
+                sourceX
+            ] ??
+              Number.NEGATIVE_INFINITY) <
+            threshold
+          ) {
+            continue;
+          }
+
+          const bit =
+            y *
+              side +
+            x;
+
+          bytes[
+            bit >>
+              3
+          ] |=
+            128 >>
+            (
+              bit &
+              7
+            );
+        }
+      }
+
+      let binary = "";
+
+      for (
+        const byte of
+        bytes
+      ) {
+        binary +=
+          String.fromCharCode(
+            byte,
+          );
+      }
+
+      return {
+        topFraction,
+        threshold,
+        fingerprint32:
+          btoa(
+            binary,
+          ),
+      };
+    },
+  );
+};
+
 const discoveryGrid = (
   pointsPerSide: number,
 ): readonly QualitySeedPoint[] => {
@@ -1336,7 +1488,9 @@ const main =
         seedMode ===
           "birefnet-direct" ||
         seedMode ===
-          "hybrid"
+          "hybrid" ||
+        seedMode ===
+          "birefnet-saliency-train"
       ) &&
       requested !==
         "edgetam"
@@ -1425,6 +1579,8 @@ const main =
       seedMode !==
         "hybrid-fp16" &&
       seedMode !==
+        "birefnet-saliency-train" &&
+      seedMode !==
         "grid-oracle" &&
       seedMode !==
         "grid-model"
@@ -1461,7 +1617,9 @@ const main =
       seedMode ===
         "hybrid" ||
       seedMode ===
-        "hybrid-fp16"
+        "hybrid-fp16" ||
+      seedMode ===
+        "birefnet-saliency-train"
     ) {
       const decoded =
         await source.frameAt(
@@ -1483,7 +1641,9 @@ const main =
       const seeder =
         await createBiRefNetSeeder(
           seedMode ===
-          "hybrid-fp16"
+              "hybrid-fp16" ||
+            seedMode ===
+              "birefnet-saliency-train"
             ? "fp16"
             : "fp32",
         );
@@ -1688,6 +1848,13 @@ const main =
             quality.jAndF,
           proposalOverlaps,
           selectedProposalOverlap,
+          relativeSaliency:
+            seedMode ===
+            "birefnet-saliency-train"
+              ? relativeSaliencyFingerprints(
+                  seed,
+                )
+              : [],
         };
       } finally {
         decoded.close();
@@ -1701,6 +1868,105 @@ const main =
 
         await seeder.close();
       }
+    }
+
+    if (
+      seedMode ===
+      "birefnet-saliency-train"
+    ) {
+      if (
+        automaticSeed ===
+        null
+      ) {
+        throw new Error(
+          "BiRefNet saliency training did not produce a seed report.",
+        );
+      }
+
+      const report:
+        QualityReport = {
+          schemaVersion: 1,
+          fixture,
+          fixtureLabel:
+            QUALITY_FIXTURES[
+              fixture
+            ].label,
+          candidate:
+            requested,
+          seedMode,
+          proposalIndex: null,
+          automaticSeed,
+          gridDiscovery: null,
+          model:
+            automaticSeed
+              .modelRevision,
+          frameCount: 1,
+          loadMs:
+            automaticSeed
+              .modelLoadMs,
+          seedPoint,
+          seedIou:
+            automaticSeed
+              .groundTruthIou,
+          seedBoundaryF:
+            automaticSeed
+              .groundTruthBoundaryF,
+          seedAlternatives: [],
+          bestSeedAlternativeIou:
+            automaticSeed
+              .groundTruthIou,
+          bestSeedAlternativeJAndF:
+            automaticSeed
+              .groundTruthJAndF,
+          meanTrackedIou: 0,
+          minTrackedIou: 0,
+          meanTrackedBoundaryF: 0,
+          minTrackedBoundaryF: 0,
+          meanTrackedJAndF: 0,
+          meanTrackedInferenceMs: 0,
+          frames: [
+            {
+              frameIndex: 0,
+              timestamp:
+                source.info
+                  .firstTimestamp,
+              inferenceMs:
+                automaticSeed
+                  .inferenceMs,
+              groundTruthIou:
+                automaticSeed
+                  .groundTruthIou,
+              groundTruthBoundaryF:
+                automaticSeed
+                  .groundTruthBoundaryF,
+              groundTruthJAndF:
+                automaticSeed
+                  .groundTruthJAndF,
+              modelIou: null,
+              objectScore: null,
+            },
+          ],
+        };
+
+      source.close();
+
+      for (
+        const mask of
+        groundTruth
+      ) {
+        mask.bitmap.close();
+      }
+
+      await postJson(
+        "/result",
+        report,
+      );
+
+      writeStatus(
+        `${report.fixtureLabel} BiRefNet saliency recorded.`,
+      );
+
+      return;
     }
 
     if (
