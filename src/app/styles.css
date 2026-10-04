@@ -2401,6 +2401,21 @@ figure {
   width: 100%;
   height: auto;
   display: block;
+  opacity: 0;
+}
+
+.video-lab-selection-frame video.is-ready {
+  opacity: 1;
+}
+
+.video-lab-selection-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
 }
 
 .video-lab-selection-surface {
@@ -2413,9 +2428,8 @@ figure {
   cursor: crosshair;
 }
 
-.video-lab-selection-surface:focus-visible {
-  outline: 2px solid var(--text-primary);
-  outline-offset: -3px;
+.video-lab-selection-surface {
+  touch-action: none;
 }
 
 .video-lab-point {
