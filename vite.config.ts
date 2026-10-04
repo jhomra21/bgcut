@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
 import solid from "@solidjs/vite-plugin";
 import { defineConfig, type Plugin } from "vite";
 
@@ -11,10 +14,115 @@ import {
   WEBGPU_MODEL_PUBLIC_PATH,
   WEBGPU_MODEL_RELEASE_URL,
 } from "./src/shared/model-config.ts";
+import {
+  ORT_WASM_FILENAME,
+  ORT_WASM_MODULE_FILENAME,
+  ORT_WASM_MODULE_PUBLIC_PATH,
+  ORT_WASM_PUBLIC_PATH,
+  ORT_WEBGPU_WASM_FILENAME,
+  ORT_WEBGPU_WASM_PUBLIC_PATH,
+} from "./src/shared/ort-assets.ts";
 
 const releaseModelUrl = new URL(MODEL_RELEASE_URL);
 
 const releaseWebGpuModelUrl = new URL(WEBGPU_MODEL_RELEASE_URL);
+
+const ORT_RUNTIME_ASSETS = [
+  {
+    publicPath: ORT_WEBGPU_WASM_PUBLIC_PATH,
+    filename: ORT_WEBGPU_WASM_FILENAME,
+    contentType: "application/wasm",
+  },
+  {
+    publicPath: ORT_WASM_PUBLIC_PATH,
+    filename: ORT_WASM_FILENAME,
+    contentType: "application/wasm",
+  },
+  {
+    publicPath: ORT_WASM_MODULE_PUBLIC_PATH,
+    filename: ORT_WASM_MODULE_FILENAME,
+    contentType: "text/javascript; charset=utf-8",
+  },
+] as const;
+
+const ortRuntimeDirectory = resolve(
+  "node_modules/onnxruntime-web/dist",
+);
+
+const ortRuntimeDevPlugin = (): Plugin => ({
+  name: "bgcut-ort-runtime-dev",
+  configureServer(server) {
+    server.middlewares.use((request, response, next) => {
+      const requestUrl = request.url;
+
+      if (
+        requestUrl === undefined ||
+        (request.method !== "GET" &&
+          request.method !== "HEAD")
+      ) {
+        next();
+
+        return;
+      }
+
+      const pathname =
+        new URL(
+          requestUrl,
+          "http://127.0.0.1",
+        ).pathname;
+
+      const asset =
+        ORT_RUNTIME_ASSETS.find(
+          (candidate) =>
+            candidate.publicPath ===
+            pathname,
+        );
+
+      if (asset === undefined) {
+        next();
+
+        return;
+      }
+
+      void (async () => {
+        const bytes =
+          await readFile(
+            resolve(
+              ortRuntimeDirectory,
+              asset.filename,
+            ),
+          );
+
+        response.statusCode = 200;
+        response.setHeader(
+          "content-type",
+          asset.contentType,
+        );
+        response.setHeader(
+          "cache-control",
+          "no-store",
+        );
+        response.setHeader(
+          "content-length",
+          bytes.byteLength,
+        );
+
+        response.end(
+          request.method === "HEAD"
+            ? undefined
+            : bytes,
+        );
+      })().catch((error) => {
+        response.statusCode = 500;
+        response.end(
+          error instanceof Error
+            ? error.message
+            : String(error),
+        );
+      });
+    });
+  },
+});
 
 const videoModelDevPlugin = (): Plugin => ({
   name: "bgcut-video-model-dev-proxy",
@@ -71,6 +179,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       solid({ ssr: true }),
+      ortRuntimeDevPlugin(),
       videoModelDevPlugin(),
     ],
     publicDir: externalAssetHost ? false : "public",
