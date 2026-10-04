@@ -2300,3 +2300,127 @@ figure {
     grid-template-columns: 1fr;
   }
 }
+
+
+.video-lab {
+  width: min(1120px, calc(100% - 32px));
+  margin: 12px auto 48px;
+  padding: 22px;
+  border: 1px solid var(--border-primary);
+  border-radius: 18px;
+  background: var(--background-surface);
+}
+
+.video-lab-head,
+.video-lab-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.video-lab-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  letter-spacing: -0.025em;
+}
+
+.video-lab-kicker,
+.video-lab-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.video-lab-copy {
+  max-width: 760px;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.video-lab-drop {
+  width: 100%;
+  min-height: 104px;
+  margin-top: 18px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  border: 1px dashed var(--border-drop);
+  border-radius: 14px;
+  background: var(--background-subtle);
+  color: var(--text-primary);
+}
+
+.video-lab-drop span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.video-lab-progress {
+  margin-top: 14px;
+  display: grid;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.video-lab-progress progress {
+  width: 100%;
+  height: 8px;
+}
+
+.video-lab-preview,
+.video-lab-video {
+  width: 100%;
+  margin-top: 16px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+}
+
+.video-lab-preview {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+}
+
+.video-lab-preview canvas,
+.video-lab-video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.checkerboard {
+  background-color: var(--background-surface);
+  background-image:
+    linear-gradient(45deg, var(--background-checker) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--background-checker) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--background-checker) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--background-checker) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.video-lab-result {
+  margin-top: 16px;
+}
+
+.video-lab-result-row {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .video-lab-head,
+  .video-lab-result-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
