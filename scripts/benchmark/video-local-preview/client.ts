@@ -18,6 +18,11 @@ const FIXTURES = [
 type FixtureId =
   typeof FIXTURES[number];
 
+type PixelPoint = {
+  readonly x: number;
+  readonly y: number;
+};
+
 type PreviewFailure = {
   readonly schemaVersion: 2;
   readonly message: string;
@@ -643,12 +648,10 @@ const promptSeparatedPoints = async (
     const farthestFrom = (
       x: number,
       y: number,
-    ): {
-      readonly x: number;
-      readonly y: number;
-    } => {
+    ): PixelPoint => {
       let selectedX = 0;
       let selectedY = 0;
+
       let selectedDistance =
         Number.NEGATIVE_INFINITY;
 
