@@ -1,5 +1,5 @@
 import {
-  Index,
+  For,
   Show,
   createSignal,
   onCleanup,
@@ -675,6 +675,7 @@ export const VideoLab = () => {
       }
 
       event.preventDefault();
+
       const target =
         event.currentTarget;
 
@@ -1015,30 +1016,30 @@ export const VideoLab = () => {
                   handleSelectionPointer
                 }
               />
-              <Index each={points()}>
+              <For each={points()}>
                 {(point) => (
                   <span
                     class={
-                      point().label ===
+                      point.label ===
                       1
                         ? "video-lab-point is-keep"
                         : "video-lab-point is-exclude"
                     }
                     style={{
                       left:
-                        `${point().x * 100}%`,
+                        `${point.x * 100}%`,
                       top:
-                        `${point().y * 100}%`,
+                        `${point.y * 100}%`,
                     }}
                     aria-hidden="true"
                   >
-                    {point().label ===
+                    {point.label ===
                     1
                       ? "+"
                       : "−"}
                   </span>
                 )}
-              </Index>
+              </For>
             </Show>
           </div>
 
