@@ -9,7 +9,7 @@ import {
 
 import {
   ORT_WEBGPU_WASM_PUBLIC_PATH,
-} from "../../src/shared/ort-assets";
+} from "../../../src/shared/ort-assets";
 import {
   proxyBiRefNetSeedModelRequest,
 } from "../benchmark/video-segmentation/birefnet-model-proxy";
@@ -149,7 +149,7 @@ const clientSource =
 const runtimePath =
   resolve(
     import.meta.dir,
-    "../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm",
+    "../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm",
   );
 
 const runtime =
