@@ -689,6 +689,7 @@ const promptPointsByObject = async (
 
         let bestX = 0;
         let bestY = 0;
+
         let bestDistance =
           Number.POSITIVE_INFINITY;
 
