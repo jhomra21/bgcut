@@ -440,6 +440,120 @@ export const VideoLab = () => {
           1,
       ).length;
 
+  const activeSubjectNumber =
+    () =>
+      Math.max(
+        1,
+        subjects().findIndex(
+          (subject) =>
+            subject.id ===
+            activeSubjectId(),
+        ) +
+          1,
+      );
+
+  const readySubjects =
+    () =>
+      subjects().filter(
+        (subject) =>
+          subject.points.some(
+            (point) =>
+              point.label ===
+              1,
+          ),
+      );
+
+  const addSubject =
+    () => {
+      if (
+        positivePoints() ===
+          0 ||
+        subjects().length >=
+          MAX_SUBJECTS
+      ) {
+        return;
+      }
+
+      subjectSequence +=
+        1;
+
+      const id =
+        `subject-${subjectSequence}`;
+
+      setSubjects(
+        (current) => [
+          ...current,
+          {
+            id,
+            points: [],
+          },
+        ],
+      );
+
+      setActiveSubjectId(
+        id,
+      );
+
+      setPromptMode(
+        "keep",
+      );
+    };
+
+  const removeSubject =
+    () => {
+      const current =
+        subjects();
+
+      if (
+        current.length <=
+        1
+      ) {
+        setPoints(
+          [],
+        );
+
+        return;
+      }
+
+      const index =
+        current.findIndex(
+          (subject) =>
+            subject.id ===
+            activeSubjectId(),
+        );
+
+      const next =
+        current.filter(
+          (subject) =>
+            subject.id !==
+            activeSubjectId(),
+        );
+
+      const replacement =
+        next[
+          Math.min(
+            Math.max(
+              0,
+              index,
+            ),
+            next.length - 1,
+          )
+        ];
+
+      setSubjects(
+        next,
+      );
+
+      if (
+        replacement !==
+        undefined
+      ) {
+        setActiveSubjectId(
+          replacement.id,
+        );
+      }
+    };
+
   const chooseFile = (
     file: File,
   ) => {
@@ -451,9 +565,7 @@ export const VideoLab = () => {
       file,
     );
 
-    setPoints(
-      [],
-    );
+    resetSubjects();
 
     setSelectionTime(
       0,
@@ -486,11 +598,14 @@ export const VideoLab = () => {
   };
 
   const run = (
-    prompt?:
-      {
-        readonly points:
-          readonly PromptPoint[];
-      },
+    selectedSubjects?:
+      readonly {
+        readonly id: string;
+        readonly prompt: {
+          readonly points:
+            readonly PromptPoint[];
+        };
+      }[],
   ) => {
     const file =
       selectedFile();
@@ -504,19 +619,16 @@ export const VideoLab = () => {
     }
 
     if (
-      prompt !==
+      selectedSubjects !==
         undefined &&
-      !prompt.points.some(
-        (point) =>
-          point.label ===
-          1,
-      )
+      selectedSubjects.length ===
+        0
     ) {
       setState({
         status:
           "error",
         message:
-          "Click the subject you want to keep before removing the background.",
+          "Select at least one subject before removing the background.",
       });
 
       return;
@@ -535,10 +647,13 @@ export const VideoLab = () => {
       fileName:
         file.name,
       message:
-        prompt ===
+        selectedSubjects ===
         undefined
           ? "Finding a subject automatically…"
-          : "Loading SAM 2.1 for your selected subject…",
+          : selectedSubjects.length >
+              1
+            ? `Loading SAM 2.1 for ${selectedSubjects.length} selected subjects…`
+            : "Loading SAM 2.1 for your selected subject…",
       progress: 0,
     });
 
@@ -548,7 +663,8 @@ export const VideoLab = () => {
           video.removeVideoBackgroundExperimental(
             file,
             {
-              prompt,
+              subjects:
+                selectedSubjects,
               seedTimeSeconds:
                 selectionTime(),
               onProgress:
@@ -751,9 +867,7 @@ export const VideoLab = () => {
       time,
     );
 
-    setPoints(
-      [],
-    );
+    resetSubjects();
   };
 
   const handleSelectionPointer =
