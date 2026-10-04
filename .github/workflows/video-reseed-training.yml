@@ -1,9 +1,9 @@
-name: video reseed training
+name: video reseed validation
 
 on:
   push:
     branches:
-      - research/video-birefnet-reseed-training
+      - research/video-birefnet-reseed-validation
 
 jobs:
   reseed:
@@ -17,12 +17,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
 
-      - name: Measure forward BiRefNet re-seeding on DAVIS training abstentions
+      - name: Validate frozen forward BiRefNet re-seeding on DAVIS abstentions
         shell: bash
         run: |
           set -euo pipefail
 
-          ROOT="$RUNNER_TEMP/video-reseed-training"
+          ROOT="$RUNNER_TEMP/video-reseed-validation"
           DAVIS_ROOT="$RUNNER_TEMP/davis-2017-trainval"
           ARCHIVE="$RUNNER_TEMP/DAVIS-2017-trainval-480p.zip"
           FOCUS_LIST="$DAVIS_ROOT/reseed-focus.txt"
@@ -32,7 +32,7 @@ jobs:
 
           printf '%s  %s\n'             "e3d0b5b77c3d031b000a19e0e25e3e2cac65d183755601bc2cf066df1a2aa492"             "$ARCHIVE"             | shasum -a 256 -c -
 
-          printf '%s\n'             boxing-fisheye             car-turn             color-run             crossing             dancing             disc-jockey             dog-gooses             drift-turn             lady-running             motocross-bumps             motorbike             night-race             rallye             scooter-board             scooter-gray             sheep             skate-park             soccerball             stroller             stunt             tractor-sand             varanus-cage             > "$FOCUS_LIST"
+          printf '%s\n'             bike-packing             bmx-trees             car-roundabout             drift-chicane             drift-straight             gold-fish             horsejump-high             india             loading             motocross-jump             parkour             scooter-black             soapbox             > "$FOCUS_LIST"
 
           while IFS= read -r fixture; do
             [[ -n "$fixture" ]] || continue
@@ -116,6 +116,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: video-reseed-training
-          path: ${{ runner.temp }}/video-reseed-training
+          name: video-reseed-validation
+          path: ${{ runner.temp }}/video-reseed-validation
           if-no-files-found: error
