@@ -25,6 +25,7 @@ import type {
   VideoSegmentationMask,
   VideoSegmentationMaskAlternative,
   VideoSegmentationPrompt,
+  VideoSegmentationSubjectPrompt,
 } from "../../scripts/benchmark/video-segmentation/types";
 
 const SAMPLE_FPS = 6;
@@ -62,6 +63,7 @@ export type ExperimentalVideoResult = {
   readonly sampleFps: number;
   readonly seed:
     | "sam21-prompt"
+    | "sam21-subjects"
     | "birefnet-direct"
     | "edgetam-grid";
 };
@@ -69,6 +71,8 @@ export type ExperimentalVideoResult = {
 export type ExperimentalVideoOptions = {
   readonly prompt?:
     VideoSegmentationPrompt;
+  readonly subjects?:
+    readonly VideoSegmentationSubjectPrompt[];
   readonly seedTimeSeconds?:
     number;
   readonly onProgress?: (
@@ -346,6 +350,82 @@ const outputSize = (
             scale,
         ),
       ),
+  };
+};
+
+const unionMasks = (
+  masks:
+    readonly VideoSegmentationMask[],
+): VideoSegmentationMask => {
+  const first =
+    masks[0];
+
+  if (
+    first ===
+    undefined
+  ) {
+    throw new Error(
+      "Cannot combine an empty subject mask set.",
+    );
+  }
+
+  if (
+    masks.length ===
+    1
+  ) {
+    return first;
+  }
+
+  const logits =
+    new Float32Array(
+      first.logits.length,
+    );
+
+  logits.fill(
+    Number.NEGATIVE_INFINITY,
+  );
+
+  for (
+    const mask of
+    masks
+  ) {
+    if (
+      mask.width !==
+        first.width ||
+      mask.height !==
+        first.height ||
+      mask.logits.length !==
+        first.logits.length
+    ) {
+      throw new Error(
+        "Tracked subject masks do not share the same geometry.",
+      );
+    }
+
+    for (
+      let index = 0;
+      index <
+      logits.length;
+      index += 1
+    ) {
+      logits[index] =
+        Math.max(
+          logits[index] ??
+            Number.NEGATIVE_INFINITY,
+          mask.logits[
+            index
+          ] ??
+            Number.NEGATIVE_INFINITY,
+        );
+    }
+  }
+
+  return {
+    logits,
+    width:
+      first.width,
+    height:
+      first.height,
   };
 };
 
@@ -652,9 +732,27 @@ export const removeVideoBackgroundExperimental =
       outputSource,
     );
 
+    const subjects =
+      options.subjects ??
+      (
+        options.prompt ===
+        undefined
+          ? undefined
+          : [
+              {
+                id:
+                  "subject-1",
+                prompt:
+                  options.prompt,
+              },
+            ]
+      );
+
     const prompted =
-      options.prompt !==
-      undefined;
+      subjects !==
+        undefined &&
+      subjects.length >
+        0;
 
     const biRefNet =
       prompted
@@ -721,7 +819,15 @@ export const removeVideoBackgroundExperimental =
         "seed"
       ] =
         prompted
-          ? "sam21-prompt"
+          ? (
+              (
+                subjects?.length ??
+                0
+              ) >
+              1
+                ? "sam21-subjects"
+                : "sam21-prompt"
+            )
           : "edgetam-grid";
 
     let encodedFrames = 0;
@@ -763,7 +869,7 @@ export const removeVideoBackgroundExperimental =
               "seeding",
             message:
               prompted
-                ? `Selecting subject at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`
+                ? `Selecting ${subjects?.length === 1 ? "subject" : `${subjects?.length ?? 0} subjects`} at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`
                 : `Finding foreground at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`,
             progress:
               0.2,
@@ -778,19 +884,34 @@ export const removeVideoBackgroundExperimental =
           VideoSegmentationMask;
 
         if (
-          options.prompt !==
-          undefined
+          prompted
         ) {
+          if (
+            subjects ===
+              undefined ||
+            segmenter.seedSubjects ===
+              undefined
+          ) {
+            throw new Error(
+              "SAM 2.1 multi-subject tracking is unavailable.",
+            );
+          }
+
           seedMask =
-            await segmenter.seed(
-              seedFrame.frame,
-              options.prompt,
-              selectedSeedIndex,
-              timestamps.length,
+            unionMasks(
+              await segmenter.seedSubjects(
+                seedFrame.frame,
+                subjects,
+                selectedSeedIndex,
+                timestamps.length,
+              ),
             );
 
           seedKind =
-            "sam21-prompt";
+            subjects.length >
+            1
+              ? "sam21-subjects"
+              : "sam21-prompt";
         } else {
           if (
             biRefNet ===
@@ -934,11 +1055,28 @@ export const removeVideoBackgroundExperimental =
             masks[
               frameIndex
             ] =
-              await segmenter.track(
-                decoded.frame,
-                frameIndex,
-                timestamps.length,
-              );
+              prompted
+                ? unionMasks(
+                    await (
+                      segmenter.trackSubjects ??
+                      (
+                        () => {
+                          throw new Error(
+                            "SAM 2.1 multi-subject tracking is unavailable.",
+                          );
+                        }
+                      )
+                    )(
+                      decoded.frame,
+                      frameIndex,
+                      timestamps.length,
+                    ),
+                  )
+                : await segmenter.track(
+                    decoded.frame,
+                    frameIndex,
+                    timestamps.length,
+                  );
 
             trackedFrames +=
               1;
@@ -965,7 +1103,22 @@ export const removeVideoBackgroundExperimental =
         selectedSeedIndex >
         0
       ) {
-        segmenter.rewind();
+        if (
+          prompted
+        ) {
+          if (
+            segmenter.rewindSubjects ===
+            undefined
+          ) {
+            throw new Error(
+              "SAM 2.1 multi-subject rewind is unavailable.",
+            );
+          }
+
+          segmenter.rewindSubjects();
+        } else {
+          segmenter.rewind();
+        }
 
         for (
           let frameIndex =
