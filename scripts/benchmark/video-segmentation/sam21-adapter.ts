@@ -18,6 +18,7 @@ import type {
   VideoSegmentationCandidate,
   VideoSegmentationMask,
   VideoSegmentationPrompt,
+  VideoSegmentationSubjectPrompt,
 } from "./types";
 
 const FEATURE_CHANNELS = 256;
@@ -593,12 +594,22 @@ export const createSam21Adapter =
       MAX_POINTERS *
         POINTER_TOKENS;
 
+    const createBank =
+      () =>
+        new SamMemoryBank(
+          constants
+            .memory_temporal_positional_encoding,
+          featureTokens,
+        );
+
     const bank =
-      new SamMemoryBank(
-        constants
-          .memory_temporal_positional_encoding,
-        featureTokens,
-      );
+      createBank();
+
+    const subjectBanks =
+      new Map<
+        string,
+        SamMemoryBank
+      >();
 
     const encode =
       async (
