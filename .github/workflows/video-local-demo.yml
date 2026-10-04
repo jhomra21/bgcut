@@ -1,0 +1,34 @@
+name: video local demo
+
+on:
+  push:
+    branches:
+      - research/video-local-demo
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - name: Bundle local video demo
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run benchmark:video-segmentation:demo -- 4192 >"$RUNNER_TEMP/video-demo.log" 2>&1 &
+          DEMO_PID=$!
+          trap 'kill "$DEMO_PID" 2>/dev/null || true' EXIT
+
+          for _ in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4192/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          cat "$RUNNER_TEMP/video-demo.log" >&2
+          exit 1
