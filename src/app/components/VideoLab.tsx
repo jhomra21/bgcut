@@ -1040,7 +1040,7 @@ export const VideoLab = () => {
       </div>
 
       <p class="video-lab-copy">
-        Choose the subject you want to keep, then SAM 2.1 tracks it through the video. You can still try automatic selection when a quick result matters more than precise control.
+        Choose one or more subjects to keep, then SAM 2.1 tracks them through the video. You can still try automatic selection when a quick result matters more than precise control.
       </p>
 
       <input
@@ -1099,7 +1099,7 @@ export const VideoLab = () => {
                 Select what stays
               </strong>
               <span>
-                Scrub to a useful frame, then click the subject you want to keep. Add exclude points when background or nearby objects get included.
+                Scrub to a useful frame, select each subject you want to keep, and add exclude points when nearby objects or background get included.
               </span>
             </div>
             <button
@@ -1229,28 +1229,45 @@ export const VideoLab = () => {
                   handleSelectionPointer
                 }
               />
-              <For each={points()}>
-                {(point) => (
-                  <span
-                    class={
-                      point.label ===
-                      1
-                        ? "video-lab-point is-keep"
-                        : "video-lab-point is-exclude"
-                    }
-                    style={{
-                      left:
-                        `${point.x * 100}%`,
-                      top:
-                        `${point.y * 100}%`,
-                    }}
-                    aria-hidden="true"
-                  >
-                    {point.label ===
-                    1
-                      ? "+"
-                      : "−"}
-                  </span>
+              <For each={subjects()}>
+                {(
+                  subject,
+                  subjectIndex,
+                ) => (
+                  <For each={subject.points}>
+                    {(point) => (
+                      <span
+                        class={
+                          [
+                            "video-lab-point",
+                            point.label ===
+                            1
+                              ? "is-keep"
+                              : "is-exclude",
+                            subject.id ===
+                            activeSubjectId()
+                              ? "is-active-subject"
+                              : "is-other-subject",
+                          ].join(
+                            " ",
+                          )
+                        }
+                        style={{
+                          left:
+                            `${point.x * 100}%`,
+                          top:
+                            `${point.y * 100}%`,
+                        }}
+                        aria-hidden="true"
+                      >
+                        {point.label ===
+                        1
+                          ? subjectIndex() +
+                            1
+                          : "−"}
+                      </span>
+                    )}
+                  </For>
                 )}
               </For>
             </Show>
@@ -1289,6 +1306,76 @@ export const VideoLab = () => {
                 Pick the frame where your subject is easiest to identify.
               </span>
             </div>
+          </div>
+
+          <div class="video-lab-subjects">
+            <div
+              class="video-lab-subject-tabs"
+              role="group"
+              aria-label="Tracked subjects"
+            >
+              <For each={subjects()}>
+                {(
+                  subject,
+                  index,
+                ) => (
+                  <button
+                    class={
+                      subject.id ===
+                      activeSubjectId()
+                        ? "text-button is-active"
+                        : "text-button"
+                    }
+                    type="button"
+                    aria-pressed={
+                      subject.id ===
+                      activeSubjectId()
+                        ? "true"
+                        : "false"
+                    }
+                    onClick={() => {
+                      setActiveSubjectId(
+                        subject.id,
+                      );
+
+                      setPromptMode(
+                        "keep",
+                      );
+                    }}
+                  >
+                    Subject {index() + 1}
+                  </button>
+                )}
+              </For>
+              <button
+                class="text-button"
+                type="button"
+                disabled={
+                  positivePoints() ===
+                    0 ||
+                  subjects().length >=
+                    MAX_SUBJECTS
+                }
+                onClick={
+                  addSubject
+                }
+              >
+                Add subject
+              </button>
+            </div>
+
+            <button
+              class="text-button"
+              type="button"
+              onClick={
+                removeSubject
+              }
+            >
+              {subjects().length >
+              1
+                ? "Remove subject"
+                : "Clear subject"}
+            </button>
           </div>
 
           <div class="video-lab-selection-toolbar">
@@ -1387,8 +1474,8 @@ export const VideoLab = () => {
             <span>
               {positivePoints() ===
               0
-                ? "Add at least one Keep point."
-                : `${positivePoints()} keep point${positivePoints() === 1 ? "" : "s"} · ${points().length - positivePoints()} exclude`}
+                ? `Subject ${activeSubjectNumber()}: add at least one Keep point.`
+                : `Subject ${activeSubjectNumber()}: ${positivePoints()} keep point${positivePoints() === 1 ? "" : "s"} · ${points().length - positivePoints()} exclude · ${readySubjects().length} subject${readySubjects().length === 1 ? "" : "s"} ready`}
             </span>
             <div class="video-lab-selection-actions">
               <button
@@ -1404,14 +1491,22 @@ export const VideoLab = () => {
                 class="download-button"
                 type="button"
                 disabled={
-                  positivePoints() ===
+                  readySubjects().length ===
                   0
                 }
                 onClick={() =>
-                  run({
-                    points:
-                      points(),
-                  })
+                  run(
+                    readySubjects().map(
+                      (subject) => ({
+                        id:
+                          subject.id,
+                        prompt: {
+                          points:
+                            subject.points,
+                        },
+                      }),
+                    ),
+                  )
                 }
               >
                 Remove background
