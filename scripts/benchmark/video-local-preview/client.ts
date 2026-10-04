@@ -9,6 +9,12 @@ import {
   removeVideoBackgroundExperimental,
 } from "../../../src/browser/video-experimental";
 
+type PreviewFailure = {
+  readonly schemaVersion: 1;
+  readonly message: string;
+  readonly stack: string;
+};
+
 type PreviewReport = {
   readonly schemaVersion: 1;
   readonly blobBytes: number;
@@ -22,9 +28,13 @@ type PreviewReport = {
   readonly opaqueOrPartialPixels: number;
 };
 
+type PreviewPost =
+  | PreviewReport
+  | PreviewFailure;
+
 const postJson = async (
   path: string,
-  value: unknown,
+  value: PreviewPost,
 ) => {
   const response =
     await fetch(
