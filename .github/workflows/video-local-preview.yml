@@ -15,6 +15,82 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
 
+      - name: Verify Vite serves ORT runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/vite-runtime"
+          mkdir -p "$ROOT"
+
+          bun run dev -- --host 127.0.0.1 --port 4194 --strictPort >"$ROOT/vite.log" 2>&1 &
+          VITE_PID=$!
+
+          cleanup() {
+            kill "$VITE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4194/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          bun -e '
+            import {
+              ORT_WASM_MODULE_PUBLIC_PATH,
+              ORT_WASM_PUBLIC_PATH,
+              ORT_WEBGPU_WASM_PUBLIC_PATH,
+            } from "./src/shared/ort-assets.ts";
+
+            const origin = "http://127.0.0.1:4194";
+
+            for (const path of [
+              ORT_WEBGPU_WASM_PUBLIC_PATH,
+              ORT_WASM_PUBLIC_PATH,
+            ]) {
+              const response = await fetch(origin + path);
+              const contentType = response.headers.get("content-type") ?? "";
+              const bytes = new Uint8Array(await response.arrayBuffer());
+
+              if (!response.ok) {
+                throw new Error(path + " returned HTTP " + response.status + ".");
+              }
+
+              if (!contentType.startsWith("application/wasm")) {
+                throw new Error(path + " returned " + contentType + " instead of application/wasm.");
+              }
+
+              if (
+                bytes.length < 4 ||
+                bytes[0] !== 0x00 ||
+                bytes[1] !== 0x61 ||
+                bytes[2] !== 0x73 ||
+                bytes[3] !== 0x6d
+              ) {
+                throw new Error(path + " did not return a WebAssembly binary.");
+              }
+            }
+
+            const moduleResponse = await fetch(origin + ORT_WASM_MODULE_PUBLIC_PATH);
+            const moduleType = moduleResponse.headers.get("content-type") ?? "";
+            const moduleSource = await moduleResponse.text();
+
+            if (!moduleResponse.ok) {
+              throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned HTTP " + moduleResponse.status + ".");
+            }
+
+            if (!moduleType.startsWith("text/javascript")) {
+              throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned " + moduleType + " instead of JavaScript.");
+            }
+
+            if (moduleSource.length === 0 || moduleSource.trimStart().startsWith("<!")) {
+              throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned empty content or SPA HTML.");
+            }
+          '
+
       - name: Run local video preview acceptance
         shell: bash
         run: |
