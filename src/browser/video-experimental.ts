@@ -69,6 +69,8 @@ export type ExperimentalVideoResult = {
 export type ExperimentalVideoOptions = {
   readonly prompt?:
     VideoSegmentationPrompt;
+  readonly seedTimeSeconds?:
+    number;
   readonly onProgress?: (
     progress:
       ExperimentalVideoProgress,
@@ -494,6 +496,71 @@ const frameTimes = (
       index /
         SAMPLE_FPS,
   );
+};
+
+const seedFrameIndex = (
+  timestamps:
+    readonly number[],
+  firstTimestamp: number,
+  seedTimeSeconds:
+    number | undefined,
+): number => {
+  if (
+    timestamps.length ===
+    0 ||
+    seedTimeSeconds ===
+    undefined ||
+    !Number.isFinite(
+      seedTimeSeconds,
+    )
+  ) {
+    return 0;
+  }
+
+  const target =
+    firstTimestamp +
+    Math.max(
+      0,
+      seedTimeSeconds,
+    );
+
+  let selected = 0;
+  let selectedDistance =
+    Math.abs(
+      (
+        timestamps[0] ??
+        firstTimestamp
+      ) -
+        target,
+    );
+
+  for (
+    let index = 1;
+    index <
+    timestamps.length;
+    index += 1
+  ) {
+    const distance =
+      Math.abs(
+        (
+          timestamps[index] ??
+          firstTimestamp
+        ) -
+          target,
+      );
+
+    if (
+      distance <
+      selectedDistance
+    ) {
+      selected =
+        index;
+      selectedDistance =
+        distance;
+    }
+  }
+
+  return selected;
 };
 
 export const removeVideoBackgroundExperimental =
