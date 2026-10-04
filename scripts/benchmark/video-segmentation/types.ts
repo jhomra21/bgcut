@@ -58,6 +58,12 @@ export type VideoSegmentationPrompt = {
   readonly proposalIndex?: number;
 };
 
+export type VideoSegmentationSubjectPrompt = {
+  readonly id: string;
+  readonly prompt:
+    VideoSegmentationPrompt;
+};
+
 export type VideoSegmentationMaskAlternative = {
   readonly logits: Float32Array;
   readonly width: number;
@@ -100,6 +106,22 @@ export type VideoSegmentationAdapter = {
     frameIndex: number,
     totalFrames: number,
   ): Promise<VideoSegmentationMask>;
+  seedSubjects?(
+    frame: VideoFrame,
+    subjects:
+      readonly VideoSegmentationSubjectPrompt[],
+    frameIndex: number,
+    totalFrames: number,
+  ): Promise<
+    readonly VideoSegmentationMask[]
+  >;
+  trackSubjects?(
+    frame: VideoFrame,
+    frameIndex: number,
+    totalFrames: number,
+  ): Promise<
+    readonly VideoSegmentationMask[]
+  >;
   discover?(
     frame: VideoFrame,
     points:
@@ -108,6 +130,7 @@ export type VideoSegmentationAdapter = {
     readonly VideoSegmentationDiscovery[]
   >;
   rewind(): void;
+  rewindSubjects?(): void;
   close(): Promise<void>;
 };
 
