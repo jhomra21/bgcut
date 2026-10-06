@@ -1083,6 +1083,10 @@ export const createSam21Adapter =
         }
       },
 
+      async prepareTracking() {
+        await getTrackingSessions();
+      },
+
       async seed(
         frame,
         prompt:
