@@ -90,6 +90,7 @@ export type VideoSegmentationDiscovery = {
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
   prepareFrame?(frame: VideoFrame): Promise<void>;
+  prepareTracking?(): Promise<void>;
   seed(
     frame: VideoFrame,
     prompt: VideoSegmentationPrompt,
