@@ -127,10 +127,12 @@ const benchmarkVfrNonzero = async () => {
   }
 
   const editor = createVideoSelection(generated.file);
+
   const subjects = [{
     id: "subject-0",
     prompt: { points: [{ x: 0.22, y: 0.5, label: 1 as const }] },
   }];
+
   const start = 0.025;
   const end = 1;
 
@@ -138,6 +140,7 @@ const benchmarkVfrNonzero = async () => {
     await editor.prepare(() => undefined);
     await editor.prepareFrame(0.2, new AbortController().signal);
     await editor.preview(0.2, subjects, new AbortController().signal);
+
     const result = await editor.run({
       subjects,
       seedTimeSeconds: 0.2,
@@ -145,8 +148,10 @@ const benchmarkVfrNonzero = async () => {
     });
 
     await save("vfr-nonzero-source.mp4", result.blob);
+
     const decoded = await inspect(result.blob);
     const absoluteStart = info.firstTimestamp + start;
+
     const expected = [
       0,
       ...generated.timestamps
