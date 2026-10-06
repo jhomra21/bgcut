@@ -6,6 +6,7 @@ import {
 } from "mediabunny";
 
 import {
+  createVideoSelection,
   removeVideoBackgroundExperimental,
 } from "../../../src/browser/video-experimental";
 
@@ -30,6 +31,7 @@ type PreviewFailure = {
 };
 
 type PreviewCase = {
+  readonly exports?: readonly ExportCheck[];
   readonly fixture: FixtureId;
   readonly blobBytes: number;
   readonly width: number;
@@ -40,6 +42,97 @@ type PreviewCase = {
   readonly seed: string;
   readonly transparentPixels: number;
   readonly opaqueOrPartialPixels: number;
+};
+
+type ExportCheck = {
+  readonly format: string;
+  readonly width: number;
+  readonly height: number;
+  readonly duration: number;
+  readonly title: string;
+  readonly previewPixels: number;
+};
+
+const verifyTrimmedExports = async (file: File): Promise<readonly ExportCheck[]> => {
+  const editor = createVideoSelection(file);
+
+  const subjects = [{
+    id: "bear",
+    prompt: { points: [await promptPointFromMask("bear", 11)] },
+  }];
+
+  const checks: ExportCheck[] = [];
+
+  try {
+    const masks = await editor.preview(1.5, subjects, new AbortController().signal);
+    const previewPixels = masks[0]?.alpha.filter((alpha) => alpha > 0).length ?? 0;
+
+    if (previewPixels === 0) {
+      throw new Error("One-click subject preview did not produce a visible mask.");
+    }
+
+    for (const format of ["webm", "mp4"] as const) {
+      const result = await editor.run({
+        subjects,
+        seedTimeSeconds: 1.5,
+        export: {
+          start: 1, end: 2.1, format,
+          size: format === "webm" ? 720 : "original",
+          quality: "high", background: "black", title: "Local trim acceptance",
+        },
+      });
+
+      const input = new Input({ source: new BlobSource(result.blob), formats: ALL_FORMATS });
+
+      try {
+        const track = await input.getPrimaryVideoTrack();
+        const tags = await input.getMetadataTags();
+        const duration = await input.computeDuration();
+
+        if (
+          track === null || Math.abs(duration - 1.1) > 0.02 ||
+          Math.abs(await track.getFirstTimestamp()) > 0.001 ||
+          tags.title !== "Local trim acceptance"
+        ) {
+          throw new Error(`Invalid ${format} trim, relative timestamp or title: ${JSON.stringify({ duration, tags })}`);
+        }
+
+        const wrapped = await new CanvasSink(track, { alpha: true }).getCanvas(0);
+
+        if (wrapped === null || wrapped.canvas.width !== result.width || wrapped.canvas.height !== result.height) {
+          throw new Error(`${format} decoded dimensions differ from the export result.`);
+        }
+
+        if (format === "webm") {
+          await verifyAlpha(result.blob);
+
+          if (result.width !== 720) throw new Error("WebM did not honor its 720px export setting.");
+        } else {
+          const context = wrapped.canvas.getContext("2d");
+          const pixels = context?.getImageData(0, 0, 1, 1).data;
+
+          if (pixels === undefined || pixels[3] !== 255 || (pixels[0] ?? 255) > 10) {
+            throw new Error("MP4 did not bake the requested opaque black background.");
+          }
+        }
+
+        const saved = await fetch(`/output/bear-trim.${format}`, { method: "POST", body: result.blob });
+
+        if (!saved.ok) throw new Error(await saved.text());
+
+        checks.push({
+          format, width: result.width, height: result.height, duration,
+          title: tags.title, previewPixels,
+        });
+      } finally {
+        input.dispose();
+      }
+    }
+  } finally {
+    await editor.close();
+  }
+
+  return checks;
 };
 
 type PreviewReport = {
@@ -174,7 +267,7 @@ const verifyAlpha = async (
 
       if (
         alpha <
-        255
+        32
       ) {
         transparentPixels +=
           1;
@@ -182,7 +275,7 @@ const verifyAlpha = async (
 
       if (
         alpha >
-        0
+        223
       ) {
         opaqueOrPartialPixels +=
           1;
@@ -1112,6 +1205,7 @@ const runFixture = async (
 
   return {
     fixture,
+    exports: fixture === "bear" ? await verifyTrimmedExports(file) : undefined,
     blobBytes:
       result.blob.size,
     width:

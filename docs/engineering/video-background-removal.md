@@ -2,6 +2,65 @@
 
 This work is experimental. It does not change bgcut's public browser, CLI, or Node.js API.
 
+## Checkpoint handoff - 2026-10-06
+
+The branch includes the accepted unified intake, subject previews, precise trim timeline,
+and Safari-compatible MP4 exports. The latest immediate warm-up, progressive-disclosure
+UI, source-rate exports capped at 60 fps, streaming decode, and compact matte storage
+changes are a work-in-progress checkpoint, not a completed performance acceptance.
+
+At this checkpoint, the complete `bun run check` passes, including lint, typecheck,
+115 tests, bundle checks, production build, and package consumer smoke. The real
+Safari/Chrome acceptances predate the latest frame-rate and layout changes; rerun
+them on this candidate.
+No measured claim of 60 fps inference or improved segmentation quality has been made.
+
+Continue with:
+
+1. Run `bun install` and `bun run check`.
+2. Run the performance harness below and record cold/warm selection latency,
+   achieved processing FPS, real output timestamps, and quality comparisons.
+3. Verify immediate preparation before any click, retained highlights on rapid edits,
+   and the primary action in the initial desktop/mobile viewport.
+4. Rerun Safari playback and Chrome transparent/multi-subject acceptance at source
+   cadence, including genuine 60 fps input, VFR, nonzero starting timestamps, and trims.
+5. Resolve any failures and update these notes with measured results before release.
+
+Screenshots and encoded acceptance artifacts from the prior passes were stored under
+`/tmp` on the original computer and are not in the repository. The checked-in harnesses
+are the repeatable source of evidence on another computer. Video remains local-only;
+hosted and packaged model delivery is still unfinished.
+
+## Local editing workflow
+
+The development/local shell now routes video from the same intake as images, including recognized video extensions when the browser supplies an empty MIME type. The hosted image intake stays image-only until production model delivery is ready. The packaged server still needs video model routes before video is a supported packaged feature.
+
+An interior click runs the actual SAM seed operation and displays its mask before tracking. Keep and Exclude clicks refine the active subject; Add subject creates a separate memory bank, up to four subjects. The editor serializes preview, tracking, and disposal around one loaded SAM adapter. Each multi-subject seed shares its encoded frame across subjects. Rapid preview changes are debounced and stale work is aborted/ignored; an in-flight ONNX call finishes before the next queued operation or disposal. Changing the frame or trim clears prompts. The current single-mask SAM export is unchanged; this is not a new whole-object proposal algorithm and imperfect masks still need corrections.
+
+Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
+
+Exports use MediaBunny's real quality settings and metadata tags. VP9 WebM retains alpha. H.264 MP4 bakes white or black behind the matte. Codec/dimension support is checked before tracking. Original dimensions and high encoding quality are the defaults; explicit resizing preserves aspect ratio without upscaling. Source metadata is never copied; only the optional user-entered title is passed to the muxer.
+
+Safari defaults to explicitly opaque MP4 and shows a single native video player. Transparent WebM is still offered, with its limitation stated before export and a concise download notice afterward. A real Safari 26.3 HEVC/MP4 alpha probe through MediaBunny encoded successfully but decoded all 4096 pixels of a 64×64 transparent test frame as opaque; it is not exposed as a transparent alternative. Encoding support is checked as settings change, and playback errors retain the download with a retry control.
+
+The 15-second memory/work budget remains explicit, but a range can start anywhere in the source. The default follows real presentation timestamps up to 60 fps, with no audio. Settings can cap the rate at 6, 24, 30 or 60 fps; a 24 fps source stays 24 real frames per second, not 60 duplicates. Packet timing is sorted in presentation order and VFR intervals are preserved. Trim and seed selection no longer snap to a 6 fps grid; output timestamps start at zero, and the final sample duration ends at the requested trim end. Invalid ranges fail rather than silently truncating. SAM still tracks both before and after the chosen seed.
+
+The editor and export now share the precise primary-video packet timeline, not native `HTMLVideoElement.duration` or container metadata. MediaBunny's `computeDuration()` returns the last packet's end timestamp; the usable span subtracts the first presentable timestamp. UI scrubbing is relative to that span and native seeking adds its start offset. This fixes original bear MP4 defaults on Safari: native duration is 3.417 seconds but the video ends at 3.4166666666666665. The transcoded bear fixture reports 3.33203125 natively versus 3.3333333333333335 in the track, which previously hid the failure. Range validation remains strict: no epsilon and no clipping of invalid user ends.
+
+Forward and backward tracking now consume bounded MediaBunny frame iterators rather than independently requesting every frame. Only the selected frame is retained for interaction. Stored temporal output mattes use the exact 8-bit sigmoid alpha previously produced during compositing, reducing retained 256×256 matte memory from about 225 MiB to 56 MiB for a 900-frame/15-second/60-fps clip, without changing compositing precision or introducing smoothing. Tracking memory banks and models are unchanged. Reverse decoding can still cost more than forward streaming.
+
+### Repeatable performance and quality acceptance
+
+Run `bun run scripts/benchmark/video-local-preview/server.ts /tmp/bgcut-rate-performance 4203 performance` and open that loopback URL in Chromium. The harness measures session load, frame warm-up, first/warm click, decode/seed/tracking/encoding time, real decoded timestamps and dimensions, plus encode PSNR against the uncompressed composite. It covers bear, two independent BMX subjects, and a generated moving 60-fps fixture. It saves input/output MP4s and `result.json`; higher output FPS is reported separately from achieved processing FPS. The unchanged bear seed is also scored against the DAVIS annotation with IoU and boundary F.
+
+### Repeatable acceptance
+
+Start `bun run scripts/benchmark/video-local-preview/server.ts /tmp/bgcut-video-acceptance 4196`, then open `http://127.0.0.1:4196/` in a WebGPU-capable Chromium browser. The local-only harness writes `result.json` or `failure.json`, the three original subject/automatic artifacts, and `bear-trim.webm` / `bear-trim.mp4`. The added cases verify a nonempty click mask, nonzero trim start, backward tracking from an interior seed, output duration/timestamps, decoded dimensions, title metadata, WebM alpha, and MP4's opaque black background. Original multi-subject cross-negative prompts remain unchanged.
+
+For the actual Solid UI, start `bun run dev -- --host 127.0.0.1 --port 5184 --strictPort`, install Chromium with `agent-browser install`, then run `bun run scripts/benchmark/video-local-preview/ui-e2e.ts /absolute/path/to/bear.mp4 http://127.0.0.1:5184 /tmp/bgcut-video-ui`. This checks the single intake, click mask, desktop/mobile layout, a real export, and switching back to the image error flow. It writes screenshots and the result summary to the supplied artifact directory.
+
+For Safari, start a separate `/usr/bin/safaridriver --port 4450`, then run `bun run scripts/benchmark/video-local-preview/safari-e2e.ts /absolute/path/to/bear.mp4 http://127.0.0.1:5184 /tmp/bgcut-safari-video http://127.0.0.1:4450`. The harness owns and closes its automation session, records readiness/refinement screenshots, verifies `video.play()` advances `currentTime`, samples the decoded white background, and saves the actual MP4 and JSON evidence.
+
 ## Goal
 
 Find a fully local video segmentation path that can follow a foreground subject through a clip without uploading source frames.

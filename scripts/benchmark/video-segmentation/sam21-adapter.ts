@@ -611,6 +611,10 @@ export const createSam21Adapter =
         SamMemoryBank
       >();
 
+    let seedFrame: VideoFrame | undefined;
+    let seedVision: SamVision | undefined;
+    let promptPipelineWarm = false;
+
     const encode =
       async (
         frame: VideoFrame,
@@ -986,6 +990,24 @@ export const createSam21Adapter =
     return {
       candidate,
 
+      async prepareFrame(frame) {
+        if (seedFrame !== frame || seedVision === undefined) {
+          seedVision = await encode(frame);
+          seedFrame = frame;
+        }
+
+        if (!promptPipelineWarm) {
+          const decoded = await decode(
+            seedVision, seedVision.feats2NoMemory,
+            pointPromptTensors([{ x: 0.5, y: 0.5, label: 1 }], candidate.inputSize),
+          );
+
+          // Warm graph kernels without conditioning any temporal bank or exposing a selection.
+          await remember(seedVision, decoded, 0, true);
+          promptPipelineWarm = true;
+        }
+      },
+
       async seed(
         frame,
         prompt:
@@ -1049,10 +1071,12 @@ export const createSam21Adapter =
           );
         }
 
-        const vision =
-          await encode(
-            frame,
-          );
+        if (seedFrame !== frame || seedVision === undefined) {
+          seedVision = await encode(frame);
+          seedFrame = frame;
+        }
+
+        const vision = seedVision;
 
         subjectBanks.clear();
 
@@ -1139,6 +1163,8 @@ export const createSam21Adapter =
       },
 
       async close() {
+        seedFrame = undefined;
+        seedVision = undefined;
         subjectBanks.clear();
 
         await closeVideoSessions({

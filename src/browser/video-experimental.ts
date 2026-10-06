@@ -1,5 +1,10 @@
+import { Effect, Exit, Scope, Semaphore } from "effect";
+import { planVideoExport, VideoExportError, type VideoExportSettings } from "./video-export";
+
 import {
   BufferTarget,
+  canEncodeVideo,
+  Mp4OutputFormat,
   CanvasSource,
   Output,
   Quality,
@@ -17,10 +22,13 @@ import {
 } from "../../scripts/benchmark/video-segmentation/candidates";
 import {
   openMediaBunnyVideoSource,
+  readVideoSourceInfo,
 } from "../../scripts/benchmark/video-segmentation/media-source";
 
 import type {
   VideoPointPrompt,
+  DecodedVideoFrame,
+  VideoSegmentationAdapter,
   VideoSegmentationDiscovery,
   VideoSegmentationMask,
   VideoSegmentationMaskAlternative,
@@ -28,18 +36,7 @@ import type {
   VideoSegmentationSubjectPrompt,
 } from "../../scripts/benchmark/video-segmentation/types";
 
-const SAMPLE_FPS = 6;
-
-const MAX_DURATION_SECONDS = 15;
-
-const MAX_OUTPUT_SIDE = 1280;
-
 const GRID_POINTS_PER_SIDE = 7;
-
-type VideoOutputSize = {
-  readonly width: number;
-  readonly height: number;
-};
 
 export type ExperimentalVideoProgress = {
   readonly stage:
@@ -55,6 +52,7 @@ export type ExperimentalVideoProgress = {
 };
 
 export type ExperimentalVideoResult = {
+  readonly timings: { readonly decodingMs: number; readonly seedMs: number; readonly trackingMs: number; readonly encodingMs: number };
   readonly blob: Blob;
   readonly width: number;
   readonly height: number;
@@ -69,6 +67,8 @@ export type ExperimentalVideoResult = {
 };
 
 export type ExperimentalVideoOptions = {
+  readonly export?: VideoExportSettings;
+  readonly signal?: AbortSignal;
   readonly prompt?:
     VideoSegmentationPrompt;
   readonly subjects?:
@@ -92,6 +92,8 @@ const progress = (
   value:
     ExperimentalVideoProgress,
 ) => {
+  options.signal?.throwIfAborted();
+
   options.onProgress?.(
     value,
   );
@@ -319,40 +321,6 @@ const selectDiscovery = (
   );
 };
 
-const outputSize = (
-  width: number,
-  height: number,
-): VideoOutputSize => {
-  const scale =
-    Math.min(
-      1,
-      MAX_OUTPUT_SIDE /
-        Math.max(
-          width,
-          height,
-        ),
-    );
-
-  return {
-    width:
-      Math.max(
-        1,
-        Math.round(
-          width *
-            scale,
-        ),
-      ),
-    height:
-      Math.max(
-        1,
-        Math.round(
-          height *
-            scale,
-        ),
-      ),
-  };
-};
-
 const unionMasks = (
   masks:
     readonly VideoSegmentationMask[],
@@ -429,9 +397,18 @@ const unionMasks = (
   };
 };
 
+type VideoMatte = { readonly width: number; readonly height: number; readonly alpha: Uint8ClampedArray };
+
+// Store exactly the 8-bit soft alpha that compositing already produced, not 4-byte logits.
+const matteFromMask = (mask: VideoSegmentationMask): VideoMatte => ({
+  width: mask.width,
+  height: mask.height,
+  alpha: Uint8ClampedArray.from(mask.logits, (value) => Math.round(255 / (1 + Math.exp(-value)))),
+});
+
 const renderMask = (
   mask:
-    VideoSegmentationMask,
+    VideoMatte,
   target:
     HTMLCanvasElement,
   maskCanvas:
@@ -465,23 +442,9 @@ const renderMask = (
   for (
     let index = 0;
     index <
-    mask.logits.length;
+    mask.alpha.length;
     index += 1
   ) {
-    const probability =
-      1 /
-      (
-        1 +
-        Math.exp(
-          -(
-            mask.logits[
-              index
-            ] ??
-            Number.NEGATIVE_INFINITY
-          ),
-        )
-      );
-
     const offset =
       index *
       4;
@@ -501,10 +464,7 @@ const renderMask = (
       offset +
         3
     ] =
-      Math.round(
-        probability *
-          255,
-      );
+      mask.alpha[index] ?? 0;
   }
 
   maskContext.putImageData(
@@ -543,39 +503,6 @@ const renderMask = (
     target.height,
   );
   context.restore();
-};
-
-const frameTimes = (
-  firstTimestamp: number,
-  duration: number,
-): readonly number[] => {
-  const usableDuration =
-    Math.min(
-      duration,
-      MAX_DURATION_SECONDS,
-    );
-
-  const count =
-    Math.max(
-      1,
-      Math.ceil(
-        usableDuration *
-          SAMPLE_FPS,
-      ),
-    );
-
-  return Array.from(
-    {
-      length: count,
-    },
-    (
-      _,
-      index,
-    ) =>
-      firstTimestamp +
-      index /
-        SAMPLE_FPS,
-  );
 };
 
 const seedFrameIndex = (
@@ -644,12 +571,14 @@ const seedFrameIndex = (
   return selected;
 };
 
-export const removeVideoBackgroundExperimental =
+const removeVideo =
   async (
     file: File,
     options:
-      ExperimentalVideoOptions = {},
+      ExperimentalVideoOptions,
+    sharedSegmenter?: VideoSegmentationAdapter,
   ): Promise<ExperimentalVideoResult> => {
+    const timings = { decodingMs: 0, seedMs: 0, trackingMs: 0, encodingMs: 0 };
     progress(
       options,
       {
@@ -665,174 +594,210 @@ export const removeVideoBackgroundExperimental =
         file,
       );
 
-    const size =
-      outputSize(
-        source.info.width,
-        source.info.height,
-      );
+    const releases: (() => void | Promise<void>)[] = [() => source.close()];
 
-    const canvas =
-      document.createElement(
-        "canvas",
-      );
-
-    canvas.width =
-      size.width;
-    canvas.height =
-      size.height;
-
-    const maskCanvas =
-      document.createElement(
-        "canvas",
-      );
-
-    const context =
-      canvas.getContext(
-        "2d",
-        {
-          alpha: true,
-        },
-      );
-
-    if (
-      context ===
-      null
-    ) {
-      source.close();
-
-      throw new Error(
-        "This browser could not create a video canvas.",
-      );
-    }
-
-    const target =
-      new BufferTarget();
-
-    const output =
-      new Output({
-        format:
-          new WebMOutputFormat(),
-        target,
+    try {
+      const size = planVideoExport(source.info, options.export ?? {
+        start: 0,
+        end: Math.min(source.info.duration, 15),
       });
 
-    const outputSource =
-      new CanvasSource(
-        canvas,
-        {
-          codec: "vp9",
-          quality:
-            new Quality(
-              "medium",
-            ),
-          alpha: "keep",
-        },
-      );
+      const supported = await canEncodeVideo(size.codec, {
+        width: size.width,
+        height: size.height,
+        quality: new Quality(size.quality),
+        alpha: size.alpha,
+        frameRate: size.maxFps,
+      });
 
-    output.addVideoTrack(
-      outputSource,
-    );
+      if (!supported) {
+        throw new VideoExportError({
+          message: `This browser cannot encode ${size.format.toUpperCase()} at ${size.width}×${size.height}. Try a smaller size or another format.`,
+        });
+      }
 
-    const subjects =
-      options.subjects ??
-      (
-        options.prompt ===
-        undefined
-          ? undefined
-          : [
-              {
-                id:
-                  "subject-1",
-                prompt:
-                  options.prompt,
-              },
-            ]
-      );
+      options.signal?.throwIfAborted();
 
-    const prompted =
-      subjects !==
-        undefined &&
-      subjects.length >
-        0;
+      const canvas =
+        document.createElement(
+          "canvas",
+        );
 
-    const biRefNet =
-      prompted
-        ? undefined
-        : await createBiRefNetSeeder(
-            "fp16",
-          );
+      canvas.width =
+        size.width;
+      canvas.height =
+        size.height;
 
-    const segmenter =
-      await createVideoSegmentationAdapter(
-        prompted
-          ? VIDEO_SEGMENTATION_CANDIDATES[
-              "sam21-tiny"
-            ]
-          : VIDEO_SEGMENTATION_CANDIDATES
-              .edgetam,
-        (value) => {
-          progress(
-            options,
-            {
-              stage: "loading",
-              message:
-                prompted
-                  ? "Loading SAM 2.1…"
-                  : "Loading EdgeTAM…",
-              progress:
-                Math.min(
-                  0.18,
-                  value *
-                    0.18,
-                ),
-            },
-          );
-        },
-      );
+      const maskCanvas =
+        document.createElement(
+          "canvas",
+        );
 
-    const timestamps =
-      frameTimes(
-        source.info.firstTimestamp,
-        source.info.duration,
-      );
-
-    const selectedSeedIndex =
-      seedFrameIndex(
-        timestamps,
-        source.info.firstTimestamp,
-        options.seedTimeSeconds,
-      );
-
-    const masks:
-      (
-        VideoSegmentationMask |
-        undefined
-      )[] =
-        Array.from(
+      const context =
+        canvas.getContext(
+          "2d",
           {
-            length:
-              timestamps.length,
+            alpha: true,
           },
         );
 
-    let seedKind:
-      ExperimentalVideoResult[
-        "seed"
-      ] =
+      if (
+        context ===
+        null
+      ) {
+        throw new VideoExportError({
+          message: "This browser could not create a video canvas.",
+        });
+      }
+
+      const target =
+        new BufferTarget();
+
+      const output =
+        new Output({
+          format:
+            size.format === "mp4" ? new Mp4OutputFormat() : new WebMOutputFormat(),
+          target,
+        });
+
+      const outputSource =
+        new CanvasSource(
+          canvas,
+          {
+            codec: size.codec,
+            quality:
+              new Quality(
+                size.quality,
+              ),
+            alpha: size.alpha,
+          },
+        );
+
+      releases.push(async () => {
+        outputSource.close();
+
+        if (output.state !== "finalized" && output.state !== "canceled") {
+          await output.cancel();
+        }
+      });
+
+      if (size.title) {
+        output.setMetadataTags({ title: size.title });
+      }
+
+      output.addVideoTrack(
+        outputSource,
+      );
+
+      const subjects =
+        options.subjects ??
+        (
+          options.prompt ===
+          undefined
+            ? undefined
+            : [
+                {
+                  id:
+                    "subject-1",
+                  prompt:
+                    options.prompt,
+                },
+              ]
+        );
+
+      const prompted =
+        subjects !==
+          undefined &&
+        subjects.length >
+          0;
+
+      const biRefNet =
         prompted
-          ? (
-              (
-                subjects?.length ??
-                0
-              ) >
-              1
-                ? "sam21-subjects"
-                : "sam21-prompt"
-            )
-          : "edgetam-grid";
+          ? undefined
+          : await createBiRefNetSeeder(
+              "fp16",
+            );
 
-    let encodedFrames = 0;
+      if (biRefNet !== undefined) {
+        releases.push(() => biRefNet.close());
+      }
 
-    try {
+      const segmenter =
+        sharedSegmenter ?? await createVideoSegmentationAdapter(
+          prompted
+            ? VIDEO_SEGMENTATION_CANDIDATES[
+                "sam21-tiny"
+              ]
+            : VIDEO_SEGMENTATION_CANDIDATES
+                .edgetam,
+          (value) => {
+            progress(
+              options,
+              {
+                stage: "loading",
+                message:
+                  prompted
+                    ? "Loading SAM 2.1…"
+                    : "Loading EdgeTAM…",
+                progress:
+                  Math.min(
+                    0.18,
+                    value *
+                      0.18,
+                  ),
+              },
+            );
+          },
+        );
+
+      if (sharedSegmenter === undefined) {
+        releases.push(() => segmenter.close());
+      }
+
+      const timestamps = await source.frameTimes(
+        source.info.firstTimestamp + size.start,
+        source.info.firstTimestamp + size.end,
+        size.maxFps,
+        options.signal,
+      );
+
+      const selectedSeedIndex =
+        seedFrameIndex(
+          timestamps,
+          source.info.firstTimestamp,
+          options.seedTimeSeconds,
+        );
+
+      const masks:
+        (
+          VideoMatte |
+          undefined
+        )[] =
+          Array.from(
+            {
+              length:
+                timestamps.length,
+            },
+          );
+
+      let seedKind:
+        ExperimentalVideoResult[
+          "seed"
+        ] =
+          prompted
+            ? (
+                (
+                  subjects?.length ??
+                  0
+                ) >
+                1
+                  ? "sam21-subjects"
+                  : "sam21-prompt"
+              )
+            : "edgetam-grid";
+
+      let encodedFrames = 0;
+
       const seedTimestamp =
         timestamps[
           selectedSeedIndex
@@ -847,10 +812,13 @@ export const removeVideoBackgroundExperimental =
         );
       }
 
-      const seedFrame =
-        await source.frameAt(
-          seedTimestamp,
-        );
+      // Preview and tracking must condition on the same decoded subject frame,
+      // even when the chosen export cadence omits that source timestamp.
+      const seedFrame = await source.frameAt(
+        options.seedTimeSeconds === undefined
+          ? seedTimestamp
+          : source.info.firstTimestamp + Math.max(size.start, Math.min(size.end, options.seedTimeSeconds)),
+      );
 
       if (
         seedFrame ===
@@ -860,6 +828,9 @@ export const removeVideoBackgroundExperimental =
           "The selected video frame could not be decoded.",
         );
       }
+
+      timings.decodingMs += seedFrame.decodeMs;
+      const seedStarted = performance.now();
 
       try {
         progress(
@@ -990,8 +961,9 @@ export const removeVideoBackgroundExperimental =
         masks[
           selectedSeedIndex
         ] =
-          seedMask;
+          matteFromMask(seedMask);
       } finally {
+        timings.seedMs += performance.now() - seedStarted;
         seedFrame.close();
       }
 
@@ -999,36 +971,26 @@ export const removeVideoBackgroundExperimental =
 
       const trackFrame =
         async (
+          decoded: DecodedVideoFrame | null,
           frameIndex: number,
           direction:
             "before" |
             "after",
         ) => {
-          const timestamp =
-            timestamps[
-              frameIndex
-            ];
-
-          if (
-            timestamp ===
-            undefined
-          ) {
-            return;
-          }
-
-          const decoded =
-            await source.frameAt(
-              timestamp,
-            );
-
           if (
             decoded ===
             null
           ) {
-            return;
+            throw new VideoExportError({
+              message: `Frame ${frameIndex + 1} could not be decoded. Choose a shorter range or another source video.`,
+            });
           }
 
+          timings.decodingMs += decoded.decodeMs;
+          const trackingStarted = performance.now();
+
           try {
+            options.signal?.throwIfAborted();
             progress(
               options,
               {
@@ -1052,10 +1014,7 @@ export const removeVideoBackgroundExperimental =
               },
             );
 
-            masks[
-              frameIndex
-            ] =
-              prompted
+            const trackedMask = prompted
                 ? unionMasks(
                     await (
                       segmenter.trackSubjects ??
@@ -1078,26 +1037,26 @@ export const removeVideoBackgroundExperimental =
                     timestamps.length,
                   );
 
+            masks[frameIndex] = matteFromMask(trackedMask);
+
             trackedFrames +=
               1;
           } finally {
+            timings.trackingMs += performance.now() - trackingStarted;
             decoded.close();
           }
         };
 
-      for (
-        let frameIndex =
-          selectedSeedIndex +
-          1;
-        frameIndex <
-        timestamps.length;
-        frameIndex += 1
-      ) {
-        await trackFrame(
-          frameIndex,
-          "after",
-        );
-      }
+      const trackRange = async (times: readonly number[], firstIndex: number, direction: "before" | "after") => {
+        let index = firstIndex;
+
+        for await (const decoded of source.framesAt(times)) {
+          await trackFrame(decoded, index, direction);
+          index += direction === "after" ? 1 : -1;
+        }
+      };
+
+      await trackRange(timestamps.slice(selectedSeedIndex + 1), selectedSeedIndex + 1, "after");
 
       if (
         selectedSeedIndex >
@@ -1120,19 +1079,7 @@ export const removeVideoBackgroundExperimental =
           segmenter.rewind();
         }
 
-        for (
-          let frameIndex =
-            selectedSeedIndex -
-            1;
-          frameIndex >=
-          0;
-          frameIndex -= 1
-        ) {
-          await trackFrame(
-            frameIndex,
-            "before",
-          );
-        }
+        await trackRange(timestamps.slice(0, selectedSeedIndex).reverse(), selectedSeedIndex - 1, "before");
       }
 
       await output.start();
@@ -1157,12 +1104,13 @@ export const removeVideoBackgroundExperimental =
             undefined
         ) {
           decoded?.close();
-
-          frameIndex +=
-            1;
-
-          continue;
+          throw new VideoExportError({
+            message: `Frame ${frameIndex + 1} could not be exported. Choose another range and retry.`,
+          });
         }
+
+        timings.decodingMs += decoded.decodeMs;
+        const encodingStarted = performance.now();
 
         try {
           context.clearRect(
@@ -1188,6 +1136,13 @@ export const removeVideoBackgroundExperimental =
             canvas,
             maskCanvas,
           );
+
+          if (size.format === "mp4") {
+            context.globalCompositeOperation = "destination-over";
+            context.fillStyle = size.background;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.globalCompositeOperation = "source-over";
+          }
 
           options.onFrame?.(
             canvas,
@@ -1218,15 +1173,14 @@ export const removeVideoBackgroundExperimental =
           );
 
           await outputSource.add(
-            encodedFrames /
-              SAMPLE_FPS,
-            1 /
-              SAMPLE_FPS,
+            (timestamps[frameIndex] ?? timestamps[0] ?? 0) - (timestamps[0] ?? 0),
+            (timestamps[frameIndex + 1] ?? source.info.firstTimestamp + size.end) - (timestamps[frameIndex] ?? 0),
           );
 
           encodedFrames +=
             1;
         } finally {
+          timings.encodingMs += performance.now() - encodingStarted;
           decoded.close();
         }
 
@@ -1250,7 +1204,7 @@ export const removeVideoBackgroundExperimental =
         {
           stage: "encoding",
           message:
-            "Finalizing transparent WebM…",
+            `Finalizing ${size.format.toUpperCase()}…`,
           progress: 0.95,
         },
       );
@@ -1274,7 +1228,7 @@ export const removeVideoBackgroundExperimental =
           [buffer],
           {
             type:
-              "video/webm",
+              size.mime,
           },
         );
 
@@ -1283,12 +1237,13 @@ export const removeVideoBackgroundExperimental =
         {
           stage: "done",
           message:
-            "Transparent video ready.",
+            "Video ready.",
           progress: 1,
         },
       );
 
       return {
+        timings,
         blob,
         width:
           canvas.width,
@@ -1297,16 +1252,187 @@ export const removeVideoBackgroundExperimental =
         frameCount:
           encodedFrames,
         duration:
-          encodedFrames /
-          SAMPLE_FPS,
-        sampleFps:
-          SAMPLE_FPS,
+          size.duration,
+        sampleFps: encodedFrames / size.duration,
         seed:
           seedKind,
       };
     } finally {
-      await segmenter.close();
-      await biRefNet?.close();
-      source.close();
+      await Promise.all(releases.reverse().map((release) => release()));
     }
   };
+
+const videoBoundary = <T>(operation: () => Promise<T>): Promise<T> =>
+  Effect.runPromise(Effect.tryPromise({
+    try: operation,
+    catch: (cause) => new VideoExportError({
+      message: cause instanceof Error ? cause.message : String(cause),
+    }),
+  }));
+
+export const removeVideoBackgroundExperimental = (
+  file: File,
+  options: ExperimentalVideoOptions = {},
+): Promise<ExperimentalVideoResult> => videoBoundary(() => removeVideo(file, options));
+
+export const inspectVideo = (file: File) => videoBoundary(() => readVideoSourceInfo(file));
+
+export const checkVideoEncoding = (file: File, settings: VideoExportSettings) =>
+  videoBoundary(async () => {
+    const plan = planVideoExport(await readVideoSourceInfo(file), settings);
+
+    const supported = await canEncodeVideo(plan.codec, {
+      width: plan.width, height: plan.height, quality: new Quality(plan.quality),
+      alpha: plan.alpha, frameRate: plan.maxFps,
+    });
+
+    if (!supported) {
+      throw new VideoExportError({
+        message: `${plan.format.toUpperCase()} encoding at ${plan.width}×${plan.height} is unavailable in this browser. Choose another format or a smaller size.`,
+      });
+    }
+  });
+
+// Finish old GPU work and disposal before loading the next editor after a media switch.
+const selectionGate = Semaphore.makeUnsafe(1);
+
+/** One editor owns one SAM stack. Preview, tracking and disposal never overlap. */
+export const createVideoSelection = (file: File) => {
+  let segmenter: VideoSegmentationAdapter | undefined;
+  let modelScope = Scope.makeUnsafe();
+  let disposed = false;
+
+  let previewFrame: {
+    readonly time: number;
+    readonly frame: VideoFrame;
+  } | undefined;
+
+  // Waiting fibers are interruptible; an in-flight ONNX call must settle before
+  // releasing the GPU permit or closing its session. Signals are checked between calls.
+  const serialize = <T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> =>
+    Effect.runPromise(selectionGate.withPermit(Effect.uninterruptible(Effect.tryPromise({
+      try: operation,
+      catch: (cause) => new VideoExportError({
+        message: cause instanceof Error ? cause.message : String(cause),
+      }),
+    }))), { signal });
+
+  const getSegmenter = async (onProgress?: (value: number) => void) => {
+    segmenter ??= await Effect.runPromise(Effect.acquireRelease(
+      Effect.tryPromise({
+        try: () => createVideoSegmentationAdapter(VIDEO_SEGMENTATION_CANDIDATES["sam21-tiny"], (value) => {
+          if (disposed) throw new VideoExportError({ message: "The video editor was closed." });
+
+          onProgress?.(value);
+        }),
+        catch: (cause) => new VideoExportError({
+          message: cause instanceof Error ? cause.message : String(cause),
+        }),
+      }),
+      (model) => Effect.promise(() => model.close()),
+    ).pipe(Scope.provide(modelScope)));
+
+    return segmenter;
+  };
+
+  const getPreviewFrame = async (time: number) => {
+  if (previewFrame?.time !== time) {
+    previewFrame?.frame.close();
+    previewFrame = undefined;
+    const source = await openMediaBunnyVideoSource(file);
+
+    try {
+      const decoded = await source.frameAt(source.info.firstTimestamp + time);
+
+      if (decoded !== null) {
+        previewFrame = { time, frame: decoded.frame.clone() };
+        decoded.close();
+      }
+    } finally {
+      source.close();
+    }
+  }
+
+  if (previewFrame === undefined) {
+    throw new VideoExportError({ message: "This subject frame could not be opened. Choose another frame." });
+  }
+
+    return previewFrame.frame;
+  };
+
+  return {
+    prepare(onProgress: (value: number) => void) {
+      return serialize(async () => {
+        if (disposed) throw new VideoExportError({ message: "The video editor was closed." });
+
+        await getSegmenter(onProgress);
+      });
+    },
+    prepareFrame(time: number, signal: AbortSignal) {
+      return serialize(async () => {
+        signal.throwIfAborted();
+
+        if (disposed) throw new VideoExportError({ message: "The video editor was closed." });
+        const model = await getSegmenter();
+        signal.throwIfAborted();
+        const frame = await getPreviewFrame(time);
+        signal.throwIfAborted();
+        await model.prepareFrame?.(frame);
+        signal.throwIfAborted();
+      }, signal);
+    },
+    preview(time: number, subjects: readonly VideoSegmentationSubjectPrompt[], signal: AbortSignal) {
+      return serialize(async () => {
+        signal.throwIfAborted();
+
+        if (disposed) {
+          throw new VideoExportError({ message: "The video editor was closed." });
+        }
+
+        const model = await getSegmenter();
+        signal.throwIfAborted();
+
+        const frame = await getPreviewFrame(time);
+
+        if (model.seedSubjects === undefined) throw new VideoExportError({ message: "Subject selection is unavailable." });
+
+        signal.throwIfAborted();
+        const masks = await model.seedSubjects(frame, subjects, 0, 1);
+        signal.throwIfAborted();
+
+        return masks.map((mask) => ({
+          width: mask.width,
+          height: mask.height,
+          alpha: Uint8ClampedArray.from(mask.logits, (value) => value > 0 ? 120 : 0),
+        }));
+      }, signal);
+    },
+    run(options: ExperimentalVideoOptions) {
+      return serialize(async () => {
+        options.signal?.throwIfAborted();
+
+        if (disposed) {
+          throw new VideoExportError({ message: "The video editor was closed." });
+        }
+
+        if (options.subjects === undefined && segmenter !== undefined) {
+          await Effect.runPromise(Scope.close(modelScope, Exit.void));
+          modelScope = Scope.makeUnsafe();
+          segmenter = undefined;
+        }
+
+        return removeVideo(file, options, options.subjects === undefined ? undefined : await getSegmenter());
+      }, options.signal);
+    },
+    close() {
+      disposed = true;
+
+      return serialize(async () => {
+        previewFrame?.frame.close();
+        previewFrame = undefined;
+        await Effect.runPromise(Scope.close(modelScope, Exit.void));
+        segmenter = undefined;
+      });
+    },
+  };
+};

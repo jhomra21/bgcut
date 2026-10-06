@@ -18,6 +18,16 @@ Source images stay on the user's machine. bgcut does not upload them to an appli
 
 This documentation describes bgcut 0.6.1.
 
+### Unreleased local video experiment
+
+The development app (`bun run dev`) accepts images and videos through the same picker or drop area. Video opens a subject editor: click inside an object to preview its selected area, then use Keep/Exclude to correct it. Add up to four separate subjects. Model loading starts immediately alongside media inspection, and the selected frame and prompt kernels warm before the first click; clicks made while loading are retained. Refinements keep the previous highlight visible until the latest selection is ready.
+
+Choose a range of up to 15 seconds anywhere in the source. Export options include quality, original size or a smaller longest edge, transparent VP9 WebM, or H.264 MP4 with an explicitly solid white/black background. Exports are silent and preserve real source cadence up to 60 fps by default; lower caps are available. Lower-rate footage is not duplicated to invent 60 fps motion. Processing speed depends on your GPU and is not realtime 60 fps. Original size and high encoding quality are the defaults. Source metadata is not copied; an optional title can be written. Encoding support depends on the browser and selected dimensions. Safari defaults to playable MP4 with a clearly labeled solid background. Transparent WebM remains an explicit option with an upfront warning that Safari cannot reliably play its alpha.
+
+The primary action stays next to the media. Refine and Export settings & trim disclose advanced controls without losing your settings.
+
+Video remains a local development experiment, not a released CLI/Node feature or a hosted-site capability. Model delivery for the hosted and packaged apps is not yet ready. Source frames stay on your device; first use downloads local inference models.
+
 [Private browser removal](https://bgcut.dev/private-background-remover) · [Node.js](https://bgcut.dev/node-background-removal) · [CLI](https://bgcut.dev/background-removal-cli) · [Batch](https://bgcut.dev/batch-background-remover) · [Guides](https://bgcut.dev/guides) · [Comparisons](https://bgcut.dev/compare)
 
 ## Install

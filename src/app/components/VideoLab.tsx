@@ -2,12 +2,18 @@ import {
   For,
   Show,
   createSignal,
+  createEffect,
+  onSettled,
   onCleanup,
 } from "solid-js";
 
 import {
   isSafariUserAgent,
 } from "../../browser/webgpu-session-strategy";
+
+import { VideoExportControls } from "./VideoExportControls";
+
+import type { VideoExportSettings } from "../../browser/video-export";
 
 type VideoModule =
   typeof import(
@@ -99,6 +105,7 @@ const loadVideoModule =
 
 const transparentName = (
   fileName: string,
+  format: "webm" | "mp4",
 ): string => {
   const lastDot =
     fileName.lastIndexOf(
@@ -114,7 +121,7 @@ const transparentName = (
         )
       : fileName;
 
-  return `${base || "video"}-transparent.webm`;
+  return `${base || "video"}-${format === "webm" ? "transparent" : "cutout"}.${format}`;
 };
 
 const seedLabel = (
@@ -140,9 +147,6 @@ const seedLabel = (
       return "automatic fallback";
   }
 };
-
-const MAX_SELECTION_SECONDS =
-  15;
 
 const MAX_SUBJECTS =
   4;
@@ -180,13 +184,69 @@ const formatVideoTime = (
     )}`;
 };
 
-export const VideoLab = () => {
+export const VideoLab = (props: { readonly file: File; readonly onChangeMedia: () => void }) => {
   const safari =
     typeof navigator !==
       "undefined" &&
     isSafariUserAgent(
       navigator.userAgent,
     );
+
+  const [trimStart, setTrimStart] = createSignal(0);
+  const [trimEnd, setTrimEnd] = createSignal(0);
+  const [exportFormat, setExportFormat] = createSignal<"webm" | "mp4">(safari ? "mp4" : "webm");
+  const [exportQuality, setExportQuality] = createSignal<"low" | "medium" | "high">("high");
+  const [exportSize, setExportSize] = createSignal<VideoExportSettings["size"]>("original");
+  const [frameRate, setFrameRate] = createSignal<NonNullable<VideoExportSettings["frameRate"]>>("source");
+  const [frameStatus, setFrameStatus] = createSignal<"waiting" | "warming" | "ready" | "error">("waiting");
+  const [frameError, setFrameError] = createSignal("");
+  const [sourceAspect, setSourceAspect] = createSignal(16 / 9);
+  const [frameRevision, setFrameRevision] = createSignal(0);
+  const [background, setBackground] = createSignal<"white" | "black">("white");
+  const [title, setTitle] = createSignal("");
+  const [previewMessage, setPreviewMessage] = createSignal("");
+  const [selectionStatus, setSelectionStatus] = createSignal<"idle" | "updating" | "ready" | "error">("idle");
+  const previewReady = () => selectionStatus() === "ready";
+  const [modelStatus, setModelStatus] = createSignal<"loading" | "ready" | "error">("loading");
+  const [modelProgress, setModelProgress] = createSignal(0);
+  const [modelError, setModelError] = createSignal("");
+  const [previewRevision, setPreviewRevision] = createSignal(0);
+  const [encodingStatus, setEncodingStatus] = createSignal<"checking" | "ready" | "error">("checking");
+  const [encodingError, setEncodingError] = createSignal("");
+  const [playbackError, setPlaybackError] = createSignal(false);
+  let playback: HTMLVideoElement | undefined;
+  let lastMaskIdentity = "";
+  let alive = true;
+  let maskPreview: HTMLCanvasElement | undefined;
+  let editor: Promise<ReturnType<VideoModule["createVideoSelection"]>> | undefined;
+  let runController: AbortController | undefined;
+  let sourceFirstTimestamp = 0;
+
+  const getEditor = () => {
+    editor ??= loadVideoModule().then((module) => module.createVideoSelection(props.file));
+
+    return editor;
+  };
+
+  const prepareModel = () => {
+    setModelStatus("loading");
+    setModelProgress(0);
+    setModelError("");
+    void getEditor().then((session) => session.prepare((value) => {
+      if (alive) setModelProgress(value);
+    })).then(() => {
+      if (alive) setModelStatus("ready");
+    }).catch((error) => {
+      if (!alive) return;
+
+      setModelStatus("error");
+      setModelError(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  const validTrim = () => Number.isFinite(trimStart()) && Number.isFinite(trimEnd()) &&
+    trimStart() >= 0 && trimEnd() > trimStart() && trimEnd() <= selectionDuration() && trimEnd() - trimStart() <= 15;
+
 
   const [
     state,
@@ -267,10 +327,6 @@ export const VideoLab = () => {
     createSignal(
       "subject-1",
     );
-
-  let input:
-    HTMLInputElement |
-    undefined;
 
   let selectionVideo:
     HTMLVideoElement |
@@ -453,18 +509,6 @@ export const VideoLab = () => {
           1,
       ).length;
 
-  const activeSubjectNumber =
-    () =>
-      Math.max(
-        1,
-        subjects().findIndex(
-          (subject) =>
-            subject.id ===
-            activeSubjectId(),
-        ) +
-          1,
-      );
-
   const readySubjects =
     () =>
       subjects().filter(
@@ -596,17 +640,27 @@ export const VideoLab = () => {
       "keep",
     );
 
-    setSelectionUrl(
-      URL.createObjectURL(
-        file,
-      ),
-    );
+    const selectionVersion = version;
+    setState({ status: "selecting", fileName: file.name });
+    setSelectionUrl(URL.createObjectURL(file));
+    prepareModel();
 
-    setState({
-      status:
-        "selecting",
-      fileName:
-        file.name,
+    void loadVideoModule().then((module) => module.inspectVideo(file)).then((info) => {
+      if (version !== selectionVersion) return;
+
+      sourceFirstTimestamp = info.firstTimestamp;
+      setSourceAspect(info.width / info.height);
+      setSelectionDuration(info.duration);
+      setTrimStart(0);
+      setTrimEnd(Math.min(15, info.duration));
+
+      if (selectionVideo !== undefined && sourceFirstTimestamp > 0) {
+        selectionVideo.currentTime = sourceFirstTimestamp;
+      }
+    }).catch((error) => {
+      if (version !== selectionVersion) return;
+
+      setState({ status: "error", message: error instanceof Error ? error.message : String(error) });
     });
   };
 
@@ -647,6 +701,14 @@ export const VideoLab = () => {
       return;
     }
 
+    const settings: VideoExportSettings = {
+      start: trimStart(), end: trimEnd(), format: exportFormat(),
+      size: exportSize(), quality: exportQuality(), background: background(), title: title(), frameRate: frameRate(),
+    };
+
+    setPlaybackError(false);
+    const controller = new AbortController();
+    runController = controller;
     version += 1;
 
     const runVersion =
@@ -670,14 +732,14 @@ export const VideoLab = () => {
       progress: 0,
     });
 
-    void loadVideoModule()
+    void getEditor()
       .then(
         (video) =>
-          video.removeVideoBackgroundExperimental(
-            file,
+          video.run(
             {
-              subjects:
-                selectedSubjects,
+              subjects: selectedSubjects,
+              export: settings,
+              signal: controller.signal,
               seedTimeSeconds:
                 selectionTime(),
               onProgress:
@@ -780,6 +842,7 @@ export const VideoLab = () => {
             downloadName:
               transparentName(
                 file.name,
+                settings.format ?? "webm",
               ),
             width:
               result.width,
@@ -834,6 +897,7 @@ export const VideoLab = () => {
 
       version += 1;
       clearResultUrl();
+      prepareModel();
 
       setSelectionFrameReady(
         false,
@@ -864,17 +928,11 @@ export const VideoLab = () => {
       selectionDuration();
 
     const time =
-      Math.min(
-        duration,
-        Math.max(
-          0,
-          value,
-        ),
-      );
+      Math.min(duration, Math.max(0, value));
 
+    setSelectionFrameReady(false);
     video.pause();
-    video.currentTime =
-      time;
+    video.currentTime = sourceFirstTimestamp + time;
 
     setSelectionTime(
       time,
@@ -970,64 +1028,138 @@ export const VideoLab = () => {
       );
     };
 
-  const handleInput = (
-    event: Event,
-  ) => {
-    const target =
-      event.currentTarget;
+  createEffect(
+    () => ({ selecting: selecting(), model: modelStatus(), time: selectionTime(), duration: selectionDuration(), revision: frameRevision() }),
+    (selection) => {
+      const controller = new AbortController();
+      setFrameStatus("waiting");
 
-    if (
-      !(
-        target instanceof
-        HTMLInputElement
-      )
-    ) {
-      return;
-    }
+      if (!selection.selecting || selection.model !== "ready" || selection.duration <= 0) return;
 
-    const file =
-      target.files?.item(
-        0,
-      );
+      setFrameStatus("warming");
+      setFrameError("");
+      void getEditor().then((session) => session.prepareFrame(selection.time, controller.signal)).then(() => {
+        if (!controller.signal.aborted) setFrameStatus("ready");
+      }).catch((error) => {
+        if (controller.signal.aborted) return;
+        setFrameStatus("error");
+        setFrameError(error instanceof Error ? error.message : String(error));
+      });
+      onCleanup(() => controller.abort());
+    },
+  );
 
-    if (
-      file !==
-        null &&
-      file !==
-        undefined
-    ) {
-      chooseFile(
-        file,
-      );
-    }
-  };
+  createEffect(
+    () => ({ selecting: selecting(), ready: selectionFrameReady(), time: selectionTime(), subjects: readySubjects(), model: modelStatus(), frame: frameStatus(), revision: previewRevision() }),
+    (selection) => {
+      const controller = new AbortController();
+      const canvas = maskPreview;
+      const identity = `${selection.time}:${selection.subjects.map((subject) => subject.id).join(",")}`;
 
-  const handleDrop = (
-    event: DragEvent,
-  ) => {
-    event.preventDefault();
+      if (!selection.selecting || !selection.ready || identity !== lastMaskIdentity) {
+        canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+        lastMaskIdentity = "";
+      }
 
-    const file =
-      event.dataTransfer
-        ?.files.item(
-          0,
-        );
+      setSelectionStatus("idle");
 
-    if (
-      file !==
-        null &&
-      file !==
-        undefined
-    ) {
-      chooseFile(
-        file,
-      );
-    }
-  };
+      if (!selection.selecting || !selection.ready || selection.subjects.length === 0) {
+        setPreviewMessage("");
+
+        return;
+      }
+
+      setSelectionStatus("updating");
+
+      if (selection.model !== "ready" || selection.frame !== "ready") {
+        setPreviewMessage(selection.model === "error" ? "Selection paused. Retry model loading below." : "Clicks saved; preparing selection…");
+
+        return;
+      }
+
+      setPreviewMessage(lastMaskIdentity === identity ? "Updating selection…" : "Selecting subject locally…");
+
+      const timer = setTimeout(() => {
+        void getEditor().then((session) => session.preview(
+          selection.time,
+          selection.subjects.map((subject) => ({ id: subject.id, prompt: { points: subject.points } })),
+          controller.signal,
+        )).then((masks) => {
+          if (controller.signal.aborted || canvas === undefined) return;
+          const first = masks[0];
+
+          if (first === undefined) return;
+          canvas.width = first.width;
+          canvas.height = first.height;
+          const context = canvas.getContext("2d");
+
+          if (context === null) return;
+          const pixels = context.createImageData(canvas.width, canvas.height);
+          const colors = [[42, 170, 110], [65, 130, 230], [220, 140, 40], [180, 90, 210]];
+
+          for (let subjectIndex = 0; subjectIndex < masks.length; subjectIndex += 1) {
+            const mask = masks[subjectIndex];
+            const color = colors[subjectIndex];
+
+            if (mask === undefined || color === undefined) continue;
+
+            for (let index = 0; index < mask.alpha.length; index += 1) {
+              if ((mask.alpha[index] ?? 0) === 0) continue;
+              pixels.data[index * 4] = color[0] ?? 0;
+              pixels.data[index * 4 + 1] = color[1] ?? 0;
+              pixels.data[index * 4 + 2] = color[2] ?? 0;
+              pixels.data[index * 4 + 3] = mask.alpha[index] ?? 0;
+            }
+          }
+
+          context.putImageData(pixels, 0, 0);
+          lastMaskIdentity = identity;
+          setSelectionStatus("ready");
+          setPreviewMessage("Highlighted selection ready.");
+        }).catch((error) => {
+          if (!controller.signal.aborted) {
+            setSelectionStatus("error");
+            setPreviewMessage(error instanceof Error ? error.message : String(error));
+          }
+        });
+      }, 180);
+
+      onCleanup(() => {
+        clearTimeout(timer);
+        controller.abort();
+      });
+    },
+  );
+
+  createEffect(
+    () => ({ valid: validTrim(), format: exportFormat(), quality: exportQuality(), size: exportSize(), start: trimStart(), end: trimEnd(), frameRate: frameRate() }),
+    (settings) => {
+      let current = true;
+      setEncodingStatus("checking");
+      setEncodingError("");
+
+      if (!settings.valid) return;
+
+      void loadVideoModule().then((module) => module.checkVideoEncoding(props.file, settings)).then(() => {
+        if (current) setEncodingStatus("ready");
+      }).catch((error) => {
+        if (!current) return;
+
+        setEncodingStatus("error");
+        setEncodingError(error instanceof Error ? error.message : String(error));
+      });
+      onCleanup(() => { current = false; });
+    },
+  );
+
+  onSettled(() => chooseFile(props.file));
 
   onCleanup(
     () => {
+      alive = false;
       version += 1;
+      runController?.abort();
+      void editor?.then((session) => session.close()).catch(() => undefined);
       clearResultUrl();
       clearSelectionUrl();
     },
@@ -1036,97 +1168,15 @@ export const VideoLab = () => {
   return (
     <section
       class="video-lab"
-      aria-labelledby="video-lab-title"
+      aria-label="Video editor"
     >
-      <div class="video-lab-head">
-        <div>
-          <span class="video-lab-kicker">
-            Local experiment
-          </span>
-          <h2 id="video-lab-title">
-            Video background removal
-          </h2>
-        </div>
-        <span class="video-lab-meta">
-          First 15s · 6 fps · silent WebM
-        </span>
-      </div>
-
-      <p class="video-lab-copy">
-        Choose one or more subjects to keep, then SAM 2.1 tracks them through the video. You can still try automatic selection when a quick result matters more than precise control.
-      </p>
-
-      <input
-        ref={(element) => {
-          input =
-            element;
-        }}
-        class="file-input"
-        type="file"
-        accept="video/*"
-        aria-label="Choose video"
-        onChange={
-          handleInput
-        }
-      />
-
-      <Show
-        when={
-          state().status ===
-          "empty"
-        }
-      >
-        <button
-          class="video-lab-drop"
-          type="button"
-          onClick={() =>
-            input?.click()
-          }
-          onDragOver={(
-            event,
-          ) =>
-            event.preventDefault()
-          }
-          onDrop={
-            handleDrop
-          }
-        >
-          <strong>
-            Choose or drop a short video
-          </strong>
-          <span>
-            Nothing is uploaded.
-          </span>
-        </button>
-      </Show>
-
       <Show
         when={
           selecting()
         }
       >
         <div class="video-lab-selection">
-          <div class="video-lab-selection-head">
-            <div>
-              <strong>
-                Select what stays
-              </strong>
-              <span>
-                Scrub to a useful frame, select each subject you want to keep, and add exclude points when nearby objects or background get included.
-              </span>
-            </div>
-            <button
-              class="text-button"
-              type="button"
-              onClick={() =>
-                input?.click()
-              }
-            >
-              Change video
-            </button>
-          </div>
-
-          <div class="video-lab-selection-frame">
+          <div class="video-lab-selection-frame" style={{ "--video-aspect": sourceAspect(), "--video-viewport-width": `${sourceAspect() * 42}svh` }}>
             <video
               ref={(element) => {
                 selectionVideo =
@@ -1138,6 +1188,10 @@ export const VideoLab = () => {
               muted
               playsinline
               preload="auto"
+              onError={() => setState({
+                status: "error",
+                message: "This browser could not open the video. Try an H.264 MP4 or choose another file.",
+              })}
               class={
                 selectionFrameReady()
                   ? "is-ready"
@@ -1156,29 +1210,7 @@ export const VideoLab = () => {
 
                 video.pause();
 
-                const duration =
-                  Number.isFinite(
-                    video.duration,
-                  )
-                    ? Math.min(
-                        video.duration,
-                        MAX_SELECTION_SECONDS,
-                      )
-                    : MAX_SELECTION_SECONDS;
-
-                setSelectionDuration(
-                  duration,
-                );
-
-                const time =
-                  Math.min(
-                    duration,
-                    selectionTime(),
-                  );
-
-                setSelectionTime(
-                  time,
-                );
+                const time = sourceFirstTimestamp + selectionTime();
 
                 if (
                   Math.abs(
@@ -1193,8 +1225,8 @@ export const VideoLab = () => {
               }}
               onLoadedData={() => {
                 if (
-                  selectionTime() <=
-                  0.001
+                  selectionVideo !== undefined &&
+                  Math.abs(selectionVideo.currentTime - sourceFirstTimestamp - selectionTime()) <= 0.04
                 ) {
                   setSelectionFrameReady(
                     true,
@@ -1214,7 +1246,7 @@ export const VideoLab = () => {
 
                 if (
                   Math.abs(
-                    video.currentTime -
+                    video.currentTime - sourceFirstTimestamp -
                     selectionTime(),
                   ) <=
                   0.04
@@ -1225,6 +1257,7 @@ export const VideoLab = () => {
                 }
               }}
             />
+            <canvas class="video-lab-mask-overlay" ref={(element) => { maskPreview = element; }} aria-hidden="true" />
             <Show
               when={
                 selectionFrameReady()
@@ -1237,7 +1270,7 @@ export const VideoLab = () => {
             >
               <div
                 class="video-lab-selection-surface"
-                aria-label="Add a selection point"
+                aria-label="Click inside the subject to select it"
                 onPointerDown={
                   handleSelectionPointer
                 }
@@ -1286,14 +1319,69 @@ export const VideoLab = () => {
             </Show>
           </div>
 
+          <div class="video-lab-selection-footer">
+            <div class="video-lab-selection-actions">
+              <button class="text-button" type="button" onClick={() => props.onChangeMedia()}>Change media</button>
+              <button
+                class="download-button"
+                type="button"
+                disabled={
+                  !previewReady() || !validTrim() || encodingStatus() !== "ready"
+                }
+                onClick={() =>
+                  run(
+                    readySubjects().map(
+                      (subject) => ({
+                        id:
+                          subject.id,
+                        prompt: {
+                          points:
+                            subject.points,
+                        },
+                      }),
+                    ),
+                  )
+                }
+              >
+                Remove background
+              </button>
+            </div>
+          </div>
+          <div class="video-lab-model-status" hidden={modelStatus() === "ready"} role="status" data-state={modelStatus()}>
+            <Show when={modelStatus() === "loading"}>
+              <span>Preparing selection · {Math.round(modelProgress() * 5)}/5 models. Click while loading.</span>
+              <progress max="1" value={modelProgress()} aria-label="Selection model loading" />
+            </Show>
+
+            <Show when={modelStatus() === "error"}>
+              <span>{modelError()}</span>
+              <button class="text-button" type="button" onClick={prepareModel}>Retry model loading</button>
+            </Show>
+          </div>
+
+          <div class="video-lab-frame-status" role="status" data-state={frameStatus()}>
+            <Show when={modelStatus() === "ready" && frameStatus() !== "error"}>
+              <span>{frameStatus() === "ready" ? "Click inside a subject. No outlining needed." : "Warming this frame… Your clicks are saved."}</span>
+            </Show>
+            <Show when={frameStatus() === "error"}>
+              <span>{frameError()}</span>
+              <button class="text-button" type="button" onClick={() => setFrameRevision((value) => value + 1)}>Retry frame</button>
+            </Show>
+          </div>
+          <div class="video-lab-export-notices">
+            <Show when={!validTrim()}><p role="alert">Choose a valid range of up to 15 seconds within this video.</p></Show>
+            <Show when={exportFormat() === "mp4"}><p>MP4 · {background()} background, no transparency.</p></Show>
+            <Show when={safari && exportFormat() === "webm"}><p>Transparent WebM: download for an alpha-capable editor; Safari playback is not supported.</p></Show>
+            <Show when={encodingStatus() === "checking" && validTrim()}><p role="status">Checking browser encoding support…</p></Show>
+            <Show when={encodingStatus() === "error"}><p role="alert">{encodingError()}</p></Show>
+          </div>
+
           <div class="video-lab-scrubber">
             <input
               type="range"
-              min="0"
-              max={
-                selectionDuration()
-              }
-              step="0.01"
+              min={trimStart()}
+              max={Math.max(trimStart(), trimEnd() - 1 / 60)}
+              step={1 / 60}
               value={
                 selectionTime()
               }
@@ -1321,6 +1409,7 @@ export const VideoLab = () => {
             </div>
           </div>
 
+          <Show when={subjects().some((subject) => subject.points.length > 0)}>
           <div class="video-lab-subjects">
             <div
               class="video-lab-subject-tabs"
@@ -1377,20 +1466,9 @@ export const VideoLab = () => {
               </button>
             </div>
 
-            <button
-              class="text-button"
-              type="button"
-              onClick={
-                removeSubject
-              }
-            >
-              {subjects().length >
-              1
-                ? "Remove subject"
-                : "Clear subject"}
-            </button>
           </div>
 
+          <details class="video-lab-refine"><summary>Refine selection</summary>
           <div class="video-lab-selection-toolbar">
             <div
               class="video-lab-prompt-modes"
@@ -1483,50 +1561,55 @@ export const VideoLab = () => {
             </div>
           </div>
 
-          <div class="video-lab-selection-footer">
-            <span>
-              {positivePoints() ===
-              0
-                ? `Subject ${activeSubjectNumber()}: add at least one Keep point.`
-                : `Subject ${activeSubjectNumber()}: ${positivePoints()} keep point${positivePoints() === 1 ? "" : "s"} · ${points().length - positivePoints()} exclude · ${readySubjects().length} subject${readySubjects().length === 1 ? "" : "s"} ready`}
-            </span>
-            <div class="video-lab-selection-actions">
-              <button
-                class="text-button"
-                type="button"
-                onClick={() =>
-                  run()
-                }
-              >
-                Auto select
-              </button>
-              <button
-                class="download-button"
-                type="button"
-                disabled={
-                  readySubjects().length ===
-                  0
-                }
-                onClick={() =>
-                  run(
-                    readySubjects().map(
-                      (subject) => ({
-                        id:
-                          subject.id,
-                        prompt: {
-                          points:
-                            subject.points,
-                        },
-                      }),
-                    ),
-                  )
-                }
-              >
-                Remove background
-              </button>
-            </div>
-          </div>
+            <button
+              class="text-button"
+              type="button"
+              onClick={
+                removeSubject
+              }
+            >
+              {subjects().length >
+              1
+                ? "Remove subject"
+                : "Clear subject"}
+            </button>
+          </details>
+          </Show>
+          <p class="video-lab-preview-status" role="status" data-state={selectionStatus()}>{previewMessage()}</p>
+          <Show when={selectionStatus() === "error"}>
+            <button class="text-button" type="button" onClick={() => setPreviewRevision((value) => value + 1)}>Retry selection</button>
+          </Show>
+
+          <details class="video-lab-export-details">
+            <summary>Export settings &amp; trim · {exportFormat().toUpperCase()} · {exportSize() === "original" ? "Original size" : `${exportSize()} px`} · {frameRate() === "source" ? "Source ≤60 fps" : `≤${frameRate()} fps`}</summary>
+            <button class="text-button" type="button" disabled={!validTrim() || encodingStatus() !== "ready"} onClick={() => run()}>Auto select instead</button>
+            <VideoExportControls trimStart={trimStart} setTrimStart={setTrimStart} trimEnd={trimEnd} setTrimEnd={setTrimEnd} selectionDuration={selectionDuration} resetSubjects={resetSubjects} scrubSelection={scrubSelection} selectionTime={selectionTime} exportFormat={exportFormat} setExportFormat={setExportFormat} background={background} setBackground={setBackground} exportQuality={exportQuality} setExportQuality={setExportQuality} exportSize={exportSize} setExportSize={setExportSize} frameRate={frameRate} setFrameRate={setFrameRate} title={title} setTitle={setTitle} />
+          </details>
+
+
         </div>
+      </Show>
+
+      <Show
+        when={
+          processing()
+        }
+      >
+        <div class="video-lab-preview checkerboard">
+          <canvas
+            ref={(element) => {
+              preview =
+                element;
+            }}
+          />
+        </div>
+      </Show>
+
+      <Show when={processing()}>
+        <button class="text-button" type="button" onClick={() => {
+          runController?.abort();
+          editSelection();
+        }}>Cancel processing</button>
       </Show>
 
       <Show
@@ -1551,47 +1634,34 @@ export const VideoLab = () => {
       </Show>
 
       <Show
-        when={
-          processing() ||
-          state().status ===
-            "ready"
-        }
-      >
-        <div class="video-lab-preview checkerboard">
-          <canvas
-            ref={(element) => {
-              preview =
-                element;
-            }}
-          />
-        </div>
-      </Show>
-
-      <Show
         keyed
         when={ready()}
       >
         {(result) => (
           <div class="video-lab-result">
-            <Show
-              when={
-                !safari
-              }
-              fallback={
-                <div class="video-lab-safari-preview-note checkerboard">
-                  <span>
-                    Safari does not preview transparent WebM correctly. The checkerboard frame above shows the transparency result; the downloaded WebM keeps its alpha.
-                  </span>
-                </div>
-              }
-            >
+            <Show when={!safari || result.downloadName.endsWith(".mp4")} fallback={
+              <p class="video-lab-preview-status">Transparent WebM is ready to download. Safari cannot reliably play its alpha; choose MP4 for playback here.</p>
+            }>
               <video
+                ref={(element) => { playback = element; }}
                 class="video-lab-video checkerboard"
                 src={result.url}
                 controls
                 loop
                 playsinline
+                preload="auto"
+                onError={() => setPlaybackError(true)}
+                onCanPlay={() => setPlaybackError(false)}
               />
+              <Show when={playbackError()}>
+                <div class="video-lab-error" role="alert">
+                  <span>The preview could not play. Your download is still available.</span>
+                  <button class="text-button" type="button" onClick={() => {
+                    setPlaybackError(false);
+                    playback?.load();
+                  }}>Retry playback</button>
+                </div>
+              </Show>
             </Show>
             <div class="video-lab-result-row">
               <span>
@@ -1616,7 +1686,7 @@ export const VideoLab = () => {
                     result.downloadName
                   }
                 >
-                  Download WebM
+                  Download video
                 </a>
               </div>
             </div>
@@ -1654,6 +1724,9 @@ export const VideoLab = () => {
                 Back to subject selection
               </button>
             </Show>
+            <button class="text-button" type="button" onClick={() => props.onChangeMedia()}>
+              Choose another file
+            </button>
           </div>
         )}
       </Show>

@@ -89,6 +89,7 @@ export type VideoSegmentationDiscovery = {
 
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
+  prepareFrame?(frame: VideoFrame): Promise<void>;
   seed(
     frame: VideoFrame,
     prompt: VideoSegmentationPrompt,
@@ -155,6 +156,7 @@ export type VideoSourceInfo = {
 
 export type VideoFrameSource = {
   readonly info: VideoSourceInfo;
+  frameTimes(start: number, end: number, maxFps: number, signal?: AbortSignal): Promise<readonly number[]>;
   frameAt(timestamp: number): Promise<DecodedVideoFrame | null>;
   framesAt(
     timestamps: readonly number[],

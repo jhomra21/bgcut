@@ -88,7 +88,7 @@ describe("browser product UI", () => {
     expect(appSource).not.toContain(">\n        App\n      </a>");
     expect(appSource).toContain('href="https://github.com/jhomra21/bgcut"');
     expect(appSource).toContain("GitHub");
-    expect(appSource).toContain("Click or drag image here");
+    expect(appSource).toContain("Click or drag image");
     expect(appSource).toContain("onClick={handleSurfaceClick}");
     expect(appSource).toContain("event.target !== event.currentTarget");
     expect(appSource).toContain("New Image");
@@ -141,7 +141,8 @@ describe("browser product UI", () => {
 
     expect(localBranch).toContain("<LocalAppHeader />");
     expect(localBranch).toContain('class="site-root local-app-root"');
-    expect(localBranch).toContain("<HomePage />");
+    expect(localBranch).toContain("<HomePage allowVideo />");
+    expect(localBranch).not.toContain("<VideoLab");
     expect(localBranch).not.toContain("<SiteHeader");
     expect(localBranch).not.toContain("<SiteFooter");
     expect(localBranch).not.toContain("<DocsPage");

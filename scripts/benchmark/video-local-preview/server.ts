@@ -70,7 +70,7 @@ const build =
     entrypoints: [
       join(
         import.meta.dir,
-        "client.ts",
+        process.argv[4] === "performance" ? "performance-client.ts" : "client.ts",
       ),
     ],
     target:
@@ -148,7 +148,7 @@ const html =
 const outputMatch = (
   pathname: string,
 ): RegExpExecArray | null =>
-  /^\/output\/([a-z0-9-]+)\.webm$/u.exec(
+  /^\/output\/([a-z0-9-]+)\.(webm|mp4)$/u.exec(
     pathname,
   );
 
@@ -284,7 +284,7 @@ const app =
         await writeFile(
           join(
             outputRoot,
-            `${fixture}.webm`,
+            `${fixture}.${output[2]}`,
           ),
           new Uint8Array(
             await request.arrayBuffer(),
