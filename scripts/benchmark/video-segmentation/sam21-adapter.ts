@@ -602,10 +602,6 @@ export const createSam21Adapter =
         return trackingSessionsPromise;
       };
 
-    void getTrackingSessions().catch(
-      () => undefined,
-    );
-
     const featureSide =
       candidate.inputSize /
       16;
