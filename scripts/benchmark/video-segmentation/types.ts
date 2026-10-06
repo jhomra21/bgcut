@@ -107,6 +107,13 @@ export type VideoSegmentationAdapter = {
     frameIndex: number,
     totalFrames: number,
   ): Promise<VideoSegmentationMask>;
+  previewSubjects?(
+    frame: VideoFrame,
+    subjects:
+      readonly VideoSegmentationSubjectPrompt[],
+  ): Promise<
+    readonly VideoSegmentationMask[]
+  >;
   seedSubjects?(
     frame: VideoFrame,
     subjects:
