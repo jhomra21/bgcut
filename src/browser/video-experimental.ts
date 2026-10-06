@@ -754,6 +754,28 @@ const removeVideo =
         releases.push(() => segmenter.close());
       }
 
+      if (
+        prompted &&
+        segmenter.prepareTracking !==
+          undefined
+      ) {
+        progress(
+          options,
+          {
+            stage:
+              "loading",
+            message:
+              "Preparing SAM tracking…",
+            progress:
+              0.18,
+          },
+        );
+
+        await segmenter.prepareTracking();
+
+        options.signal?.throwIfAborted();
+      }
+
       const timestamps = await source.frameTimes(
         source.info.firstTimestamp + size.start,
         source.info.firstTimestamp + size.end,
