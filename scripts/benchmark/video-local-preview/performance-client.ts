@@ -201,7 +201,15 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
   let started = performance.now();
 
   try {
-    await editor.prepare(() => undefined);
+    const modelMilestones: { readonly progress: number; readonly elapsedMs: number }[] = [];
+
+    await editor.prepare((progress) => {
+      modelMilestones.push({
+        progress,
+        elapsedMs: performance.now() - started,
+      });
+    });
+
     const modelMs = performance.now() - started;
     started = performance.now();
     const seedTime = name === "bmx-trees" ? 0.5 : 0;
@@ -291,7 +299,7 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       quality = { iou: binaryMaskIou(predicted, expected), boundaryF: davisBoundaryF(predicted, expected, canvas.width, canvas.height) };
     }
 
-    return { name, modelMs, frameWarmMs, firstClickMs, warmClickMs, cases, quality };
+    return { name, modelMs, modelMilestones, frameWarmMs, firstClickMs, warmClickMs, cases, quality };
   } finally {
     await editor.close();
   }
