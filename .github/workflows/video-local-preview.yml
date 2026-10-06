@@ -161,3 +161,95 @@ jobs:
           name: video-local-preview
           path: ${{ runner.temp }}/video-local-preview
           if-no-files-found: error
+
+
+  performance:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Measure local video performance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-performance"
+          mkdir -p "$ROOT"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4197 performance >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4197/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4197/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..900}; do
+            if [[ -f "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              test -s "$ROOT/bear-6.mp4"
+              test -s "$ROOT/bear-source.mp4"
+              test -s "$ROOT/bmx-trees-6.mp4"
+              test -s "$ROOT/bmx-trees-source.mp4"
+              test -s "$ROOT/genuine-sixty-input.mp4"
+              test -s "$ROOT/sixty-source.mp4"
+              exit 0
+            fi
+
+            if [[ -f "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              echo "Chrome exited before video performance acceptance completed." >&2
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for video performance acceptance." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-local-performance
+          path: ${{ runner.temp }}/video-local-performance
+          if-no-files-found: error
