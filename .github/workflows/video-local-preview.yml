@@ -3,6 +3,10 @@ name: video local preview
 on:
   pull_request:
 
+concurrency:
+  group: video-local-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   acceptance:
     if: github.head_ref == 'feat/video-local-preview'
