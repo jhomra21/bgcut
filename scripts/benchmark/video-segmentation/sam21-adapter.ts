@@ -577,27 +577,75 @@ export const createSam21Adapter =
       Promise<SamTrackingSessions> |
       undefined;
 
+    const loadTrackingSessions =
+      async (): Promise<
+        SamTrackingSessions
+      > => {
+        try {
+          return {
+            memoryAttention:
+              await load(
+                "memory-attention",
+              ),
+            memoryEncoder:
+              await load(
+                "memory-encoder",
+              ),
+            pointerTpos:
+              await load(
+                "pointer-tpos",
+              ),
+          };
+        } catch (error) {
+          await closeVideoSessions({
+            "memory-attention":
+              loaded.get(
+                "memory-attention",
+              ),
+            "memory-encoder":
+              loaded.get(
+                "memory-encoder",
+              ),
+            "pointer-tpos":
+              loaded.get(
+                "pointer-tpos",
+              ),
+          });
+
+          loaded.delete(
+            "memory-attention",
+          );
+
+          loaded.delete(
+            "memory-encoder",
+          );
+
+          loaded.delete(
+            "pointer-tpos",
+          );
+
+          throw error;
+        }
+      };
+
     const getTrackingSessions =
       (): Promise<
         SamTrackingSessions
       > => {
-        trackingSessionsPromise ??=
-          (
-            async () => ({
-              memoryAttention:
-                await load(
-                  "memory-attention",
-                ),
-              memoryEncoder:
-                await load(
-                  "memory-encoder",
-                ),
-              pointerTpos:
-                await load(
-                  "pointer-tpos",
-                ),
-            })
-          )();
+        if (
+          trackingSessionsPromise ===
+          undefined
+        ) {
+          trackingSessionsPromise =
+            loadTrackingSessions().catch(
+              (error) => {
+                trackingSessionsPromise =
+                  undefined;
+
+                throw error;
+              },
+            );
+        }
 
         return trackingSessionsPromise;
       };
