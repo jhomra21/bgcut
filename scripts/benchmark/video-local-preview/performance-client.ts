@@ -222,7 +222,7 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
     await editor.preview(seedTime, subjects, new AbortController().signal);
     const warmClickMs = performance.now() - started;
 
-    for (const frameRate of name === "sixty" ? ["source"] as const : [6, "source"] as const) {
+    for (const frameRate of name === "sixty" ? ["source"] as const : ["source", 6] as const) {
       let firstFrame: Uint8ClampedArray | undefined;
       const stages: Partial<Record<string, number>> = {};
       started = performance.now();
