@@ -141,7 +141,7 @@ describe("browser product UI", () => {
 
     expect(localBranch).toContain("<LocalAppHeader />");
     expect(localBranch).toContain('class="site-root local-app-root"');
-    expect(localBranch).toContain("<HomePage allowVideo />");
+    expect(localBranch).toContain("<HomePage allowVideo={import.meta.env.DEV} />");
     expect(localBranch).not.toContain("<VideoLab");
     expect(localBranch).not.toContain("<SiteHeader");
     expect(localBranch).not.toContain("<SiteFooter");
