@@ -37,11 +37,14 @@ const POINTER_TOKENS =
 
 const RELIABLE_IOU = 0.25;
 
-type SamSessions = {
+type SamPromptSessions = {
   readonly visionEncoder:
     ort.InferenceSession;
   readonly maskDecoder:
     ort.InferenceSession;
+};
+
+type SamTrackingSessions = {
   readonly memoryAttention:
     ort.InferenceSession;
   readonly memoryEncoder:
@@ -512,8 +515,11 @@ export const createSam21Adapter =
         "pointer-tpos",
       ] as const;
 
-    const loaded:
-      ort.InferenceSession[] = [];
+    const loaded =
+      new Map<
+        (typeof roles)[number],
+        ort.InferenceSession
+      >();
 
     const load = async (
       role:
@@ -525,23 +531,24 @@ export const createSam21Adapter =
           role,
         );
 
-      loaded.push(
+      loaded.set(
+        role,
         session,
       );
 
       onProgress?.(
-        loaded.length /
+        loaded.size /
           roles.length,
       );
 
       return session;
     };
 
-    let sessions:
-      SamSessions;
+    let promptSessions:
+      SamPromptSessions;
 
     try {
-      sessions = {
+      promptSessions = {
         visionEncoder:
           await load(
             "vision-encoder",
@@ -550,35 +557,54 @@ export const createSam21Adapter =
           await load(
             "mask-decoder",
           ),
-        memoryAttention:
-          await load(
-            "memory-attention",
-          ),
-        memoryEncoder:
-          await load(
-            "memory-encoder",
-          ),
-        pointerTpos:
-          await load(
-            "pointer-tpos",
-          ),
       };
     } catch (error) {
       await closeVideoSessions({
         "vision-encoder":
-          loaded[0],
+          loaded.get(
+            "vision-encoder",
+          ),
         "mask-decoder":
-          loaded[1],
-        "memory-attention":
-          loaded[2],
-        "memory-encoder":
-          loaded[3],
-        "pointer-tpos":
-          loaded[4],
+          loaded.get(
+            "mask-decoder",
+          ),
       });
 
       throw error;
     }
+
+    let trackingSessionsPromise:
+      Promise<SamTrackingSessions> |
+      undefined;
+
+    const getTrackingSessions =
+      (): Promise<
+        SamTrackingSessions
+      > => {
+        trackingSessionsPromise ??=
+          (
+            async () => ({
+              memoryAttention:
+                await load(
+                  "memory-attention",
+                ),
+              memoryEncoder:
+                await load(
+                  "memory-encoder",
+                ),
+              pointerTpos:
+                await load(
+                  "pointer-tpos",
+                ),
+            })
+          )();
+
+        return trackingSessionsPromise;
+      };
+
+    void getTrackingSessions().catch(
+      () => undefined,
+    );
 
     const featureSide =
       candidate.inputSize /
@@ -620,7 +646,7 @@ export const createSam21Adapter =
         frame: VideoFrame,
       ): Promise<SamVision> => {
         const outputs =
-          await sessions.visionEncoder.run({
+          await promptSessions.visionEncoder.run({
             pixel_values:
               new ort.Tensor(
                 "float32",
@@ -680,7 +706,7 @@ export const createSam21Adapter =
           >,
       ): Promise<SamDecoded> =>
         decodedMask(
-          await sessions.maskDecoder.run({
+          await promptSessions.maskDecoder.run({
             feats0:
               vision.feats0,
             feats1:
@@ -703,8 +729,11 @@ export const createSam21Adapter =
         index: number,
         prompted: boolean,
       ): Promise<StoredMemory> => {
+        const trackingSessions =
+          await getTrackingSessions();
+
         const outputs =
-          await sessions.memoryEncoder.run({
+          await trackingSessions.memoryEncoder.run({
             feats2:
               vision.feats2,
             high_res_mask:
@@ -845,6 +874,9 @@ export const createSam21Adapter =
       ): Promise<
         VideoSegmentationMask
       > => {
+        const trackingSessions =
+          await getTrackingSessions();
+
         const assembled =
           targetBank.assemble(
             frameIndex,
@@ -852,7 +884,7 @@ export const createSam21Adapter =
           );
 
         const pointerOutput =
-          await sessions.pointerTpos.run({
+          await trackingSessions.pointerTpos.run({
             normalized_diffs:
               new ort.Tensor(
                 "float32",
@@ -891,7 +923,7 @@ export const createSam21Adapter =
         }
 
         const attention =
-          await sessions.memoryAttention.run({
+          await trackingSessions.memoryAttention.run({
             current_vision_features:
               new ort.Tensor(
                 "float32",
@@ -1167,17 +1199,31 @@ export const createSam21Adapter =
         seedVision = undefined;
         subjectBanks.clear();
 
+        await trackingSessionsPromise?.catch(
+          () => undefined,
+        );
+
         await closeVideoSessions({
           "vision-encoder":
-            sessions.visionEncoder,
+            loaded.get(
+              "vision-encoder",
+            ),
           "mask-decoder":
-            sessions.maskDecoder,
+            loaded.get(
+              "mask-decoder",
+            ),
           "memory-attention":
-            sessions.memoryAttention,
+            loaded.get(
+              "memory-attention",
+            ),
           "memory-encoder":
-            sessions.memoryEncoder,
+            loaded.get(
+              "memory-encoder",
+            ),
           "pointer-tpos":
-            sessions.pointerTpos,
+            loaded.get(
+              "pointer-tpos",
+            ),
         });
       },
     };
