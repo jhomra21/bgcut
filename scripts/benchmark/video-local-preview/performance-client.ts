@@ -3,6 +3,7 @@ import {
   Input, Mp4OutputFormat, Output, Quality,
 } from "mediabunny";
 import { createVideoSelection } from "../../../src/browser/video-experimental";
+import { readVideoSourceInfo } from "../video-segmentation/media-source";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
 
 const save = async (name: string, blob: Blob) => {
@@ -75,6 +76,114 @@ const generatedSixty = async () => {
   return new File([target.buffer], "genuine-sixty.mp4", { type: "video/mp4" });
 };
 
+const generatedVfrNonzero = async () => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 180;
+  const context = canvas.getContext("2d");
+
+  if (context === null) throw new Error("Missing VFR test canvas.");
+  const target = new BufferTarget();
+  const output = new Output({ target, format: new Mp4OutputFormat() });
+  const source = new CanvasSource(canvas, { codec: "avc", quality: new Quality("high") });
+  const timestamps = [2, 2.04, 2.09, 2.15, 2.24, 2.33, 2.46, 2.55, 2.7, 2.82, 2.94] as const;
+  const end = 3;
+  output.addVideoTrack(source);
+  await output.start();
+
+  for (let index = 0; index < timestamps.length; index += 1) {
+    const timestamp = timestamps[index];
+
+    if (timestamp === undefined) throw new Error("Missing VFR fixture timestamp.");
+    const next = timestamps[index + 1] ?? end;
+    context.fillStyle = "#d4e6e0";
+    context.fillRect(0, 0, 320, 180);
+    context.fillStyle = "#b72525";
+    context.fillRect(30 + index * 10, 40, 70, 100);
+    context.fillStyle = "white";
+    context.font = "22px sans-serif";
+    context.fillText(String(index), 45 + index * 10, 95);
+    await source.add(timestamp, next - timestamp);
+  }
+
+  source.close();
+  await output.finalize();
+
+  if (target.buffer === null) throw new Error("Missing VFR fixture.");
+
+  return {
+    file: new File([target.buffer], "vfr-nonzero.mp4", { type: "video/mp4" }),
+    timestamps,
+    end,
+  };
+};
+
+const benchmarkVfrNonzero = async () => {
+  const generated = await generatedVfrNonzero();
+  const info = await readVideoSourceInfo(generated.file);
+
+  if (Math.abs(info.firstTimestamp - 2) > 0.001 || Math.abs(info.duration - 1) > 0.001) {
+    throw new Error(`VFR fixture lost its nonzero source timeline: ${JSON.stringify(info)}`);
+  }
+
+  const editor = createVideoSelection(generated.file);
+  const subjects = [{
+    id: "subject-0",
+    prompt: { points: [{ x: 0.22, y: 0.5, label: 1 as const }] },
+  }];
+  const start = 0.025;
+  const end = 1;
+
+  try {
+    await editor.prepare(() => undefined);
+    await editor.prepareFrame(0.2, new AbortController().signal);
+    await editor.preview(0.2, subjects, new AbortController().signal);
+    const result = await editor.run({
+      subjects,
+      seedTimeSeconds: 0.2,
+      export: { start, end, frameRate: "source", format: "mp4", quality: "high" },
+    });
+
+    await save("vfr-nonzero-source.mp4", result.blob);
+    const decoded = await inspect(result.blob);
+    const absoluteStart = info.firstTimestamp + start;
+    const expected = [
+      0,
+      ...generated.timestamps
+        .filter((timestamp) => timestamp > absoluteStart && timestamp < info.firstTimestamp + end)
+        .map((timestamp) => timestamp - absoluteStart),
+    ];
+
+    if (
+      decoded.timestamps.length !== expected.length ||
+      Math.abs(decoded.duration - (end - start)) > 0.001 ||
+      decoded.timestamps.some((timestamp, index) => Math.abs(timestamp - (expected[index] ?? Number.NaN)) > 0.001)
+    ) {
+      throw new Error(`VFR/nonzero export changed presentation timing: ${JSON.stringify({
+        input: generated.timestamps,
+        expected,
+        output: decoded.timestamps,
+        duration: decoded.duration,
+      })}`);
+    }
+
+    return {
+      name: "vfr-nonzero",
+      sourceFirstTimestamp: info.firstTimestamp,
+      sourceDuration: info.duration,
+      trim: { start, end },
+      sourceTimestamps: generated.timestamps,
+      outputTimestamps: decoded.timestamps,
+      outputDuration: decoded.duration,
+      frames: result.frameCount,
+      outputFps: result.sampleFps,
+      timings: result.timings,
+    };
+  } finally {
+    await editor.close();
+  }
+};
+
 const benchmark = async (name: string, file: File, points: readonly { x: number; y: number; label: 1 }[]) => {
   const editor = createVideoSelection(file);
 
@@ -141,6 +250,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       const mse = squaredError / (result.width * result.height * 3);
       cases.push({
         frameRate, frames: result.frameCount, outputFps: result.sampleFps,
+        processingFps: result.frameCount / (totalMs / 1000),
+        trackingFps: Math.max(0, result.frameCount - 1) / (result.timings.trackingMs / 1000),
         totalMs, stages, bytes: result.blob.size, width: result.width, height: result.height,
         decodedDuration: decoded.duration, rgbSum, psnr: 10 * Math.log10(255 ** 2 / mse),
         timestamps: decoded.timestamps, timings: result.timings,
@@ -197,6 +308,7 @@ const main = async () => {
   const sixty = await generatedSixty();
   await save("genuine-sixty-input.mp4", sixty);
   reports.push(await benchmark("sixty", sixty, [{ x: 0.18, y: 0.5, label: 1 }]));
+  reports.push(await benchmarkVfrNonzero());
   await fetch("/result", { method: "POST", body: JSON.stringify({ reports }) });
 };
 
