@@ -1029,13 +1029,12 @@ export const createSam21Adapter =
         }
 
         if (!promptPipelineWarm) {
-          const decoded = await decode(
+          await decode(
             seedVision, seedVision.feats2NoMemory,
             pointPromptTensors([{ x: 0.5, y: 0.5, label: 1 }], candidate.inputSize),
           );
 
-          // Warm graph kernels without conditioning any temporal bank or exposing a selection.
-          await remember(seedVision, decoded, 0, true);
+          // Selection preview only needs vision + prompt decoding. Temporal memory warms during export.
           promptPipelineWarm = true;
         }
       },
@@ -1069,6 +1068,82 @@ export const createSam21Adapter =
           frameIndex,
           totalFrames,
         );
+      },
+
+      async previewSubjects(
+        frame,
+        subjects:
+          readonly VideoSegmentationSubjectPrompt[],
+      ) {
+        if (
+          subjects.length ===
+          0
+        ) {
+          throw new Error(
+            "SAM 2.1 subject preview requires at least one subject.",
+          );
+        }
+
+        const identifiers =
+          new Set(
+            subjects.map(
+              (subject) =>
+                subject.id,
+            ),
+          );
+
+        if (
+          identifiers.size !==
+          subjects.length
+        ) {
+          throw new Error(
+            "SAM 2.1 subject identifiers must be unique.",
+          );
+        }
+
+        if (
+          seedFrame !==
+            frame ||
+          seedVision ===
+            undefined
+        ) {
+          seedVision =
+            await encode(
+              frame,
+            );
+
+          seedFrame =
+            frame;
+        }
+
+        const masks:
+          VideoSegmentationMask[] =
+            [];
+
+        for (
+          const subject of
+          subjects
+        ) {
+          validatePrompt(
+            subject.prompt,
+          );
+
+          const decoded =
+            await decode(
+              seedVision,
+              seedVision.feats2NoMemory,
+              pointPromptTensors(
+                subject.prompt.points,
+                candidate.inputSize,
+              ),
+            );
+
+          masks.push(
+            decoded.mask,
+          );
+        }
+
+        return masks;
       },
 
       async seedSubjects(
