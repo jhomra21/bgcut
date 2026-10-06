@@ -224,6 +224,7 @@ jobs:
               test -s "$ROOT/bmx-trees-source.mp4"
               test -s "$ROOT/genuine-sixty-input.mp4"
               test -s "$ROOT/sixty-source.mp4"
+              test -s "$ROOT/vfr-nonzero-source.mp4"
               exit 0
             fi
 
