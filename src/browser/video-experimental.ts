@@ -1394,32 +1394,8 @@ export const createVideoSelection = (file: File) => {
 
         const frame = await getPreviewFrame(time);
 
-        const previewSubjects =
-          model.previewSubjects ??
-          (
-            model.seedSubjects ===
-              undefined
-              ? undefined
-              : (
-                  previewFrame,
-                  previewSubjects,
-                ) =>
-                  model.seedSubjects?.(
-                    previewFrame,
-                    previewSubjects,
-                    0,
-                    1,
-                  ) ??
-                  Promise.reject(
-                    new VideoExportError({
-                      message:
-                        "Subject selection is unavailable.",
-                    }),
-                  )
-          );
-
         if (
-          previewSubjects ===
+          model.previewSubjects ===
           undefined
         ) {
           throw new VideoExportError({
@@ -1431,7 +1407,7 @@ export const createVideoSelection = (file: File) => {
         signal.throwIfAborted();
 
         const masks =
-          await previewSubjects(
+          await model.previewSubjects(
             frame,
             subjects,
           );
