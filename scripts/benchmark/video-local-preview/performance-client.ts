@@ -198,23 +198,47 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
   }));
 
   const cases = [];
-  let started = performance.now();
+
+  let started =
+    performance.now();
 
   try {
     const modelMilestones: { readonly progress: number; readonly elapsedMs: number }[] = [];
+    const prepareStarted =
+      started;
 
     await editor.prepare((progress) => {
       modelMilestones.push({
         progress,
-        elapsedMs: performance.now() - started,
+        elapsedMs:
+          performance.now() -
+          prepareStarted,
       });
     });
 
-    const modelMs = performance.now() - started;
-    started = performance.now();
-    const seedTime = name === "bmx-trees" ? 0.5 : 0;
-    await editor.prepareFrame(seedTime, new AbortController().signal);
-    const frameWarmMs = performance.now() - started;
+    const modelMs =
+      performance.now() -
+      prepareStarted;
+
+    started =
+      performance.now();
+
+    const seedTime =
+      name ===
+      "bmx-trees"
+        ? 0.5
+        : 0;
+
+    const framePreparation =
+      await editor.prepareFrame(
+        seedTime,
+        new AbortController()
+          .signal,
+      );
+
+    const frameWarmMs =
+      performance.now() -
+      started;
     started = performance.now();
     await editor.preview(seedTime, subjects, new AbortController().signal);
     const firstClickMs = performance.now() - started;
@@ -299,7 +323,20 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       quality = { iou: binaryMaskIou(predicted, expected), boundaryF: davisBoundaryF(predicted, expected, canvas.width, canvas.height) };
     }
 
-    return { name, modelMs, modelMilestones, frameWarmMs, firstClickMs, warmClickMs, cases, quality };
+    return {
+      name,
+      modelMs,
+      modelMilestones,
+      frameWarmMs,
+      framePreparation,
+      coldSelectionReadyMs:
+        modelMs +
+        frameWarmMs,
+      firstClickMs,
+      warmClickMs,
+      cases,
+      quality,
+    };
   } finally {
     await editor.close();
   }
