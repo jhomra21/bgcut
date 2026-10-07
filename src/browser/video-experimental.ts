@@ -1422,9 +1422,10 @@ export const createVideoSelection = (file: File) => {
 
         signal.throwIfAborted();
 
-        await model.prepareFrame?.(
-          frame,
-        );
+        const modelPreparation =
+          await model.prepareFrame?.(
+            frame,
+          );
 
         const preparedAt =
           performance.now();
@@ -1441,6 +1442,7 @@ export const createVideoSelection = (file: File) => {
           modelWarmMs:
             preparedAt -
             frameReadyAt,
+          modelPreparation,
         };
       }, signal);
     },
