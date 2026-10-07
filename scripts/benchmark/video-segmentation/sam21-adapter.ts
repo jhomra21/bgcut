@@ -538,7 +538,9 @@ export const createSam21Adapter =
     const preferredOutputLocation = (
       role:
         (typeof roles)[number],
-    ) => {
+    ): ort.InferenceSession.SessionOptions[
+      "preferredOutputLocation"
+    ] => {
       if (
         options?.gpuResidentIntermediates !==
         true
