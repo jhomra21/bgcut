@@ -51,10 +51,14 @@ const SPECIALIZED_DECODER =
 const SPECIALIZED_MEMORY_ENCODER =
   "/specialized/sam21-tracked-memory-encoder.onnx";
 
+const SPECIALIZED_TRACKED_STEP =
+  "/specialized/sam21-tracked-step.onnx";
+
 type TrackerVariant =
   | "baseline"
   | "decoder"
-  | "decoder-memory";
+  | "decoder-memory"
+  | "fused-step";
 
 const truthMask = async (
   fixture:
@@ -422,15 +426,21 @@ const runTracker = async (
       variant ===
         "baseline"
         ? undefined
-        : {
-            trackedMaskDecoderUrl:
-              SPECIALIZED_DECODER,
-            trackedMemoryEncoderUrl:
-              variant ===
-              "decoder-memory"
-                ? SPECIALIZED_MEMORY_ENCODER
-                : undefined,
-          },
+        : variant ===
+            "fused-step"
+          ? {
+              trackedStepUrl:
+                SPECIALIZED_TRACKED_STEP,
+            }
+          : {
+              trackedMaskDecoderUrl:
+                SPECIALIZED_DECODER,
+              trackedMemoryEncoderUrl:
+                variant ===
+                "decoder-memory"
+                  ? SPECIALIZED_MEMORY_ENCODER
+                  : undefined,
+            },
     );
 
   try {
@@ -750,6 +760,15 @@ const main = async () => {
         "decoder-memory",
       );
 
+    const fusedStep =
+      await runTracker(
+        fixture,
+        file,
+        truths,
+        point,
+        "fused-step",
+      );
+
     const compare = (
       candidate:
         typeof decoder,
@@ -808,6 +827,13 @@ const main = async () => {
           decoderMemory,
         ...compare(
           decoderMemory,
+        ),
+      },
+      fusedStep: {
+        result:
+          fusedStep,
+        ...compare(
+          fusedStep,
         ),
       },
     });
