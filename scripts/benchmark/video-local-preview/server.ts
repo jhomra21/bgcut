@@ -65,12 +65,24 @@ await mkdir(
   },
 );
 
+const mode =
+  process.argv[4];
+
+const clientFilename =
+  mode ===
+    "performance"
+    ? "performance-client.ts"
+    : mode ===
+        "tracked-decoder"
+      ? "tracked-decoder-client.ts"
+      : "client.ts";
+
 const build =
   await Bun.build({
     entrypoints: [
       join(
         import.meta.dir,
-        process.argv[4] === "performance" ? "performance-client.ts" : "client.ts",
+        clientFilename,
       ),
     ],
     target:
