@@ -212,40 +212,60 @@ const app =
 
       if (
         request.method ===
-          "GET" &&
-        url.pathname ===
-          "/specialized/sam21-tracked-mask-decoder.onnx"
+        "GET"
       ) {
-        const trackedDecoder =
-          Bun.file(
-            join(
-              outputRoot,
+        const specializedModels =
+          new Map([
+            [
+              "/specialized/sam21-tracked-mask-decoder.onnx",
               "sam21-tracked-mask-decoder.onnx",
-            ),
+            ],
+            [
+              "/specialized/sam21-tracked-memory-encoder.onnx",
+              "sam21-tracked-memory-encoder.onnx",
+            ],
+          ]);
+
+        const filename =
+          specializedModels.get(
+            url.pathname,
           );
 
         if (
-          !(await trackedDecoder.exists())
+          filename !==
+          undefined
         ) {
+          const model =
+            Bun.file(
+              join(
+                outputRoot,
+                filename,
+              ),
+            );
+
+          if (
+            !(await model.exists())
+          ) {
+            return new Response(
+              "Specialized SAM graph is unavailable.",
+              {
+                status: 404,
+              },
+            );
+          }
+
           return new Response(
-            "Tracked SAM decoder is unavailable.",
+            model,
             {
-              status: 404,
+              headers: {
+                "content-type":
+                  "application/octet-stream",
+                "cache-control":
+                  "no-store",
+              },
             },
           );
         }
-
-        return new Response(
-          trackedDecoder,
-          {
-            headers: {
-              "content-type":
-                "application/octet-stream",
-              "cache-control":
-                "no-store",
-            },
-          },
-        );
       }
 
       const quality =
