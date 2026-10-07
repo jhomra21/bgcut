@@ -4,6 +4,7 @@ export type VideoModelGraphRole =
   | "vision-encoder"
   | "mask-decoder"
   | "tracked-mask-decoder"
+  | "tracked-memory-encoder"
   | "memory-attention"
   | "memory-encoder"
   | "pointer-tpos";
