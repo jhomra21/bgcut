@@ -171,6 +171,8 @@ export type VideoSegmentationAdapter = {
 export type VideoSegmentationAdapterOptions = {
   readonly trackedMaskDecoderUrl?:
     string;
+  readonly trackedMemoryEncoderUrl?:
+    string;
 };
 
 export type VideoSegmentationAdapterFactory = (
