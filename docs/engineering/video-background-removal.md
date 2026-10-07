@@ -2,34 +2,53 @@
 
 This work is experimental. It does not change bgcut's public browser, CLI, or Node.js API.
 
-## Checkpoint handoff - 2026-10-06
+## Checkpoint handoff - 2026-10-07
 
-The branch includes the accepted unified intake, subject previews, precise trim timeline,
-and Safari-compatible MP4 exports. The latest immediate warm-up, progressive-disclosure
-UI, source-rate exports capped at 60 fps, streaming decode, and compact matte storage
-changes are a work-in-progress checkpoint, not a completed performance acceptance.
+The accepted code baseline is `5cbb0dc04a81b3eaad93640323baa72b588a4beb`.
+On that exact head, `bun run check`, the Cloudflare dry run/runtime smoke, the
+lower-level Chromium video acceptance, the performance harness, and the actual Solid
+video-editor acceptance all passed. The Solid gate runs in macOS CI and exercises the
+single intake, real SAM click/refinement flow, retained masks during queued refinements,
+desktop and 390 px mobile layout, the initial-viewport primary action, a real export,
+and switching back to the image path.
 
-At this checkpoint, the complete `bun run check` passes, including lint, typecheck,
-115 tests, bundle checks, production build, and package consumer smoke. The real
-Safari/Chrome acceptances predate the latest frame-rate and layout changes; rerun
-them on this candidate.
-No measured claim of 60 fps inference or improved segmentation quality has been made.
+The performance work now has measured limits rather than an output-rate claim. A
+generated 60 fps source is exported with 60 distinct timestamps, but full-cadence SAM
+tracking processed that one-second fixture at about 1.92 output frames/s and 2.05
+tracked frames/s on the accepted runner. Output cadence and inference throughput are
+therefore separate: bgcut can preserve a 60 fps timeline, but it does not infer at
+60 fps.
 
-Continue with:
+The selected subject frame is reused when an interactive export starts at that same
+frame, so export no longer decodes and vision-encodes a frame the editor already owns.
+In the run before this optimization, the full-cadence seed stage was about 1.79 s on
+`bear` and 1.51 s on `bmx-trees`; on the accepted head it was about 0.91 s and
+0.81 s. Bear quality was unchanged at 0.950 mean DAVIS IoU and 0.957 mean boundary F.
 
-1. Run `bun install` and `bun run check`.
-2. Run the performance harness below and record cold/warm selection latency,
-   achieved processing FPS, real output timestamps, and quality comparisons.
-3. Verify immediate preparation before any click, retained highlights on rapid edits,
-   and the primary action in the initial desktop/mobile viewport.
-4. Rerun Safari playback and Chrome transparent/multi-subject acceptance at source
-   cadence, including genuine 60 fps input, VFR, nonzero starting timestamps, and trims.
-5. Resolve any failures and update these notes with measured results before release.
+Several tempting shortcuts were measured and rejected:
 
-Screenshots and encoded acceptance artifacts from the prior passes were stored under
-`/tmp` on the original computer and are not in the repository. The checked-in harnesses
-are the repeatable source of evidence on another computer. Video remains local-only;
-hosted and packaged model delivery is still unfinished.
+- A fixed sparse tracking cadence is not the product default. Twelve tracked frames/s
+  stayed close to full cadence on bear, but `bmx-trees` diverged sharply between
+  tracked frames.
+- Linear alpha interpolation improved bear's sparse masks but did not repair the hard
+  `bmx-trees` trajectory, so the experiment was removed.
+- Keeping selected SAM outputs in WebGPU buffers produced identical quality but no
+  throughput gain in the same-click benchmark (about 2.79 tracked frames/s normally
+  versus 2.77 with residency), so that plumbing was removed.
+- EdgeTAM remains slightly more accurate on the same bear click, but slower in the
+  accepted comparison: SAM 2.1 reached 0.946 mean IoU / 0.959 boundary F at about
+  1.79 tracked frames/s; EdgeTAM reached 0.955 / 0.974 at about 1.61 tracked frames/s.
+
+The next performance work should reduce the cost of full-cadence SAM inference rather
+than skip temporal updates. Profile the steady-state vision encoder, memory attention,
+mask decoder, and memory encoder separately before changing graph or memory behavior.
+
+Safari 26.3 was manually accepted earlier for prompted scrubbing, refinement, MP4
+playback, and exported WebM alpha. The latest automated Solid gate is Chromium; rerun
+the checked-in Safari harness before treating a future release candidate as
+cross-browser accepted. Video remains a local development experiment. Hosted/package
+video-model delivery is still unfinished, and no public video API, deployment, merge,
+or package release is implied by this checkpoint.
 
 ## Local editing workflow
 
@@ -37,7 +56,7 @@ The development/local shell now routes video from the same intake as images, inc
 
 An interior click runs the actual SAM seed operation and displays its mask before tracking. Keep and Exclude clicks refine the active subject; Add subject creates a separate memory bank, up to four subjects. The editor serializes preview, tracking, and disposal around one loaded SAM adapter. Each multi-subject seed shares its encoded frame across subjects. Rapid preview changes are debounced and stale work is aborted/ignored; an in-flight ONNX call finishes before the next queued operation or disposal. Changing the frame or trim clears prompts. The current single-mask SAM export is unchanged; this is not a new whole-object proposal algorithm and imperfect masks still need corrections.
 
-Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
+Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. Prompted export borrows that editor-owned frame when the selected time is unchanged, which lets SAM reuse the already prepared vision features instead of decoding and encoding the seed again; export does not take ownership of or close the borrowed frame. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
 
 Exports use MediaBunny's real quality settings and metadata tags. VP9 WebM retains alpha. H.264 MP4 bakes white or black behind the matte. Codec/dimension support is checked before tracking. Original dimensions and high encoding quality are the defaults; explicit resizing preserves aspect ratio without upscaling. Source metadata is never copied; only the optional user-entered title is passed to the muxer.
 
@@ -51,13 +70,13 @@ Forward and backward tracking now consume bounded MediaBunny frame iterators rat
 
 ### Repeatable performance and quality acceptance
 
-Run `bun run scripts/benchmark/video-local-preview/server.ts /tmp/bgcut-rate-performance 4203 performance` and open that loopback URL in Chromium. The harness measures session load, frame warm-up, first/warm click, decode/seed/tracking/encoding time, real decoded timestamps and dimensions, plus encode PSNR against the uncompressed composite. It covers bear, two independent BMX subjects, and a generated moving 60-fps fixture. It saves input/output MP4s and `result.json`; higher output FPS is reported separately from achieved processing FPS. The unchanged bear seed is also scored against the DAVIS annotation with IoU and boundary F.
+Run `bun run scripts/benchmark/video-local-preview/server.ts /tmp/bgcut-rate-performance 4203 performance` and open that loopback URL in Chromium. The harness measures session load, frame warm-up, first/warm click, decode/seed/tracking/encoding time, real decoded timestamps and dimensions, plus encode PSNR against the final encoder frame. It covers bear, two independent BMX subjects, `blackswan`, `camel`, `car-shadow`, a generated moving 60 fps fixture, and a VFR/nonzero-timestamp source. Raw segmentation alpha is scored separately from the opaque MP4 encoder frame. DAVIS masks provide IoU and boundary-F checks for the real fixtures, and a same-click tracker lane compares SAM 2.1 with EdgeTAM. It saves input/output MP4s and `result.json`; output FPS, processing FPS, and temporal tracking FPS are reported separately.
 
 ### Repeatable acceptance
 
 Start `bun run scripts/benchmark/video-local-preview/server.ts /tmp/bgcut-video-acceptance 4196`, then open `http://127.0.0.1:4196/` in a WebGPU-capable Chromium browser. The local-only harness writes `result.json` or `failure.json`, the three original subject/automatic artifacts, and `bear-trim.webm` / `bear-trim.mp4`. The added cases verify a nonempty click mask, nonzero trim start, backward tracking from an interior seed, output duration/timestamps, decoded dimensions, title metadata, WebM alpha, and MP4's opaque black background. Original multi-subject cross-negative prompts remain unchanged.
 
-For the actual Solid UI, start `bun run dev -- --host 127.0.0.1 --port 5184 --strictPort`, install Chromium with `agent-browser install`, then run `bun run scripts/benchmark/video-local-preview/ui-e2e.ts /absolute/path/to/bear.mp4 http://127.0.0.1:5184 /tmp/bgcut-video-ui`. This checks the single intake, click mask, desktop/mobile layout, a real export, and switching back to the image error flow. It writes screenshots and the result summary to the supplied artifact directory.
+For the actual Solid UI, start `bun run dev -- --host 127.0.0.1 --port 5184 --strictPort`, install Chromium with `agent-browser install`, then run `bun run scripts/benchmark/video-local-preview/ui-e2e.ts /absolute/path/to/bear.mp4 http://127.0.0.1:5184 /tmp/bgcut-video-ui`. This checks the single intake, explicit model/frame readiness, the click mask, retained highlights during rapid refinements, stale-preview export blocking, desktop/mobile layout, the initial-viewport primary action, a real export, subject switching/clearing, seek invalidation, and switching back to the image error flow. The macOS acceptance workflow now runs this harness automatically with a pinned `agent-browser` version and uploads its screenshots/result with the other video evidence.
 
 For Safari, start a separate `/usr/bin/safaridriver --port 4450`, then run `bun run scripts/benchmark/video-local-preview/safari-e2e.ts /absolute/path/to/bear.mp4 http://127.0.0.1:5184 /tmp/bgcut-safari-video http://127.0.0.1:4450`. The harness owns and closes its automation session, records readiness/refinement screenshots, verifies `video.play()` advances `currentTime`, samples the decoded white background, and saves the actual MP4 and JSON evidence.
 
