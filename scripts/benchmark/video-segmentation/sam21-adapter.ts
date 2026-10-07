@@ -69,6 +69,14 @@ const MEMORY_OUTPUTS_WITH_POSITION = [
   "memory_pos",
 ] as const;
 
+const TRACKED_STEP_OUTPUTS = [
+  "low_res_mask",
+  "iou",
+  "tracked_object_score_logits",
+  "object_pointer",
+  "memory_memory_tokens",
+] as const;
+
 type SamPromptSessions = {
   readonly visionEncoder:
     ort.InferenceSession;
@@ -86,6 +94,8 @@ type SamTrackingSessions = {
   readonly trackedMaskDecoder?:
     ort.InferenceSession;
   readonly trackedMemoryEncoder?:
+    ort.InferenceSession;
+  readonly trackedStep?:
     ort.InferenceSession;
 };
 
@@ -117,6 +127,17 @@ type SamDecoded = {
   readonly pointer:
     Float32Array;
   readonly objectScore: number;
+};
+
+type SamTrackedStep = {
+  readonly mask:
+    VideoSegmentationMask;
+  readonly pointer:
+    Float32Array;
+  readonly objectScore:
+    number;
+  readonly memoryTokens:
+    Float32Array;
 };
 
 type StoredMemory = {
@@ -156,6 +177,104 @@ const requireTensor = (
   }
 
   return tensor;
+};
+
+const decodedTrackedStep = (
+  outputs:
+    Record<
+      string,
+      ort.Tensor
+    >,
+): SamTrackedStep => {
+  const logits =
+    floatData(
+      requireTensor(
+        outputs,
+        "low_res_mask",
+      ),
+      "SAM 2.1 tracked low_res_mask",
+    ).slice();
+
+  const iou =
+    floatData(
+      requireTensor(
+        outputs,
+        "iou",
+      ),
+      "SAM 2.1 tracked iou",
+    )[0] ??
+    0;
+
+  const objectScore =
+    floatData(
+      requireTensor(
+        outputs,
+        "tracked_object_score_logits",
+      ),
+      "SAM 2.1 tracked object score",
+    )[0] ??
+    0;
+
+  const pointer =
+    floatData(
+      requireTensor(
+        outputs,
+        "object_pointer",
+      ),
+      "SAM 2.1 tracked object pointer",
+    );
+
+  const memoryTokens =
+    floatData(
+      requireTensor(
+        outputs,
+        "memory_memory_tokens",
+      ),
+      "SAM 2.1 tracked memory tokens",
+    ).slice();
+
+  if (
+    pointer.length <
+    POINTER_DIMENSION
+  ) {
+    throw new Error(
+      "SAM 2.1 tracked object pointer is shorter than 256 values.",
+    );
+  }
+
+  const maskSide =
+    Math.sqrt(
+      logits.length,
+    );
+
+  if (
+    !Number.isInteger(
+      maskSide,
+    )
+  ) {
+    throw new Error(
+      "SAM 2.1 tracked low-resolution mask is not square.",
+    );
+  }
+
+  return {
+    mask: {
+      logits,
+      width:
+        maskSide,
+      height:
+        maskSide,
+      iou,
+      objectScore,
+    },
+    pointer:
+      pointer.slice(
+        0,
+        POINTER_DIMENSION,
+      ),
+    objectScore,
+    memoryTokens,
+  };
 };
 
 const decodedMask = (
@@ -690,6 +809,10 @@ export const createSam21Adapter =
       ort.InferenceSession |
       undefined;
 
+    let trackedStep:
+      ort.InferenceSession |
+      undefined;
+
     const loadTrackingSessions =
       async (): Promise<
         SamTrackingSessions
@@ -742,12 +865,29 @@ export const createSam21Adapter =
             }
           }
 
+          if (
+            options?.trackedStepUrl !==
+            undefined
+          ) {
+            try {
+              trackedStep =
+                await createVideoSessionFromUrl(
+                  options.trackedStepUrl,
+                  "SAM 2.1 fused tracked step",
+                );
+            } catch {
+              trackedStep =
+                undefined;
+            }
+          }
+
           return {
             memoryAttention,
             memoryEncoder,
             pointerTpos,
             trackedMaskDecoder,
             trackedMemoryEncoder,
+            trackedStep,
           };
         } catch (error) {
           await closeVideoSessions({
@@ -767,6 +907,8 @@ export const createSam21Adapter =
               trackedMaskDecoder,
             "tracked-memory-encoder":
               trackedMemoryEncoder,
+            "tracked-step":
+              trackedStep,
           });
 
           loaded.delete(
