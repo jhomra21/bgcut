@@ -87,9 +87,19 @@ export type VideoSegmentationDiscovery = {
     VideoSegmentationMaskAlternative;
 };
 
+export type VideoFramePreparation = {
+  readonly encodeMs: number;
+  readonly promptWarmMs: number;
+};
+
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
-  prepareFrame?(frame: VideoFrame): Promise<void>;
+  prepareFrame?(
+    frame: VideoFrame,
+  ): Promise<
+    VideoFramePreparation |
+    void
+  >;
   prepareTracking?(): Promise<void>;
   seed(
     frame: VideoFrame,
