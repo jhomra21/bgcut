@@ -76,6 +76,8 @@ type SamTrackingSessions = {
     ort.InferenceSession;
   readonly trackedMaskDecoder?:
     ort.InferenceSession;
+  readonly trackedMemoryEncoder?:
+    ort.InferenceSession;
 };
 
 type SamVision = {
@@ -675,6 +677,10 @@ export const createSam21Adapter =
       ort.InferenceSession |
       undefined;
 
+    let trackedMemoryEncoder:
+      ort.InferenceSession |
+      undefined;
+
     const loadTrackingSessions =
       async (): Promise<
         SamTrackingSessions
@@ -711,11 +717,28 @@ export const createSam21Adapter =
             }
           }
 
+          if (
+            options?.trackedMemoryEncoderUrl !==
+            undefined
+          ) {
+            try {
+              trackedMemoryEncoder =
+                await createVideoSessionFromUrl(
+                  options.trackedMemoryEncoderUrl,
+                  "SAM 2.1 tracked memory encoder",
+                );
+            } catch {
+              trackedMemoryEncoder =
+                undefined;
+            }
+          }
+
           return {
             memoryAttention,
             memoryEncoder,
             pointerTpos,
             trackedMaskDecoder,
+            trackedMemoryEncoder,
           };
         } catch (error) {
           await closeVideoSessions({
@@ -733,6 +756,8 @@ export const createSam21Adapter =
               ),
             "tracked-mask-decoder":
               trackedMaskDecoder,
+            "tracked-memory-encoder":
+              trackedMemoryEncoder,
           });
 
           loaded.delete(
@@ -1100,16 +1125,6 @@ export const createSam21Adapter =
                 1,
               ],
             ),
-          binarize:
-            new ort.Tensor(
-              "float32",
-              Float32Array.of(
-                prompted
-                  ? 1
-                  : 0,
-              ),
-              [],
-            ),
         };
 
         const runStartedAt =
@@ -1119,16 +1134,43 @@ export const createSam21Adapter =
           memoryPosition ===
           undefined;
 
+        const trackedEncoder =
+          prompted
+            ? undefined
+            : trackingSessions
+                .trackedMemoryEncoder;
+
         const outputs =
-          await trackingSessions.memoryEncoder.run(
-            memoryInputs,
-            needsPosition
-              ? MEMORY_OUTPUTS_WITH_POSITION
-              : MEMORY_OUTPUTS,
-          );
+          trackedEncoder ===
+          undefined
+            ? await trackingSessions.memoryEncoder.run(
+                {
+                  ...memoryInputs,
+                  binarize:
+                    new ort.Tensor(
+                      "float32",
+                      Float32Array.of(
+                        prompted
+                          ? 1
+                          : 0,
+                      ),
+                      [],
+                    ),
+                },
+                needsPosition
+                  ? MEMORY_OUTPUTS_WITH_POSITION
+                  : MEMORY_OUTPUTS,
+              )
+            : await trackedEncoder.run(
+                memoryInputs,
+                MEMORY_OUTPUTS,
+              );
 
         recordTiming(
-          "memory-encoder",
+          trackedEncoder ===
+            undefined
+            ? "memory-encoder"
+            : "tracked-memory-encoder",
           runStartedAt,
         );
 
@@ -1762,6 +1804,8 @@ export const createSam21Adapter =
             ),
           "tracked-mask-decoder":
             trackedMaskDecoder,
+          "tracked-memory-encoder":
+            trackedMemoryEncoder,
         });
       },
     };
