@@ -4,10 +4,10 @@ This work is experimental. It does not change bgcut's public browser, CLI, or No
 
 ## Checkpoint handoff - 2026-10-07
 
-The accepted code baseline is `5cbb0dc04a81b3eaad93640323baa72b588a4beb`.
+The accepted code baseline is `c3c631db9f984c5499ebb4c87295fff135572998`.
 On that exact head, `bun run check`, the Cloudflare dry run/runtime smoke, the
-lower-level Chromium video acceptance, the performance harness, and the actual Solid
-video-editor acceptance all passed. The Solid gate runs in macOS CI and exercises the
+lower-level Chromium video acceptance, the performance harness, the cross-DAVIS
+tracked-decoder validation, and the actual Solid video-editor acceptance all passed. The Solid gate runs in macOS CI and exercises the
 single intake, real SAM click/refinement flow, retained masks during queued refinements,
 desktop and 390 px mobile layout, the initial-viewport primary action, a real export,
 and switching back to the image path.
@@ -22,8 +22,19 @@ therefore separate: bgcut can preserve a 60 fps timeline, but it does not infer 
 The selected subject frame is reused when an interactive export starts at that same
 frame, so export no longer decodes and vision-encodes a frame the editor already owns.
 In the run before this optimization, the full-cadence seed stage was about 1.79 s on
-`bear` and 1.51 s on `bmx-trees`; on the accepted head it was about 0.91 s and
-0.81 s. Bear quality was unchanged at 0.950 mean DAVIS IoU and 0.957 mean boundary F.
+`bear` and 1.51 s on `bmx-trees`; after reuse it was about 0.91 s and
+0.81 s. Bear quality remained 0.950 mean DAVIS IoU and 0.957 mean boundary F.
+
+Tracked frames now have an optional derived SAM decoder with the no-point tracking
+prompt frozen into the graph. The full prompt decoder remains unchanged for selection
+and seed frames. The four-fixture DAVIS validation measured tracking speedups of about
+1.13× on `bear`, 1.20× on `blackswan`, 1.58× on `camel`, and 1.16× on
+`car-shadow`, with mean IoU deltas within about 0.00004 and boundary-F deltas within
+about 0.00063. The real Solid editor was accepted with this path enabled. The derived
+ONNX is not committed: run `bun run video:model:prepare` to create it under
+`.cache/bgcut-video/`. Vite serves that cache entry only in development; if the
+derived file is absent or cannot be loaded, SAM falls back to the original decoder.
+Hosted/package model delivery remains unchanged.
 
 Several tempting shortcuts were measured and rejected:
 
@@ -47,14 +58,14 @@ Several tempting shortcuts were measured and rejected:
   accepted comparison: SAM 2.1 reached 0.946 mean IoU / 0.959 boundary F at about
   1.79 tracked frames/s; EdgeTAM reached 0.955 / 0.974 at about 1.61 tracked frames/s.
 
-The steady-state graph profiler now shows where that work belongs. On a 12-frame bear
-run, JavaScript/media/tensor preparation outside ONNX accounted for only about 0.21 s.
-The ONNX calls accounted for roughly 2.23 s in the vision encoder, 2.79 s in the mask
-decoder, 1.25 s in memory attention, 0.70 s in memory encoding, and 0.11 s in pointer
-temporal positions. The mask decoder and vision encoder are therefore the first
-model-level targets. Tracked frames always use SAM's padding prompt, so a dedicated
-tracked-frame decoder/export is the next experiment worth measuring before changing
-memory semantics.
+The steady-state graph profiler shows where further work belongs. Before decoder
+specialization, a 12-frame bear run spent about 2.23 s in the vision encoder, 2.79 s
+in the mask decoder, 1.25 s in memory attention, 0.70 s in memory encoding, and
+0.11 s in pointer temporal positions, while host-side inference overhead was only
+about 0.21 s. The derived tracked decoder removes most repeated prompt-decoder work;
+the remaining large targets are the vision encoder and memory attention. Future
+performance changes should preserve full-cadence temporal updates unless they are
+validated on hard-motion DAVIS clips.
 
 Safari 26.3 was manually accepted earlier for prompted scrubbing, refinement, MP4
 playback, and exported WebM alpha. The latest automated Solid gate is Chromium; rerun
@@ -69,7 +80,7 @@ The development/local shell now routes video from the same intake as images, inc
 
 An interior click runs the actual SAM seed operation and displays its mask before tracking. Keep and Exclude clicks refine the active subject; Add subject creates a separate memory bank, up to four subjects. The editor serializes preview, tracking, and disposal around one loaded SAM adapter. Each multi-subject seed shares its encoded frame across subjects. Rapid preview changes are debounced and stale work is aborted/ignored; an in-flight ONNX call finishes before the next queued operation or disposal. Changing the frame or trim clears prompts. The current single-mask SAM export is unchanged; this is not a new whole-object proposal algorithm and imperfect masks still need corrections.
 
-Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. Prompted export borrows that editor-owned frame when the selected time is unchanged, which lets SAM reuse the already prepared vision features instead of decoding and encoding the seed again; export does not take ownership of or close the borrowed frame. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
+For the faster local path, run `bun run video:model:prepare` once to derive the tracked-frame SAM decoder into the ignored `.cache/bgcut-video/` directory. This is a development cache, not a published model surface. Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. Prompted export borrows that editor-owned frame when the selected time is unchanged, which lets SAM reuse the already prepared vision features instead of decoding and encoding the seed again; export does not take ownership of or close the borrowed frame. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
 
 Exports use MediaBunny's real quality settings and metadata tags. VP9 WebM retains alpha. H.264 MP4 bakes white or black behind the matte. Codec/dimension support is checked before tracking. Original dimensions and high encoding quality are the defaults; explicit resizing preserves aspect ratio without upscaling. Source metadata is never copied; only the optional user-entered title is passed to the muxer.
 
