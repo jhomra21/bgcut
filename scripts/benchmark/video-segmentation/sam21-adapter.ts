@@ -77,14 +77,6 @@ const TRACKED_STEP_OUTPUTS = [
   "memory_memory_tokens",
 ] as const;
 
-const TRACKED_ATTENTION_STEP_OUTPUTS = [
-  "tracked_low_res_mask",
-  "tracked_iou",
-  "tracked_tracked_object_score_logits",
-  "tracked_object_pointer",
-  "tracked_memory_memory_tokens",
-] as const;
-
 type SamPromptSessions = {
   readonly visionEncoder:
     ort.InferenceSession;
@@ -104,8 +96,6 @@ type SamTrackingSessions = {
   readonly trackedMemoryEncoder?:
     ort.InferenceSession;
   readonly trackedStep?:
-    ort.InferenceSession;
-  readonly trackedAttentionStep?:
     ort.InferenceSession;
 };
 
@@ -286,41 +276,6 @@ const decodedTrackedStep = (
     memoryTokens,
   };
 };
-
-const decodedTrackedAttentionStep = (
-  outputs:
-    Record<
-      string,
-      ort.Tensor
-    >,
-): SamTrackedStep =>
-  decodedTrackedStep({
-    low_res_mask:
-      requireTensor(
-        outputs,
-        "tracked_low_res_mask",
-      ),
-    iou:
-      requireTensor(
-        outputs,
-        "tracked_iou",
-      ),
-    tracked_object_score_logits:
-      requireTensor(
-        outputs,
-        "tracked_tracked_object_score_logits",
-      ),
-    object_pointer:
-      requireTensor(
-        outputs,
-        "tracked_object_pointer",
-      ),
-    memory_memory_tokens:
-      requireTensor(
-        outputs,
-        "tracked_memory_memory_tokens",
-      ),
-  });
 
 const decodedMask = (
   outputs:
@@ -858,10 +813,6 @@ export const createSam21Adapter =
       ort.InferenceSession |
       undefined;
 
-    let trackedAttentionStep:
-      ort.InferenceSession |
-      undefined;
-
     const loadTrackingSessions =
       async (): Promise<
         SamTrackingSessions
@@ -930,22 +881,6 @@ export const createSam21Adapter =
             }
           }
 
-          if (
-            options?.trackedAttentionStepUrl !==
-            undefined
-          ) {
-            try {
-              trackedAttentionStep =
-                await createVideoSessionFromUrl(
-                  options.trackedAttentionStepUrl,
-                  "SAM 2.1 fused tracked attention step",
-                );
-            } catch {
-              trackedAttentionStep =
-                undefined;
-            }
-          }
-
           return {
             memoryAttention,
             memoryEncoder,
@@ -953,7 +888,6 @@ export const createSam21Adapter =
             trackedMaskDecoder,
             trackedMemoryEncoder,
             trackedStep,
-            trackedAttentionStep,
           };
         } catch (error) {
           await closeVideoSessions({
@@ -981,16 +915,7 @@ export const createSam21Adapter =
             // Experimental session cleanup must not hide the load failure.
           }
 
-          try {
-            await trackedAttentionStep?.release();
-          } catch {
-            // Experimental session cleanup must not hide the load failure.
-          }
-
           trackedStep =
-            undefined;
-
-          trackedAttentionStep =
             undefined;
 
           loaded.delete(
@@ -1646,82 +1571,6 @@ export const createSam21Adapter =
             ),
         };
 
-        const fusedAttentionStep =
-          trackingSessions
-            .trackedAttentionStep;
-
-        if (
-          fusedAttentionStep !==
-          undefined
-        ) {
-          runStartedAt =
-            performance.now();
-
-          const outputs =
-            await fusedAttentionStep.run(
-              {
-                ...attentionInputs,
-                tracked_feats0:
-                  vision.feats0,
-                tracked_feats1:
-                  vision.feats1,
-                tracked_memory_feats2:
-                  vision.feats2,
-              },
-              TRACKED_ATTENTION_STEP_OUTPUTS,
-            );
-
-          recordTiming(
-            "tracked-attention-step",
-            runStartedAt,
-          );
-
-          const tracked =
-            decodedTrackedAttentionStep(
-              outputs,
-            );
-
-          if (
-            tracked.objectScore >
-              0 &&
-            (tracked.mask.iou ??
-              0) >=
-              RELIABLE_IOU
-          ) {
-            if (
-              memoryPosition ===
-              undefined
-            ) {
-              throw new Error(
-                "SAM 2.1 memory position cache was not initialized.",
-              );
-            }
-
-            if (
-              tracked.memoryTokens.length !==
-              featureTokens *
-                MEMORY_DIMENSION
-            ) {
-              throw new Error(
-                "SAM 2.1 fused tracked attention step returned unexpected memory geometry.",
-              );
-            }
-
-            targetBank.push({
-              index:
-                frameIndex,
-              tokens:
-                tracked.memoryTokens,
-              positions:
-                memoryPosition,
-              pointer:
-                tracked.pointer,
-            });
-          }
-
-          return tracked.mask;
-        }
-
         runStartedAt =
           performance.now();
 
@@ -2226,12 +2075,6 @@ export const createSam21Adapter =
 
         try {
           await trackedStep?.release();
-        } catch {
-          // Closing the experimental fused session is best-effort.
-        }
-
-        try {
-          await trackedAttentionStep?.release();
         } catch {
           // Closing the experimental fused session is best-effort.
         }
