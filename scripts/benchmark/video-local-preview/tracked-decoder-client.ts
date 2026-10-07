@@ -48,6 +48,14 @@ const FIXTURES =
 const SPECIALIZED_DECODER =
   "/specialized/sam21-tracked-mask-decoder.onnx";
 
+const SPECIALIZED_MEMORY_ENCODER =
+  "/specialized/sam21-tracked-memory-encoder.onnx";
+
+type TrackerVariant =
+  | "baseline"
+  | "decoder"
+  | "decoder-memory";
+
 const truthMask = async (
   fixture:
     QualityFixtureId,
@@ -397,8 +405,8 @@ const runTracker = async (
     readonly TruthMask[],
   point:
     PositivePoint,
-  specialized:
-    boolean,
+  variant:
+    TrackerVariant,
 ) => {
   const source =
     await openMediaBunnyVideoSource(
@@ -411,12 +419,18 @@ const runTracker = async (
         "sam21-tiny"
       ],
       undefined,
-      specialized
-        ? {
+      variant ===
+        "baseline"
+        ? undefined
+        : {
             trackedMaskDecoderUrl:
               SPECIALIZED_DECODER,
-          }
-        : undefined,
+            trackedMemoryEncoderUrl:
+              variant ===
+              "decoder-memory"
+                ? SPECIALIZED_MEMORY_ENCODER
+                : undefined,
+          },
     );
 
   try {
@@ -598,7 +612,7 @@ const runTracker = async (
     }
 
     return {
-      specialized,
+      variant,
       trackingPrepareMs,
       seedMs,
       trackingMs,
@@ -709,63 +723,93 @@ const main = async () => {
         truths[0]!,
       );
 
-    const normal =
+    const baseline =
       await runTracker(
         fixture,
         file,
         truths,
         point,
-        false,
+        "baseline",
       );
 
-    const specialized =
+    const decoder =
       await runTracker(
         fixture,
         file,
         truths,
         point,
-        true,
+        "decoder",
       );
 
-    const meanIouDelta =
-      specialized.meanIou -
-      normal.meanIou;
+    const decoderMemory =
+      await runTracker(
+        fixture,
+        file,
+        truths,
+        point,
+        "decoder-memory",
+      );
 
-    const meanBoundaryDelta =
-      specialized.meanBoundaryF -
-      normal.meanBoundaryF;
+    const compare = (
+      candidate:
+        typeof decoder,
+    ) => {
+      const meanIouDelta =
+        candidate.meanIou -
+        baseline.meanIou;
 
-    if (
-      Math.abs(
+      const meanBoundaryDelta =
+        candidate.meanBoundaryF -
+        baseline.meanBoundaryF;
+
+      if (
+        Math.abs(
+          meanIouDelta,
+        ) >
+          0.005 ||
+        Math.abs(
+          meanBoundaryDelta,
+        ) >
+          0.005 ||
+        candidate.worstIou <
+          baseline.worstIou -
+            0.01 ||
+        candidate.worstBoundaryF <
+          baseline.worstBoundaryF -
+            0.01
+      ) {
+        throw new Error(
+          `${candidate.variant} changed ${fixture} quality too much: IoU delta ${meanIouDelta.toFixed(4)}, boundary delta ${meanBoundaryDelta.toFixed(4)}.`,
+        );
+      }
+
+      return {
+        speedup:
+          candidate.trackingFps /
+          baseline.trackingFps,
         meanIouDelta,
-      ) >
-        0.005 ||
-      Math.abs(
         meanBoundaryDelta,
-      ) >
-        0.005 ||
-      specialized.worstIou <
-        normal.worstIou -
-          0.01 ||
-      specialized.worstBoundaryF <
-        normal.worstBoundaryF -
-          0.01
-    ) {
-      throw new Error(
-        `Specialized tracked decoder changed ${fixture} quality too much: IoU delta ${meanIouDelta.toFixed(4)}, boundary delta ${meanBoundaryDelta.toFixed(4)}.`,
-      );
-    }
+      };
+    };
 
     cases.push({
       fixture,
       point,
-      normal,
-      specialized,
-      speedup:
-        specialized.trackingFps /
-        normal.trackingFps,
-      meanIouDelta,
-      meanBoundaryDelta,
+      baseline,
+      decoder: {
+        result:
+          decoder,
+        ...compare(
+          decoder,
+        ),
+      },
+      decoderMemory: {
+        result:
+          decoderMemory,
+        ...compare(
+          decoderMemory,
+        ),
+      },
     });
   }
 
