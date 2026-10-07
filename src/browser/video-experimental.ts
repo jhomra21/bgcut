@@ -779,16 +779,55 @@ const removeVideo =
         options.signal?.throwIfAborted();
       }
 
-      const timestamps = await source.frameTimes(
-        source.info.firstTimestamp + size.start,
-        source.info.firstTimestamp + size.end,
-        size.maxFps,
-        options.signal,
-      );
+      const outputTimestamps =
+        await source.frameTimes(
+          source.info.firstTimestamp +
+            size.start,
+          source.info.firstTimestamp +
+            size.end,
+          size.maxFps,
+          options.signal,
+        );
+
+      const requestedTrackingFps =
+        options.trackingFrameRate ??
+        size.maxFps;
+
+      if (
+        !Number.isFinite(
+          requestedTrackingFps,
+        ) ||
+        requestedTrackingFps <=
+          0
+      ) {
+        throw new VideoExportError({
+          message:
+            "Video tracking frame rate must be greater than zero.",
+        });
+      }
+
+      const trackingMaxFps =
+        Math.min(
+          size.maxFps,
+          requestedTrackingFps,
+        );
+
+      const trackingTimestamps =
+        trackingMaxFps ===
+        size.maxFps
+          ? outputTimestamps
+          : await source.frameTimes(
+              source.info.firstTimestamp +
+                size.start,
+              source.info.firstTimestamp +
+                size.end,
+              trackingMaxFps,
+              options.signal,
+            );
 
       const selectedSeedIndex =
         seedFrameIndex(
-          timestamps,
+          trackingTimestamps,
           source.info.firstTimestamp,
           options.seedTimeSeconds,
         );
@@ -801,7 +840,7 @@ const removeVideo =
           Array.from(
             {
               length:
-                timestamps.length,
+                trackingTimestamps.length,
             },
           );
 
@@ -824,7 +863,7 @@ const removeVideo =
       let encodedFrames = 0;
 
       const seedTimestamp =
-        timestamps[
+        trackingTimestamps[
           selectedSeedIndex
         ];
 
@@ -865,14 +904,14 @@ const removeVideo =
               "seeding",
             message:
               prompted
-                ? `Selecting ${subjects?.length === 1 ? "subject" : `${subjects?.length ?? 0} subjects`} at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`
-                : `Finding foreground at frame ${selectedSeedIndex + 1} of ${timestamps.length}…`,
+                ? `Selecting ${subjects?.length === 1 ? "subject" : `${subjects?.length ?? 0} subjects`} at frame ${selectedSeedIndex + 1} of ${trackingTimestamps.length}…`
+                : `Finding foreground at frame ${selectedSeedIndex + 1} of ${trackingTimestamps.length}…`,
             progress:
               0.2,
             frameIndex:
               selectedSeedIndex,
             frameCount:
-              timestamps.length,
+              trackingTimestamps.length,
           },
         );
 
@@ -899,7 +938,7 @@ const removeVideo =
                 seedFrame.frame,
                 subjects,
                 selectedSeedIndex,
-                timestamps.length,
+                trackingTimestamps.length,
               ),
             );
 
@@ -942,7 +981,7 @@ const removeVideo =
                 seedFrame.frame,
                 semantic,
                 selectedSeedIndex,
-                timestamps.length,
+                trackingTimestamps.length,
               );
 
             seedKind =
@@ -975,7 +1014,7 @@ const removeVideo =
                 seedFrame.frame,
                 selected.mask,
                 selectedSeedIndex,
-                timestamps.length,
+                trackingTimestamps.length,
               );
 
             seedKind =
@@ -1022,14 +1061,14 @@ const removeVideo =
                 stage:
                   "tracking",
                 message:
-                  `Tracking ${direction} selected frame · ${frameIndex + 1} of ${timestamps.length}…`,
+                  `Tracking ${direction} selected frame · ${frameIndex + 1} of ${trackingTimestamps.length}…`,
                 progress:
                   0.2 +
                   (
                     trackedFrames /
                     Math.max(
                       1,
-                      timestamps.length,
+                      trackingTimestamps.length,
                     )
                   ) *
                     0.55,
@@ -1053,7 +1092,7 @@ const removeVideo =
                     )(
                       decoded.frame,
                       frameIndex,
-                      timestamps.length,
+                      trackingTimestamps.length,
                     ),
                   )
                 : await segmenter.track(
@@ -1081,7 +1120,15 @@ const removeVideo =
         }
       };
 
-      await trackRange(timestamps.slice(selectedSeedIndex + 1), selectedSeedIndex + 1, "after");
+      await trackRange(
+        trackingTimestamps.slice(
+          selectedSeedIndex +
+            1,
+        ),
+        selectedSeedIndex +
+          1,
+        "after",
+      );
 
       if (
         selectedSeedIndex >
@@ -1104,7 +1151,17 @@ const removeVideo =
           segmenter.rewind();
         }
 
-        await trackRange(timestamps.slice(0, selectedSeedIndex).reverse(), selectedSeedIndex - 1, "before");
+        await trackRange(
+          trackingTimestamps
+            .slice(
+              0,
+              selectedSeedIndex,
+            )
+            .reverse(),
+          selectedSeedIndex -
+            1,
+          "before",
+        );
       }
 
       await output.start();
@@ -1180,7 +1237,7 @@ const removeVideo =
               stage:
                 "encoding",
               message:
-                `Encoding frame ${frameIndex + 1} of ${timestamps.length}…`,
+                `Encoding frame ${frameIndex + 1} of ${trackingTimestamps.length}…`,
               progress:
                 0.76 +
                 (
