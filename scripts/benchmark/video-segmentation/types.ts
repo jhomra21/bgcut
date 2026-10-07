@@ -176,6 +176,8 @@ export type VideoSegmentationAdapterOptions = {
     string;
   readonly trackedStepUrl?:
     string;
+  readonly trackedAttentionStepUrl?:
+    string;
 };
 
 export type VideoSegmentationAdapterFactory = (
