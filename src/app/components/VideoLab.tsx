@@ -1349,7 +1349,7 @@ export const VideoLab = (props: { readonly file: File; readonly onChangeMedia: (
           </div>
           <div class="video-lab-model-status" hidden={modelStatus() === "ready"} role="status" data-state={modelStatus()}>
             <Show when={modelStatus() === "loading"}>
-              <span>Preparing selection · {Math.round(modelProgress() * 5)}/5 models. Click while loading.</span>
+              <span>Preparing selection · {Math.round(Math.min(1, modelProgress() / 0.4) * 2)}/2 sessions. Click while loading.</span>
               <progress max="1" value={modelProgress()} aria-label="Selection model loading" />
             </Show>
 
