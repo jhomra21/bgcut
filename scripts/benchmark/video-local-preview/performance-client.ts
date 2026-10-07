@@ -16,6 +16,12 @@ import type {
   VideoSegmentationMask,
 } from "../video-segmentation/types";
 
+type PositivePoint = {
+  readonly x: number;
+  readonly y: number;
+  readonly label: 1;
+};
+
 const save = async (name: string, blob: Blob) => {
   const response = await fetch(`/output/${name}`, { method: "POST", body: blob });
 
@@ -310,11 +316,7 @@ const pointFromTruth = (
     readonly height:
       number;
   },
-): {
-  readonly x: number;
-  readonly y: number;
-  readonly label: 1;
-} => {
+): PositivePoint => {
   let foreground =
     0;
 
