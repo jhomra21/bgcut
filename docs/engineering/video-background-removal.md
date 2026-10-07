@@ -32,16 +32,29 @@ Several tempting shortcuts were measured and rejected:
   tracked frames.
 - Linear alpha interpolation improved bear's sparse masks but did not repair the hard
   `bmx-trees` trajectory, so the experiment was removed.
-- Keeping selected SAM outputs in WebGPU buffers produced identical quality but no
-  throughput gain in the same-click benchmark (about 2.79 tracked frames/s normally
+- Keeping only selected SAM outputs in WebGPU buffers produced identical quality but
+  no throughput gain in the same-click benchmark (about 2.79 tracked frames/s normally
   versus 2.77 with residency), so that plumbing was removed.
+- A deeper follow-up kept all vision feature maps and the memory-attention result
+  device-local, with a WebGPU feature transpose before temporal attention. Quality
+  stayed exactly unchanged, but the experiment was slower overall in its A/B run:
+  1.14 tracked frames/s versus 1.39 for the normal path. Vision encoding and memory
+  attention became faster, but synchronization moved into mask decoding, pointer
+  position, and memory encoding; total graph time increased from about 10.9 s to
+  14.1 s across the 12-frame bear comparison. That partial device-local path was
+  removed rather than carried as dead complexity.
 - EdgeTAM remains slightly more accurate on the same bear click, but slower in the
   accepted comparison: SAM 2.1 reached 0.946 mean IoU / 0.959 boundary F at about
   1.79 tracked frames/s; EdgeTAM reached 0.955 / 0.974 at about 1.61 tracked frames/s.
 
-The next performance work should reduce the cost of full-cadence SAM inference rather
-than skip temporal updates. Profile the steady-state vision encoder, memory attention,
-mask decoder, and memory encoder separately before changing graph or memory behavior.
+The steady-state graph profiler now shows where that work belongs. On a 12-frame bear
+run, JavaScript/media/tensor preparation outside ONNX accounted for only about 0.21 s.
+The ONNX calls accounted for roughly 2.23 s in the vision encoder, 2.79 s in the mask
+decoder, 1.25 s in memory attention, 0.70 s in memory encoding, and 0.11 s in pointer
+temporal positions. The mask decoder and vision encoder are therefore the first
+model-level targets. Tracked frames always use SAM's padding prompt, so a dedicated
+tracked-frame decoder/export is the next experiment worth measuring before changing
+memory semantics.
 
 Safari 26.3 was manually accepted earlier for prompted scrubbing, refinement, MP4
 playback, and exported WebM alpha. The latest automated Solid gate is Chromium; rerun
