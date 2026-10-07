@@ -550,8 +550,6 @@ const benchmarkPromptTracker = async (
     readonly y: number;
     readonly label: 1;
   },
-  gpuResidentIntermediates =
-    false,
 ) => {
   const source =
     await openMediaBunnyVideoSource(
@@ -569,10 +567,6 @@ const benchmarkPromptTracker = async (
   const adapter =
     await createVideoSegmentationAdapter(
       candidate,
-      undefined,
-      {
-        gpuResidentIntermediates,
-      },
     );
 
   const adapterLoadMs =
@@ -803,7 +797,6 @@ const benchmarkPromptTracker = async (
     return {
       candidate:
         candidateId,
-      gpuResidentIntermediates,
       adapterLoadMs,
       trackingPrepareMs,
       seedMs,
@@ -1816,38 +1809,21 @@ const main = async () => {
     [];
 
   for (
-    const tracker of
+    const candidateId of
     [
-      {
-        candidateId:
-          "sam21-tiny",
-        gpuResidentIntermediates:
-          false,
-      },
-      {
-        candidateId:
-          "sam21-tiny",
-        gpuResidentIntermediates:
-          true,
-      },
-      {
-        candidateId:
-          "edgetam",
-        gpuResidentIntermediates:
-          false,
-      },
+      "sam21-tiny",
+      "edgetam",
     ] as const
   ) {
     promptTrackerCases.push(
       await benchmarkPromptTracker(
         bearFile,
-        tracker.candidateId,
+        candidateId,
         {
           x: 0.4,
           y: 0.65,
           label: 1,
         },
-        tracker.gpuResidentIntermediates,
       ),
     );
   }
