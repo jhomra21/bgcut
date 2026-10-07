@@ -1023,7 +1023,9 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           name ===
             "sixty" ||
           name ===
-            "bear"
+            "bear" ||
+          name ===
+            "bmx-trees"
         ) &&
         alphaFrames.length >
         0
