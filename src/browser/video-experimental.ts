@@ -1273,17 +1273,17 @@ const removeVideo =
             maskCanvas,
           );
 
+          options.onFrame?.(
+            canvas,
+            frameIndex,
+          );
+
           if (size.format === "mp4") {
             context.globalCompositeOperation = "destination-over";
             context.fillStyle = size.background;
             context.fillRect(0, 0, canvas.width, canvas.height);
             context.globalCompositeOperation = "source-over";
           }
-
-          options.onFrame?.(
-            canvas,
-            frameIndex,
-          );
 
           progress(
             options,
