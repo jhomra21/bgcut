@@ -548,15 +548,22 @@ export const createSam21Adapter =
       SamPromptSessions;
 
     try {
-      promptSessions = {
-        visionEncoder:
-          await load(
+      const [
+        visionEncoder,
+        maskDecoder,
+      ] =
+        await Promise.all([
+          load(
             "vision-encoder",
           ),
-        maskDecoder:
-          await load(
+          load(
             "mask-decoder",
           ),
+        ]);
+
+      promptSessions = {
+        visionEncoder,
+        maskDecoder,
       };
     } catch (error) {
       await closeVideoSessions({
@@ -582,19 +589,27 @@ export const createSam21Adapter =
         SamTrackingSessions
       > => {
         try {
-          return {
-            memoryAttention:
-              await load(
+          const [
+            memoryAttention,
+            memoryEncoder,
+            pointerTpos,
+          ] =
+            await Promise.all([
+              load(
                 "memory-attention",
               ),
-            memoryEncoder:
-              await load(
+              load(
                 "memory-encoder",
               ),
-            pointerTpos:
-              await load(
+              load(
                 "pointer-tpos",
               ),
+            ]);
+
+          return {
+            memoryAttention,
+            memoryEncoder,
+            pointerTpos,
           };
         } catch (error) {
           await closeVideoSessions({
