@@ -779,11 +779,13 @@ const pointInHalf = (
 
   const centerX =
     sumX / count;
+
   const centerY =
     sumY / count;
 
   let bestX = 0;
   let bestY = 0;
+
   let bestDistance =
     Number.POSITIVE_INFINITY;
 
@@ -839,6 +841,7 @@ const runMultiSubjectTracker = async (
 ) => {
   const left =
     pointInHalf(truth, false);
+
   const right =
     pointInHalf(truth, true);
 
