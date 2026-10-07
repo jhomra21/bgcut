@@ -790,7 +790,9 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       ];
     } else if (
       name ===
-      "bear"
+        "bear" ||
+      name ===
+        "bmx-trees"
     ) {
       configurations = [
         {
@@ -810,12 +812,6 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
             "source",
           trackingFrameRate:
             8,
-        },
-        {
-          frameRate:
-            "source",
-          trackingFrameRate:
-            6,
         },
         {
           frameRate:
@@ -841,10 +837,19 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       ];
     }
 
-    const cadenceTruths =
+    const cadenceFixture =
       name ===
-      "bear"
-        ? await Promise.all(
+        "bear" ||
+      name ===
+        "bmx-trees"
+        ? name
+        : undefined;
+
+    const cadenceTruths =
+      cadenceFixture ===
+      undefined
+        ? undefined
+        : await Promise.all(
             Array.from(
               {
                 length:
@@ -855,12 +860,11 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
                 index,
               ) =>
                 truthMask(
-                  "bear",
+                  cadenceFixture,
                   index,
                 ),
             ),
-          )
-        : undefined;
+          );
 
     let referenceAlphaFrames:
       readonly Uint8Array[] |
@@ -1092,8 +1096,12 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           name ===
             "sixty" ||
           (
-            name ===
-              "bear" &&
+            (
+              name ===
+                "bear" ||
+              name ===
+                "bmx-trees"
+            ) &&
             frameRate ===
               "source"
           )
@@ -1270,8 +1278,12 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         undefined;
 
       if (
-        name ===
-          "bear" &&
+        (
+          name ===
+            "bear" ||
+          name ===
+            "bmx-trees"
+        ) &&
         frameRate ===
           "source" &&
         cadenceTruths !==
@@ -1417,6 +1429,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           );
 
         if (
+          name ===
+            "bear" &&
           configuration.trackingFrameRate ===
             undefined &&
           (
