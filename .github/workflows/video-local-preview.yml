@@ -388,12 +388,18 @@ jobs:
             "$ROOT/sam21-tracked-step.onnx" \
             >"$ROOT/sam21-tracked-step.json"
 
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-attention-step.py \
+            "$ROOT/sam21-tracked-attention-step.onnx" \
+            >"$ROOT/sam21-tracked-attention-step.json"
+
           test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
           test -s "$ROOT/sam21-tracked-mask-decoder.json"
           test -s "$ROOT/sam21-tracked-memory-encoder.onnx"
           test -s "$ROOT/sam21-tracked-memory-encoder.json"
           test -s "$ROOT/sam21-tracked-step.onnx"
           test -s "$ROOT/sam21-tracked-step.json"
+          test -s "$ROOT/sam21-tracked-attention-step.onnx"
+          test -s "$ROOT/sam21-tracked-attention-step.json"
 
           bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4198 tracked-decoder >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
