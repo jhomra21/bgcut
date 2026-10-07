@@ -25,16 +25,20 @@ In the run before this optimization, the full-cadence seed stage was about 1.79 
 `bear` and 1.51 s on `bmx-trees`; after reuse it was about 0.91 s and
 0.81 s. Bear quality remained 0.950 mean DAVIS IoU and 0.957 mean boundary F.
 
-Tracked frames now have an optional derived SAM decoder with the no-point tracking
-prompt frozen into the graph. The full prompt decoder remains unchanged for selection
-and seed frames. The four-fixture DAVIS validation measured tracking speedups of about
-1.13× on `bear`, 1.20× on `blackswan`, 1.58× on `camel`, and 1.16× on
-`car-shadow`, with mean IoU deltas within about 0.00004 and boundary-F deltas within
-about 0.00063. The real Solid editor was accepted with this path enabled. The derived
-ONNX is not committed: run `bun run video:model:prepare` to create it under
-`.cache/bgcut-video/`. Vite serves that cache entry only in development; if the
-derived file is absent or cannot be loaded, SAM falls back to the original decoder.
-Hosted/package model delivery remains unchanged.
+Tracked frames now use a derived fused SAM step in the local editor. It freezes the
+no-point tracking prompt and combines the tracked mask decoder with the memory encoder,
+while the full prompt decoder remains unchanged for selection and seed frames. Across
+the four-fixture DAVIS A/B runs, this fused step was consistently faster than the base
+tracking path, with fixture-level speedups varying roughly from 1.2× to 1.9× across
+runner samples and mean IoU/boundary-F deltas staying effectively zero. The lower-level
+preview and the real Solid editor both passed with the fused step enabled.
+
+The derived ONNX is not committed: run `bun run video:model:prepare` to create
+`.cache/bgcut-video/sam21-tracked-step.onnx`. Vite serves that cache entry only in
+development. If it is absent or cannot be loaded, SAM falls back to the original
+decoder and memory encoder. The older decoder-only derived graph remains a benchmark
+variant, not a local-editor dependency. Hosted/package model delivery remains
+unchanged.
 
 Several tempting shortcuts were measured and rejected:
 
@@ -54,18 +58,23 @@ Several tempting shortcuts were measured and rejected:
   position, and memory encoding; total graph time increased from about 10.9 s to
   14.1 s across the 12-frame bear comparison. That partial device-local path was
   removed rather than carried as dead complexity.
+- Fusing memory attention into the fused tracked step preserved quality exactly, but
+  was not a consistent improvement over the simpler fused step. It was faster on
+  `camel` and `car-shadow`, but slower on `bear` and `blackswan`; the experiment
+  was removed rather than adding another runtime graph.
 - EdgeTAM remains slightly more accurate on the same bear click, but slower in the
   accepted comparison: SAM 2.1 reached 0.946 mean IoU / 0.959 boundary F at about
   1.79 tracked frames/s; EdgeTAM reached 0.955 / 0.974 at about 1.61 tracked frames/s.
 
-The steady-state graph profiler shows where further work belongs. Before decoder
-specialization, a 12-frame bear run spent about 2.23 s in the vision encoder, 2.79 s
-in the mask decoder, 1.25 s in memory attention, 0.70 s in memory encoding, and
-0.11 s in pointer temporal positions, while host-side inference overhead was only
-about 0.21 s. The derived tracked decoder removes most repeated prompt-decoder work;
-the remaining large targets are the vision encoder and memory attention. Future
-performance changes should preserve full-cadence temporal updates unless they are
-validated on hard-motion DAVIS clips.
+The steady-state graph profiler shows where further work belongs. Before graph
+specialization, a 12-frame bear run spent several seconds in the vision encoder and
+mask decoder, with memory attention the next largest repeated graph and host-side
+inference overhead comparatively small. The fused tracked step removes most repeated
+decoder/memory-encoder overhead. A follow-up that also fused memory attention did not
+win consistently, so the next high-value target is the vision encoder itself or a
+larger graph-level optimization that demonstrably reduces end-to-end frame cost.
+Future performance changes should preserve full-cadence temporal updates unless they
+are validated on hard-motion DAVIS clips.
 
 Safari 26.3 was manually accepted earlier for prompted scrubbing, refinement, MP4
 playback, and exported WebM alpha. The latest automated Solid gate is Chromium; rerun
