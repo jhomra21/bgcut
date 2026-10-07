@@ -1181,29 +1181,34 @@ const main = async () => {
     );
   }
 
+  const promptTrackerCases =
+    [];
+
+  for (
+    const candidateId of
+    [
+      "sam21-tiny",
+      "edgetam",
+    ] as const
+  ) {
+    promptTrackerCases.push(
+      await benchmarkPromptTracker(
+        bearFile,
+        candidateId,
+        {
+          x: 0.4,
+          y: 0.65,
+          label: 1,
+        },
+      ),
+    );
+  }
+
   reports.push({
     name:
       "prompt-trackers",
     cases:
-      await Promise.all(
-        (
-          [
-            "sam21-tiny",
-            "edgetam",
-          ] as const
-        ).map(
-          (candidateId) =>
-            benchmarkPromptTracker(
-              bearFile,
-              candidateId,
-              {
-                x: 0.4,
-                y: 0.65,
-                label: 1,
-              },
-            ),
-        ),
-      ),
+      promptTrackerCases,
   });
 
   const sixty = await generatedSixty();
