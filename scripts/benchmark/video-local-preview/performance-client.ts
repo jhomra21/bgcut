@@ -969,7 +969,14 @@ const benchmarkPromptTracker = async (
 };
 
 const benchmark = async (name: string, file: File, points: readonly { x: number; y: number; label: 1 }[]) => {
-  const editor = createVideoSelection(file);
+  const editor =
+    createVideoSelection(
+      file,
+      {
+        trackedStepUrl:
+          "/specialized/sam21-tracked-step.onnx",
+      },
+    );
 
   const subjects = points.map((point, index) => ({
     id: `subject-${index}`,
