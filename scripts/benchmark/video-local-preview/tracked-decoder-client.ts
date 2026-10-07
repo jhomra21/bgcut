@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import {
   createVideoSegmentationAdapter,
 } from "../video-segmentation/adapter";
@@ -417,30 +418,48 @@ const runTracker = async (
       file,
     );
 
+  const adapterOptions =
+    Match.value(
+      variant,
+    ).pipe(
+      Match.when(
+        "baseline",
+        () =>
+          undefined,
+      ),
+      Match.when(
+        "fused-step",
+        () => ({
+          trackedStepUrl:
+            SPECIALIZED_TRACKED_STEP,
+        }),
+      ),
+      Match.when(
+        "decoder-memory",
+        () => ({
+          trackedMaskDecoderUrl:
+            SPECIALIZED_DECODER,
+          trackedMemoryEncoderUrl:
+            SPECIALIZED_MEMORY_ENCODER,
+        }),
+      ),
+      Match.when(
+        "decoder",
+        () => ({
+          trackedMaskDecoderUrl:
+            SPECIALIZED_DECODER,
+        }),
+      ),
+      Match.exhaustive,
+    );
+
   const adapter =
     await createVideoSegmentationAdapter(
       VIDEO_SEGMENTATION_CANDIDATES[
         "sam21-tiny"
       ],
       undefined,
-      variant ===
-        "baseline"
-        ? undefined
-        : variant ===
-            "fused-step"
-          ? {
-              trackedStepUrl:
-                SPECIALIZED_TRACKED_STEP,
-            }
-          : {
-              trackedMaskDecoderUrl:
-                SPECIALIZED_DECODER,
-              trackedMemoryEncoderUrl:
-                variant ===
-                "decoder-memory"
-                  ? SPECIALIZED_MEMORY_ENCODER
-                  : undefined,
-            },
+      adapterOptions,
     );
 
   try {
