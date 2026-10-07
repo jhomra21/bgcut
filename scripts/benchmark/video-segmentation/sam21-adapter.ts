@@ -1583,6 +1583,87 @@ export const createSam21Adapter =
             "conditioned_feats",
           );
 
+        const fusedStep =
+          trackingSessions
+            .trackedStep;
+
+        if (
+          fusedStep !==
+          undefined
+        ) {
+          try {
+            runStartedAt =
+              performance.now();
+
+            const outputs =
+              await fusedStep.run(
+                {
+                  feats0:
+                    vision.feats0,
+                  feats1:
+                    vision.feats1,
+                  feats2_cond:
+                    conditioned,
+                  memory_feats2:
+                    vision.feats2,
+                },
+                TRACKED_STEP_OUTPUTS,
+              );
+
+            recordTiming(
+              "tracked-step",
+              runStartedAt,
+            );
+
+            const tracked =
+              decodedTrackedStep(
+                outputs,
+              );
+
+            if (
+              tracked.objectScore >
+                0 &&
+              (tracked.mask.iou ??
+                0) >=
+                RELIABLE_IOU
+            ) {
+              if (
+                memoryPosition ===
+                undefined
+              ) {
+                throw new Error(
+                  "SAM 2.1 memory position cache was not initialized.",
+                );
+              }
+
+              if (
+                tracked.memoryTokens.length !==
+                featureTokens *
+                  MEMORY_DIMENSION
+              ) {
+                throw new Error(
+                  "SAM 2.1 fused tracked step returned unexpected memory geometry.",
+                );
+              }
+
+              targetBank.push({
+                index:
+                  frameIndex,
+                tokens:
+                  tracked.memoryTokens,
+                positions:
+                  memoryPosition,
+                pointer:
+                  tracked.pointer,
+              });
+            }
+
+            return tracked.mask;
+          } finally {
+            conditioned.dispose();
+          }
+        }
+
         let decoded:
           SamDecoded;
 
@@ -1983,6 +2064,8 @@ export const createSam21Adapter =
             trackedMaskDecoder,
           "tracked-memory-encoder":
             trackedMemoryEncoder,
+          "tracked-step":
+            trackedStep,
         });
       },
     };
