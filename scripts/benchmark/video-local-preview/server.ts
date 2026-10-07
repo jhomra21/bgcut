@@ -68,14 +68,22 @@ await mkdir(
 const mode =
   process.argv[4];
 
-const clientFilename =
+let clientFilename =
+  "client.ts";
+
+if (
   mode ===
-    "performance"
-    ? "performance-client.ts"
-    : mode ===
-        "tracked-decoder"
-      ? "tracked-decoder-client.ts"
-      : "client.ts";
+  "performance"
+) {
+  clientFilename =
+    "performance-client.ts";
+} else if (
+  mode ===
+  "tracked-decoder"
+) {
+  clientFilename =
+    "tracked-decoder-client.ts";
+}
 
 const build =
   await Bun.build({
