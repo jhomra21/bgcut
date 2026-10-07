@@ -183,6 +183,44 @@ export const fetchVideoModelConstants =
     };
   };
 
+export const createVideoSessionFromUrl =
+  async (
+    url: string,
+    label: string,
+  ): Promise<ort.InferenceSession> => {
+    const response =
+      await fetch(
+        url,
+        {
+          cache:
+            "force-cache",
+        },
+      );
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        `Could not fetch ${label}: HTTP ${response.status}.`,
+      );
+    }
+
+    return ort.InferenceSession.create(
+      new Uint8Array(
+        await response.arrayBuffer(),
+      ),
+      {
+        executionProviders: [
+          {
+            name: "webgpu",
+          },
+        ],
+        graphOptimizationLevel:
+          "all",
+      },
+    );
+  };
+
 export const createVideoSession =
   async (
     candidate: VideoSegmentationCandidate,
