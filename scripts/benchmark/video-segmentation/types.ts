@@ -92,8 +92,23 @@ export type VideoFramePreparation = {
   readonly promptWarmMs: number;
 };
 
+export type VideoSegmentationTimingSummary =
+  Readonly<
+    Record<
+      string,
+      {
+        readonly calls:
+          number;
+        readonly totalMs:
+          number;
+      }
+    >
+  >;
+
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
+  timingSnapshot?():
+    VideoSegmentationTimingSummary;
   prepareFrame?(
     frame: VideoFrame,
   ): Promise<
