@@ -15,6 +15,7 @@ import {
 
 import type {
   VideoSegmentationAdapter,
+  VideoSegmentationAdapterOptions,
   VideoSegmentationCandidate,
   VideoSegmentationMask,
   VideoSegmentationPrompt,
@@ -498,6 +499,8 @@ export const createSam21Adapter =
     onProgress?: (
       progress: number,
     ) => void,
+    options?:
+      VideoSegmentationAdapterOptions,
   ): Promise<VideoSegmentationAdapter> => {
     configureVideoOrt();
 
@@ -521,6 +524,44 @@ export const createSam21Adapter =
         ort.InferenceSession
       >();
 
+    const preferredOutputLocation = (
+      role:
+        (typeof roles)[number],
+    ) => {
+      if (
+        options?.gpuResidentIntermediates !==
+        true
+      ) {
+        return undefined;
+      }
+
+      if (
+        role ===
+        "vision-encoder"
+      ) {
+        return {
+          feats0:
+            "gpu-buffer",
+          feats1:
+            "gpu-buffer",
+          feats2_no_mem:
+            "gpu-buffer",
+        } as const;
+      }
+
+      if (
+        role ===
+        "memory-attention"
+      ) {
+        return {
+          conditioned_feats:
+            "gpu-buffer",
+        } as const;
+      }
+
+      return undefined;
+    };
+
     const load = async (
       role:
         (typeof roles)[number],
@@ -529,6 +570,9 @@ export const createSam21Adapter =
         await createVideoSession(
           candidate,
           role,
+          preferredOutputLocation(
+            role,
+          ),
         );
 
       loaded.set(
