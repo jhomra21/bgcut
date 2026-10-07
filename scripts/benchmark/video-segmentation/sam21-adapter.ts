@@ -1,6 +1,12 @@
 import * as ort from "onnxruntime-web/webgpu";
 
 import {
+  createSamFeatureTransposer,
+  requireGpuBuffer,
+  type SamFeatureTransposer,
+} from "./sam21-gpu";
+
+import {
   channelsToTokens,
   closeVideoSessions,
   concatenateFloat32,
@@ -15,6 +21,7 @@ import {
 
 import type {
   VideoSegmentationAdapter,
+  VideoSegmentationAdapterOptions,
   VideoSegmentationCandidate,
   VideoSegmentationMask,
   VideoSegmentationPrompt,
@@ -529,6 +536,8 @@ export const createSam21Adapter =
     onProgress?: (
       progress: number,
     ) => void,
+    options?:
+      VideoSegmentationAdapterOptions,
   ): Promise<VideoSegmentationAdapter> => {
     configureVideoOrt();
 
@@ -609,6 +618,49 @@ export const createSam21Adapter =
         ort.InferenceSession
       >();
 
+    const preferredOutputLocation = (
+      role:
+        (typeof roles)[number],
+    ):
+      ort.InferenceSession.SessionOptions[
+        "preferredOutputLocation"
+      ] => {
+      if (
+        options?.gpuFeatureHandoff !==
+        true
+      ) {
+        return undefined;
+      }
+
+      if (
+        role ===
+        "vision-encoder"
+      ) {
+        return {
+          feats0:
+            "gpu-buffer",
+          feats1:
+            "gpu-buffer",
+          feats2:
+            "gpu-buffer",
+          feats2_no_mem:
+            "gpu-buffer",
+        };
+      }
+
+      if (
+        role ===
+        "memory-attention"
+      ) {
+        return {
+          conditioned_feats:
+            "gpu-buffer",
+        };
+      }
+
+      return undefined;
+    };
+
     const load = async (
       role:
         (typeof roles)[number],
@@ -617,6 +669,9 @@ export const createSam21Adapter =
         await createVideoSession(
           candidate,
           role,
+          preferredOutputLocation(
+            role,
+          ),
         );
 
       loaded.set(
