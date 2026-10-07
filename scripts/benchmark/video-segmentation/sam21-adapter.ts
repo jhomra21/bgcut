@@ -547,33 +547,18 @@ export const createSam21Adapter =
     let promptSessions:
       SamPromptSessions;
 
-    const promptSessionLoads = [
-      load(
-        "vision-encoder",
-      ),
-      load(
-        "mask-decoder",
-      ),
-    ] as const;
-
     try {
-      const [
-        visionEncoder,
-        maskDecoder,
-      ] =
-        await Promise.all(
-          promptSessionLoads,
-        );
-
       promptSessions = {
-        visionEncoder,
-        maskDecoder,
+        visionEncoder:
+          await load(
+            "vision-encoder",
+          ),
+        maskDecoder:
+          await load(
+            "mask-decoder",
+          ),
       };
     } catch (error) {
-      await Promise.allSettled(
-        promptSessionLoads,
-      );
-
       await closeVideoSessions({
         "vision-encoder":
           loaded.get(
@@ -596,38 +581,22 @@ export const createSam21Adapter =
       async (): Promise<
         SamTrackingSessions
       > => {
-        const trackingLoads = [
-          load(
-            "memory-attention",
-          ),
-          load(
-            "memory-encoder",
-          ),
-          load(
-            "pointer-tpos",
-          ),
-        ] as const;
-
         try {
-          const [
-            memoryAttention,
-            memoryEncoder,
-            pointerTpos,
-          ] =
-            await Promise.all(
-              trackingLoads,
-            );
-
           return {
-            memoryAttention,
-            memoryEncoder,
-            pointerTpos,
+            memoryAttention:
+              await load(
+                "memory-attention",
+              ),
+            memoryEncoder:
+              await load(
+                "memory-encoder",
+              ),
+            pointerTpos:
+              await load(
+                "pointer-tpos",
+              ),
           };
         } catch (error) {
-          await Promise.allSettled(
-            trackingLoads,
-          );
-
           await closeVideoSessions({
             "memory-attention":
               loaded.get(
