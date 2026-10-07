@@ -261,6 +261,7 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 
   try {
     const modelMilestones: { readonly progress: number; readonly elapsedMs: number }[] = [];
+
     const prepareStarted =
       started;
 
@@ -296,6 +297,7 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
     const frameWarmMs =
       performance.now() -
       started;
+
     started = performance.now();
     await editor.preview(seedTime, subjects, new AbortController().signal);
     const firstClickMs = performance.now() - started;
