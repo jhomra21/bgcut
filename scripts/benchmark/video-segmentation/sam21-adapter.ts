@@ -807,6 +807,23 @@ export const createSam21Adapter =
       MAX_POINTERS *
         POINTER_TOKENS;
 
+    let featureTransposer:
+      SamFeatureTransposer |
+      undefined;
+
+    const getFeatureTransposer =
+      async (): Promise<
+        SamFeatureTransposer
+      > => {
+        featureTransposer ??=
+          await createSamFeatureTransposer(
+            featureTokens,
+            FEATURE_CHANNELS,
+          );
+
+        return featureTransposer;
+      };
+
     const createBank =
       () =>
         new SamMemoryBank(
@@ -1254,24 +1271,37 @@ export const createSam21Adapter =
           );
         }
 
-        const attentionInputs = {
-          current_vision_features:
-            new ort.Tensor(
-              "float32",
-              channelsToTokens(
-                floatData(
+        const visionFeatures =
+          options?.gpuFeatureHandoff ===
+          true
+            ? (
+                await getFeatureTransposer()
+              ).run(
+                requireGpuBuffer(
                   vision.feats2,
                   "SAM 2.1 feats2",
                 ),
-                FEATURE_CHANNELS,
-                featureTokens,
-              ),
-              [
-                featureTokens,
-                1,
-                FEATURE_CHANNELS,
-              ],
-            ),
+              )
+            : new ort.Tensor(
+                "float32",
+                channelsToTokens(
+                  floatData(
+                    vision.feats2,
+                    "SAM 2.1 feats2",
+                  ),
+                  FEATURE_CHANNELS,
+                  featureTokens,
+                ),
+                [
+                  featureTokens,
+                  1,
+                  FEATURE_CHANNELS,
+                ],
+              );
+
+        const attentionInputs = {
+          current_vision_features:
+            visionFeatures,
           current_vision_position_embeddings:
             new ort.Tensor(
               "float32",
@@ -1691,6 +1721,12 @@ export const createSam21Adapter =
         }
 
         subjectBanks.clear();
+
+        featureTransposer
+          ?.dispose();
+
+        featureTransposer =
+          undefined;
 
         await trackingSessionsPromise?.catch(
           () => undefined,
