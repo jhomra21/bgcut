@@ -579,12 +579,19 @@ const seedFrameIndex = (
   return selected;
 };
 
+type PreparedVideoSeedFrame = {
+  readonly time: number;
+  readonly frame: VideoFrame;
+};
+
 const removeVideo =
   async (
     file: File,
     options:
       ExperimentalVideoOptions,
     sharedSegmenter?: VideoSegmentationAdapter,
+    preparedSeedFrame?:
+      PreparedVideoSeedFrame,
   ): Promise<ExperimentalVideoResult> => {
     const timings = { decodingMs: 0, seedMs: 0, trackingMs: 0, encodingMs: 0 };
     progress(
@@ -883,11 +890,47 @@ const removeVideo =
 
       // Preview and tracking must condition on the same decoded subject frame,
       // even when the chosen export cadence omits that source timestamp.
-      const seedFrame = await source.frameAt(
-        options.seedTimeSeconds === undefined
-          ? seedTimestamp
-          : source.info.firstTimestamp + Math.max(size.start, Math.min(size.end, options.seedTimeSeconds)),
-      );
+      const selectedTime =
+        options.seedTimeSeconds ===
+        undefined
+          ? undefined
+          : Math.max(
+              size.start,
+              Math.min(
+                size.end,
+                options.seedTimeSeconds,
+              ),
+            );
+
+      const borrowedSeedFrame =
+        prompted &&
+        preparedSeedFrame !==
+          undefined &&
+        selectedTime !==
+          undefined &&
+        preparedSeedFrame.time ===
+          selectedTime
+          ? {
+              frame:
+                preparedSeedFrame.frame,
+              timestamp:
+                source.info.firstTimestamp +
+                selectedTime,
+              decodeMs: 0,
+              close() {},
+            } satisfies
+              DecodedVideoFrame
+          : undefined;
+
+      const seedFrame =
+        borrowedSeedFrame ??
+        await source.frameAt(
+          selectedTime ===
+            undefined
+            ? seedTimestamp
+            : source.info.firstTimestamp +
+              selectedTime,
+        );
 
       if (
         seedFrame ===
@@ -1649,7 +1692,25 @@ export const createVideoSelection = (file: File) => {
           segmenter = undefined;
         }
 
-        return removeVideo(file, options, options.subjects === undefined ? undefined : await getSegmenter());
+        return removeVideo(
+          file,
+          options,
+          options.subjects ===
+            undefined
+            ? undefined
+            : await getSegmenter(),
+          options.subjects ===
+              undefined ||
+            previewFrame ===
+              undefined
+            ? undefined
+            : {
+                time:
+                  previewFrame.time,
+                frame:
+                  previewFrame.frame,
+              },
+        );
       }, options.signal);
     },
     close() {
