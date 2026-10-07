@@ -3,8 +3,17 @@ import {
   Input, Mp4OutputFormat, Output, Quality,
 } from "mediabunny";
 import { createVideoSelection } from "../../../src/browser/video-experimental";
-import { readVideoSourceInfo } from "../video-segmentation/media-source";
+import { createVideoSegmentationAdapter } from "../video-segmentation/adapter";
+import { VIDEO_SEGMENTATION_CANDIDATES } from "../video-segmentation/candidates";
+import {
+  openMediaBunnyVideoSource,
+  readVideoSourceInfo,
+} from "../video-segmentation/media-source";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
+import type {
+  VideoSegmentationCandidateId,
+  VideoSegmentationMask,
+} from "../video-segmentation/types";
 
 const save = async (name: string, blob: Blob) => {
   const response = await fetch(`/output/${name}`, { method: "POST", body: blob });
@@ -186,6 +195,491 @@ const benchmarkVfrNonzero = async () => {
     };
   } finally {
     await editor.close();
+  }
+};
+
+const truthMask = async (
+  fixture: string,
+  frameIndex: number,
+): Promise<{
+  readonly mask: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+}> => {
+  const response =
+    await fetch(
+      `/quality/${fixture}/${frameIndex.toString().padStart(5, "0")}.png`,
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `Could not load ${fixture} truth frame ${frameIndex}: HTTP ${response.status}.`,
+    );
+  }
+
+  const bitmap =
+    await createImageBitmap(
+      await response.blob(),
+    );
+
+  try {
+    const canvas =
+      document.createElement(
+        "canvas",
+      );
+
+    canvas.width =
+      bitmap.width;
+    canvas.height =
+      bitmap.height;
+
+    const context =
+      canvas.getContext(
+        "2d",
+        {
+          willReadFrequently:
+            true,
+        },
+      );
+
+    if (
+      context ===
+      null
+    ) {
+      throw new Error(
+        "Could not inspect DAVIS truth mask.",
+      );
+    }
+
+    context.drawImage(
+      bitmap,
+      0,
+      0,
+    );
+
+    const pixels =
+      context.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      ).data;
+
+    return {
+      width:
+        canvas.width,
+      height:
+        canvas.height,
+      mask:
+        Uint8Array.from(
+          {
+            length:
+              canvas.width *
+              canvas.height,
+          },
+          (
+            _,
+            index,
+          ) =>
+            (
+              pixels[
+                index *
+                  4
+              ] ??
+              0
+            ) >
+            0
+              ? 1
+              : 0,
+        ),
+    };
+  } finally {
+    bitmap.close();
+  }
+};
+
+const scoreSegmentationMask = (
+  prediction:
+    VideoSegmentationMask,
+  truth: {
+    readonly mask:
+      Uint8Array;
+    readonly width:
+      number;
+    readonly height:
+      number;
+  },
+) => {
+  const predicted =
+    Uint8Array.from(
+      {
+        length:
+          truth.width *
+          truth.height,
+      },
+      (
+        _,
+        index,
+      ) => {
+        const x =
+          Math.min(
+            prediction.width -
+              1,
+            Math.floor(
+              (
+                index %
+                truth.width
+              ) *
+                prediction.width /
+                truth.width,
+            ),
+          );
+
+        const y =
+          Math.min(
+            prediction.height -
+              1,
+            Math.floor(
+              Math.floor(
+                index /
+                  truth.width,
+              ) *
+                prediction.height /
+                truth.height,
+            ),
+          );
+
+        return (
+          prediction.logits[
+            y *
+              prediction.width +
+              x
+          ] ??
+          Number.NEGATIVE_INFINITY
+        ) >
+        0
+          ? 1
+          : 0;
+      },
+    );
+
+  return {
+    iou:
+      binaryMaskIou(
+        predicted,
+        truth.mask,
+      ),
+    boundaryF:
+      davisBoundaryF(
+        predicted,
+        truth.mask,
+        truth.width,
+        truth.height,
+      ),
+  };
+};
+
+const benchmarkPromptTracker = async (
+  file: File,
+  candidateId:
+    VideoSegmentationCandidateId,
+  point: {
+    readonly x: number;
+    readonly y: number;
+    readonly label: 1;
+  },
+) => {
+  const source =
+    await openMediaBunnyVideoSource(
+      file,
+    );
+
+  const candidate =
+    VIDEO_SEGMENTATION_CANDIDATES[
+      candidateId
+    ];
+
+  const loadStarted =
+    performance.now();
+
+  const adapter =
+    await createVideoSegmentationAdapter(
+      candidate,
+    );
+
+  const adapterLoadMs =
+    performance.now() -
+    loadStarted;
+
+  try {
+    const trackingPrepareStarted =
+      performance.now();
+
+    await adapter.prepareTracking?.();
+
+    const trackingPrepareMs =
+      performance.now() -
+      trackingPrepareStarted;
+
+    const timestamps =
+      await source.frameTimes(
+        source.info.firstTimestamp,
+        source.info.firstTimestamp +
+          Math.min(
+            1,
+            source.info.duration,
+          ),
+        24,
+      );
+
+    if (
+      timestamps.length <
+      2
+    ) {
+      throw new Error(
+        "Prompt tracker benchmark needs at least two frames.",
+      );
+    }
+
+    const truths =
+      await Promise.all(
+        timestamps.map(
+          (
+            _,
+            index,
+          ) =>
+            truthMask(
+              "bear",
+              index,
+            ),
+        ),
+      );
+
+    const seedTimestamp =
+      timestamps[0];
+
+    if (
+      seedTimestamp ===
+      undefined
+    ) {
+      throw new Error(
+        "Prompt tracker benchmark has no seed timestamp.",
+      );
+    }
+
+    const seedFrame =
+      await source.frameAt(
+        seedTimestamp,
+      );
+
+    if (
+      seedFrame ===
+      null
+    ) {
+      throw new Error(
+        "Prompt tracker benchmark could not decode its seed frame.",
+      );
+    }
+
+    let seedMs =
+      0;
+
+    let trackingMs =
+      0;
+
+    let decodingMs =
+      seedFrame.decodeMs;
+
+    const scores: {
+      readonly iou: number;
+      readonly boundaryF:
+        number;
+    }[] = [];
+
+    try {
+      const seedStarted =
+        performance.now();
+
+      const seed =
+        await adapter.seed(
+          seedFrame.frame,
+          candidateId ===
+            "edgetam"
+            ? {
+                points: [
+                  point,
+                ],
+                proposalIndex: 0,
+              }
+            : {
+                points: [
+                  point,
+                ],
+              },
+          0,
+          timestamps.length,
+        );
+
+      seedMs =
+        performance.now() -
+        seedStarted;
+
+      const truth =
+        truths[0];
+
+      if (
+        truth ===
+        undefined
+      ) {
+        throw new Error(
+          "Prompt tracker benchmark is missing seed truth.",
+        );
+      }
+
+      scores.push(
+        scoreSegmentationMask(
+          seed,
+          truth,
+        ),
+      );
+    } finally {
+      seedFrame.close();
+    }
+
+    let frameIndex =
+      1;
+
+    for await (
+      const decoded of
+      source.framesAt(
+        timestamps.slice(
+          1,
+        ),
+      )
+    ) {
+      if (
+        decoded ===
+        null
+      ) {
+        throw new Error(
+          `Prompt tracker benchmark could not decode frame ${frameIndex}.`,
+        );
+      }
+
+      decodingMs +=
+        decoded.decodeMs;
+
+      try {
+        const trackingStarted =
+          performance.now();
+
+        const mask =
+          await adapter.track(
+            decoded.frame,
+            frameIndex,
+            timestamps.length,
+          );
+
+        trackingMs +=
+          performance.now() -
+          trackingStarted;
+
+        const truth =
+          truths[
+            frameIndex
+          ];
+
+        if (
+          truth ===
+          undefined
+        ) {
+          throw new Error(
+            `Prompt tracker benchmark is missing truth frame ${frameIndex}.`,
+          );
+        }
+
+        scores.push(
+          scoreSegmentationMask(
+            mask,
+            truth,
+          ),
+        );
+      } finally {
+        decoded.close();
+      }
+
+      frameIndex +=
+        1;
+    }
+
+    const mean = (
+      values:
+        readonly number[],
+    ) =>
+      values.reduce(
+        (
+          total,
+          value,
+        ) =>
+          total +
+          value,
+        0,
+      ) /
+      values.length;
+
+    return {
+      candidate:
+        candidateId,
+      adapterLoadMs,
+      trackingPrepareMs,
+      seedMs,
+      decodingMs,
+      trackingMs,
+      trackingFps:
+        (
+          scores.length -
+          1
+        ) /
+        (
+          trackingMs /
+          1000
+        ),
+      meanIou:
+        mean(
+          scores.map(
+            (score) =>
+              score.iou,
+          ),
+        ),
+      worstIou:
+        Math.min(
+          ...scores.map(
+            (score) =>
+              score.iou,
+          ),
+        ),
+      meanBoundaryF:
+        mean(
+          scores.map(
+            (score) =>
+              score.boundaryF,
+          ),
+        ),
+      worstBoundaryF:
+        Math.min(
+          ...scores.map(
+            (score) =>
+              score.boundaryF,
+          ),
+        ),
+      frameCount:
+        scores.length,
+    };
+  } finally {
+    source.close();
+    await adapter.close();
   }
 };
 
@@ -656,8 +1150,20 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 const main = async () => {
   const reports = [];
 
+  let bearFile:
+    File |
+    undefined;
+
   for (const name of ["bear", "bmx-trees"] as const) {
     const file = new File([await fetch(`/quality/${name}.mp4`).then((response) => response.blob())], `${name}.mp4`);
+
+    if (
+      name ===
+      "bear"
+    ) {
+      bearFile =
+        file;
+    }
 
     const points = name === "bear"
       ? [{ x: 0.4, y: 0.65, label: 1 as const }]
@@ -665,6 +1171,40 @@ const main = async () => {
 
     reports.push(await benchmark(name, file, points));
   }
+
+  if (
+    bearFile ===
+    undefined
+  ) {
+    throw new Error(
+      "Bear tracker benchmark fixture is unavailable.",
+    );
+  }
+
+  reports.push({
+    name:
+      "prompt-trackers",
+    cases:
+      await Promise.all(
+        (
+          [
+            "sam21-tiny",
+            "edgetam",
+          ] as const
+        ).map(
+          (candidateId) =>
+            benchmarkPromptTracker(
+              bearFile,
+              candidateId,
+              {
+                x: 0.4,
+                y: 0.65,
+                label: 1,
+              },
+            ),
+        ),
+      ),
+  });
 
   const sixty = await generatedSixty();
   await save("genuine-sixty-input.mp4", sixty);
