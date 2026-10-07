@@ -37,6 +37,27 @@ const POINTER_TOKENS =
 
 const RELIABLE_IOU = 0.25;
 
+const VISION_OUTPUTS = [
+  "feats0",
+  "feats1",
+  "feats2",
+  "feats2_no_mem",
+] as const;
+
+const VISION_OUTPUTS_WITH_POSITION = [
+  ...VISION_OUTPUTS,
+  "vision_pos_embed",
+] as const;
+
+const MEMORY_OUTPUTS = [
+  "memory_tokens",
+] as const;
+
+const MEMORY_OUTPUTS_WITH_POSITION = [
+  ...MEMORY_OUTPUTS,
+  "memory_pos",
+] as const;
+
 type SamPromptSessions = {
   readonly visionEncoder:
     ort.InferenceSession;
@@ -60,7 +81,7 @@ type SamVision = {
   readonly feats2NoMemory:
     ort.Tensor;
   readonly position:
-    ort.Tensor;
+    Float32Array;
 };
 
 const disposeVision = (
@@ -71,7 +92,6 @@ const disposeVision = (
   vision.feats1.dispose();
   vision.feats2.dispose();
   vision.feats2NoMemory.dispose();
-  vision.position.dispose();
 };
 
 type SamDecoded = {
@@ -751,6 +771,12 @@ export const createSam21Adapter =
 
     let seedFrame: VideoFrame | undefined;
     let seedVision: SamVision | undefined;
+    let visionPosition:
+      Float32Array |
+      undefined;
+    let memoryPosition:
+      Float32Array |
+      undefined;
     let promptPipelineWarm = false;
 
     const encode =
@@ -777,16 +803,47 @@ export const createSam21Adapter =
         const runStartedAt =
           performance.now();
 
+        const needsPosition =
+          visionPosition ===
+          undefined;
+
         const outputs =
-          await promptSessions.visionEncoder.run({
-            pixel_values:
-              pixelValues,
-          });
+          await promptSessions.visionEncoder.run(
+            {
+              pixel_values:
+                pixelValues,
+            },
+            needsPosition
+              ? VISION_OUTPUTS_WITH_POSITION
+              : VISION_OUTPUTS,
+          );
 
         recordTiming(
           "vision-encoder",
           runStartedAt,
         );
+
+        if (
+          needsPosition
+        ) {
+          visionPosition =
+            floatData(
+              requireTensor(
+                outputs,
+                "vision_pos_embed",
+              ),
+              "SAM 2.1 vision_pos_embed",
+            ).slice();
+        }
+
+        if (
+          visionPosition ===
+          undefined
+        ) {
+          throw new Error(
+            "SAM 2.1 vision position cache was not initialized.",
+          );
+        }
 
         return {
           feats0:
@@ -810,10 +867,7 @@ export const createSam21Adapter =
               "feats2_no_mem",
             ),
           position:
-            requireTensor(
-              outputs,
-              "vision_pos_embed",
-            ),
+            visionPosition,
         };
       };
 
@@ -947,9 +1001,16 @@ export const createSam21Adapter =
         const runStartedAt =
           performance.now();
 
+        const needsPosition =
+          memoryPosition ===
+          undefined;
+
         const outputs =
           await trackingSessions.memoryEncoder.run(
             memoryInputs,
+            needsPosition
+              ? MEMORY_OUTPUTS_WITH_POSITION
+              : MEMORY_OUTPUTS,
           );
 
         recordTiming(
@@ -966,20 +1027,33 @@ export const createSam21Adapter =
             "SAM 2.1 memory_tokens",
           ).slice();
 
-        const positions =
-          floatData(
-            requireTensor(
-              outputs,
-              "memory_pos",
-            ),
-            "SAM 2.1 memory_pos",
-          ).slice();
+        if (
+          needsPosition
+        ) {
+          memoryPosition =
+            floatData(
+              requireTensor(
+                outputs,
+                "memory_pos",
+              ),
+              "SAM 2.1 memory_pos",
+            ).slice();
+        }
+
+        if (
+          memoryPosition ===
+          undefined
+        ) {
+          throw new Error(
+            "SAM 2.1 memory position cache was not initialized.",
+          );
+        }
 
         if (
           tokens.length !==
             featureTokens *
               MEMORY_DIMENSION ||
-          positions.length !==
+          memoryPosition.length !==
             featureTokens *
               MEMORY_DIMENSION
         ) {
@@ -991,7 +1065,8 @@ export const createSam21Adapter =
         return {
           index,
           tokens,
-          positions,
+          positions:
+            memoryPosition,
           pointer:
             decoded.pointer,
         };
@@ -1143,10 +1218,7 @@ export const createSam21Adapter =
             new ort.Tensor(
               "float32",
               channelsToTokens(
-                floatData(
-                  vision.position,
-                  "SAM 2.1 vision_pos_embed",
-                ),
+                vision.position,
                 FEATURE_CHANNELS,
                 featureTokens,
               ),
