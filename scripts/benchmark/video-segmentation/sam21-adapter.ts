@@ -811,6 +811,10 @@ export const createSam21Adapter =
       Float32Array |
       undefined;
 
+    let visionPositionTokens:
+      ort.Tensor |
+      undefined;
+
     let memoryPosition:
       Float32Array |
       undefined;
@@ -882,6 +886,21 @@ export const createSam21Adapter =
             "SAM 2.1 vision position cache was not initialized.",
           );
         }
+
+        visionPositionTokens ??=
+          new ort.Tensor(
+            "float32",
+            channelsToTokens(
+              visionPosition,
+              FEATURE_CHANNELS,
+              featureTokens,
+            ),
+            [
+              featureTokens,
+              1,
+              FEATURE_CHANNELS,
+            ],
+          );
 
         return {
           feats0:
@@ -1310,19 +1329,12 @@ export const createSam21Adapter =
               ],
             ),
           current_vision_position_embeddings:
-            new ort.Tensor(
-              "float32",
-              channelsToTokens(
-                vision.position,
-                FEATURE_CHANNELS,
-                featureTokens,
-              ),
-              [
-                featureTokens,
-                1,
-                FEATURE_CHANNELS,
-              ],
-            ),
+            visionPositionTokens ??
+            (() => {
+              throw new Error(
+                "SAM 2.1 tokenized vision position cache was not initialized.",
+              );
+            })(),
           memory:
             new ort.Tensor(
               "float32",
@@ -1718,6 +1730,10 @@ export const createSam21Adapter =
         }
 
         subjectBanks.clear();
+
+        visionPositionTokens?.dispose();
+        visionPositionTokens =
+          undefined;
 
         await trackingSessionsPromise?.catch(
           () => undefined,
