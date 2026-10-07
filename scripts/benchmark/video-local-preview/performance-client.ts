@@ -915,9 +915,6 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         readonly trackingFrameRate:
           number |
           undefined;
-        readonly trackingInterpolation?:
-          "nearest" |
-          "linear";
       }[];
 
     if (
@@ -995,23 +992,7 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           frameRate:
             "source",
           trackingFrameRate:
-            12,
-          trackingInterpolation:
-            "linear",
-        },
-        {
-          frameRate:
-            "source",
-          trackingFrameRate:
             8,
-        },
-        {
-          frameRate:
-            "source",
-          trackingFrameRate:
-            8,
-          trackingInterpolation:
-            "linear",
         },
         {
           frameRate:
@@ -1099,8 +1080,6 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           seedTime,
         trackingFrameRate:
           configuration.trackingFrameRate,
-        trackingInterpolation:
-          configuration.trackingInterpolation,
         export: { start: 0, end: 1, frameRate, format: "mp4", quality: frameRate === 6 ? "medium" : "high" },
         onProgress: (update) => { stages[update.stage] ??= performance.now() - started; },
         onFrame: (canvas) => {
@@ -1204,14 +1183,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           ? ""
           : `-track-${configuration.trackingFrameRate}`;
 
-      const interpolationSuffix =
-        configuration.trackingInterpolation ===
-        undefined
-          ? ""
-          : `-${configuration.trackingInterpolation}`;
-
       await save(
-        `${name}-${frameRate}${trackingSuffix}${interpolationSuffix}.mp4`,
+        `${name}-${frameRate}${trackingSuffix}.mp4`,
         result.blob,
       );
 
@@ -1690,8 +1663,6 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         frameRate,
         trackingFrameRate:
           configuration.trackingFrameRate,
-        trackingInterpolation:
-          configuration.trackingInterpolation,
         frames: result.frameCount,
         trackingFrames:
           result.trackingFrameCount,
