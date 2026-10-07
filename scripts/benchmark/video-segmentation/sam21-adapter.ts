@@ -6,6 +6,7 @@ import {
   concatenateFloat32,
   configureVideoOrt,
   createVideoSession,
+  createVideoSessionFromUrl,
   fetchVideoModelConstants,
   floatData,
   frameToNchw,
@@ -15,6 +16,7 @@ import {
 
 import type {
   VideoSegmentationAdapter,
+  VideoSegmentationAdapterOptions,
   VideoSegmentationCandidate,
   VideoSegmentationMask,
   VideoSegmentationPrompt,
@@ -71,6 +73,8 @@ type SamTrackingSessions = {
   readonly memoryEncoder:
     ort.InferenceSession;
   readonly pointerTpos:
+    ort.InferenceSession;
+  readonly trackedMaskDecoder?:
     ort.InferenceSession;
 };
 
@@ -529,6 +533,8 @@ export const createSam21Adapter =
     onProgress?: (
       progress: number,
     ) => void,
+    options?:
+      VideoSegmentationAdapterOptions,
   ): Promise<VideoSegmentationAdapter> => {
     configureVideoOrt();
 
@@ -665,24 +671,46 @@ export const createSam21Adapter =
       Promise<SamTrackingSessions> |
       undefined;
 
+    let trackedMaskDecoder:
+      ort.InferenceSession |
+      undefined;
+
     const loadTrackingSessions =
       async (): Promise<
         SamTrackingSessions
       > => {
         try {
+          const memoryAttention =
+            await load(
+              "memory-attention",
+            );
+
+          const memoryEncoder =
+            await load(
+              "memory-encoder",
+            );
+
+          const pointerTpos =
+            await load(
+              "pointer-tpos",
+            );
+
+          if (
+            options?.trackedMaskDecoderUrl !==
+            undefined
+          ) {
+            trackedMaskDecoder =
+              await createVideoSessionFromUrl(
+                options.trackedMaskDecoderUrl,
+                "SAM 2.1 tracked mask decoder",
+              );
+          }
+
           return {
-            memoryAttention:
-              await load(
-                "memory-attention",
-              ),
-            memoryEncoder:
-              await load(
-                "memory-encoder",
-              ),
-            pointerTpos:
-              await load(
-                "pointer-tpos",
-              ),
+            memoryAttention,
+            memoryEncoder,
+            pointerTpos,
+            trackedMaskDecoder,
           };
         } catch (error) {
           await closeVideoSessions({
@@ -698,6 +726,8 @@ export const createSam21Adapter =
               loaded.get(
                 "pointer-tpos",
               ),
+            "tracked-mask-decoder":
+              trackedMaskDecoder,
           });
 
           loaded.delete(
@@ -944,6 +974,63 @@ export const createSam21Adapter =
 
         recordTiming(
           "mask-decoder",
+          runStartedAt,
+        );
+
+        return decodedMask(
+          outputs,
+        );
+      };
+
+    const decodeTracked =
+      async (
+        vision:
+          SamVision,
+        conditioned:
+          ort.Tensor,
+      ): Promise<SamDecoded> => {
+        const trackingSessions =
+          await getTrackingSessions();
+
+        const trackedDecoder =
+          trackingSessions
+            .trackedMaskDecoder;
+
+        if (
+          trackedDecoder ===
+          undefined
+        ) {
+          return decode(
+            vision,
+            conditioned,
+            pointPromptTensors(
+              [
+                {
+                  x: 0,
+                  y: 0,
+                  label: -1,
+                },
+              ],
+              candidate.inputSize,
+            ),
+          );
+        }
+
+        const runStartedAt =
+          performance.now();
+
+        const outputs =
+          await trackedDecoder.run({
+            feats0:
+              vision.feats0,
+            feats1:
+              vision.feats1,
+            feats2_cond:
+              conditioned,
+          });
+
+        recordTiming(
+          "tracked-mask-decoder",
           runStartedAt,
         );
 
@@ -1277,19 +1364,9 @@ export const createSam21Adapter =
 
         try {
           decoded =
-            await decode(
+            await decodeTracked(
               vision,
               conditioned,
-              pointPromptTensors(
-                [
-                  {
-                    x: 0,
-                    y: 0,
-                    label: -1,
-                  },
-                ],
-                candidate.inputSize,
-              ),
             );
         } finally {
           conditioned.dispose();
@@ -1662,6 +1739,8 @@ export const createSam21Adapter =
             loaded.get(
               "pointer-tpos",
             ),
+          "tracked-mask-decoder":
+            trackedMaskDecoder,
         });
       },
     };
