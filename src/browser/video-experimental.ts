@@ -78,9 +78,6 @@ export type ExperimentalVideoOptions = {
     number;
   readonly trackingFrameRate?:
     number;
-  readonly trackingInterpolation?:
-    | "nearest"
-    | "linear";
   readonly onProgress?: (
     progress:
       ExperimentalVideoProgress,
@@ -1177,10 +1174,6 @@ const removeVideo =
       let frameIndex = 0;
       let trackingMaskIndex = 0;
 
-      let interpolatedAlpha:
-        Uint8ClampedArray |
-        undefined;
-
       const maskForTimestamp = (
         timestamp: number,
       ): VideoMatte | undefined => {
@@ -1189,6 +1182,11 @@ const removeVideo =
             1 <
           trackingTimestamps.length
         ) {
+          const currentTime =
+            trackingTimestamps[
+              trackingMaskIndex
+            ];
+
           const nextTime =
             trackingTimestamps[
               trackingMaskIndex +
@@ -1196,10 +1194,18 @@ const removeVideo =
             ];
 
           if (
+            currentTime ===
+              undefined ||
             nextTime ===
               undefined ||
-            nextTime >
-              timestamp
+            Math.abs(
+              nextTime -
+                timestamp,
+            ) >
+              Math.abs(
+                currentTime -
+                  timestamp,
+              )
           ) {
             break;
           }
@@ -1208,156 +1214,9 @@ const removeVideo =
             1;
         }
 
-        const currentMask =
-          masks[
-            trackingMaskIndex
-          ];
-
-        if (
-          currentMask ===
-            undefined
-        ) {
-          return undefined;
-        }
-
-        const nextMask =
-          masks[
-            trackingMaskIndex +
-              1
-          ];
-
-        const currentTime =
-          trackingTimestamps[
-            trackingMaskIndex
-          ];
-
-        const nextTime =
-          trackingTimestamps[
-            trackingMaskIndex +
-              1
-          ];
-
-        if (
-          options.trackingInterpolation !==
-            "linear" ||
-          nextMask ===
-            undefined ||
-          currentTime ===
-            undefined ||
-          nextTime ===
-            undefined ||
-          nextTime <=
-            currentTime ||
-          currentMask.width !==
-            nextMask.width ||
-          currentMask.height !==
-            nextMask.height ||
-          currentMask.alpha.length !==
-            nextMask.alpha.length
-        ) {
-          if (
-            nextMask !==
-              undefined &&
-            currentTime !==
-              undefined &&
-            nextTime !==
-              undefined &&
-            Math.abs(
-              nextTime -
-                timestamp,
-            ) <
-              Math.abs(
-                currentTime -
-                  timestamp,
-              )
-          ) {
-            return nextMask;
-          }
-
-          return currentMask;
-        }
-
-        const ratio =
-          Math.max(
-            0,
-            Math.min(
-              1,
-              (
-                timestamp -
-                currentTime
-              ) /
-                (
-                  nextTime -
-                  currentTime
-                ),
-            ),
-          );
-
-        if (
-          ratio ===
-          0
-        ) {
-          return currentMask;
-        }
-
-        if (
-          ratio ===
-          1
-        ) {
-          return nextMask;
-        }
-
-        if (
-          interpolatedAlpha ===
-            undefined ||
-          interpolatedAlpha.length !==
-            currentMask.alpha.length
-        ) {
-          interpolatedAlpha =
-            new Uint8ClampedArray(
-              currentMask.alpha.length,
-            );
-        }
-
-        for (
-          let index = 0;
-          index <
-          interpolatedAlpha.length;
-          index += 1
-        ) {
-          const currentAlpha =
-            currentMask.alpha[
-              index
-            ] ??
-            0;
-
-          const nextAlpha =
-            nextMask.alpha[
-              index
-            ] ??
-            0;
-
-          interpolatedAlpha[
-            index
-          ] =
-            Math.round(
-              currentAlpha +
-                (
-                  nextAlpha -
-                  currentAlpha
-                ) *
-                  ratio,
-            );
-        }
-
-        return {
-          width:
-            currentMask.width,
-          height:
-            currentMask.height,
-          alpha:
-            interpolatedAlpha,
-        };
+        return masks[
+          trackingMaskIndex
+        ];
       };
 
       for await (
