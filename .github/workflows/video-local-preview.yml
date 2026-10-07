@@ -28,6 +28,8 @@ jobs:
           bun run video:model:prepare
           test -s .cache/bgcut-video/sam21-tracked-mask-decoder.onnx
           test -s .cache/bgcut-video/sam21-tracked-mask-decoder.json
+          test -s .cache/bgcut-video/sam21-tracked-step.onnx
+          test -s .cache/bgcut-video/sam21-tracked-step.json
 
       - name: Verify Vite serves ORT runtime assets
         shell: bash
@@ -55,6 +57,7 @@ jobs:
           bun -e '
             import {
               TRACKED_MASK_DECODER_PUBLIC_PATH,
+              TRACKED_STEP_PUBLIC_PATH,
             } from "./src/shared/video-experimental-config.ts";
             import {
               ORT_WASM_MODULE_PUBLIC_PATH,
@@ -107,20 +110,25 @@ jobs:
               throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned empty content or SPA HTML.");
             }
 
-            const trackedResponse = await fetch(origin + TRACKED_MASK_DECODER_PUBLIC_PATH);
-            const trackedType = trackedResponse.headers.get("content-type") ?? "";
-            const trackedBytes = new Uint8Array(await trackedResponse.arrayBuffer());
+            for (const path of [
+              TRACKED_MASK_DECODER_PUBLIC_PATH,
+              TRACKED_STEP_PUBLIC_PATH,
+            ]) {
+              const response = await fetch(origin + path);
+              const contentType = response.headers.get("content-type") ?? "";
+              const bytes = new Uint8Array(await response.arrayBuffer());
 
-            if (!trackedResponse.ok) {
-              throw new Error(TRACKED_MASK_DECODER_PUBLIC_PATH + " returned HTTP " + trackedResponse.status + ".");
-            }
+              if (!response.ok) {
+                throw new Error(path + " returned HTTP " + response.status + ".");
+              }
 
-            if (!trackedType.startsWith("application/octet-stream")) {
-              throw new Error(TRACKED_MASK_DECODER_PUBLIC_PATH + " returned " + trackedType + " instead of binary model data.");
-            }
+              if (!contentType.startsWith("application/octet-stream")) {
+                throw new Error(path + " returned " + contentType + " instead of binary model data.");
+              }
 
-            if (trackedBytes.length < 1024) {
-              throw new Error(TRACKED_MASK_DECODER_PUBLIC_PATH + " returned an unexpectedly small model.");
+              if (bytes.length < 1024) {
+                throw new Error(path + " returned an unexpectedly small model.");
+              }
             }
           '
 
