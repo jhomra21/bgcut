@@ -973,8 +973,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
     createVideoSelection(
       file,
       {
-        trackedStepUrl:
-          "/specialized/sam21-tracked-step.onnx",
+        trackedMaskDecoderUrl:
+          "/specialized/sam21-tracked-mask-decoder.onnx",
       },
     );
 
