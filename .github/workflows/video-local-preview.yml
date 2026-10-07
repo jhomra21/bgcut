@@ -20,14 +20,12 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: bun install --frozen-lockfile
 
-      - name: Prepare local tracked SAM decoder
+      - name: Prepare local fused SAM tracked step
         shell: bash
         run: |
           set -euo pipefail
 
           bun run video:model:prepare
-          test -s .cache/bgcut-video/sam21-tracked-mask-decoder.onnx
-          test -s .cache/bgcut-video/sam21-tracked-mask-decoder.json
           test -s .cache/bgcut-video/sam21-tracked-step.onnx
           test -s .cache/bgcut-video/sam21-tracked-step.json
 
@@ -56,7 +54,6 @@ jobs:
 
           bun -e '
             import {
-              TRACKED_MASK_DECODER_PUBLIC_PATH,
               TRACKED_STEP_PUBLIC_PATH,
             } from "./src/shared/video-experimental-config.ts";
             import {
@@ -111,7 +108,6 @@ jobs:
             }
 
             for (const path of [
-              TRACKED_MASK_DECODER_PUBLIC_PATH,
               TRACKED_STEP_PUBLIC_PATH,
             ]) {
               const response = await fetch(origin + path);
