@@ -9,6 +9,7 @@ import {
   openMediaBunnyVideoSource,
   readVideoSourceInfo,
 } from "../video-segmentation/media-source";
+import { QUALITY_FRAME_COUNT } from "../video-segmentation/quality-fixture";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
 import type {
   VideoSegmentationCandidateId,
@@ -424,14 +425,19 @@ const benchmarkPromptTracker = async (
       trackingPrepareStarted;
 
     const timestamps =
-      await source.frameTimes(
-        source.info.firstTimestamp,
-        source.info.firstTimestamp +
-          Math.min(
-            1,
-            source.info.duration,
-          ),
-        24,
+      (
+        await source.frameTimes(
+          source.info.firstTimestamp,
+          source.info.firstTimestamp +
+            Math.min(
+              1,
+              source.info.duration,
+            ),
+          24,
+        )
+      ).slice(
+        0,
+        QUALITY_FRAME_COUNT,
       );
 
     if (
