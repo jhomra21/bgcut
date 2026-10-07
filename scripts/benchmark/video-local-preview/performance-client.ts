@@ -353,14 +353,14 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       Array.from(
         {
           length:
-            12,
+            60,
         },
         (
           _,
           index,
         ) =>
           index /
-          12,
+          60,
       );
 
     let referenceSamples:
@@ -439,6 +439,14 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         number |
         undefined;
 
+      let referenceMeanFramePsnr:
+        number |
+        undefined;
+
+      let referenceWorstFramePsnr:
+        number |
+        undefined;
+
       if (
         name ===
         "sixty"
@@ -455,6 +463,10 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 
           let referenceChannels =
             0;
+
+          const framePsnr:
+            number[] =
+              [];
 
           for (
             let sampleIndex = 0;
@@ -485,6 +497,12 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
               );
             }
 
+            let frameSquaredError =
+              0;
+
+            let frameChannels =
+              0;
+
             for (
               let index = 0;
               index <
@@ -499,26 +517,52 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
                 continue;
               }
 
-              referenceSquaredError +=
+              const difference =
                 (
-                  (
-                    sample[
-                      index
-                    ] ??
-                    0
-                  ) -
-                  (
-                    reference[
-                      index
-                    ] ??
-                    0
-                  )
-                ) **
+                  sample[
+                    index
+                  ] ??
+                  0
+                ) -
+                (
+                  reference[
+                    index
+                  ] ??
+                  0
+                );
+
+              const squared =
+                difference **
                 2;
+
+              referenceSquaredError +=
+                squared;
+
+              frameSquaredError +=
+                squared;
 
               referenceChannels +=
                 1;
+
+              frameChannels +=
+                1;
             }
+
+            const frameMse =
+              frameSquaredError /
+              frameChannels;
+
+            framePsnr.push(
+              frameMse ===
+                0
+                ? Number.POSITIVE_INFINITY
+                : 10 *
+                  Math.log10(
+                    255 **
+                      2 /
+                      frameMse,
+                  ),
+            );
           }
 
           const referenceMse =
@@ -535,6 +579,23 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
                     2 /
                     referenceMse,
                 );
+
+          referenceMeanFramePsnr =
+            framePsnr.reduce(
+              (
+                total,
+                value,
+              ) =>
+                total +
+                value,
+              0,
+            ) /
+            framePsnr.length;
+
+          referenceWorstFramePsnr =
+            Math.min(
+              ...framePsnr,
+            );
         }
       }
 
@@ -551,6 +612,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         totalMs, stages, bytes: result.blob.size, width: result.width, height: result.height,
         decodedDuration: decoded.duration, rgbSum, psnr: 10 * Math.log10(255 ** 2 / mse),
         referencePsnr,
+        referenceMeanFramePsnr,
+        referenceWorstFramePsnr,
         timestamps: decoded.timestamps, timings: result.timings,
       });
     }
