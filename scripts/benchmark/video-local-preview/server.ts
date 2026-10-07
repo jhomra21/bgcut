@@ -228,6 +228,10 @@ const app =
               "/specialized/sam21-tracked-step.onnx",
               "sam21-tracked-step.onnx",
             ],
+            [
+              "/specialized/sam21-tracked-attention-step.onnx",
+              "sam21-tracked-attention-step.onnx",
+            ],
           ]);
 
         const filename =
