@@ -793,6 +793,46 @@ export const createSam21Adapter =
         };
       };
 
+    const getSeedVision =
+      async (
+        frame:
+          VideoFrame,
+      ): Promise<SamVision> => {
+        if (
+          seedFrame ===
+            frame &&
+          seedVision !==
+            undefined
+        ) {
+          return seedVision;
+        }
+
+        const next =
+          await encode(
+            frame,
+          );
+
+        const previous =
+          seedVision;
+
+        seedFrame =
+          frame;
+
+        seedVision =
+          next;
+
+        if (
+          previous !==
+          undefined
+        ) {
+          disposeVision(
+            previous,
+          );
+        }
+
+        return next;
+      };
+
     const decode =
       async (
         vision:
@@ -1137,20 +1177,10 @@ export const createSam21Adapter =
         const encodeStartedAt =
           performance.now();
 
-        if (
-          seedFrame !==
-            frame ||
-          seedVision ===
-            undefined
-        ) {
-          seedVision =
-            await encode(
-              frame,
-            );
-
-          seedFrame =
-            frame;
-        }
+        const currentSeedVision =
+          await getSeedVision(
+            frame,
+          );
 
         const encodedAt =
           performance.now();
@@ -1165,8 +1195,8 @@ export const createSam21Adapter =
             performance.now();
 
           await decode(
-            seedVision,
-            seedVision.feats2NoMemory,
+            currentSeedVision,
+            currentSeedVision.feats2NoMemory,
             pointPromptTensors(
               [
                 {
