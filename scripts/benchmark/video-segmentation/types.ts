@@ -153,16 +153,9 @@ export type VideoSegmentationAdapter = {
   close(): Promise<void>;
 };
 
-export type VideoSegmentationAdapterOptions = {
-  readonly gpuResidentIntermediates?:
-    boolean;
-};
-
 export type VideoSegmentationAdapterFactory = (
   candidate: VideoSegmentationCandidate,
   onProgress?: (progress: number) => void,
-  options?:
-    VideoSegmentationAdapterOptions,
 ) => Promise<VideoSegmentationAdapter>;
 
 export type DecodedVideoFrame = {
