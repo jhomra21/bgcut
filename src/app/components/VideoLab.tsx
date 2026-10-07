@@ -10,6 +10,9 @@ import {
 import {
   isSafariUserAgent,
 } from "../../browser/webgpu-session-strategy";
+import {
+  TRACKED_MASK_DECODER_PUBLIC_PATH,
+} from "../../shared/video-experimental-config";
 
 import { VideoExportControls } from "./VideoExportControls";
 
@@ -223,7 +226,17 @@ export const VideoLab = (props: { readonly file: File; readonly onChangeMedia: (
   let sourceFirstTimestamp = 0;
 
   const getEditor = () => {
-    editor ??= loadVideoModule().then((module) => module.createVideoSelection(props.file));
+    editor ??=
+      loadVideoModule().then(
+        (module) =>
+          module.createVideoSelection(
+            props.file,
+            {
+              trackedMaskDecoderUrl:
+                TRACKED_MASK_DECODER_PUBLIC_PATH,
+            },
+          ),
+      );
 
     return editor;
   };
