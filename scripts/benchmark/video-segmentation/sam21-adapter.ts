@@ -771,12 +771,15 @@ export const createSam21Adapter =
 
     let seedFrame: VideoFrame | undefined;
     let seedVision: SamVision | undefined;
+
     let visionPosition:
       Float32Array |
       undefined;
+
     let memoryPosition:
       Float32Array |
       undefined;
+
     let promptPipelineWarm = false;
 
     const encode =
