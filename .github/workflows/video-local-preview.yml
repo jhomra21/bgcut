@@ -17,7 +17,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
       - run: bun install --frozen-lockfile
+
+      - name: Prepare local tracked SAM decoder
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bun run video:model:prepare
+          test -s .cache/bgcut-video/sam21-tracked-mask-decoder.onnx
+          test -s .cache/bgcut-video/sam21-tracked-mask-decoder.json
 
       - name: Verify Vite serves ORT runtime assets
         shell: bash
@@ -43,6 +53,9 @@ jobs:
           done
 
           bun -e '
+            import {
+              TRACKED_MASK_DECODER_PUBLIC_PATH,
+            } from "./src/shared/video-experimental-config.ts";
             import {
               ORT_WASM_MODULE_PUBLIC_PATH,
               ORT_WASM_PUBLIC_PATH,
@@ -92,6 +105,22 @@ jobs:
 
             if (moduleSource.length === 0 || moduleSource.trimStart().startsWith("<!")) {
               throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned empty content or SPA HTML.");
+            }
+
+            const trackedResponse = await fetch(origin + TRACKED_MASK_DECODER_PUBLIC_PATH);
+            const trackedType = trackedResponse.headers.get("content-type") ?? "";
+            const trackedBytes = new Uint8Array(await trackedResponse.arrayBuffer());
+
+            if (!trackedResponse.ok) {
+              throw new Error(TRACKED_MASK_DECODER_PUBLIC_PATH + " returned HTTP " + trackedResponse.status + ".");
+            }
+
+            if (!trackedType.startsWith("application/octet-stream")) {
+              throw new Error(TRACKED_MASK_DECODER_PUBLIC_PATH + " returned " + trackedType + " instead of binary model data.");
+            }
+
+            if (trackedBytes.length < 1024) {
+              throw new Error(TRACKED_MASK_DECODER_PUBLIC_PATH + " returned an unexpectedly small model.");
             }
           '
 
