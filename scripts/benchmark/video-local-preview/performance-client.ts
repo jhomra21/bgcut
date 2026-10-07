@@ -301,6 +301,163 @@ const truthMask = async (
   }
 };
 
+const pointFromTruth = (
+  truth: {
+    readonly mask:
+      Uint8Array;
+    readonly width:
+      number;
+    readonly height:
+      number;
+  },
+): {
+  readonly x: number;
+  readonly y: number;
+  readonly label: 1;
+} => {
+  let foreground =
+    0;
+
+  let sumX =
+    0;
+
+  let sumY =
+    0;
+
+  for (
+    let y = 0;
+    y <
+    truth.height;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x <
+      truth.width;
+      x += 1
+    ) {
+      if (
+        (
+          truth.mask[
+            y *
+              truth.width +
+              x
+          ] ??
+          0
+        ) ===
+        0
+      ) {
+        continue;
+      }
+
+      foreground +=
+        1;
+
+      sumX +=
+        x;
+
+      sumY +=
+        y;
+    }
+  }
+
+  if (
+    foreground ===
+    0
+  ) {
+    throw new Error(
+      "DAVIS truth mask has no foreground.",
+    );
+  }
+
+  const centerX =
+    sumX /
+    foreground;
+
+  const centerY =
+    sumY /
+    foreground;
+
+  let selectedX =
+    0;
+
+  let selectedY =
+    0;
+
+  let selectedDistance =
+    Number.POSITIVE_INFINITY;
+
+  for (
+    let y = 0;
+    y <
+    truth.height;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x <
+      truth.width;
+      x += 1
+    ) {
+      if (
+        (
+          truth.mask[
+            y *
+              truth.width +
+              x
+          ] ??
+          0
+        ) ===
+        0
+      ) {
+        continue;
+      }
+
+      const distance =
+        (
+          x -
+          centerX
+        ) **
+          2 +
+        (
+          y -
+          centerY
+        ) **
+          2;
+
+      if (
+        distance <
+        selectedDistance
+      ) {
+        selectedDistance =
+          distance;
+
+        selectedX =
+          x;
+
+        selectedY =
+          y;
+      }
+    }
+  }
+
+  return {
+    x:
+      (
+        selectedX +
+        0.5
+      ) /
+      truth.width,
+    y:
+      (
+        selectedY +
+        0.5
+      ) /
+      truth.height,
+    label: 1,
+  };
+};
+
 const scoreSegmentationMask = (
   prediction:
     VideoSegmentationMask,
@@ -790,6 +947,28 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       ];
     } else if (
       name ===
+        "blackswan" ||
+      name ===
+        "camel" ||
+      name ===
+        "car-shadow"
+    ) {
+      configurations = [
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            undefined,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            12,
+        },
+      ];
+    } else if (
+      name ===
         "bear" ||
       name ===
         "bmx-trees"
@@ -841,7 +1020,13 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       name ===
         "bear" ||
       name ===
-        "bmx-trees"
+        "bmx-trees" ||
+      name ===
+        "blackswan" ||
+      name ===
+        "camel" ||
+      name ===
+        "car-shadow"
         ? name
         : undefined;
 
@@ -902,7 +1087,13 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
             name !==
               "bear" &&
             name !==
-              "bmx-trees"
+              "bmx-trees" &&
+            name !==
+              "blackswan" &&
+            name !==
+              "camel" &&
+            name !==
+              "car-shadow"
           ) {
             return;
           }
@@ -1025,7 +1216,13 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           name ===
             "bear" ||
           name ===
-            "bmx-trees"
+            "bmx-trees" ||
+          name ===
+            "blackswan" ||
+          name ===
+            "camel" ||
+          name ===
+            "car-shadow"
         ) &&
         alphaFrames.length >
         0
@@ -1102,7 +1299,13 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
               name ===
                 "bear" ||
               name ===
-                "bmx-trees"
+                "bmx-trees" ||
+              name ===
+                "blackswan" ||
+              name ===
+                "camel" ||
+              name ===
+                "car-shadow"
             ) &&
             frameRate ===
               "source"
@@ -1284,7 +1487,13 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           name ===
             "bear" ||
           name ===
-            "bmx-trees"
+            "bmx-trees" ||
+          name ===
+            "blackswan" ||
+          name ===
+            "camel" ||
+          name ===
+            "car-shadow"
         ) &&
         frameRate ===
           "source" &&
@@ -1541,6 +1750,48 @@ const main = async () => {
       : [{ x: 0.531615925058548, y: 0.49375, label: 1 as const }, { x: 0.5011709601873536, y: 0.6895833333333333, label: 1 as const }];
 
     reports.push(await benchmark(name, file, points));
+  }
+
+  for (
+    const name of
+    [
+      "blackswan",
+      "camel",
+      "car-shadow",
+    ] as const
+  ) {
+    const file =
+      new File(
+        [
+          await fetch(
+            `/quality/${name}.mp4`,
+          ).then(
+            (
+              response,
+            ) =>
+              response.blob(),
+          ),
+        ],
+        `${name}.mp4`,
+      );
+
+    const truth =
+      await truthMask(
+        name,
+        0,
+      );
+
+    reports.push(
+      await benchmark(
+        name,
+        file,
+        [
+          pointFromTruth(
+            truth,
+          ),
+        ],
+      ),
+    );
   }
 
   if (
