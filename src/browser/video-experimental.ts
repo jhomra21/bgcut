@@ -1176,6 +1176,7 @@ const removeVideo =
 
       let frameIndex = 0;
       let trackingMaskIndex = 0;
+
       let interpolatedAlpha:
         Uint8ClampedArray |
         undefined;
