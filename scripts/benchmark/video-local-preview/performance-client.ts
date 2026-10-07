@@ -12,6 +12,7 @@ import {
 import { QUALITY_FRAME_COUNT } from "../video-segmentation/quality-fixture";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
 import type {
+  VideoSegmentationAdapter,
   VideoSegmentationCandidateId,
   VideoSegmentationMask,
 } from "../video-segmentation/types";
@@ -541,6 +542,72 @@ const scoreSegmentationMask = (
   };
 };
 
+const timingDelta = (
+  before:
+    ReturnType<
+      NonNullable<
+        VideoSegmentationAdapter[
+          "timingSnapshot"
+        ]
+      >
+    > |
+    undefined,
+  after:
+    ReturnType<
+      NonNullable<
+        VideoSegmentationAdapter[
+          "timingSnapshot"
+        ]
+      >
+    > |
+    undefined,
+) => {
+  if (
+    after ===
+    undefined
+  ) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(
+      after,
+    ).map(
+      (
+        [
+          stage,
+          timing,
+        ],
+      ) => {
+        const previous =
+          before?.[
+            stage
+          ];
+
+        return [
+          stage,
+          {
+            calls:
+              timing.calls -
+              (
+                previous
+                  ?.calls ??
+                0
+              ),
+            totalMs:
+              timing.totalMs -
+              (
+                previous
+                  ?.totalMs ??
+                0
+              ),
+          },
+        ];
+      },
+    ),
+  );
+};
+
 const benchmarkPromptTracker = async (
   file: File,
   candidateId:
@@ -582,6 +649,9 @@ const benchmarkPromptTracker = async (
     const trackingPrepareMs =
       performance.now() -
       trackingPrepareStarted;
+
+    const timingBefore =
+      adapter.timingSnapshot?.();
 
     const timestamps =
       (
@@ -794,9 +864,47 @@ const benchmarkPromptTracker = async (
       ) /
       values.length;
 
+    const graphTimings =
+      timingDelta(
+        timingBefore,
+        adapter
+          .timingSnapshot?.(),
+      );
+
+    const graphMs =
+      graphTimings ===
+      undefined
+        ? undefined
+        : Object.values(
+            graphTimings,
+          ).reduce(
+            (
+              total,
+              timing,
+            ) =>
+              total +
+              timing.totalMs,
+            0,
+          );
+
+    const measuredInferenceMs =
+      seedMs +
+      trackingMs;
+
     return {
       candidate:
         candidateId,
+      graphTimings,
+      graphMs,
+      hostInferenceMs:
+        graphMs ===
+        undefined
+          ? undefined
+          : Math.max(
+              0,
+              measuredInferenceMs -
+                graphMs,
+            ),
       adapterLoadMs,
       trackingPrepareMs,
       seedMs,
