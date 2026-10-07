@@ -159,6 +159,56 @@ jobs:
           cat "$ROOT/server.log" >&2 || true
           exit 1
 
+      - name: Run Solid video UI acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-preview"
+          UI_ROOT="$ROOT/ui"
+          FIXTURE_ROOT="$ROOT/ui-fixture-proxy"
+          mkdir -p "$UI_ROOT" "$FIXTURE_ROOT"
+
+          bun add --global agent-browser@0.38.2
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$FIXTURE_ROOT" 4196 >"$ROOT/ui-fixture-server.log" 2>&1 &
+          FIXTURE_PID=$!
+
+          bun run dev -- --host 127.0.0.1 --port 5184 --strictPort >"$ROOT/ui-vite.log" 2>&1 &
+          VITE_PID=$!
+
+          cleanup() {
+            kill "$VITE_PID" 2>/dev/null || true
+            kill "$FIXTURE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4196/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:5184/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent --show-error             http://127.0.0.1:4196/quality/bear.mp4             --output "$ROOT/bear-ui.mp4"
+
+          test -s "$ROOT/bear-ui.mp4"
+
+          bun run scripts/benchmark/video-local-preview/ui-e2e.ts             "$ROOT/bear-ui.mp4"             http://127.0.0.1:5184             "$UI_ROOT"
+
+          test -s "$UI_ROOT/result.json"
+          test -s "$UI_ROOT/initial-readiness.png"
+          test -s "$UI_ROOT/desktop-mask.png"
+          test -s "$UI_ROOT/mobile-mask.png"
+          test -s "$UI_ROOT/mobile-result.png"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
