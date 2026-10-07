@@ -617,6 +617,8 @@ const benchmarkPromptTracker = async (
     readonly y: number;
     readonly label: 1;
   },
+  trackedMaskDecoderUrl?:
+    string,
 ) => {
   const source =
     await openMediaBunnyVideoSource(
@@ -634,6 +636,13 @@ const benchmarkPromptTracker = async (
   const adapter =
     await createVideoSegmentationAdapter(
       candidate,
+      undefined,
+      trackedMaskDecoderUrl ===
+        undefined
+        ? undefined
+        : {
+            trackedMaskDecoderUrl,
+          },
     );
 
   const adapterLoadMs =
@@ -894,6 +903,9 @@ const benchmarkPromptTracker = async (
     return {
       candidate:
         candidateId,
+      trackedMaskDecoder:
+        trackedMaskDecoderUrl !==
+        undefined,
       graphTimings,
       graphMs,
       hostInferenceMs:
@@ -1916,22 +1928,38 @@ const main = async () => {
   const promptTrackerCases =
     [];
 
-  for (
-    const candidateId of
+  const trackerCases =
     [
-      "sam21-tiny",
-      "edgetam",
-    ] as const
+      {
+        candidateId:
+          "sam21-tiny" as const,
+      },
+      {
+        candidateId:
+          "sam21-tiny" as const,
+        trackedMaskDecoderUrl:
+          "/specialized/sam21-tracked-mask-decoder.onnx",
+      },
+      {
+        candidateId:
+          "edgetam" as const,
+      },
+    ];
+
+  for (
+    const trackerCase of
+    trackerCases
   ) {
     promptTrackerCases.push(
       await benchmarkPromptTracker(
         bearFile,
-        candidateId,
+        trackerCase.candidateId,
         {
           x: 0.4,
           y: 0.65,
           label: 1,
         },
+        trackerCase.trackedMaskDecoderUrl,
       ),
     );
   }
