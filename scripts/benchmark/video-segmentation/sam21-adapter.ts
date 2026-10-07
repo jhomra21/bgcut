@@ -1310,20 +1310,10 @@ export const createSam21Adapter =
           );
         }
 
-        if (
-          seedFrame !==
-            frame ||
-          seedVision ===
-            undefined
-        ) {
-          seedVision =
-            await encode(
-              frame,
-            );
-
-          seedFrame =
-            frame;
-        }
+        const vision =
+          await getSeedVision(
+            frame,
+          );
 
         const masks:
           VideoSegmentationMask[] =
@@ -1339,8 +1329,8 @@ export const createSam21Adapter =
 
           const decoded =
             await decode(
-              seedVision,
-              seedVision.feats2NoMemory,
+              vision,
+              vision.feats2NoMemory,
               pointPromptTensors(
                 subject.prompt.points,
                 candidate.inputSize,
@@ -1387,12 +1377,10 @@ export const createSam21Adapter =
           );
         }
 
-        if (seedFrame !== frame || seedVision === undefined) {
-          seedVision = await encode(frame);
-          seedFrame = frame;
-        }
-
-        const vision = seedVision;
+        const vision =
+          await getSeedVision(
+            frame,
+          );
 
         subjectBanks.clear();
 
