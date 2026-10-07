@@ -321,3 +321,97 @@ jobs:
           name: video-local-performance
           path: ${{ runner.temp }}/video-local-performance
           if-no-files-found: error
+
+
+  tracked-decoder:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+
+      - name: Validate specialized SAM tracked decoder
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-tracked-decoder"
+          mkdir -p "$ROOT"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-decoder.py \
+            "$ROOT/sam21-tracked-mask-decoder.onnx" \
+            >"$ROOT/sam21-tracked-mask-decoder.json"
+
+          test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
+          test -s "$ROOT/sam21-tracked-mask-decoder.json"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4198 tracked-decoder >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4198/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4198/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..900}; do
+            if [[ -f "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -f "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              echo "Chrome exited before tracked decoder validation completed." >&2
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for tracked decoder validation." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-tracked-decoder
+          path: ${{ runner.temp }}/video-tracked-decoder
+          if-no-files-found: error
