@@ -87,6 +87,11 @@ export type ExperimentalVideoOptions = {
       HTMLCanvasElement,
     frameIndex: number,
   ) => void;
+  readonly onOutputFrame?: (
+    canvas:
+      HTMLCanvasElement,
+    frameIndex: number,
+  ) => void;
 };
 
 const progress = (
@@ -1284,6 +1289,11 @@ const removeVideo =
             context.fillRect(0, 0, canvas.width, canvas.height);
             context.globalCompositeOperation = "source-over";
           }
+
+          options.onOutputFrame?.(
+            canvas,
+            frameIndex,
+          );
 
           progress(
             options,
