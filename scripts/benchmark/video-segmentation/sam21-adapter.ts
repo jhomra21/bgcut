@@ -907,9 +907,16 @@ export const createSam21Adapter =
               trackedMaskDecoder,
             "tracked-memory-encoder":
               trackedMemoryEncoder,
-            "tracked-step":
-              trackedStep,
           });
+
+          try {
+            await trackedStep?.release();
+          } catch {
+            // Experimental session cleanup must not hide the load failure.
+          }
+
+          trackedStep =
+            undefined;
 
           loaded.delete(
             "memory-attention",
@@ -2064,9 +2071,13 @@ export const createSam21Adapter =
             trackedMaskDecoder,
           "tracked-memory-encoder":
             trackedMemoryEncoder,
-          "tracked-step":
-            trackedStep,
         });
+
+        try {
+          await trackedStep?.release();
+        } catch {
+          // Closing the experimental fused session is best-effort.
+        }
       },
     };
 
