@@ -15,8 +15,8 @@ import {
   WEBGPU_MODEL_RELEASE_URL,
 } from "./src/shared/model-config.ts";
 import {
-  TRACKED_STEP_CACHE_PATH,
-  TRACKED_STEP_PUBLIC_PATH,
+  TRACKED_DECODER_CACHE_PATH,
+  TRACKED_DECODER_PUBLIC_PATH,
 } from "./src/shared/video-experimental-config.ts";
 import {
   ORT_WASM_FILENAME,
@@ -131,11 +131,11 @@ const ortRuntimeDevPlugin = (): Plugin => ({
 const VIDEO_EXPERIMENTAL_ASSETS = [
   {
     publicPath:
-      TRACKED_STEP_PUBLIC_PATH,
+      TRACKED_DECODER_PUBLIC_PATH,
     cachePath:
-      TRACKED_STEP_CACHE_PATH,
+      TRACKED_DECODER_CACHE_PATH,
     missing:
-      "Fused SAM tracked step is not prepared. Run bun run video:model:prepare.",
+      "SAM tracked decoder is not prepared. Run bun run video:model:prepare.",
   },
 ] as const;
 
