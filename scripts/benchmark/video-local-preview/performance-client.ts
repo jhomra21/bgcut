@@ -891,7 +891,18 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
           configuration.trackingFrameRate,
         export: { start: 0, end: 1, frameRate, format: "mp4", quality: frameRate === 6 ? "medium" : "high" },
         onProgress: (update) => { stages[update.stage] ??= performance.now() - started; },
-        onFrame: (canvas, index) => {
+        onFrame: (canvas) => {
+          if (
+            name !==
+              "sixty" &&
+            name !==
+              "bear" &&
+            name !==
+              "bmx-trees"
+          ) {
+            return;
+          }
+
           const pixels =
             canvas
               .getContext(
@@ -909,49 +920,57 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
             undefined
           ) {
             throw new Error(
-              "Could not inspect composited output frame.",
+              "Could not inspect raw segmentation frame.",
             );
           }
 
+          const alpha =
+            new Uint8Array(
+              canvas.width *
+                canvas.height,
+            );
+
+          for (
+            let pixel = 0;
+            pixel <
+            alpha.length;
+            pixel += 1
+          ) {
+            alpha[pixel] =
+              pixels[
+                pixel *
+                  4 +
+                  3
+              ] ??
+              0;
+          }
+
+          alphaFrames.push(
+            alpha,
+          );
+        },
+        onOutputFrame: (
+          canvas,
+          index,
+        ) => {
           if (
-            index ===
+            index !==
             0
           ) {
-            firstFrame =
-              pixels;
+            return;
           }
 
-          if (
-            name ===
-              "sixty" ||
-            name ===
-              "bear"
-          ) {
-            const alpha =
-              new Uint8Array(
-                canvas.width *
-                  canvas.height,
-              );
-
-            for (
-              let pixel = 0;
-              pixel <
-              alpha.length;
-              pixel += 1
-            ) {
-              alpha[pixel] =
-                pixels[
-                  pixel *
-                    4 +
-                    3
-                ] ??
-                0;
-            }
-
-            alphaFrames.push(
-              alpha,
-            );
-          }
+          firstFrame =
+            canvas
+              .getContext(
+                "2d",
+              )
+              ?.getImageData(
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+              ).data;
         },
       });
 
