@@ -580,17 +580,25 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
                     referenceMse,
                 );
 
+          const finiteFramePsnr =
+            framePsnr.filter(
+              Number.isFinite,
+            );
+
           referenceMeanFramePsnr =
-            framePsnr.reduce(
-              (
-                total,
-                value,
-              ) =>
-                total +
-                value,
-              0,
-            ) /
-            framePsnr.length;
+            finiteFramePsnr.length ===
+              0
+              ? Number.POSITIVE_INFINITY
+              : finiteFramePsnr.reduce(
+                  (
+                    total,
+                    value,
+                  ) =>
+                    total +
+                    value,
+                  0,
+                ) /
+                finiteFramePsnr.length;
 
           referenceWorstFramePsnr =
             Math.min(
