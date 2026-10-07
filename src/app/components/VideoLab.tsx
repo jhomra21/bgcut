@@ -11,7 +11,6 @@ import {
   isSafariUserAgent,
 } from "../../browser/webgpu-session-strategy";
 import {
-  TRACKED_MASK_DECODER_PUBLIC_PATH,
   TRACKED_STEP_PUBLIC_PATH,
 } from "../../shared/video-experimental-config";
 
@@ -233,8 +232,6 @@ export const VideoLab = (props: { readonly file: File; readonly onChangeMedia: (
           module.createVideoSelection(
             props.file,
             {
-              trackedMaskDecoderUrl:
-                TRACKED_MASK_DECODER_PUBLIC_PATH,
               trackedStepUrl:
                 TRACKED_STEP_PUBLIC_PATH,
             },
