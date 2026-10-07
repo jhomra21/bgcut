@@ -748,83 +748,98 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
     await editor.preview(seedTime, subjects, new AbortController().signal);
     const warmClickMs = performance.now() - started;
 
-    const configurations =
+    let configurations:
+      readonly {
+        readonly frameRate:
+          | "source"
+          | 6;
+        readonly trackingFrameRate:
+          number |
+          undefined;
+      }[];
+
+    if (
       name ===
       "sixty"
-        ? [
-            {
-              frameRate:
-                "source" as const,
-              trackingFrameRate:
-                60,
-            },
-            {
-              frameRate:
-                "source" as const,
-              trackingFrameRate:
-                30,
-            },
-            {
-              frameRate:
-                "source" as const,
-              trackingFrameRate:
-                24,
-            },
-            {
-              frameRate:
-                "source" as const,
-              trackingFrameRate:
-                12,
-            },
-          ]
-        : name ===
-          "bear"
-          ? [
-              {
-                frameRate:
-                  "source" as const,
-                trackingFrameRate:
-                  undefined,
-              },
-              {
-                frameRate:
-                  "source" as const,
-                trackingFrameRate:
-                  12,
-              },
-              {
-                frameRate:
-                  "source" as const,
-                trackingFrameRate:
-                  8,
-              },
-              {
-                frameRate:
-                  "source" as const,
-                trackingFrameRate:
-                  6,
-              },
-              {
-                frameRate:
-                  6 as const,
-                trackingFrameRate:
-                  undefined,
-              },
-            ]
-          : [
-              {
-                frameRate:
-                  "source" as const,
-                trackingFrameRate:
-                  undefined,
-              },
-              {
-                frameRate:
-                  6 as const,
-                trackingFrameRate:
-                  undefined,
-              },
-            ];
+    ) {
+      configurations = [
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            60,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            30,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            24,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            12,
+        },
+      ];
+    } else if (
+      name ===
+      "bear"
+    ) {
+      configurations = [
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            undefined,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            12,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            8,
+        },
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            6,
+        },
+        {
+          frameRate:
+            6,
+          trackingFrameRate:
+            undefined,
+        },
+      ];
+    } else {
+      configurations = [
+        {
+          frameRate:
+            "source",
+          trackingFrameRate:
+            undefined,
+        },
+        {
+          frameRate:
+            6,
+          trackingFrameRate:
+            undefined,
+        },
+      ];
+    }
 
     const cadenceTruths =
       name ===
