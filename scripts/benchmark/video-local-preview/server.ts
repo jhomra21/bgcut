@@ -190,6 +190,44 @@ const app =
         return edge;
       }
 
+      if (
+        request.method ===
+          "GET" &&
+        url.pathname ===
+          "/specialized/sam21-tracked-mask-decoder.onnx"
+      ) {
+        const trackedDecoder =
+          Bun.file(
+            join(
+              outputRoot,
+              "sam21-tracked-mask-decoder.onnx",
+            ),
+          );
+
+        if (
+          !(await trackedDecoder.exists())
+        ) {
+          return new Response(
+            "Tracked SAM decoder is unavailable.",
+            {
+              status: 404,
+            },
+          );
+        }
+
+        return new Response(
+          trackedDecoder,
+          {
+            headers: {
+              "content-type":
+                "application/octet-stream",
+              "cache-control":
+                "no-store",
+            },
+          },
+        );
+      }
+
       const quality =
         await proxyQualityFixtureRequest(
           request,
