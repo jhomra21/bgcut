@@ -1394,13 +1394,54 @@ export const createVideoSelection = (file: File) => {
       return serialize(async () => {
         signal.throwIfAborted();
 
-        if (disposed) throw new VideoExportError({ message: "The video editor was closed." });
-        const model = await getSegmenter();
+        if (disposed) {
+          throw new VideoExportError({
+            message:
+              "The video editor was closed.",
+          });
+        }
+
+        const startedAt =
+          performance.now();
+
+        const model =
+          await getSegmenter();
+
+        const modelReadyAt =
+          performance.now();
+
         signal.throwIfAborted();
-        const frame = await getPreviewFrame(time);
+
+        const frame =
+          await getPreviewFrame(
+            time,
+          );
+
+        const frameReadyAt =
+          performance.now();
+
         signal.throwIfAborted();
-        await model.prepareFrame?.(frame);
+
+        await model.prepareFrame?.(
+          frame,
+        );
+
+        const preparedAt =
+          performance.now();
+
         signal.throwIfAborted();
+
+        return {
+          modelWaitMs:
+            modelReadyAt -
+            startedAt,
+          decodeMs:
+            frameReadyAt -
+            modelReadyAt,
+          modelWarmMs:
+            preparedAt -
+            frameReadyAt,
+        };
       }, signal);
     },
     preview(time: number, subjects: readonly VideoSegmentationSubjectPrompt[], signal: AbortSignal) {
