@@ -699,11 +699,16 @@ export const createSam21Adapter =
             options?.trackedMaskDecoderUrl !==
             undefined
           ) {
-            trackedMaskDecoder =
-              await createVideoSessionFromUrl(
-                options.trackedMaskDecoderUrl,
-                "SAM 2.1 tracked mask decoder",
-              );
+            try {
+              trackedMaskDecoder =
+                await createVideoSessionFromUrl(
+                  options.trackedMaskDecoderUrl,
+                  "SAM 2.1 tracked mask decoder",
+                );
+            } catch {
+              trackedMaskDecoder =
+                undefined;
+            }
           }
 
           return {
