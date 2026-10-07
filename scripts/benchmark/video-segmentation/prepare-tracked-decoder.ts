@@ -7,8 +7,6 @@ import {
 } from "node:path";
 
 import {
-  TRACKED_MASK_DECODER_CACHE_PATH,
-  TRACKED_MASK_DECODER_METADATA_CACHE_PATH,
   TRACKED_STEP_CACHE_PATH,
   TRACKED_STEP_METADATA_CACHE_PATH,
 } from "../../../src/shared/video-experimental-config";
@@ -71,17 +69,6 @@ const prepare = async (
     `Prepared ${label} at ${outputPath}`,
   );
 };
-
-await prepare(
-  "specialize-sam21-tracked-decoder.py",
-  resolve(
-    TRACKED_MASK_DECODER_CACHE_PATH,
-  ),
-  resolve(
-    TRACKED_MASK_DECODER_METADATA_CACHE_PATH,
-  ),
-  "tracked SAM decoder",
-);
 
 await prepare(
   "specialize-sam21-tracked-step.py",
