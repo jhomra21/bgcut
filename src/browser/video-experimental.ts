@@ -1291,14 +1291,14 @@ const removeVideo =
               stage:
                 "encoding",
               message:
-                `Encoding frame ${frameIndex + 1} of ${trackingTimestamps.length}…`,
+                `Encoding frame ${frameIndex + 1} of ${outputTimestamps.length}…`,
               progress:
                 0.76 +
                 (
                   frameIndex /
                   Math.max(
                     1,
-                    timestamps.length,
+                    outputTimestamps.length,
                   )
                 ) *
                   0.18,
@@ -1410,6 +1410,8 @@ const removeVideo =
           canvas.height,
         frameCount:
           encodedFrames,
+        trackingFrameCount:
+          trackingTimestamps.length,
         duration:
           size.duration,
         sampleFps: encodedFrames / size.duration,
