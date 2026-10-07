@@ -224,6 +224,10 @@ const app =
               "/specialized/sam21-tracked-memory-encoder.onnx",
               "sam21-tracked-memory-encoder.onnx",
             ],
+            [
+              "/specialized/sam21-tracked-step.onnx",
+              "sam21-tracked-step.onnx",
+            ],
           ]);
 
         const filename =
