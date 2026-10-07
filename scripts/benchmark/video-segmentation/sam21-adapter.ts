@@ -64,6 +64,17 @@ type SamVision = {
     ort.Tensor;
 };
 
+const disposeVision = (
+  vision:
+    SamVision,
+): void => {
+  vision.feats0.dispose();
+  vision.feats1.dispose();
+  vision.feats2.dispose();
+  vision.feats2NoMemory.dispose();
+  vision.position.dispose();
+};
+
 type SamDecoded = {
   readonly mask:
     VideoSegmentationMask;
@@ -1068,24 +1079,34 @@ export const createSam21Adapter =
               ),
           });
 
-        const decoded =
-          await decode(
-            vision,
-            requireTensor(
-              attention,
-              "conditioned_feats",
-            ),
-            pointPromptTensors(
-              [
-                {
-                  x: 0,
-                  y: 0,
-                  label: -1,
-                },
-              ],
-              candidate.inputSize,
-            ),
+        const conditioned =
+          requireTensor(
+            attention,
+            "conditioned_feats",
           );
+
+        let decoded:
+          SamDecoded;
+
+        try {
+          decoded =
+            await decode(
+              vision,
+              conditioned,
+              pointPromptTensors(
+                [
+                  {
+                    x: 0,
+                    y: 0,
+                    label: -1,
+                  },
+                ],
+                candidate.inputSize,
+              ),
+            );
+        } finally {
+          conditioned.dispose();
+        }
 
         if (
           decoded.objectScore >
@@ -1185,14 +1206,23 @@ export const createSam21Adapter =
           VideoSegmentationPrompt,
         frameIndex,
       ) {
-        return seedWithBank(
+        const vision =
           await encode(
             frame,
-          ),
-          bank,
-          prompt,
-          frameIndex,
-        );
+          );
+
+        try {
+          return await seedWithBank(
+            vision,
+            bank,
+            prompt,
+            frameIndex,
+          );
+        } finally {
+          disposeVision(
+            vision,
+          );
+        }
       },
 
       async track(
@@ -1200,14 +1230,23 @@ export const createSam21Adapter =
         frameIndex,
         totalFrames,
       ) {
-        return trackWithBank(
+        const vision =
           await encode(
             frame,
-          ),
-          bank,
-          frameIndex,
-          totalFrames,
-        );
+          );
+
+        try {
+          return await trackWithBank(
+            vision,
+            bank,
+            frameIndex,
+            totalFrames,
+          );
+        } finally {
+          disposeVision(
+            vision,
+          );
+        }
       },
 
       async previewSubjects(
@@ -1379,21 +1418,27 @@ export const createSam21Adapter =
           VideoSegmentationMask[] =
             [];
 
-        for (
-          const subjectBank of
-          subjectBanks.values()
-        ) {
-          masks.push(
-            await trackWithBank(
-              vision,
-              subjectBank,
-              frameIndex,
-              totalFrames,
-            ),
+        try {
+          for (
+            const subjectBank of
+            subjectBanks.values()
+          ) {
+            masks.push(
+              await trackWithBank(
+                vision,
+                subjectBank,
+                frameIndex,
+                totalFrames,
+              ),
+            );
+          }
+
+          return masks;
+        } finally {
+          disposeVision(
+            vision,
           );
         }
-
-        return masks;
       },
 
       rewind() {
@@ -1411,7 +1456,19 @@ export const createSam21Adapter =
 
       async close() {
         seedFrame = undefined;
-        seedVision = undefined;
+
+        if (
+          seedVision !==
+          undefined
+        ) {
+          disposeVision(
+            seedVision,
+          );
+
+          seedVision =
+            undefined;
+        }
+
         subjectBanks.clear();
 
         await trackingSessionsPromise?.catch(
