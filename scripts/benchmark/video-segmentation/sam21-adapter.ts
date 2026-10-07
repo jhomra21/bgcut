@@ -1,12 +1,6 @@
 import * as ort from "onnxruntime-web/webgpu";
 
 import {
-  createSamFeatureTransposer,
-  requireGpuBuffer,
-  type SamFeatureTransposer,
-} from "./sam21-gpu";
-
-import {
   channelsToTokens,
   closeVideoSessions,
   concatenateFloat32,
@@ -21,7 +15,6 @@ import {
 
 import type {
   VideoSegmentationAdapter,
-  VideoSegmentationAdapterOptions,
   VideoSegmentationCandidate,
   VideoSegmentationMask,
   VideoSegmentationPrompt,
@@ -536,8 +529,6 @@ export const createSam21Adapter =
     onProgress?: (
       progress: number,
     ) => void,
-    options?:
-      VideoSegmentationAdapterOptions,
   ): Promise<VideoSegmentationAdapter> => {
     configureVideoOrt();
 
@@ -618,49 +609,6 @@ export const createSam21Adapter =
         ort.InferenceSession
       >();
 
-    const preferredOutputLocation = (
-      role:
-        (typeof roles)[number],
-    ):
-      ort.InferenceSession.SessionOptions[
-        "preferredOutputLocation"
-      ] => {
-      if (
-        options?.gpuFeatureHandoff !==
-        true
-      ) {
-        return undefined;
-      }
-
-      if (
-        role ===
-        "vision-encoder"
-      ) {
-        return {
-          feats0:
-            "gpu-buffer",
-          feats1:
-            "gpu-buffer",
-          feats2:
-            "gpu-buffer",
-          feats2_no_mem:
-            "gpu-buffer",
-        };
-      }
-
-      if (
-        role ===
-        "memory-attention"
-      ) {
-        return {
-          conditioned_feats:
-            "gpu-buffer",
-        };
-      }
-
-      return undefined;
-    };
-
     const load = async (
       role:
         (typeof roles)[number],
@@ -669,9 +617,6 @@ export const createSam21Adapter =
         await createVideoSession(
           candidate,
           role,
-          preferredOutputLocation(
-            role,
-          ),
         );
 
       loaded.set(
@@ -806,23 +751,6 @@ export const createSam21Adapter =
         featureTokens +
       MAX_POINTERS *
         POINTER_TOKENS;
-
-    let featureTransposer:
-      SamFeatureTransposer |
-      undefined;
-
-    const getFeatureTransposer =
-      async (): Promise<
-        SamFeatureTransposer
-      > => {
-        featureTransposer ??=
-          await createSamFeatureTransposer(
-            featureTokens,
-            FEATURE_CHANNELS,
-          );
-
-        return featureTransposer;
-      };
 
     const createBank =
       () =>
@@ -1271,37 +1199,24 @@ export const createSam21Adapter =
           );
         }
 
-        const visionFeatures =
-          options?.gpuFeatureHandoff ===
-          true
-            ? (
-                await getFeatureTransposer()
-              ).run(
-                requireGpuBuffer(
+        const attentionInputs = {
+          current_vision_features:
+            new ort.Tensor(
+              "float32",
+              channelsToTokens(
+                floatData(
                   vision.feats2,
                   "SAM 2.1 feats2",
                 ),
-              )
-            : new ort.Tensor(
-                "float32",
-                channelsToTokens(
-                  floatData(
-                    vision.feats2,
-                    "SAM 2.1 feats2",
-                  ),
-                  FEATURE_CHANNELS,
-                  featureTokens,
-                ),
-                [
-                  featureTokens,
-                  1,
-                  FEATURE_CHANNELS,
-                ],
-              );
-
-        const attentionInputs = {
-          current_vision_features:
-            visionFeatures,
+                FEATURE_CHANNELS,
+                featureTokens,
+              ),
+              [
+                featureTokens,
+                1,
+                FEATURE_CHANNELS,
+              ],
+            ),
           current_vision_position_embeddings:
             new ort.Tensor(
               "float32",
@@ -1721,12 +1636,6 @@ export const createSam21Adapter =
         }
 
         subjectBanks.clear();
-
-        featureTransposer
-          ?.dispose();
-
-        featureTransposer =
-          undefined;
 
         await trackingSessionsPromise?.catch(
           () => undefined,
