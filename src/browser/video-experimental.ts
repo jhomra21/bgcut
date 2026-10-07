@@ -57,6 +57,7 @@ export type ExperimentalVideoResult = {
   readonly width: number;
   readonly height: number;
   readonly frameCount: number;
+  readonly trackingFrameCount: number;
   readonly duration: number;
   readonly sampleFps: number;
   readonly seed:
@@ -74,6 +75,8 @@ export type ExperimentalVideoOptions = {
   readonly subjects?:
     readonly VideoSegmentationSubjectPrompt[];
   readonly seedTimeSeconds?:
+    number;
+  readonly trackingFrameRate?:
     number;
   readonly onProgress?: (
     progress:
