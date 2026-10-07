@@ -15,6 +15,10 @@ import {
   WEBGPU_MODEL_RELEASE_URL,
 } from "./src/shared/model-config.ts";
 import {
+  TRACKED_MASK_DECODER_CACHE_PATH,
+  TRACKED_MASK_DECODER_PUBLIC_PATH,
+} from "./src/shared/video-experimental-config.ts";
+import {
   ORT_WASM_FILENAME,
   ORT_WASM_MODULE_FILENAME,
   ORT_WASM_MODULE_PUBLIC_PATH,
@@ -140,9 +144,73 @@ const videoModelDevPlugin = (): Plugin => ({
       }
 
       void (async () => {
-        const proxied = await proxyVideoModelRequest(
-          new Request(`http://127.0.0.1${requestUrl}`),
-        );
+        const pathname =
+          new URL(
+            requestUrl,
+            "http://127.0.0.1",
+          ).pathname;
+
+        if (
+          pathname ===
+          TRACKED_MASK_DECODER_PUBLIC_PATH
+        ) {
+          const bytes =
+            await readFile(
+              resolve(
+                TRACKED_MASK_DECODER_CACHE_PATH,
+              ),
+            ).catch(
+              () =>
+                undefined,
+            );
+
+          if (
+            bytes ===
+            undefined
+          ) {
+            response.statusCode =
+              404;
+            response.end(
+              "Tracked SAM decoder is not prepared. Run bun run video:model:prepare.",
+            );
+
+            return;
+          }
+
+          response.statusCode =
+            200;
+
+          response.setHeader(
+            "content-type",
+            "application/octet-stream",
+          );
+
+          response.setHeader(
+            "cache-control",
+            "no-store",
+          );
+
+          response.setHeader(
+            "content-length",
+            bytes.byteLength,
+          );
+
+          response.end(
+            request.method ===
+              "HEAD"
+              ? undefined
+              : bytes,
+          );
+
+          return;
+        }
+
+        const proxied =
+          await proxyVideoModelRequest(
+            new Request(
+              `http://127.0.0.1${requestUrl}`,
+            ),
+          );
 
         if (proxied === null) {
           next();
