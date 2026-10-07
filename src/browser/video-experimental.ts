@@ -1074,7 +1074,7 @@ const removeVideo =
                     0.55,
                 frameIndex,
                 frameCount:
-                  timestamps.length,
+                  trackingTimestamps.length,
               },
             );
 
@@ -1098,7 +1098,7 @@ const removeVideo =
                 : await segmenter.track(
                     decoded.frame,
                     frameIndex,
-                    timestamps.length,
+                    trackingTimestamps.length,
                   );
 
             masks[frameIndex] = matteFromMask(trackedMask);
@@ -1167,17 +1167,71 @@ const removeVideo =
       await output.start();
 
       let frameIndex = 0;
+      let trackingMaskIndex = 0;
+
+      const maskForTimestamp = (
+        timestamp: number,
+      ): VideoMatte | undefined => {
+        while (
+          trackingMaskIndex +
+            1 <
+          trackingTimestamps.length
+        ) {
+          const currentTime =
+            trackingTimestamps[
+              trackingMaskIndex
+            ];
+
+          const nextTime =
+            trackingTimestamps[
+              trackingMaskIndex +
+                1
+            ];
+
+          if (
+            currentTime ===
+              undefined ||
+            nextTime ===
+              undefined ||
+            Math.abs(
+              nextTime -
+                timestamp,
+            ) >
+              Math.abs(
+                currentTime -
+                  timestamp,
+              )
+          ) {
+            break;
+          }
+
+          trackingMaskIndex +=
+            1;
+        }
+
+        return masks[
+          trackingMaskIndex
+        ];
+      };
 
       for await (
         const decoded of
         source.framesAt(
-          timestamps,
+          outputTimestamps,
         )
       ) {
-        const mask =
-          masks[
+        const timestamp =
+          outputTimestamps[
             frameIndex
           ];
+
+        const mask =
+          timestamp ===
+            undefined
+            ? undefined
+            : maskForTimestamp(
+                timestamp,
+              );
 
         if (
           decoded ===
@@ -1250,13 +1304,36 @@ const removeVideo =
                   0.18,
               frameIndex,
               frameCount:
-                timestamps.length,
+                outputTimestamps.length,
             },
           );
 
+          const outputTimestamp =
+            outputTimestamps[
+              frameIndex
+            ] ??
+            outputTimestamps[
+              0
+            ] ??
+            0;
+
           await outputSource.add(
-            (timestamps[frameIndex] ?? timestamps[0] ?? 0) - (timestamps[0] ?? 0),
-            (timestamps[frameIndex + 1] ?? source.info.firstTimestamp + size.end) - (timestamps[frameIndex] ?? 0),
+            outputTimestamp -
+              (
+                outputTimestamps[
+                  0
+                ] ??
+                0
+              ),
+            (
+              outputTimestamps[
+                frameIndex +
+                  1
+              ] ??
+              source.info.firstTimestamp +
+                size.end
+            ) -
+              outputTimestamp,
           );
 
           encodedFrames +=
