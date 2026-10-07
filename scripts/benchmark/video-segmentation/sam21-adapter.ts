@@ -1281,7 +1281,12 @@ export const createSam21Adapter =
         const decoded =
           await decode(
             vision,
-            vision.feats2NoMemory,
+            vision.feats2NoMemory ??
+              (() => {
+                throw new Error(
+                  "SAM 2.1 prompt vision output is missing.",
+                );
+              })(),
             pointPromptTensors(
               prompt.points,
               candidate.inputSize,
