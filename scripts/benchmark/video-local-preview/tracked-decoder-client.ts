@@ -733,6 +733,486 @@ const runTracker = async (
   }
 };
 
+const pointInHalf = (
+  truth: TruthMask,
+  right: boolean,
+): PositivePoint => {
+  const midpoint =
+    truth.width /
+    2;
+
+  let count = 0;
+  let sumX = 0;
+  let sumY = 0;
+
+  for (
+    let y = 0;
+    y < truth.height;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x < truth.width;
+      x += 1
+    ) {
+      if (
+        (x >= midpoint) !==
+          right ||
+        (truth.mask[
+          y * truth.width + x
+        ] ?? 0) === 0
+      ) {
+        continue;
+      }
+
+      count += 1;
+      sumX += x;
+      sumY += y;
+    }
+  }
+
+  if (count < 32) {
+    throw new Error(
+      "BMX foreground cannot provide two separated subject points.",
+    );
+  }
+
+  const centerX =
+    sumX / count;
+  const centerY =
+    sumY / count;
+
+  let bestX = 0;
+  let bestY = 0;
+  let bestDistance =
+    Number.POSITIVE_INFINITY;
+
+  for (
+    let y = 0;
+    y < truth.height;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x < truth.width;
+      x += 1
+    ) {
+      if (
+        (x >= midpoint) !==
+          right ||
+        (truth.mask[
+          y * truth.width + x
+        ] ?? 0) === 0
+      ) {
+        continue;
+      }
+
+      const distance =
+        (x - centerX) ** 2 +
+        (y - centerY) ** 2;
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestX = x;
+        bestY = y;
+      }
+    }
+  }
+
+  return {
+    x:
+      (bestX + 0.5) /
+      truth.width,
+    y:
+      (bestY + 0.5) /
+      truth.height,
+    label: 1,
+  };
+};
+
+const runMultiSubjectTracker = async (
+  file: File,
+  truth: TruthMask,
+  variant:
+    "baseline" |
+    "fused-step",
+) => {
+  const left =
+    pointInHalf(truth, false);
+  const right =
+    pointInHalf(truth, true);
+
+  const subjects = [
+    {
+      id: "left",
+      prompt: {
+        points: [
+          left,
+          {
+            x: right.x,
+            y: right.y,
+            label: 0 as const,
+          },
+        ],
+      },
+    },
+    {
+      id: "right",
+      prompt: {
+        points: [
+          right,
+          {
+            x: left.x,
+            y: left.y,
+            label: 0 as const,
+          },
+        ],
+      },
+    },
+  ];
+
+  const source =
+    await openMediaBunnyVideoSource(
+      file,
+    );
+
+  const adapter =
+    await createVideoSegmentationAdapter(
+      VIDEO_SEGMENTATION_CANDIDATES[
+        "sam21-tiny"
+      ],
+      undefined,
+      variant === "fused-step"
+        ? {
+            trackedStepUrl:
+              SPECIALIZED_TRACKED_STEP,
+          }
+        : undefined,
+    );
+
+  try {
+    await adapter.prepareTracking?.();
+
+    if (
+      adapter.seedSubjects ===
+        undefined ||
+      adapter.trackSubjects ===
+        undefined ||
+      adapter.rewindSubjects ===
+        undefined
+    ) {
+      throw new Error(
+        "SAM 2.1 multi-subject tracking is unavailable.",
+      );
+    }
+
+    const timestamps =
+      (
+        await source.frameTimes(
+          source.info.firstTimestamp,
+          source.info.firstTimestamp +
+            Math.min(
+              1,
+              source.info.duration,
+            ),
+          QUALITY_FRAME_RATE,
+        )
+      ).slice(
+        0,
+        QUALITY_FRAME_COUNT,
+      );
+
+    if (
+      timestamps.length !==
+      QUALITY_FRAME_COUNT
+    ) {
+      throw new Error(
+        "BMX multi-subject acceptance needs the full labeled frame window.",
+      );
+    }
+
+    const seedIndex = 5;
+
+    const masksByFrame:
+      (readonly Uint8Array[] |
+        undefined)[] =
+      Array.from({
+        length:
+          timestamps.length,
+      });
+
+    let trackingMs = 0;
+
+    const capture = async (
+      index: number,
+      seed: boolean,
+    ) => {
+      const timestamp =
+        timestamps[index];
+
+      if (
+        timestamp ===
+        undefined
+      ) {
+        throw new Error(
+          `Missing BMX timestamp at ${index}.`,
+        );
+      }
+
+      const decoded =
+        await source.frameAt(
+          timestamp,
+        );
+
+      if (
+        decoded === null
+      ) {
+        throw new Error(
+          `Could not decode BMX frame ${index}.`,
+        );
+      }
+
+      try {
+        const started =
+          performance.now();
+
+        const masks =
+          seed
+            ? await adapter.seedSubjects!(
+                decoded.frame,
+                subjects,
+                index,
+                timestamps.length,
+              )
+            : await adapter.trackSubjects!(
+                decoded.frame,
+                index,
+                timestamps.length,
+              );
+
+        trackingMs +=
+          performance.now() -
+          started;
+
+        if (masks.length !== 2) {
+          throw new Error(
+            `Expected two tracked subject masks at frame ${index}.`,
+          );
+        }
+
+        masksByFrame[index] =
+          masks.map(
+            (mask) =>
+              Uint8Array.from(
+                mask.logits,
+                (value) =>
+                  value > 0 ? 1 : 0,
+              ),
+          );
+      } finally {
+        decoded.close();
+      }
+    };
+
+    await capture(
+      seedIndex,
+      true,
+    );
+
+    for (
+      let index = seedIndex + 1;
+      index < timestamps.length;
+      index += 1
+    ) {
+      await capture(
+        index,
+        false,
+      );
+    }
+
+    adapter.rewindSubjects();
+
+    for (
+      let index = seedIndex - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      await capture(
+        index,
+        false,
+      );
+    }
+
+    if (
+      masksByFrame.some(
+        (masks) =>
+          masks === undefined,
+      )
+    ) {
+      throw new Error(
+        "Multi-subject tracking skipped a forward or backward frame.",
+      );
+    }
+
+    return {
+      variant,
+      subjects,
+      seedIndex,
+      trackingMs,
+      masksByFrame,
+    };
+  } finally {
+    source.close();
+    await adapter.close();
+  }
+};
+
+const compareMultiSubjectTracking =
+  async () => {
+    const response =
+      await fetch(
+        "/quality/bmx-trees.mp4",
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not load BMX video: HTTP ${response.status}.`,
+      );
+    }
+
+    const file =
+      new File(
+        [await response.blob()],
+        "bmx-trees.mp4",
+      );
+
+    const truth =
+      await truthMask(
+        "bmx-trees",
+        5,
+      );
+
+    const baseline =
+      await runMultiSubjectTracker(
+        file,
+        truth,
+        "baseline",
+      );
+
+    const fused =
+      await runMultiSubjectTracker(
+        file,
+        truth,
+        "fused-step",
+      );
+
+    const frameScores:
+      number[] = [];
+
+    for (
+      let index = 0;
+      index <
+      QUALITY_FRAME_COUNT;
+      index += 1
+    ) {
+      const baselineMasks =
+        baseline.masksByFrame[
+          index
+        ];
+
+      const fusedMasks =
+        fused.masksByFrame[
+          index
+        ];
+
+      if (
+        baselineMasks ===
+          undefined ||
+        fusedMasks ===
+          undefined
+      ) {
+        throw new Error(
+          `Missing multi-subject comparison frame ${index}.`,
+        );
+      }
+
+      for (
+        let subjectIndex = 0;
+        subjectIndex < 2;
+        subjectIndex += 1
+      ) {
+        const expected =
+          baselineMasks[
+            subjectIndex
+          ];
+
+        const actual =
+          fusedMasks[
+            subjectIndex
+          ];
+
+        if (
+          expected ===
+            undefined ||
+          actual ===
+            undefined ||
+          expected.length !==
+            actual.length
+        ) {
+          throw new Error(
+            `Multi-subject mask geometry changed at frame ${index}.`,
+          );
+        }
+
+        const iou =
+          binaryMaskIou(
+            actual,
+            expected,
+          );
+
+        if (iou < 0.98) {
+          throw new Error(
+            `Fused multi-subject mask diverged at frame ${index}, subject ${subjectIndex + 1}: IoU ${iou.toFixed(4)}.`,
+          );
+        }
+
+        frameScores.push(
+          iou,
+        );
+      }
+    }
+
+    const meanIou =
+      mean(frameScores);
+
+    if (meanIou < 0.995) {
+      throw new Error(
+        `Fused multi-subject mean parity fell to ${meanIou.toFixed(4)}.`,
+      );
+    }
+
+    return {
+      fixture:
+        "bmx-trees",
+      seedIndex:
+        baseline.seedIndex,
+      subjects:
+        baseline.subjects,
+      frameCount:
+        QUALITY_FRAME_COUNT,
+      meanParityIou:
+        meanIou,
+      worstParityIou:
+        Math.min(
+          ...frameScores,
+        ),
+      baselineTrackingMs:
+        baseline.trackingMs,
+      fusedTrackingMs:
+        fused.trackingMs,
+    };
+  };
+
 const main = async () => {
   const cases =
     [];
@@ -928,6 +1408,9 @@ const main = async () => {
     });
   }
 
+  const multiSubject =
+    await compareMultiSubjectTracking();
+
   const response =
     await fetch(
       "/result",
@@ -936,8 +1419,9 @@ const main = async () => {
           "POST",
         body:
           JSON.stringify({
-            schemaVersion: 1,
+            schemaVersion: 2,
             cases,
+            multiSubject,
           }),
       },
     );
