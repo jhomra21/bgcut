@@ -995,6 +995,67 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 
       const mse = squaredError / (result.width * result.height * 3);
 
+      if (
+        (
+          name ===
+            "sixty" ||
+          name ===
+            "bear"
+        ) &&
+        alphaFrames.length >
+        0
+      ) {
+        const firstAlpha =
+          alphaFrames[0];
+
+        if (
+          firstAlpha ===
+          undefined
+        ) {
+          throw new Error(
+            "Missing raw alpha reference frame.",
+          );
+        }
+
+        let transparentPixels =
+          0;
+
+        let foregroundPixels =
+          0;
+
+        for (
+          const alpha of
+          firstAlpha
+        ) {
+          if (
+            alpha <
+            32
+          ) {
+            transparentPixels +=
+              1;
+          }
+
+          if (
+            alpha >
+            223
+          ) {
+            foregroundPixels +=
+              1;
+          }
+        }
+
+        if (
+          transparentPixels ===
+            0 ||
+          foregroundPixels ===
+            0
+        ) {
+          throw new Error(
+            `Raw segmentation frame is not a foreground/transparent matte: ${transparentPixels} transparent, ${foregroundPixels} foreground.`,
+          );
+        }
+      }
+
       let referenceMaskMeanAbsoluteError:
         number |
         undefined;
@@ -1335,6 +1396,21 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
                 score.boundaryF,
             ),
           );
+
+        if (
+          configuration.trackingFrameRate ===
+            undefined &&
+          (
+            davisMeanIou <
+              0.85 ||
+            davisMeanBoundaryF <
+              0.85
+          )
+        ) {
+          throw new Error(
+            `Full-cadence bear quality regressed: IoU ${davisMeanIou.toFixed(3)}, boundary F ${davisMeanBoundaryF.toFixed(3)}.`,
+          );
+        }
       }
 
       cases.push({
