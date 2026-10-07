@@ -1066,21 +1066,69 @@ export const createSam21Adapter =
     return {
       candidate,
 
-      async prepareFrame(frame) {
-        if (seedFrame !== frame || seedVision === undefined) {
-          seedVision = await encode(frame);
-          seedFrame = frame;
+      async prepareFrame(
+        frame,
+      ) {
+        const encodeStartedAt =
+          performance.now();
+
+        if (
+          seedFrame !==
+            frame ||
+          seedVision ===
+            undefined
+        ) {
+          seedVision =
+            await encode(
+              frame,
+            );
+
+          seedFrame =
+            frame;
         }
 
-        if (!promptPipelineWarm) {
+        const encodedAt =
+          performance.now();
+
+        let promptWarmMs =
+          0;
+
+        if (
+          !promptPipelineWarm
+        ) {
+          const promptStartedAt =
+            performance.now();
+
           await decode(
-            seedVision, seedVision.feats2NoMemory,
-            pointPromptTensors([{ x: 0.5, y: 0.5, label: 1 }], candidate.inputSize),
+            seedVision,
+            seedVision.feats2NoMemory,
+            pointPromptTensors(
+              [
+                {
+                  x: 0.5,
+                  y: 0.5,
+                  label: 1,
+                },
+              ],
+              candidate.inputSize,
+            ),
           );
 
+          promptWarmMs =
+            performance.now() -
+            promptStartedAt;
+
           // Selection preview only needs vision + prompt decoding. Temporal memory warms during export.
-          promptPipelineWarm = true;
+          promptPipelineWarm =
+            true;
         }
+
+        return {
+          encodeMs:
+            encodedAt -
+            encodeStartedAt,
+          promptWarmMs,
+        };
       },
 
       async prepareTracking() {
