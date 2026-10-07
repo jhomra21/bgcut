@@ -777,20 +777,75 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
                 12,
             },
           ]
-        : [
-            {
-              frameRate:
-                "source" as const,
-              trackingFrameRate:
-                undefined,
-            },
-            {
-              frameRate:
-                6 as const,
-              trackingFrameRate:
-                undefined,
-            },
-          ];
+        : name ===
+          "bear"
+          ? [
+              {
+                frameRate:
+                  "source" as const,
+                trackingFrameRate:
+                  undefined,
+              },
+              {
+                frameRate:
+                  "source" as const,
+                trackingFrameRate:
+                  12,
+              },
+              {
+                frameRate:
+                  "source" as const,
+                trackingFrameRate:
+                  8,
+              },
+              {
+                frameRate:
+                  "source" as const,
+                trackingFrameRate:
+                  6,
+              },
+              {
+                frameRate:
+                  6 as const,
+                trackingFrameRate:
+                  undefined,
+              },
+            ]
+          : [
+              {
+                frameRate:
+                  "source" as const,
+                trackingFrameRate:
+                  undefined,
+              },
+              {
+                frameRate:
+                  6 as const,
+                trackingFrameRate:
+                  undefined,
+              },
+            ];
+
+    const cadenceTruths =
+      name ===
+      "bear"
+        ? await Promise.all(
+            Array.from(
+              {
+                length:
+                  QUALITY_FRAME_COUNT,
+              },
+              (
+                _,
+                index,
+              ) =>
+                truthMask(
+                  "bear",
+                  index,
+                ),
+            ),
+          )
+        : undefined;
 
     let referenceAlphaFrames:
       readonly Uint8Array[] |
@@ -853,7 +908,9 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 
           if (
             name ===
-            "sixty"
+              "sixty" ||
+            name ===
+              "bear"
           ) {
             const alpha =
               new Uint8Array(
@@ -936,15 +993,29 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         undefined;
 
       if (
-        name ===
-        "sixty"
+        (
+          name ===
+            "sixty" ||
+          (
+            name ===
+              "bear" &&
+            frameRate ===
+              "source"
+          )
+        )
       ) {
+        const expectedAlphaFrames =
+          name ===
+          "sixty"
+            ? 60
+            : 24;
+
         if (
           alphaFrames.length !==
-          60
+          expectedAlphaFrames
         ) {
           throw new Error(
-            `60 fps mask comparison captured ${alphaFrames.length} frames instead of 60.`,
+            `Tracking-cadence mask comparison captured ${alphaFrames.length} frames instead of ${expectedAlphaFrames}.`,
           );
         }
 
@@ -1087,6 +1158,170 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         }
       }
 
+      let davisMeanIou:
+        number |
+        undefined;
+
+      let davisWorstIou:
+        number |
+        undefined;
+
+      let davisMeanBoundaryF:
+        number |
+        undefined;
+
+      let davisWorstBoundaryF:
+        number |
+        undefined;
+
+      if (
+        name ===
+          "bear" &&
+        frameRate ===
+          "source" &&
+        cadenceTruths !==
+          undefined
+      ) {
+        const scores =
+          alphaFrames
+            .slice(
+              0,
+              cadenceTruths.length,
+            )
+            .map(
+              (
+                alpha,
+                index,
+              ) => {
+                const truth =
+                  cadenceTruths[
+                    index
+                  ];
+
+                if (
+                  truth ===
+                  undefined
+                ) {
+                  throw new Error(
+                    `Missing DAVIS cadence truth frame ${index}.`,
+                  );
+                }
+
+                const predicted =
+                  Uint8Array.from(
+                    {
+                      length:
+                        truth.width *
+                        truth.height,
+                    },
+                    (
+                      _,
+                      pixel,
+                    ) => {
+                      const x =
+                        Math.min(
+                          result.width -
+                            1,
+                          Math.floor(
+                            (
+                              pixel %
+                              truth.width
+                            ) *
+                              result.width /
+                              truth.width,
+                          ),
+                        );
+
+                      const y =
+                        Math.min(
+                          result.height -
+                            1,
+                          Math.floor(
+                            Math.floor(
+                              pixel /
+                              truth.width,
+                            ) *
+                              result.height /
+                              truth.height,
+                          ),
+                        );
+
+                      return (
+                        alpha[
+                          y *
+                            result.width +
+                            x
+                        ] ??
+                        0
+                      ) >=
+                      128
+                        ? 1
+                        : 0;
+                    },
+                  );
+
+                return {
+                  iou:
+                    binaryMaskIou(
+                      predicted,
+                      truth.mask,
+                    ),
+                  boundaryF:
+                    davisBoundaryF(
+                      predicted,
+                      truth.mask,
+                      truth.width,
+                      truth.height,
+                    ),
+                };
+              },
+            );
+
+        davisMeanIou =
+          scores.reduce(
+            (
+              total,
+              score,
+            ) =>
+              total +
+              score.iou,
+            0,
+          ) /
+          scores.length;
+
+        davisWorstIou =
+          Math.min(
+            ...scores.map(
+              (
+                score,
+              ) =>
+                score.iou,
+            ),
+          );
+
+        davisMeanBoundaryF =
+          scores.reduce(
+            (
+              total,
+              score,
+            ) =>
+              total +
+              score.boundaryF,
+            0,
+          ) /
+          scores.length;
+
+        davisWorstBoundaryF =
+          Math.min(
+            ...scores.map(
+              (
+                score,
+              ) =>
+                score.boundaryF,
+            ),
+          );
+      }
+
       cases.push({
         frameRate,
         trackingFrameRate:
@@ -1102,6 +1337,10 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         referenceMaskMeanAbsoluteError,
         referenceMaskMeanIou,
         referenceMaskWorstIou,
+        davisMeanIou,
+        davisWorstIou,
+        davisMeanBoundaryF,
+        davisWorstBoundaryF,
         timestamps: decoded.timestamps, timings: result.timings,
       });
     }
