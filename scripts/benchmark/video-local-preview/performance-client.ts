@@ -12,10 +12,7 @@ const save = async (name: string, blob: Blob) => {
   if (!response.ok) throw new Error(await response.text());
 };
 
-const inspect = async (
-  blob: Blob,
-  sampleTimes: readonly number[] = [],
-) => {
+const inspect = async (blob: Blob) => {
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
 
   try {
@@ -36,65 +33,11 @@ const inspect = async (
 
     if (pixels === undefined) throw new Error("Export cannot be read.");
 
-    const samples:
-      Uint8ClampedArray[] =
-        [];
-
-    for (
-      const time of
-      sampleTimes
-    ) {
-      const sample =
-        await new CanvasSink(
-          track,
-          {
-            alpha: true,
-          },
-        ).getCanvas(
-          time,
-        );
-
-      if (
-        sample ===
-        null
-      ) {
-        throw new Error(
-          `Export cannot decode sample at ${time}.`,
-        );
-      }
-
-      const samplePixels =
-        sample.canvas
-          .getContext(
-            "2d",
-          )
-          ?.getImageData(
-            0,
-            0,
-            sample.canvas.width,
-            sample.canvas.height,
-          ).data;
-
-      if (
-        samplePixels ===
-        undefined
-      ) {
-        throw new Error(
-          `Export sample at ${time} cannot be read.`,
-        );
-      }
-
-      samples.push(
-        samplePixels,
-      );
-    }
-
     return {
       count: timestamps.length, timestamps, duration: await input.computeDuration(), codec: track.codec,
       width: canvas.canvas.width, height: canvas.canvas.height,
       transparent: pixels.filter((value, index) => index % 4 === 3 && value < 32).length,
       pixels,
-      samples,
     };
   } finally {
     input.dispose();
@@ -349,22 +292,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
             },
           ];
 
-    const comparisonTimes =
-      Array.from(
-        {
-          length:
-            60,
-        },
-        (
-          _,
-          index,
-        ) =>
-          index /
-          60,
-      );
-
-    let referenceSamples:
-      readonly Uint8ClampedArray[] |
+    let referenceAlphaFrames:
+      readonly Uint8Array[] |
       undefined;
 
     for (
@@ -375,7 +304,13 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         configuration.frameRate;
 
       let firstFrame: Uint8ClampedArray | undefined;
+
+      const alphaFrames:
+        Uint8Array[] =
+          [];
+
       const stages: Partial<Record<string, number>> = {};
+
       started = performance.now();
 
       const result = await editor.run({
@@ -387,7 +322,64 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         export: { start: 0, end: 1, frameRate, format: "mp4", quality: frameRate === 6 ? "medium" : "high" },
         onProgress: (update) => { stages[update.stage] ??= performance.now() - started; },
         onFrame: (canvas, index) => {
-          if (index === 0) firstFrame = canvas.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data;
+          const pixels =
+            canvas
+              .getContext(
+                "2d",
+              )
+              ?.getImageData(
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+              ).data;
+
+          if (
+            pixels ===
+            undefined
+          ) {
+            throw new Error(
+              "Could not inspect composited output frame.",
+            );
+          }
+
+          if (
+            index ===
+            0
+          ) {
+            firstFrame =
+              pixels;
+          }
+
+          if (
+            name ===
+            "sixty"
+          ) {
+            const alpha =
+              new Uint8Array(
+                canvas.width *
+                  canvas.height,
+              );
+
+            for (
+              let pixel = 0;
+              pixel <
+              alpha.length;
+              pixel += 1
+            ) {
+              alpha[pixel] =
+                pixels[
+                  pixel *
+                    4 +
+                    3
+                ] ??
+                0;
+            }
+
+            alphaFrames.push(
+              alpha,
+            );
+          }
         },
       });
 
@@ -411,10 +403,6 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       const decoded =
         await inspect(
           result.blob,
-          name ===
-            "sixty"
-            ? comparisonTimes
-            : [],
         );
 
       const expected = name === "sixty" ? 60 : frameRate === 6 ? 6 : 24;
@@ -435,15 +423,15 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 
       const mse = squaredError / (result.width * result.height * 3);
 
-      let referencePsnr:
+      let referenceMaskMeanAbsoluteError:
         number |
         undefined;
 
-      let referenceMeanFramePsnr:
+      let referenceMaskMeanIou:
         number |
         undefined;
 
-      let referenceWorstFramePsnr:
+      let referenceMaskWorstIou:
         number |
         undefined;
 
@@ -452,157 +440,149 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         "sixty"
       ) {
         if (
-          referenceSamples ===
+          alphaFrames.length !==
+          60
+        ) {
+          throw new Error(
+            `60 fps mask comparison captured ${alphaFrames.length} frames instead of 60.`,
+          );
+        }
+
+        if (
+          referenceAlphaFrames ===
           undefined
         ) {
-          referenceSamples =
-            decoded.samples;
+          referenceAlphaFrames =
+            alphaFrames;
         } else {
-          let referenceSquaredError =
+          let absoluteError =
             0;
 
-          let referenceChannels =
+          let alphaSamples =
             0;
 
-          const framePsnr:
+          const frameIou:
             number[] =
               [];
 
           for (
-            let sampleIndex = 0;
-            sampleIndex <
-            decoded.samples.length;
-            sampleIndex += 1
+            let frame = 0;
+            frame <
+            alphaFrames.length;
+            frame += 1
           ) {
-            const sample =
-              decoded.samples[
-                sampleIndex
+            const alpha =
+              alphaFrames[
+                frame
               ];
 
             const reference =
-              referenceSamples[
-                sampleIndex
+              referenceAlphaFrames[
+                frame
               ];
 
             if (
-              sample ===
+              alpha ===
                 undefined ||
               reference ===
                 undefined ||
-              sample.length !==
+              alpha.length !==
                 reference.length
             ) {
               throw new Error(
-                "Tracking-cadence comparison samples do not align.",
+                "Tracking-cadence alpha frames do not align.",
               );
             }
 
-            let frameSquaredError =
+            let intersection =
               0;
 
-            let frameChannels =
+            let union =
               0;
 
             for (
-              let index = 0;
-              index <
-              sample.length;
-              index += 1
+              let pixel = 0;
+              pixel <
+              alpha.length;
+              pixel += 1
             ) {
-              if (
-                index %
-                  4 ===
-                3
-              ) {
-                continue;
-              }
+              const actual =
+                alpha[
+                  pixel
+                ] ??
+                0;
 
-              const difference =
-                (
-                  sample[
-                    index
-                  ] ??
-                  0
-                ) -
-                (
-                  reference[
-                    index
-                  ] ??
-                  0
+              const expectedAlpha =
+                reference[
+                  pixel
+                ] ??
+                0;
+
+              absoluteError +=
+                Math.abs(
+                  actual -
+                    expectedAlpha,
                 );
 
-              const squared =
-                difference **
-                2;
-
-              referenceSquaredError +=
-                squared;
-
-              frameSquaredError +=
-                squared;
-
-              referenceChannels +=
+              alphaSamples +=
                 1;
 
-              frameChannels +=
-                1;
+              const actualForeground =
+                actual >=
+                128;
+
+              const expectedForeground =
+                expectedAlpha >=
+                128;
+
+              if (
+                actualForeground &&
+                expectedForeground
+              ) {
+                intersection +=
+                  1;
+              }
+
+              if (
+                actualForeground ||
+                expectedForeground
+              ) {
+                union +=
+                  1;
+              }
             }
 
-            const frameMse =
-              frameSquaredError /
-              frameChannels;
-
-            framePsnr.push(
-              frameMse ===
+            frameIou.push(
+              union ===
                 0
-                ? Number.POSITIVE_INFINITY
-                : 10 *
-                  Math.log10(
-                    255 **
-                      2 /
-                      frameMse,
-                  ),
+                ? 1
+                : intersection /
+                  union,
             );
           }
 
-          const referenceMse =
-            referenceSquaredError /
-            referenceChannels;
-
-          referencePsnr =
-            referenceMse ===
-            0
-              ? Number.POSITIVE_INFINITY
-              : 10 *
-                Math.log10(
-                  255 **
-                    2 /
-                    referenceMse,
-                );
-
-          const finiteFramePsnr =
-            framePsnr.filter(
-              Number.isFinite,
+          referenceMaskMeanAbsoluteError =
+            absoluteError /
+            (
+              alphaSamples *
+              255
             );
 
-          referenceMeanFramePsnr =
-            finiteFramePsnr.length ===
-              0
-              ? Number.POSITIVE_INFINITY
-              : finiteFramePsnr.reduce(
-                  (
-                    total,
-                    value,
-                  ) =>
-                    total +
-                    value,
-                  0,
-                ) /
-                finiteFramePsnr.length;
+          referenceMaskMeanIou =
+            frameIou.reduce(
+              (
+                total,
+                value,
+              ) =>
+                total +
+                value,
+              0,
+            ) /
+            frameIou.length;
 
-          referenceWorstFramePsnr =
+          referenceMaskWorstIou =
             Math.min(
-              ...framePsnr,
+              ...frameIou,
             );
         }
       }
@@ -619,9 +599,9 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         trackingFps: Math.max(0, result.trackingFrameCount - 1) / (result.timings.trackingMs / 1000),
         totalMs, stages, bytes: result.blob.size, width: result.width, height: result.height,
         decodedDuration: decoded.duration, rgbSum, psnr: 10 * Math.log10(255 ** 2 / mse),
-        referencePsnr,
-        referenceMeanFramePsnr,
-        referenceWorstFramePsnr,
+        referenceMaskMeanAbsoluteError,
+        referenceMaskMeanIou,
+        referenceMaskWorstIou,
         timestamps: decoded.timestamps, timings: result.timings,
       });
     }
