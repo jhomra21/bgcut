@@ -517,6 +517,63 @@ export const createSam21Adapter =
         candidate,
       );
 
+    const timingTotals:
+      Record<
+        string,
+        {
+          calls: number;
+          totalMs: number;
+        }
+      > = {};
+
+    const recordTiming = (
+      stage: string,
+      startedAt: number,
+    ) => {
+      const current =
+        timingTotals[
+          stage
+        ] ?? {
+          calls: 0,
+          totalMs: 0,
+        };
+
+      current.calls +=
+        1;
+
+      current.totalMs +=
+        performance.now() -
+        startedAt;
+
+      timingTotals[
+        stage
+      ] =
+        current;
+    };
+
+    const timingSnapshot =
+      () =>
+        Object.fromEntries(
+          Object.entries(
+            timingTotals,
+          ).map(
+            (
+              [
+                stage,
+                timing,
+              ],
+            ) => [
+              stage,
+              {
+                calls:
+                  timing.calls,
+                totalMs:
+                  timing.totalMs,
+              },
+            ],
+          ),
+        );
+
     const roles =
       [
         "vision-encoder",
@@ -700,25 +757,36 @@ export const createSam21Adapter =
       async (
         frame: VideoFrame,
       ): Promise<SamVision> => {
+        const pixelValues =
+          new ort.Tensor(
+            "float32",
+            frameToNchw(
+              frame,
+              candidate.inputSize,
+              constants.image_mean,
+              constants.image_std,
+            ),
+            [
+              1,
+              3,
+              candidate.inputSize,
+              candidate.inputSize,
+            ],
+          );
+
+        const runStartedAt =
+          performance.now();
+
         const outputs =
           await promptSessions.visionEncoder.run({
             pixel_values:
-              new ort.Tensor(
-                "float32",
-                frameToNchw(
-                  frame,
-                  candidate.inputSize,
-                  constants.image_mean,
-                  constants.image_std,
-                ),
-                [
-                  1,
-                  3,
-                  candidate.inputSize,
-                  candidate.inputSize,
-                ],
-              ),
+              pixelValues,
           });
+
+        recordTiming(
+          "vision-encoder",
+          runStartedAt,
+        );
 
         return {
           feats0:
@@ -799,8 +867,11 @@ export const createSam21Adapter =
           ReturnType<
             typeof pointPromptTensors
           >,
-      ): Promise<SamDecoded> =>
-        decodedMask(
+      ): Promise<SamDecoded> => {
+        const runStartedAt =
+          performance.now();
+
+        const outputs =
           await promptSessions.maskDecoder.run({
             feats0:
               vision.feats0,
@@ -812,8 +883,17 @@ export const createSam21Adapter =
               prompt.points,
             input_labels:
               prompt.labels,
-          }),
+          });
+
+        recordTiming(
+          "mask-decoder",
+          runStartedAt,
         );
+
+        return decodedMask(
+          outputs,
+        );
+      };
 
     const remember =
       async (
@@ -827,43 +907,55 @@ export const createSam21Adapter =
         const trackingSessions =
           await getTrackingSessions();
 
+        const memoryInputs = {
+          feats2:
+            vision.feats2,
+          high_res_mask:
+            new ort.Tensor(
+              "float32",
+              decoded.highResolution,
+              [
+                1,
+                1,
+                candidate.inputSize,
+                candidate.inputSize,
+              ],
+            ),
+          object_score_logits:
+            new ort.Tensor(
+              "float32",
+              Float32Array.of(
+                decoded.objectScore,
+              ),
+              [
+                1,
+                1,
+              ],
+            ),
+          binarize:
+            new ort.Tensor(
+              "float32",
+              Float32Array.of(
+                prompted
+                  ? 1
+                  : 0,
+              ),
+              [],
+            ),
+        };
+
+        const runStartedAt =
+          performance.now();
+
         const outputs =
-          await trackingSessions.memoryEncoder.run({
-            feats2:
-              vision.feats2,
-            high_res_mask:
-              new ort.Tensor(
-                "float32",
-                decoded.highResolution,
-                [
-                  1,
-                  1,
-                  candidate.inputSize,
-                  candidate.inputSize,
-                ],
-              ),
-            object_score_logits:
-              new ort.Tensor(
-                "float32",
-                Float32Array.of(
-                  decoded.objectScore,
-                ),
-                [
-                  1,
-                  1,
-                ],
-              ),
-            binarize:
-              new ort.Tensor(
-                "float32",
-                Float32Array.of(
-                  prompted
-                    ? 1
-                    : 0,
-                ),
-                [],
-              ),
-          });
+          await trackingSessions.memoryEncoder.run(
+            memoryInputs,
+          );
+
+        recordTiming(
+          "memory-encoder",
+          runStartedAt,
+        );
 
         const tokens =
           floatData(
@@ -978,17 +1070,29 @@ export const createSam21Adapter =
             totalFrames,
           );
 
+        const pointerInputs = {
+          normalized_diffs:
+            new ort.Tensor(
+              "float32",
+              assembled.normalizedPointerDiffs,
+              [
+                MAX_POINTERS,
+              ],
+            ),
+        };
+
+        let runStartedAt =
+          performance.now();
+
         const pointerOutput =
-          await trackingSessions.pointerTpos.run({
-            normalized_diffs:
-              new ort.Tensor(
-                "float32",
-                assembled.normalizedPointerDiffs,
-                [
-                  MAX_POINTERS,
-                ],
-              ),
-          });
+          await trackingSessions.pointerTpos.run(
+            pointerInputs,
+          );
+
+        recordTiming(
+          "pointer-tpos",
+          runStartedAt,
+        );
 
         const pointerPositions =
           expandPointerPositions(
@@ -1017,63 +1121,75 @@ export const createSam21Adapter =
           );
         }
 
+        const attentionInputs = {
+          current_vision_features:
+            new ort.Tensor(
+              "float32",
+              channelsToTokens(
+                floatData(
+                  vision.feats2,
+                  "SAM 2.1 feats2",
+                ),
+                FEATURE_CHANNELS,
+                featureTokens,
+              ),
+              [
+                featureTokens,
+                1,
+                FEATURE_CHANNELS,
+              ],
+            ),
+          current_vision_position_embeddings:
+            new ort.Tensor(
+              "float32",
+              channelsToTokens(
+                floatData(
+                  vision.position,
+                  "SAM 2.1 vision_pos_embed",
+                ),
+                FEATURE_CHANNELS,
+                featureTokens,
+              ),
+              [
+                featureTokens,
+                1,
+                FEATURE_CHANNELS,
+              ],
+            ),
+          memory:
+            new ort.Tensor(
+              "float32",
+              assembled.memory,
+              [
+                memoryRows,
+                1,
+                MEMORY_DIMENSION,
+              ],
+            ),
+          memory_pos:
+            new ort.Tensor(
+              "float32",
+              memoryPositions,
+              [
+                memoryRows,
+                1,
+                MEMORY_DIMENSION,
+              ],
+            ),
+        };
+
+        runStartedAt =
+          performance.now();
+
         const attention =
-          await trackingSessions.memoryAttention.run({
-            current_vision_features:
-              new ort.Tensor(
-                "float32",
-                channelsToTokens(
-                  floatData(
-                    vision.feats2,
-                    "SAM 2.1 feats2",
-                  ),
-                  FEATURE_CHANNELS,
-                  featureTokens,
-                ),
-                [
-                  featureTokens,
-                  1,
-                  FEATURE_CHANNELS,
-                ],
-              ),
-            current_vision_position_embeddings:
-              new ort.Tensor(
-                "float32",
-                channelsToTokens(
-                  floatData(
-                    vision.position,
-                    "SAM 2.1 vision_pos_embed",
-                  ),
-                  FEATURE_CHANNELS,
-                  featureTokens,
-                ),
-                [
-                  featureTokens,
-                  1,
-                  FEATURE_CHANNELS,
-                ],
-              ),
-            memory:
-              new ort.Tensor(
-                "float32",
-                assembled.memory,
-                [
-                  memoryRows,
-                  1,
-                  MEMORY_DIMENSION,
-                ],
-              ),
-            memory_pos:
-              new ort.Tensor(
-                "float32",
-                memoryPositions,
-                [
-                  memoryRows,
-                  1,
-                  MEMORY_DIMENSION,
-                ],
-              ),
-          });
+          await trackingSessions.memoryAttention.run(
+            attentionInputs,
+          );
+
+        recordTiming(
+          "memory-attention",
+          runStartedAt,
+        );
 
         const conditioned =
           requireTensor(
@@ -1126,6 +1242,7 @@ export const createSam21Adapter =
 
     return {
       candidate,
+      timingSnapshot,
 
       async prepareFrame(
         frame,
