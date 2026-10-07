@@ -61,6 +61,39 @@ type TrackerVariant =
   | "decoder-memory"
   | "fused-step";
 
+const VARIANT_ORDER_BY_FIXTURE = {
+  bear: [
+    "baseline",
+    "decoder",
+    "decoder-memory",
+    "fused-step",
+  ],
+  blackswan: [
+    "decoder",
+    "decoder-memory",
+    "fused-step",
+    "baseline",
+  ],
+  camel: [
+    "decoder-memory",
+    "fused-step",
+    "baseline",
+    "decoder",
+  ],
+  "car-shadow": [
+    "fused-step",
+    "baseline",
+    "decoder",
+    "decoder-memory",
+  ],
+} as const satisfies
+  Readonly<
+    Record<
+      (typeof FIXTURES)[number],
+      readonly TrackerVariant[]
+    >
+  >;
+
 const truthMask = async (
   fixture:
     QualityFixtureId,
@@ -752,39 +785,75 @@ const main = async () => {
         truths[0]!,
       );
 
+    const order =
+      VARIANT_ORDER_BY_FIXTURE[
+        fixture
+      ];
+
+    const results =
+      new Map<
+        TrackerVariant,
+        Awaited<
+          ReturnType<
+            typeof runTracker
+          >
+        >
+      >();
+
+    for (
+      const variant of
+      order
+    ) {
+      results.set(
+        variant,
+        await runTracker(
+          fixture,
+          file,
+          truths,
+          point,
+          variant,
+        ),
+      );
+    }
+
+    const requireResult = (
+      variant:
+        TrackerVariant,
+    ) => {
+      const result =
+        results.get(
+          variant,
+        );
+
+      if (
+        result ===
+        undefined
+      ) {
+        throw new Error(
+          `Missing ${fixture} ${variant} result.`,
+        );
+      }
+
+      return result;
+    };
+
     const baseline =
-      await runTracker(
-        fixture,
-        file,
-        truths,
-        point,
+      requireResult(
         "baseline",
       );
 
     const decoder =
-      await runTracker(
-        fixture,
-        file,
-        truths,
-        point,
+      requireResult(
         "decoder",
       );
 
     const decoderMemory =
-      await runTracker(
-        fixture,
-        file,
-        truths,
-        point,
+      requireResult(
         "decoder-memory",
       );
 
     const fusedStep =
-      await runTracker(
-        fixture,
-        file,
-        truths,
-        point,
+      requireResult(
         "fused-step",
       );
 
@@ -833,6 +902,7 @@ const main = async () => {
     cases.push({
       fixture,
       point,
+      order,
       baseline,
       decoder: {
         result:
