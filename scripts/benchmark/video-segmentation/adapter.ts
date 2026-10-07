@@ -14,7 +14,6 @@ export const createVideoSegmentationAdapter:
   (
     candidate,
     onProgress,
-    options,
   ) => {
     switch (
       candidate.id
@@ -29,7 +28,6 @@ export const createVideoSegmentationAdapter:
         return createSam21Adapter(
           candidate,
           onProgress,
-          options,
         );
     }
   };
