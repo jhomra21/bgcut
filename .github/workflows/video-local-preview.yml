@@ -226,6 +226,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
       - run: bun install --frozen-lockfile
 
       - name: Measure local video performance
@@ -235,6 +236,13 @@ jobs:
 
           ROOT="$RUNNER_TEMP/video-local-performance"
           mkdir -p "$ROOT"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-decoder.py \
+            "$ROOT/sam21-tracked-mask-decoder.onnx" \
+            >"$ROOT/sam21-tracked-mask-decoder.json"
+
+          test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
+          test -s "$ROOT/sam21-tracked-mask-decoder.json"
 
           bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4197 performance >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
