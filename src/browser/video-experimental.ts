@@ -29,6 +29,7 @@ import type {
   VideoPointPrompt,
   DecodedVideoFrame,
   VideoSegmentationAdapter,
+  VideoSegmentationAdapterOptions,
   VideoSegmentationDiscovery,
   VideoSegmentationMask,
   VideoSegmentationMaskAlternative,
@@ -1511,7 +1512,11 @@ export const checkVideoEncoding = (file: File, settings: VideoExportSettings) =>
 const selectionGate = Semaphore.makeUnsafe(1);
 
 /** One editor owns one SAM stack. Preview, tracking and disposal never overlap. */
-export const createVideoSelection = (file: File) => {
+export const createVideoSelection = (
+  file: File,
+  adapterOptions?:
+    VideoSegmentationAdapterOptions,
+) => {
   let segmenter: VideoSegmentationAdapter | undefined;
   let modelScope = Scope.makeUnsafe();
   let disposed = false;
@@ -1534,11 +1539,26 @@ export const createVideoSelection = (file: File) => {
   const getSegmenter = async (onProgress?: (value: number) => void) => {
     segmenter ??= await Effect.runPromise(Effect.acquireRelease(
       Effect.tryPromise({
-        try: () => createVideoSegmentationAdapter(VIDEO_SEGMENTATION_CANDIDATES["sam21-tiny"], (value) => {
-          if (disposed) throw new VideoExportError({ message: "The video editor was closed." });
+        try: () => createVideoSegmentationAdapter(
+          VIDEO_SEGMENTATION_CANDIDATES[
+            "sam21-tiny"
+          ],
+          (value) => {
+            if (
+              disposed
+            ) {
+              throw new VideoExportError({
+                message:
+                  "The video editor was closed.",
+              });
+            }
 
-          onProgress?.(value);
-        }),
+            onProgress?.(
+              value,
+            );
+          },
+          adapterOptions,
+        ),
         catch: (cause) => new VideoExportError({
           message: cause instanceof Error ? cause.message : String(cause),
         }),
