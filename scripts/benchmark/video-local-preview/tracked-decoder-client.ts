@@ -55,15 +55,11 @@ const SPECIALIZED_MEMORY_ENCODER =
 const SPECIALIZED_TRACKED_STEP =
   "/specialized/sam21-tracked-step.onnx";
 
-const SPECIALIZED_TRACKED_ATTENTION_STEP =
-  "/specialized/sam21-tracked-attention-step.onnx";
-
 type TrackerVariant =
   | "baseline"
   | "decoder"
   | "decoder-memory"
-  | "fused-step"
-  | "fused-attention-step";
+  | "fused-step";
 
 const truthMask = async (
   fixture:
@@ -439,13 +435,6 @@ const runTracker = async (
         }),
       ),
       Match.when(
-        "fused-attention-step",
-        () => ({
-          trackedAttentionStepUrl:
-            SPECIALIZED_TRACKED_ATTENTION_STEP,
-        }),
-      ),
-      Match.when(
         "decoder-memory",
         () => ({
           trackedMaskDecoderUrl:
@@ -799,15 +788,6 @@ const main = async () => {
         "fused-step",
       );
 
-    const fusedAttentionStep =
-      await runTracker(
-        fixture,
-        file,
-        truths,
-        point,
-        "fused-attention-step",
-      );
-
     const compare = (
       candidate:
         typeof decoder,
@@ -873,13 +853,6 @@ const main = async () => {
           fusedStep,
         ...compare(
           fusedStep,
-        ),
-      },
-      fusedAttentionStep: {
-        result:
-          fusedAttentionStep,
-        ...compare(
-          fusedAttentionStep,
         ),
       },
     });
