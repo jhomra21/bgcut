@@ -376,8 +376,14 @@ jobs:
             "$ROOT/sam21-tracked-mask-decoder.onnx" \
             >"$ROOT/sam21-tracked-mask-decoder.json"
 
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-memory-encoder.py \
+            "$ROOT/sam21-tracked-memory-encoder.onnx" \
+            >"$ROOT/sam21-tracked-memory-encoder.json"
+
           test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
           test -s "$ROOT/sam21-tracked-mask-decoder.json"
+          test -s "$ROOT/sam21-tracked-memory-encoder.onnx"
+          test -s "$ROOT/sam21-tracked-memory-encoder.json"
 
           bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4198 tracked-decoder >"$ROOT/server.log" 2>&1 &
           SERVER_PID=$!
