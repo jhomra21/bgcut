@@ -187,6 +187,10 @@ export const createVideoSession =
   async (
     candidate: VideoSegmentationCandidate,
     role: VideoModelGraphRole,
+    preferredOutputLocation?:
+      ort.InferenceSession.SessionOptions[
+        "preferredOutputLocation"
+      ],
   ): Promise<ort.InferenceSession> => {
     const artifact =
       artifactFor(
@@ -262,6 +266,14 @@ export const createVideoSession =
         graphOptimizationLevel:
           "all",
       };
+
+    if (
+      preferredOutputLocation !==
+      undefined
+    ) {
+      sessionOptions.preferredOutputLocation =
+        preferredOutputLocation;
+    }
 
     if (
       externalData.length >
