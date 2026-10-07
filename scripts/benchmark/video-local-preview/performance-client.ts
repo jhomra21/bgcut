@@ -12,7 +12,10 @@ const save = async (name: string, blob: Blob) => {
   if (!response.ok) throw new Error(await response.text());
 };
 
-const inspect = async (blob: Blob) => {
+const inspect = async (
+  blob: Blob,
+  sampleTimes: readonly number[] = [],
+) => {
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
 
   try {
@@ -33,11 +36,65 @@ const inspect = async (blob: Blob) => {
 
     if (pixels === undefined) throw new Error("Export cannot be read.");
 
+    const samples:
+      Uint8ClampedArray[] =
+        [];
+
+    for (
+      const time of
+      sampleTimes
+    ) {
+      const sample =
+        await new CanvasSink(
+          track,
+          {
+            alpha: true,
+          },
+        ).getCanvas(
+          time,
+        );
+
+      if (
+        sample ===
+        null
+      ) {
+        throw new Error(
+          `Export cannot decode sample at ${time}.`,
+        );
+      }
+
+      const samplePixels =
+        sample.canvas
+          .getContext(
+            "2d",
+          )
+          ?.getImageData(
+            0,
+            0,
+            sample.canvas.width,
+            sample.canvas.height,
+          ).data;
+
+      if (
+        samplePixels ===
+        undefined
+      ) {
+        throw new Error(
+          `Export sample at ${time} cannot be read.`,
+        );
+      }
+
+      samples.push(
+        samplePixels,
+      );
+    }
+
     return {
       count: timestamps.length, timestamps, duration: await input.computeDuration(), codec: track.codec,
       width: canvas.canvas.width, height: canvas.canvas.height,
       transparent: pixels.filter((value, index) => index % 4 === 3 && value < 32).length,
       pixels,
+      samples,
     };
   } finally {
     input.dispose();
@@ -246,13 +303,85 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
     await editor.preview(seedTime, subjects, new AbortController().signal);
     const warmClickMs = performance.now() - started;
 
-    for (const frameRate of name === "sixty" ? ["source"] as const : ["source", 6] as const) {
+    const configurations =
+      name ===
+      "sixty"
+        ? [
+            {
+              frameRate:
+                "source" as const,
+              trackingFrameRate:
+                60,
+            },
+            {
+              frameRate:
+                "source" as const,
+              trackingFrameRate:
+                30,
+            },
+            {
+              frameRate:
+                "source" as const,
+              trackingFrameRate:
+                24,
+            },
+            {
+              frameRate:
+                "source" as const,
+              trackingFrameRate:
+                12,
+            },
+          ]
+        : [
+            {
+              frameRate:
+                "source" as const,
+              trackingFrameRate:
+                undefined,
+            },
+            {
+              frameRate:
+                6 as const,
+              trackingFrameRate:
+                undefined,
+            },
+          ];
+
+    const comparisonTimes =
+      Array.from(
+        {
+          length:
+            12,
+        },
+        (
+          _,
+          index,
+        ) =>
+          index /
+          12,
+      );
+
+    let referenceSamples:
+      readonly Uint8ClampedArray[] |
+      undefined;
+
+    for (
+      const configuration of
+      configurations
+    ) {
+      const frameRate =
+        configuration.frameRate;
+
       let firstFrame: Uint8ClampedArray | undefined;
       const stages: Partial<Record<string, number>> = {};
       started = performance.now();
 
       const result = await editor.run({
-        subjects, seedTimeSeconds: seedTime,
+        subjects,
+        seedTimeSeconds:
+          seedTime,
+        trackingFrameRate:
+          configuration.trackingFrameRate,
         export: { start: 0, end: 1, frameRate, format: "mp4", quality: frameRate === 6 ? "medium" : "high" },
         onProgress: (update) => { stages[update.stage] ??= performance.now() - started; },
         onFrame: (canvas, index) => {
@@ -266,8 +395,26 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
         throw new Error("Missing measured processing stages.");
       }
 
-      await save(`${name}-${frameRate}.mp4`, result.blob);
-      const decoded = await inspect(result.blob);
+      const trackingSuffix =
+        configuration.trackingFrameRate ===
+        undefined
+          ? ""
+          : `-track-${configuration.trackingFrameRate}`;
+
+      await save(
+        `${name}-${frameRate}${trackingSuffix}.mp4`,
+        result.blob,
+      );
+
+      const decoded =
+        await inspect(
+          result.blob,
+          name ===
+            "sixty"
+            ? comparisonTimes
+            : [],
+        );
+
       const expected = name === "sixty" ? 60 : frameRate === 6 ? 6 : 24;
 
       if (decoded.count !== expected || result.frameCount !== expected || new Set(decoded.timestamps).size !== expected) {
@@ -285,12 +432,123 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
       }
 
       const mse = squaredError / (result.width * result.height * 3);
+
+      let referencePsnr:
+        number |
+        undefined;
+
+      if (
+        name ===
+        "sixty"
+      ) {
+        if (
+          referenceSamples ===
+          undefined
+        ) {
+          referenceSamples =
+            decoded.samples;
+        } else {
+          let referenceSquaredError =
+            0;
+
+          let referenceChannels =
+            0;
+
+          for (
+            let sampleIndex = 0;
+            sampleIndex <
+            decoded.samples.length;
+            sampleIndex += 1
+          ) {
+            const sample =
+              decoded.samples[
+                sampleIndex
+              ];
+
+            const reference =
+              referenceSamples[
+                sampleIndex
+              ];
+
+            if (
+              sample ===
+                undefined ||
+              reference ===
+                undefined ||
+              sample.length !==
+                reference.length
+            ) {
+              throw new Error(
+                "Tracking-cadence comparison samples do not align.",
+              );
+            }
+
+            for (
+              let index = 0;
+              index <
+              sample.length;
+              index += 1
+            ) {
+              if (
+                index %
+                  4 ===
+                3
+              ) {
+                continue;
+              }
+
+              referenceSquaredError +=
+                (
+                  (
+                    sample[
+                      index
+                    ] ??
+                    0
+                  ) -
+                  (
+                    reference[
+                      index
+                    ] ??
+                    0
+                  )
+                ) **
+                2;
+
+              referenceChannels +=
+                1;
+            }
+          }
+
+          const referenceMse =
+            referenceSquaredError /
+            referenceChannels;
+
+          referencePsnr =
+            referenceMse ===
+            0
+              ? Number.POSITIVE_INFINITY
+              : 10 *
+                Math.log10(
+                  255 **
+                    2 /
+                    referenceMse,
+                );
+        }
+      }
+
       cases.push({
-        frameRate, frames: result.frameCount, outputFps: result.sampleFps,
+        frameRate,
+        trackingFrameRate:
+          configuration.trackingFrameRate,
+        frames: result.frameCount,
+        trackingFrames:
+          result.trackingFrameCount,
+        outputFps: result.sampleFps,
         processingFps: result.frameCount / (totalMs / 1000),
-        trackingFps: Math.max(0, result.frameCount - 1) / (result.timings.trackingMs / 1000),
+        trackingFps: Math.max(0, result.trackingFrameCount - 1) / (result.timings.trackingMs / 1000),
         totalMs, stages, bytes: result.blob.size, width: result.width, height: result.height,
         decodedDuration: decoded.duration, rgbSum, psnr: 10 * Math.log10(255 ** 2 / mse),
+        referencePsnr,
         timestamps: decoded.timestamps, timings: result.timings,
       });
     }
