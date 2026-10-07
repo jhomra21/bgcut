@@ -39,15 +39,24 @@ const POINTER_TOKENS =
 
 const RELIABLE_IOU = 0.25;
 
-const VISION_OUTPUTS = [
+const TRACKED_VISION_OUTPUTS = [
   "feats0",
   "feats1",
   "feats2",
+] as const;
+
+const PROMPT_VISION_OUTPUTS = [
+  ...TRACKED_VISION_OUTPUTS,
   "feats2_no_mem",
 ] as const;
 
-const VISION_OUTPUTS_WITH_POSITION = [
-  ...VISION_OUTPUTS,
+const TRACKED_VISION_OUTPUTS_WITH_POSITION = [
+  ...TRACKED_VISION_OUTPUTS,
+  "vision_pos_embed",
+] as const;
+
+const PROMPT_VISION_OUTPUTS_WITH_POSITION = [
+  ...PROMPT_VISION_OUTPUTS,
   "vision_pos_embed",
 ] as const;
 
@@ -84,7 +93,7 @@ type SamVision = {
   readonly feats0: ort.Tensor;
   readonly feats1: ort.Tensor;
   readonly feats2: ort.Tensor;
-  readonly feats2NoMemory:
+  readonly feats2NoMemory?:
     ort.Tensor;
   readonly position:
     Float32Array;
@@ -97,7 +106,7 @@ const disposeVision = (
   vision.feats0.dispose();
   vision.feats1.dispose();
   vision.feats2.dispose();
-  vision.feats2NoMemory.dispose();
+  vision.feats2NoMemory?.dispose();
 };
 
 type SamDecoded = {
@@ -849,6 +858,8 @@ export const createSam21Adapter =
     const encode =
       async (
         frame: VideoFrame,
+        includePromptOutput =
+          true,
       ): Promise<SamVision> => {
         const pixelValues =
           new ort.Tensor(
@@ -880,9 +891,17 @@ export const createSam21Adapter =
               pixel_values:
                 pixelValues,
             },
-            needsPosition
-              ? VISION_OUTPUTS_WITH_POSITION
-              : VISION_OUTPUTS,
+            includePromptOutput
+              ? (
+                  needsPosition
+                    ? PROMPT_VISION_OUTPUTS_WITH_POSITION
+                    : PROMPT_VISION_OUTPUTS
+                )
+              : (
+                  needsPosition
+                    ? TRACKED_VISION_OUTPUTS_WITH_POSITION
+                    : TRACKED_VISION_OUTPUTS
+                ),
           );
 
         recordTiming(
@@ -944,10 +963,9 @@ export const createSam21Adapter =
               "feats2",
             ),
           feats2NoMemory:
-            requireTensor(
-              outputs,
-              "feats2_no_mem",
-            ),
+            outputs[
+              "feats2_no_mem"
+            ],
           position:
             visionPosition,
         };
@@ -1480,7 +1498,12 @@ export const createSam21Adapter =
 
           await decode(
             currentSeedVision,
-            currentSeedVision.feats2NoMemory,
+            currentSeedVision.feats2NoMemory ??
+              (() => {
+                throw new Error(
+                  "SAM 2.1 prompt vision output is missing.",
+                );
+              })(),
             pointPromptTensors(
               [
                 {
@@ -1547,6 +1570,7 @@ export const createSam21Adapter =
         const vision =
           await encode(
             frame,
+            false,
           );
 
         try {
@@ -1614,7 +1638,12 @@ export const createSam21Adapter =
           const decoded =
             await decode(
               vision,
-              vision.feats2NoMemory,
+              vision.feats2NoMemory ??
+                (() => {
+                  throw new Error(
+                    "SAM 2.1 prompt vision output is missing.",
+                  );
+                })(),
               pointPromptTensors(
                 subject.prompt.points,
                 candidate.inputSize,
@@ -1714,6 +1743,7 @@ export const createSam21Adapter =
         const vision =
           await encode(
             frame,
+            false,
           );
 
         const masks:
