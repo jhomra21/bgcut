@@ -109,6 +109,11 @@ try {
 
   if (!filename?.endsWith(".mp4")) throw new Error("Safari default export failed.");
 
+  const fusedGraphRequested = await evaluate(`return performance.getEntriesByType("resource").some(entry =>
+    new URL(entry.name).pathname === "/video-model/sam21-tiny/tracked-step.onnx");`);
+
+  if (!fusedGraphRequested) throw new Error("Safari did not request the fused SAM tracking graph.");
+
   const playback = await evaluateAsync(`const done=arguments[arguments.length-1];
     const v=document.querySelector(".video-lab-video");v.muted=true;
     v.play().then(()=>{const before=v.currentTime;
@@ -136,7 +141,7 @@ try {
 
   await Bun.write(`${output}/bear.mp4`, Buffer.from(encoded, "base64"));
   await screenshot("playable-result");
-  await Bun.write(`${output}/result.json`, JSON.stringify({ cold, refinement, filename, playback, decoded }, null, 2));
+  await Bun.write(`${output}/result.json`, JSON.stringify({ cold, refinement, filename, fusedGraphRequested, playback, decoded }, null, 2));
   console.log(`Safari preview and native playback acceptance passed: ${output}`);
 } finally {
   await request(base, "DELETE");
