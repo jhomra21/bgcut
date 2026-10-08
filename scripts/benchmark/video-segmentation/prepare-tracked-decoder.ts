@@ -9,6 +9,8 @@ import {
 import {
   TRACKED_DECODER_CACHE_PATH,
   TRACKED_DECODER_METADATA_CACHE_PATH,
+  TRACKED_STEP_CACHE_PATH,
+  TRACKED_STEP_METADATA_CACHE_PATH,
 } from "../../../src/shared/video-experimental-config";
 
 const prepare = async (
@@ -79,4 +81,11 @@ await prepare(
     TRACKED_DECODER_METADATA_CACHE_PATH,
   ),
   "SAM tracked decoder",
+);
+
+await prepare(
+  "specialize-sam21-tracked-step.py",
+  resolve(TRACKED_STEP_CACHE_PATH),
+  resolve(TRACKED_STEP_METADATA_CACHE_PATH),
+  "SAM fused tracked step",
 );
