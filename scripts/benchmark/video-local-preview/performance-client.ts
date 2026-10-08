@@ -13,6 +13,7 @@ import { QUALITY_FRAME_COUNT } from "../video-segmentation/quality-fixture";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
 import type {
   VideoSegmentationAdapter,
+  VideoSegmentationAdapterOptions,
   VideoSegmentationCandidateId,
   VideoSegmentationMask,
 } from "../video-segmentation/types";
@@ -617,8 +618,7 @@ const benchmarkPromptTracker = async (
     readonly y: number;
     readonly label: 1;
   },
-  trackedMaskDecoderUrl?:
-    string,
+  options?: VideoSegmentationAdapterOptions,
 ) => {
   const source =
     await openMediaBunnyVideoSource(
@@ -637,12 +637,7 @@ const benchmarkPromptTracker = async (
     await createVideoSegmentationAdapter(
       candidate,
       undefined,
-      trackedMaskDecoderUrl ===
-        undefined
-        ? undefined
-        : {
-            trackedMaskDecoderUrl,
-          },
+      options,
     );
 
   const adapterLoadMs =
@@ -904,8 +899,9 @@ const benchmarkPromptTracker = async (
       candidate:
         candidateId,
       trackedMaskDecoder:
-        trackedMaskDecoderUrl !==
-        undefined,
+        options?.trackedMaskDecoderUrl !== undefined,
+      fusedStep:
+        options?.trackedStepUrl !== undefined,
       graphTimings,
       graphMs,
       hostInferenceMs:
@@ -973,8 +969,8 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
     createVideoSelection(
       file,
       {
-        trackedMaskDecoderUrl:
-          "/specialized/sam21-tracked-mask-decoder.onnx",
+        trackedStepUrl:
+          "/specialized/sam21-tracked-step.onnx",
       },
     );
 
@@ -1935,7 +1931,10 @@ const main = async () => {
   const promptTrackerCases =
     [];
 
-  const trackerCases =
+  const trackerCases: readonly {
+    candidateId: VideoSegmentationCandidateId;
+    options?: VideoSegmentationAdapterOptions;
+  }[] =
     [
       {
         candidateId:
@@ -1944,8 +1943,15 @@ const main = async () => {
       {
         candidateId:
           "sam21-tiny" as const,
-        trackedMaskDecoderUrl:
-          "/specialized/sam21-tracked-mask-decoder.onnx",
+        options: {
+          trackedMaskDecoderUrl: "/specialized/sam21-tracked-mask-decoder.onnx",
+        },
+      },
+      {
+        candidateId: "sam21-tiny",
+        options: {
+          trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+        },
       },
       {
         candidateId:
@@ -1966,7 +1972,7 @@ const main = async () => {
           y: 0.65,
           label: 1,
         },
-        trackerCase.trackedMaskDecoderUrl,
+        trackerCase.options,
       ),
     );
   }
