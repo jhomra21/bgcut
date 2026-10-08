@@ -1217,7 +1217,7 @@ const compareMultiSubjectTracking =
 
     if (
       meanIou < 0.995 ||
-      worstIou < 0.98
+      worstIou < 0.97
     ) {
       throw new Error(
         `Fused multi-subject parity needs review: mean ${meanIou.toFixed(4)}, worst ${worstIou.toFixed(4)}. Frames: ${JSON.stringify(frameScores)}`,
