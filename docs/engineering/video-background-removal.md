@@ -4,7 +4,7 @@ This work is experimental. It does not change bgcut's public browser, CLI, or No
 
 ## Checkpoint handoff - 2026-10-07
 
-The accepted code baseline is `c3c631db9f984c5499ebb4c87295fff135572998`.
+The accepted code baseline is `2e4cacca6d516bdd79e93092f0e549dcdaef30cd`.
 On that exact head, `bun run check`, the Cloudflare dry run/runtime smoke, the
 lower-level Chromium video acceptance, the performance harness, the cross-DAVIS
 tracked-decoder validation, and the actual Solid video-editor acceptance all passed. The Solid gate runs in macOS CI and exercises the
@@ -32,6 +32,18 @@ the four-fixture DAVIS A/B runs, this fused step was consistently faster than th
 tracking path, with fixture-level speedups varying roughly from 1.2× to 1.9× across
 runner samples and mean IoU/boundary-F deltas staying effectively zero. The lower-level
 preview and the real Solid editor both passed with the fused step enabled.
+
+A later acceptance also compares two separately prompted `bmx-trees` subjects
+against the unfused SAM graph, seeding at frame 5, tracking forward, rewinding
+both independent temporal memories, and tracking backward. On the same twelve
+frames (24 subject/frame mask comparisons), mean binary-mask parity was 0.9961
+and worst-frame parity was 0.9714. The worst case involved only two changed
+foreground pixels in a tiny mask (70 baseline versus 68 fused). The checked-in
+gate requires mean overlap at least 0.995 and per-frame overlap at least 0.97
+and retains the per-frame foreground counts for diagnosis. In that run the
+fused graph reduced two-subject tracking time from 10.36 s to 7.68 s (1.35×).
+This verifies graph parity across independent memories and rewinds; it is not
+a new claim that the prompt locations discover two whole semantic objects.
 
 The derived ONNX is not committed: run `bun run video:model:prepare` to create
 `.cache/bgcut-video/sam21-tracked-step.onnx`. Vite serves that cache entry only in
