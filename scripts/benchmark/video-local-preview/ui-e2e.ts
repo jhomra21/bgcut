@@ -167,7 +167,15 @@ try {
   const result = await browser("eval", `(() => {
     const link = document.querySelector("a[download]");
     if (!link.download.endsWith(".webm")) throw new Error("Wrong export filename");
-    return { filename:link.download, result:document.querySelector(".video-lab-result-row").textContent };
+    const fusedGraph = "/video-model/sam21-tiny/tracked-step.onnx";
+    const requested = performance.getEntriesByType("resource").some(entry =>
+      new URL(entry.name).pathname === fusedGraph);
+    if (!requested) throw new Error("The Solid editor never requested the fused SAM tracking graph.");
+    return {
+      filename:link.download,
+      result:document.querySelector(".video-lab-result-row").textContent,
+      fusedGraphRequested:requested,
+    };
   })()`);
 
   await Bun.write(`${output}/result.json`, result);
