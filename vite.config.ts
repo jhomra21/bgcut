@@ -17,6 +17,8 @@ import {
 import {
   TRACKED_DECODER_CACHE_PATH,
   TRACKED_DECODER_PUBLIC_PATH,
+  TRACKED_STEP_CACHE_PATH,
+  TRACKED_STEP_PUBLIC_PATH,
 } from "./src/shared/video-experimental-config.ts";
 import {
   ORT_WASM_FILENAME,
@@ -136,6 +138,11 @@ const VIDEO_EXPERIMENTAL_ASSETS = [
       TRACKED_DECODER_CACHE_PATH,
     missing:
       "SAM tracked decoder is not prepared. Run bun run video:model:prepare.",
+  },
+  {
+    publicPath: TRACKED_STEP_PUBLIC_PATH,
+    cachePath: TRACKED_STEP_CACHE_PATH,
+    missing: "SAM fused tracked step is not prepared. Run bun run video:model:prepare.",
   },
 ] as const;
 
