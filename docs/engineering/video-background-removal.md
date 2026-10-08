@@ -2,7 +2,22 @@
 
 This work is experimental. It does not change bgcut's public browser, CLI, or Node.js API.
 
-## Checkpoint handoff - 2026-10-07
+## Editor fused-step integration - 2026-10-08
+
+The benchmark's fused SAM graph and the Solid editor previously used different tracking paths.
+The benchmark ran the decoder/memory-encoder fused graph, but the Solid editor
+still requested the earlier decoder-only graph. The development editor now
+requests the fused tracked step. If it is missing or cannot load, the adapter
+uses the unfused decoder and memory encoder.
+
+Run `bun run video:model:prepare` to generate both specialized models. Vite
+serves them from the ignored development cache. The macOS Chromium acceptance
+checks that the real editor requests the fused model during export. The
+performance harness measures the same graph and retains the older comparisons.
+These changes still need completed CI and fresh Safari acceptance. Public
+video model delivery remains unfinished.
+
+## Previous checkpoint - 2026-10-07
 
 The accepted code baseline is `2e4cacca6d516bdd79e93092f0e549dcdaef30cd`.
 On that exact head, `bun run check`, the Cloudflare dry run/runtime smoke, the
@@ -31,7 +46,7 @@ while the full prompt decoder remains unchanged for selection and seed frames. A
 the four-fixture DAVIS A/B runs, this fused step was consistently faster than the base
 tracking path, with fixture-level speedups varying roughly from 1.2× to 1.9× across
 runner samples and mean IoU/boundary-F deltas staying effectively zero. The lower-level
-preview and the real Solid editor both passed with the fused step enabled.
+benchmark passed with the fused step. The Solid editor passed its UI flow, but its tracking path was still decoder-only in that checkpoint.
 
 A later acceptance also compares two separately prompted `bmx-trees` subjects
 against the unfused SAM graph, seeding at frame 5, tracking forward, rewinding
@@ -101,7 +116,7 @@ The development/local shell now routes video from the same intake as images, inc
 
 An interior click runs the actual SAM seed operation and displays its mask before tracking. Keep and Exclude clicks refine the active subject; Add subject creates a separate memory bank, up to four subjects. The editor serializes preview, tracking, and disposal around one loaded SAM adapter. Each multi-subject seed shares its encoded frame across subjects. Rapid preview changes are debounced and stale work is aborted/ignored; an in-flight ONNX call finishes before the next queued operation or disposal. Changing the frame or trim clears prompts. The current single-mask SAM export is unchanged; this is not a new whole-object proposal algorithm and imperfect masks still need corrections.
 
-For the faster local path, run `bun run video:model:prepare` once to derive the tracked-frame SAM decoder into the ignored `.cache/bgcut-video/` directory. This is a development cache, not a published model surface. Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. Prompted export borrows that editor-owned frame when the selected time is unchanged, which lets SAM reuse the already prepared vision features instead of decoding and encoding the seed again; export does not take ownership of or close the borrowed frame. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
+For the faster local path, run `bun run video:model:prepare` to derive the fused tracked step and decoder-only benchmark graph into the ignored `.cache/bgcut-video/` directory. This is a development cache, not a published model surface. Model preparation begins concurrently with metadata inspection immediately when the editor receives the dropped file. The native preview URL is created immediately. Once the primary-video timeline is known, the selected frame is decoded and encoded with the same adapter/cache used by selection. Prompted export borrows that editor-owned frame when the selected time is unchanged, which lets SAM reuse the already prepared vision features instead of decoding and encoding the seed again; export does not take ownership of or close the borrowed frame. A one-time prompt-decoder and memory-encoder warm-up discards its output without conditioning any temporal bank or exposing a mask. Progress counts real initialized sessions (0–5), not a timer. Loading, ready, and retryable error states are separate from selection idle/updating/ready/error states. Same-frame, same-subject-set refinements preserve the last valid highlight, but cannot authorize export until the current prompt succeeds. Seeks, cleared subjects, and removed subject identities invalidate it immediately. Effect's semaphore owns GPU exclusivity; waiting fibers are interruptible while current ONNX work is uninterruptible until it settles. Model acquisition registers its finalizer in an editor-owned Effect scope, which closes before a replacement editor can use the GPU.
 
 Exports use MediaBunny's real quality settings and metadata tags. VP9 WebM retains alpha. H.264 MP4 bakes white or black behind the matte. Codec/dimension support is checked before tracking. Original dimensions and high encoding quality are the defaults; explicit resizing preserves aspect ratio without upscaling. Source metadata is never copied; only the optional user-entered title is passed to the muxer.
 
