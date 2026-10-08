@@ -875,6 +875,13 @@ const benchmarkPromptTracker = async (
           .timingSnapshot?.(),
       );
 
+    if (
+      options?.trackedStepUrl !== undefined &&
+      (graphTimings?.["tracked-step"]?.calls ?? 0) === 0
+    ) {
+      throw new Error("The fused SAM graph was requested but did not run.");
+    }
+
     const graphMs =
       graphTimings ===
       undefined
