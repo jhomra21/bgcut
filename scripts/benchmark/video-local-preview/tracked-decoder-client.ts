@@ -1109,8 +1109,13 @@ const compareMultiSubjectTracking =
         "fused-step",
       );
 
-    const frameScores:
-      number[] = [];
+    const frameScores: {
+      readonly frame: number;
+      readonly subject: number;
+      readonly iou: number;
+      readonly baselinePixels: number;
+      readonly fusedPixels: number;
+    }[] = [];
 
     for (
       let index = 0;
@@ -1173,24 +1178,49 @@ const compareMultiSubjectTracking =
             expected,
           );
 
-        if (iou < 0.98) {
-          throw new Error(
-            `Fused multi-subject mask diverged at frame ${index}, subject ${subjectIndex + 1}: IoU ${iou.toFixed(4)}.`,
-          );
-        }
-
-        frameScores.push(
+        frameScores.push({
+          frame: index,
+          subject:
+            subjectIndex + 1,
           iou,
-        );
+          baselinePixels:
+            expected.reduce(
+              (sum, pixel) =>
+                sum + pixel,
+              0,
+            ),
+          fusedPixels:
+            actual.reduce(
+              (sum, pixel) =>
+                sum + pixel,
+              0,
+            ),
+        });
       }
     }
 
     const meanIou =
-      mean(frameScores);
+      mean(
+        frameScores.map(
+          (item) =>
+            item.iou,
+        ),
+      );
 
-    if (meanIou < 0.995) {
+    const worstIou =
+      Math.min(
+        ...frameScores.map(
+          (item) =>
+            item.iou,
+        ),
+      );
+
+    if (
+      meanIou < 0.995 ||
+      worstIou < 0.98
+    ) {
       throw new Error(
-        `Fused multi-subject mean parity fell to ${meanIou.toFixed(4)}.`,
+        `Fused multi-subject parity needs review: mean ${meanIou.toFixed(4)}, worst ${worstIou.toFixed(4)}. Frames: ${JSON.stringify(frameScores)}`,
       );
     }
 
@@ -1206,9 +1236,8 @@ const compareMultiSubjectTracking =
       meanParityIou:
         meanIou,
       worstParityIou:
-        Math.min(
-          ...frameScores,
-        ),
+        worstIou,
+      frameScores,
       baselineTrackingMs:
         baseline.trackingMs,
       fusedTrackingMs:
@@ -1217,6 +1246,9 @@ const compareMultiSubjectTracking =
   };
 
 const main = async () => {
+  const multiSubject =
+    await compareMultiSubjectTracking();
+
   const cases =
     [];
 
@@ -1410,9 +1442,6 @@ const main = async () => {
       },
     });
   }
-
-  const multiSubject =
-    await compareMultiSubjectTracking();
 
   const response =
     await fetch(
