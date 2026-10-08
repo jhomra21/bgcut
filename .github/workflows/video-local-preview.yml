@@ -20,7 +20,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: bun install --frozen-lockfile
 
-      - name: Prepare local SAM tracked decoder
+      - name: Prepare local SAM tracked models
         shell: bash
         run: |
           set -euo pipefail
@@ -28,6 +28,8 @@ jobs:
           bun run video:model:prepare
           test -s .cache/bgcut-video/sam21-tracked-mask-decoder.onnx
           test -s .cache/bgcut-video/sam21-tracked-mask-decoder.json
+          test -s .cache/bgcut-video/sam21-tracked-step.onnx
+          test -s .cache/bgcut-video/sam21-tracked-step.json
 
       - name: Verify Vite serves ORT runtime assets
         shell: bash
@@ -55,6 +57,7 @@ jobs:
           bun -e '
             import {
               TRACKED_DECODER_PUBLIC_PATH,
+              TRACKED_STEP_PUBLIC_PATH,
             } from "./src/shared/video-experimental-config.ts";
             import {
               ORT_WASM_MODULE_PUBLIC_PATH,
@@ -109,6 +112,7 @@ jobs:
 
             for (const path of [
               TRACKED_DECODER_PUBLIC_PATH,
+              TRACKED_STEP_PUBLIC_PATH,
             ]) {
               const response = await fetch(origin + path);
               const contentType = response.headers.get("content-type") ?? "";
@@ -274,6 +278,12 @@ jobs:
             "$ROOT/sam21-tracked-mask-decoder.onnx" \
             >"$ROOT/sam21-tracked-mask-decoder.json"
 
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-step.py \
+            "$ROOT/sam21-tracked-step.onnx" \
+            >"$ROOT/sam21-tracked-step.json"
+
+          test -s "$ROOT/sam21-tracked-step.onnx"
+          test -s "$ROOT/sam21-tracked-step.json"
           test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
           test -s "$ROOT/sam21-tracked-mask-decoder.json"
 
