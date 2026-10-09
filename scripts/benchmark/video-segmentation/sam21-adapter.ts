@@ -1005,12 +1005,19 @@ export const createSam21Adapter =
 
     let promptPipelineWarm = false;
 
+    const normalizationCanvas =
+      options?.visionCanvasReuse === true
+        ? new OffscreenCanvas(candidate.inputSize, candidate.inputSize)
+        : undefined;
+
     const encode =
       async (
         frame: VideoFrame,
         includePromptOutput =
           true,
       ): Promise<SamVision> => {
+        const preprocessStartedAt = performance.now();
+
         const pixelValues =
           new ort.Tensor(
             "float32",
@@ -1019,6 +1026,7 @@ export const createSam21Adapter =
               candidate.inputSize,
               constants.image_mean,
               constants.image_std,
+              normalizationCanvas,
             ),
             [
               1,
@@ -1027,6 +1035,8 @@ export const createSam21Adapter =
               candidate.inputSize,
             ],
           );
+
+        recordTiming("vision-preprocess", preprocessStartedAt);
 
         const runStartedAt =
           performance.now();
