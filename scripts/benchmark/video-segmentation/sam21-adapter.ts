@@ -1005,10 +1005,13 @@ export const createSam21Adapter =
 
     let promptPipelineWarm = false;
 
+    // A frame fully replaces the canvas pixels before readback, so the
+    // same backing surface can be reused without changing normalization.
+    // Keep the per-frame allocation path available as a benchmark control.
     const normalizationCanvas =
-      options?.visionCanvasReuse === true
-        ? new OffscreenCanvas(candidate.inputSize, candidate.inputSize)
-        : undefined;
+      options?.visionCanvasReuse === false
+        ? undefined
+        : new OffscreenCanvas(candidate.inputSize, candidate.inputSize);
 
     const encode =
       async (
