@@ -176,6 +176,8 @@ export type VideoSegmentationAdapterOptions = {
   readonly visionCanvasReuse?: boolean;
   /** Benchmark-only: upload normalized pixels through an owned WebGPU input buffer. */
   readonly visionGpuInput?: boolean;
+  /** Benchmark-only: keep decoder-facing SAM vision features on WebGPU. */
+  readonly visionGpuOutputs?: boolean;
   readonly trackedMaskDecoderUrl?:
     string;
   readonly trackedMemoryEncoderUrl?:
