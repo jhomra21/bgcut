@@ -960,6 +960,8 @@ const benchmarkPromptTracker = async (
         options?.visionCanvasReuse === true,
       visionGpuInput:
         options?.visionGpuInput === true,
+      visionGpuOutputs:
+        options?.visionGpuOutputs === true,
       preprocessMs:
         graphTimings?.["vision-preprocess"]?.totalMs,
       gpuInputUploadMs:
@@ -1019,6 +1021,8 @@ const benchmarkPromptTracker = async (
         ),
       frameCount:
         scores.length,
+      frameScores:
+        scores,
     };
   } finally {
     source.close();
@@ -2033,6 +2037,13 @@ const main = async () => {
         },
       },
       {
+        candidateId: "sam21-tiny",
+        options: {
+          trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+          visionGpuOutputs: true,
+        },
+      },
+      {
         candidateId:
           "edgetam" as const,
       }
@@ -2054,6 +2065,36 @@ const main = async () => {
         trackerCase.options,
       ),
     );
+  }
+
+  const baselineVision = promptTrackerCases.find((item) =>
+    item.candidate === "sam21-tiny" &&
+    item.fusedStep &&
+    item.visionCanvasReuse === false &&
+    item.visionGpuInput === false &&
+    item.visionGpuOutputs === false
+  );
+
+  const gpuFeatureVision = promptTrackerCases.find((item) =>
+    item.candidate === "sam21-tiny" &&
+    item.fusedStep &&
+    item.visionGpuOutputs === true
+  );
+
+  if (baselineVision === undefined || gpuFeatureVision === undefined ||
+      baselineVision.frameScores.length !== gpuFeatureVision.frameScores.length) {
+    throw new Error("GPU vision feature comparison is missing a matching CPU baseline.");
+  }
+
+  for (let frameIndex = 0; frameIndex < baselineVision.frameScores.length; frameIndex += 1) {
+    const baseline = baselineVision.frameScores[frameIndex];
+    const gpu = gpuFeatureVision.frameScores[frameIndex];
+
+    if (baseline === undefined || gpu === undefined ||
+        Math.abs(baseline.iou - gpu.iou) > 0.002 ||
+        Math.abs(baseline.boundaryF - gpu.boundaryF) > 0.002) {
+      throw new Error(`GPU-resident SAM features changed mask quality at frame ${frameIndex}.`);
+    }
   }
 
   // Graph capture is a probe, not a production option. Failure is evidence,
