@@ -371,6 +371,12 @@ jobs:
             "$ROOT/sam21-tracked-step.onnx" \
             >"$ROOT/sam21-tracked-step.json"
 
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-vision.py \
+            "$ROOT/sam21-tracked-vision.onnx" \
+            >"$ROOT/sam21-tracked-vision.json"
+
+          test -s "$ROOT/sam21-tracked-vision.onnx"
+          test -s "$ROOT/sam21-tracked-vision.json"
           test -s "$ROOT/sam21-tracked-step.onnx"
           test -s "$ROOT/sam21-tracked-step.json"
           test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
