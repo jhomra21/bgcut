@@ -281,7 +281,16 @@ const app =
         quality !==
         null
       ) {
-        return quality;
+        // Safari WebDriver's file upload can create a File whose bytes
+        // cannot be read. CI also exercises the browser File API by
+        // fetching this known fixture into a File on the app page.
+        const headers = new Headers(quality.headers);
+        headers.set("access-control-allow-origin", "*");
+        return new Response(quality.body, {
+          status: quality.status,
+          statusText: quality.statusText,
+          headers,
+        });
       }
 
       if (
