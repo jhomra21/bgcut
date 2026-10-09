@@ -228,6 +228,10 @@ const app =
               "/specialized/sam21-tracked-step.onnx",
               "sam21-tracked-step.onnx",
             ],
+            [
+              "/specialized/sam21-tracked-vision.onnx",
+              "sam21-tracked-vision.onnx",
+            ],
           ]);
 
         const filename =
