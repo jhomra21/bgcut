@@ -1005,9 +1005,9 @@ export const createSam21Adapter =
 
     let promptPipelineWarm = false;
 
-    // A frame fully replaces the canvas pixels before readback, so the
-    // same backing surface can be reused without changing normalization.
-    // Keep the per-frame allocation path available as a benchmark control.
+    // frameToNchw clears the surface before drawing (including alpha
+    // sources). Reuse avoids allocation without changing pixel values.
+    // Keep the per-frame allocation path as a benchmark control.
     const normalizationCanvas =
       options?.visionCanvasReuse === false
         ? undefined
