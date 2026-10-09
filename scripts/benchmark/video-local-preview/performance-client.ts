@@ -909,6 +909,8 @@ const benchmarkPromptTracker = async (
         options?.trackedMaskDecoderUrl !== undefined,
       fusedStep:
         options?.trackedStepUrl !== undefined,
+      visionGraphCapture:
+        options?.visionGraphCapture === true,
       graphTimings,
       graphMs,
       hostInferenceMs:
@@ -1982,6 +1984,28 @@ const main = async () => {
         trackerCase.options,
       ),
     );
+  }
+
+  // Graph capture is a probe, not a production option. Failure is evidence,
+  // not permission to silently substitute a different optimization.
+  try {
+    promptTrackerCases.push(await benchmarkPromptTracker(
+      bearFile,
+      "sam21-tiny",
+      { x: 0.4, y: 0.65, label: 1 },
+      {
+        trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+        visionGraphCapture: true,
+      },
+    ));
+  } catch (error) {
+    promptTrackerCases.push({
+      candidate: "sam21-tiny",
+      fusedStep: true,
+      visionGraphCapture: true,
+      unsupported: true,
+      reason: error instanceof Error ? error.message : String(error),
+    });
   }
 
   reports.push({
