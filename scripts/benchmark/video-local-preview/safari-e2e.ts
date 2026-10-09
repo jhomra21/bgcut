@@ -79,7 +79,14 @@ const captureState = async (name: string) => {
         'video/mp4; codecs="avc1.64001e"'
       ),
       frameStatus: document.querySelector(".video-lab-frame-status")?.dataset.state,
-      modelStatus: document.querySelector(".video-lab-model-status")?.dataset.state
+      modelStatus: document.querySelector(".video-lab-model-status")?.dataset.state,
+      webgpuPresent: Boolean(navigator.gpu),
+      webgpuFeatures: typeof navigator.gpu?.requestAdapter === "function",
+      modelText: document.querySelector(".video-lab-model-status")?.innerText,
+      frameText: document.querySelector(".video-lab-frame-status")?.innerText,
+      recentResources: performance.getEntriesByType("resource").slice(-20).map(entry => ({
+        name: entry.name, duration: entry.duration, transferSize: entry.transferSize
+      }))
     };
   })();`);
 
@@ -174,7 +181,24 @@ try {
   }
 
   await screenshot("initial-readiness");
-  await waitFor('document.querySelector(".video-lab-frame-status")?.dataset.state==="ready"');
+  try {
+    await waitFor(
+      'document.querySelector(".video-lab-frame-status")?.dataset.state==="ready" || document.querySelector(".video-lab-model-status")?.dataset.state==="error" || document.querySelector(".video-lab-frame-status")?.dataset.state==="error"',
+      40,
+    );
+
+    const state = await evaluate('return document.querySelector(".video-lab-frame-status")?.dataset.state');
+
+    if (state !== "ready") {
+      throw new Error(`Video frame preparation ended in state "${state}".`);
+    }
+  } catch (error) {
+    const details = await captureState("model-readiness-failure");
+
+    throw new Error(`Safari video model/frame not ready: ${JSON.stringify(details)}`, {
+      cause: error,
+    });
+  }
   await evaluate(`const action=[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="Remove background");
     if(action.getBoundingClientRect().bottom>innerHeight) throw new Error("Start action requires scrolling");
     if(document.querySelector(".video-lab-export-details").open) throw new Error("Settings should be collapsed");`);
