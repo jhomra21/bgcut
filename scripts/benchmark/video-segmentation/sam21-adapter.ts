@@ -753,6 +753,7 @@ export const createSam21Adapter =
         await createVideoSession(
           candidate,
           role,
+          role === "vision-encoder" && options?.visionGraphCapture === true,
         );
 
       loaded.set(
