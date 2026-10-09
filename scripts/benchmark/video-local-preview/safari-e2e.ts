@@ -111,6 +111,7 @@ try {
       'document.querySelector(".video-lab-selection-frame video.is-ready") || document.querySelector(".error-card")',
       35,
     );
+
     const uploadState = await evaluate(`return {
       ready: Boolean(document.querySelector(".video-lab-selection-frame video.is-ready")),
       error: document.querySelector(".error-card")?.textContent?.trim() ?? null
