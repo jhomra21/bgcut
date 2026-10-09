@@ -938,7 +938,8 @@ const benchmarkPromptTracker = async (
               [stage, timing],
             ) =>
               total +
-              (stage === "vision-preprocess" || stage === "vision-input-upload"
+              (stage === "vision-preprocess" || stage === "vision-input-upload" ||
+               stage === "vision-cpu-token-transpose" || stage === "vision-gpu-token-transpose"
                 ? 0 : timing.totalMs),
             0,
           );
@@ -962,10 +963,16 @@ const benchmarkPromptTracker = async (
         options?.visionGpuInput === true,
       visionGpuOutputs:
         options?.visionGpuOutputs === true,
+      visionGpuAttention:
+        options?.visionGpuAttention === true,
       preprocessMs:
         graphTimings?.["vision-preprocess"]?.totalMs,
       gpuInputUploadMs:
         graphTimings?.["vision-input-upload"]?.totalMs,
+      cpuTokenTransposeMs:
+        graphTimings?.["vision-cpu-token-transpose"]?.totalMs,
+      gpuTokenTransposeMs:
+        graphTimings?.["vision-gpu-token-transpose"]?.totalMs,
       graphTimings,
       graphMs,
       hostInferenceMs:
@@ -2129,6 +2136,13 @@ const main = async () => {
         },
       },
       {
+        candidateId: "sam21-tiny",
+        options: {
+          trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+          visionGpuAttention: true,
+        },
+      },
+      {
         candidateId:
           "edgetam" as const,
       }
@@ -2179,6 +2193,29 @@ const main = async () => {
         Math.abs(baseline.iou - gpu.iou) > 0.002 ||
         Math.abs(baseline.boundaryF - gpu.boundaryF) > 0.002) {
       throw new Error(`GPU-resident SAM features changed mask quality at frame ${frameIndex}.`);
+    }
+  }
+
+  const gpuAttentionVision = promptTrackerCases.find((item) =>
+    item.candidate === "sam21-tiny" &&
+    item.fusedStep &&
+    item.visionGpuAttention === true
+  );
+
+  if (gpuAttentionVision === undefined ||
+      gpuAttentionVision.frameScores.length !== baselineVision.frameScores.length ||
+      (gpuAttentionVision.graphTimings?.["vision-gpu-token-transpose"]?.calls ?? 0) === 0) {
+    throw new Error("GPU SAM temporal-attention transpose was requested but did not execute.");
+  }
+
+  for (let frameIndex = 0; frameIndex < baselineVision.frameScores.length; frameIndex += 1) {
+    const baseline = baselineVision.frameScores[frameIndex];
+    const gpu = gpuAttentionVision.frameScores[frameIndex];
+
+    if (baseline === undefined || gpu === undefined ||
+        Math.abs(baseline.iou - gpu.iou) > 0.002 ||
+        Math.abs(baseline.boundaryF - gpu.boundaryF) > 0.002) {
+      throw new Error(`GPU SAM temporal-attention transpose changed mask quality at frame ${frameIndex}.`);
     }
   }
 
