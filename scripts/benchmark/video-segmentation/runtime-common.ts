@@ -344,8 +344,10 @@ export const frameToNchw =
     imageSize: number,
     mean: readonly number[],
     std: readonly number[],
+    reusableCanvas?: OffscreenCanvas,
   ): Float32Array => {
     const canvas =
+      reusableCanvas ??
       new OffscreenCanvas(
         imageSize,
         imageSize,
