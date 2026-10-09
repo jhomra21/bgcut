@@ -368,6 +368,10 @@ export const frameToNchw =
       );
     }
 
+    // A reused surface may still contain pixels from the preceding frame.
+    // Clear it so transparent source frames behave exactly as a fresh canvas.
+    context.clearRect(0, 0, imageSize, imageSize);
+
     context.drawImage(
       frame,
       0,
