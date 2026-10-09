@@ -202,8 +202,7 @@ try {
     // returns no adapter. Keep its browser media checks, without calling
     // this a full WebGPU segmentation/export acceptance pass.
     if (details.modelStatus === "error" &&
-        typeof details.modelText === "string" &&
-        details.modelText.includes("Failed to get GPU adapter")) {
+        details.modelText?.includes("Failed to get GPU adapter")) {
       const gpu = await evaluateAsync(`
         const done = arguments[arguments.length - 1];
         if (!navigator.gpu) {
