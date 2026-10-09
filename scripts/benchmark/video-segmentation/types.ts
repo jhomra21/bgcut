@@ -174,6 +174,8 @@ export type VideoSegmentationAdapterOptions = {
   readonly visionGraphCapture?: boolean;
   /** Benchmark-only: compare a reusable normalization canvas with the default. */
   readonly visionCanvasReuse?: boolean;
+  /** Benchmark-only: upload normalized pixels through an owned WebGPU input buffer. */
+  readonly visionGpuInput?: boolean;
   readonly trackedMaskDecoderUrl?:
     string;
   readonly trackedMemoryEncoderUrl?:
