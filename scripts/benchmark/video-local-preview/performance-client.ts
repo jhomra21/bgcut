@@ -886,15 +886,15 @@ const benchmarkPromptTracker = async (
       graphTimings ===
       undefined
         ? undefined
-        : Object.values(
+        : Object.entries(
             graphTimings,
           ).reduce(
             (
               total,
-              timing,
+              [stage, timing],
             ) =>
               total +
-              timing.totalMs,
+              (stage === "vision-preprocess" ? 0 : timing.totalMs),
             0,
           );
 
@@ -911,6 +911,10 @@ const benchmarkPromptTracker = async (
         options?.trackedStepUrl !== undefined,
       visionGraphCapture:
         options?.visionGraphCapture === true,
+      visionCanvasReuse:
+        options?.visionCanvasReuse === true,
+      preprocessMs:
+        graphTimings?.["vision-preprocess"]?.totalMs,
       graphTimings,
       graphMs,
       hostInferenceMs:
@@ -1963,9 +1967,16 @@ const main = async () => {
         },
       },
       {
+        candidateId: "sam21-tiny",
+        options: {
+          trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+          visionCanvasReuse: true,
+        },
+      },
+      {
         candidateId:
           "edgetam" as const,
-      },
+      }
     ];
 
   for (
