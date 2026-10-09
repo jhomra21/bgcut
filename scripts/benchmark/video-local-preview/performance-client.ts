@@ -912,7 +912,7 @@ const benchmarkPromptTracker = async (
       visionGraphCapture:
         options?.visionGraphCapture === true,
       visionCanvasReuse:
-        options?.visionCanvasReuse === true,
+        candidateId === "sam21-tiny" && options?.visionCanvasReuse !== false,
       preprocessMs:
         graphTimings?.["vision-preprocess"]?.totalMs,
       graphTimings,
@@ -1964,6 +1964,7 @@ const main = async () => {
         candidateId: "sam21-tiny",
         options: {
           trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+          visionCanvasReuse: false,
         },
       },
       {
