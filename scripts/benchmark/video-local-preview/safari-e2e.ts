@@ -181,6 +181,7 @@ try {
   }
 
   await screenshot("initial-readiness");
+
   try {
     await waitFor(
       'document.querySelector(".video-lab-frame-status")?.dataset.state==="ready" || document.querySelector(".video-lab-model-status")?.dataset.state==="error" || document.querySelector(".video-lab-frame-status")?.dataset.state==="error"',
@@ -199,6 +200,7 @@ try {
       cause: error,
     });
   }
+
   await evaluate(`const action=[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="Remove background");
     if(action.getBoundingClientRect().bottom>innerHeight) throw new Error("Start action requires scrolling");
     if(document.querySelector(".video-lab-export-details").open) throw new Error("Settings should be collapsed");`);
