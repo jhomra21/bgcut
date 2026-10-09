@@ -1005,13 +1005,12 @@ export const createSam21Adapter =
 
     let promptPipelineWarm = false;
 
-    // frameToNchw clears the surface before drawing (including alpha
-    // sources). Reuse avoids allocation without changing pixel values.
-    // Keep the per-frame allocation path as a benchmark control.
+    // Benchmark control only. Independent macOS runs have not shown a
+    // repeatable speedup, so normal editor inference allocates per frame.
     const normalizationCanvas =
-      options?.visionCanvasReuse === false
-        ? undefined
-        : new OffscreenCanvas(candidate.inputSize, candidate.inputSize);
+      options?.visionCanvasReuse === true
+        ? new OffscreenCanvas(candidate.inputSize, candidate.inputSize)
+        : undefined;
 
     const encode =
       async (
