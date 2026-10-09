@@ -172,6 +172,8 @@ export type VideoSegmentationAdapter = {
 export type VideoSegmentationAdapterOptions = {
   /** Benchmark-only: try WebGPU command graph capture on the vision encoder. */
   readonly visionGraphCapture?: boolean;
+  /** Benchmark-only: reuse the normalization canvas between video frames. */
+  readonly visionCanvasReuse?: boolean;
   readonly trackedMaskDecoderUrl?:
     string;
   readonly trackedMemoryEncoderUrl?:
