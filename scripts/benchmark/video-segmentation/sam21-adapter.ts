@@ -1518,6 +1518,9 @@ export const createSam21Adapter =
         return decoded.mask;
       };
 
+    let gpuTokenTranspose:
+      ReturnType<typeof createSamGpuTokenTransposer> | undefined;
+
     const trackWithBank =
       async (
         vision: SamVision,
@@ -1588,24 +1591,54 @@ export const createSam21Adapter =
           );
         }
 
+        let gpuAttentionTokens:
+          ReturnType<ReturnType<typeof createSamGpuTokenTransposer>> | undefined;
+
+        let currentVisionFeatures: ort.Tensor;
+
+        if (options?.visionGpuAttention === true) {
+          const gpuStartedAt = performance.now();
+          const device = await ort.env.webgpu.device;
+
+          if (device === undefined) {
+            throw new Error("SAM GPU attention requires an active WebGPU device.");
+          }
+
+          gpuTokenTranspose ??= createSamGpuTokenTransposer(
+            device,
+            featureTokens,
+            FEATURE_CHANNELS,
+          );
+
+          gpuAttentionTokens = gpuTokenTranspose(vision.feats2);
+          currentVisionFeatures = gpuAttentionTokens.tensor;
+          recordTiming("vision-gpu-token-transpose", gpuStartedAt);
+        } else {
+          const cpuStartedAt = performance.now();
+
+          currentVisionFeatures = new ort.Tensor(
+            "float32",
+            channelsToTokens(
+              floatData(
+                vision.feats2,
+                "SAM 2.1 feats2",
+              ),
+              FEATURE_CHANNELS,
+              featureTokens,
+            ),
+            [
+              featureTokens,
+              1,
+              FEATURE_CHANNELS,
+            ],
+          );
+
+          recordTiming("vision-cpu-token-transpose", cpuStartedAt);
+        }
+
         const attentionInputs = {
           current_vision_features:
-            new ort.Tensor(
-              "float32",
-              channelsToTokens(
-                floatData(
-                  vision.feats2,
-                  "SAM 2.1 feats2",
-                ),
-                FEATURE_CHANNELS,
-                featureTokens,
-              ),
-              [
-                featureTokens,
-                1,
-                FEATURE_CHANNELS,
-              ],
-            ),
+            currentVisionFeatures,
           current_vision_position_embeddings:
             visionPositionTokens ??
             (() => {
@@ -1638,10 +1671,14 @@ export const createSam21Adapter =
         runStartedAt =
           performance.now();
 
+        // The submitted transpose and ONNX inference execute in order on
+        // the same WebGPU queue. Release the owned token buffer after inference.
         const attention =
           await trackingSessions.memoryAttention.run(
             attentionInputs,
-          );
+          ).finally(() => {
+            gpuAttentionTokens?.release();
+          });
 
         recordTiming(
           "memory-attention",
