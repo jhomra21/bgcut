@@ -254,6 +254,79 @@ jobs:
           if-no-files-found: error
 
 
+  safari:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+
+      - name: Accept real Safari video export
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-safari"
+          mkdir -p "$ROOT"
+          bun run video:model:prepare
+          test -s .cache/bgcut-video/sam21-tracked-step.onnx
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT/fixtures" 4196 >"$ROOT/fixtures.log" 2>&1 &
+          FIXTURE_PID=$!
+          bun run dev -- --host 127.0.0.1 --port 5184 --strictPort >"$ROOT/vite.log" 2>&1 &
+          VITE_PID=$!
+
+          cleanup() {
+            kill "${DRIVER_PID:-}" "$FIXTURE_PID" "$VITE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4196/ >/dev/null &&
+               curl --fail --silent http://127.0.0.1:5184/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent --show-error \
+            http://127.0.0.1:4196/quality/bear.mp4 \
+            --output "$ROOT/bear.mp4"
+          test -s "$ROOT/bear.mp4"
+
+          sudo /usr/bin/safaridriver --enable
+          /usr/bin/safaridriver --port 4450 >"$ROOT/safaridriver.log" 2>&1 &
+          DRIVER_PID=$!
+          for _ in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4450/status >"$ROOT/safaridriver-status.json"; then
+              break
+            fi
+            if ! kill -0 "$DRIVER_PID" 2>/dev/null; then
+              cat "$ROOT/safaridriver.log" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          bun run scripts/benchmark/video-local-preview/safari-e2e.ts \
+            "$ROOT/bear.mp4" http://127.0.0.1:5184 "$ROOT" http://127.0.0.1:4450
+
+          test -s "$ROOT/result.json"
+          test -s "$ROOT/bear.mp4"
+          test -s "$ROOT/playable-result.png"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-local-safari
+          path: ${{ runner.temp }}/video-local-safari
+          if-no-files-found: warn
+
   performance:
     if: github.head_ref == 'feat/video-local-preview'
     runs-on: macos-26
