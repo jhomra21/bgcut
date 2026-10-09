@@ -1012,6 +1012,11 @@ export const createSam21Adapter =
         ? new OffscreenCanvas(candidate.inputSize, candidate.inputSize)
         : undefined;
 
+    // The upload probe owns this GPU buffer. ORT does not destroy buffers
+    // supplied through Tensor.fromGpuBuffer, so release it when closing.
+    let visionInputBuffer: GPUBuffer | undefined;
+    let visionInputTensor: ort.Tensor | undefined;
+
     const encode =
       async (
         frame: VideoFrame,
@@ -1020,25 +1025,66 @@ export const createSam21Adapter =
       ): Promise<SamVision> => {
         const preprocessStartedAt = performance.now();
 
-        const pixelValues =
-          new ort.Tensor(
-            "float32",
-            frameToNchw(
-              frame,
-              candidate.inputSize,
-              constants.image_mean,
-              constants.image_std,
-              normalizationCanvas,
-            ),
-            [
-              1,
-              3,
-              candidate.inputSize,
-              candidate.inputSize,
-            ],
+        const normalized =
+          frameToNchw(
+            frame,
+            candidate.inputSize,
+            constants.image_mean,
+            constants.image_std,
+            normalizationCanvas,
           );
 
         recordTiming("vision-preprocess", preprocessStartedAt);
+
+        const pixelShape = [
+          1,
+          3,
+          candidate.inputSize,
+          candidate.inputSize,
+        ];
+
+        let pixelValues: ort.Tensor;
+
+        if (options?.visionGpuInput === true) {
+          const device = ort.env.webgpu.device;
+
+          if (device === undefined) {
+            throw new Error("The SAM GPU-input probe requires an active WebGPU device.");
+          }
+
+          const uploadStartedAt = performance.now();
+
+          if (visionInputBuffer === undefined) {
+            visionInputBuffer = device.createBuffer({
+              size: normalized.byteLength,
+              usage: GPUBufferUsage.STORAGE |
+                GPUBufferUsage.COPY_DST |
+                GPUBufferUsage.COPY_SRC,
+            });
+
+            visionInputTensor = ort.Tensor.fromGpuBuffer(
+              visionInputBuffer,
+              {
+                dataType: "float32",
+                dims: pixelShape,
+              },
+            );
+          }
+
+          device.queue.writeBuffer(
+            visionInputBuffer,
+            0,
+            normalized,
+          );
+
+          pixelValues = visionInputTensor ?? (() => {
+            throw new Error("SAM GPU input tensor was not initialized.");
+          })();
+
+          recordTiming("vision-input-upload", uploadStartedAt);
+        } else {
+          pixelValues = new ort.Tensor("float32", normalized, pixelShape);
+        }
 
         const runStartedAt =
           performance.now();
@@ -2091,6 +2137,10 @@ export const createSam21Adapter =
         } catch {
           // Closing the experimental fused session is best-effort.
         }
+
+        visionInputTensor = undefined;
+        visionInputBuffer?.destroy();
+        visionInputBuffer = undefined;
       },
     };
 
