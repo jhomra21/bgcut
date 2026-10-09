@@ -928,9 +928,15 @@ export const createSam21Adapter =
               trackedMaskDecoder,
             "tracked-memory-encoder":
               trackedMemoryEncoder,
-            "tracked-vision-encoder":
-              trackedVisionEncoder,
           });
+
+          try {
+            await trackedVisionEncoder?.release();
+          } catch {
+            // Experimental cleanup must not hide the load failure.
+          }
+
+          trackedVisionEncoder = undefined;
 
           try {
             await trackedStep?.release();
@@ -2206,9 +2212,15 @@ export const createSam21Adapter =
             trackedMaskDecoder,
           "tracked-memory-encoder":
             trackedMemoryEncoder,
-          "tracked-vision-encoder":
-            trackedVisionEncoder,
         });
+
+        try {
+          await trackedVisionEncoder?.release();
+        } catch {
+          // Closing the specialized vision session is best-effort.
+        }
+
+        trackedVisionEncoder = undefined;
 
         try {
           await trackedStep?.release();
