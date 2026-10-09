@@ -1034,11 +1034,14 @@ const benchmarkPromptTracker = async (
 // allocation pressure cannot consistently favor the same transfer path.
 const benchmarkVisionFeaturePairs = async (bearFile: File) => {
   const point = { x: 0.4, y: 0.65, label: 1 as const };
+
   const commonOptions = {
     trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
   };
+
   const rounds = [];
   const ratios: number[] = [];
+
   const orderByRound = [
     ["cpu", "gpu"],
     ["gpu", "cpu"],
@@ -1051,10 +1054,12 @@ const benchmarkVisionFeaturePairs = async (bearFile: File) => {
       ...commonOptions,
       visionGpuOutputs: order[0] === "gpu",
     });
+
     const second = await benchmarkPromptTracker(bearFile, "sam21-tiny", point, {
       ...commonOptions,
       visionGpuOutputs: order[1] === "gpu",
     });
+
     const cpu = order[0] === "cpu" ? first : second;
     const gpu = order[0] === "gpu" ? first : second;
 
