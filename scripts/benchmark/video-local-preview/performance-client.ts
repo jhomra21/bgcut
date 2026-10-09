@@ -938,7 +938,8 @@ const benchmarkPromptTracker = async (
               [stage, timing],
             ) =>
               total +
-              (stage === "vision-preprocess" ? 0 : timing.totalMs),
+              (stage === "vision-preprocess" || stage === "vision-input-upload"
+                ? 0 : timing.totalMs),
             0,
           );
 
@@ -957,8 +958,12 @@ const benchmarkPromptTracker = async (
         options?.visionGraphCapture === true,
       visionCanvasReuse:
         options?.visionCanvasReuse === true,
+      visionGpuInput:
+        options?.visionGpuInput === true,
       preprocessMs:
         graphTimings?.["vision-preprocess"]?.totalMs,
+      gpuInputUploadMs:
+        graphTimings?.["vision-input-upload"]?.totalMs,
       graphTimings,
       graphMs,
       hostInferenceMs:
@@ -2018,6 +2023,13 @@ const main = async () => {
         options: {
           trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
           visionCanvasReuse: true,
+        },
+      },
+      {
+        candidateId: "sam21-tiny",
+        options: {
+          trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+          visionGpuInput: true,
         },
       },
       {
