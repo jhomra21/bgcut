@@ -10,6 +10,7 @@ import {
   readVideoSourceInfo,
 } from "../video-segmentation/media-source";
 import { QUALITY_FRAME_COUNT } from "../video-segmentation/quality-fixture";
+import { frameToNchw } from "../video-segmentation/runtime-common";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
 import type {
   VideoSegmentationAdapter,
@@ -28,6 +29,49 @@ const save = async (name: string, blob: Blob) => {
   const response = await fetch(`/output/${name}`, { method: "POST", body: blob });
 
   if (!response.ok) throw new Error(await response.text());
+};
+
+const verifyVisionCanvasParity = () => {
+  const sourceCanvas = new OffscreenCanvas(2, 2);
+  const source = sourceCanvas.getContext("2d");
+
+  if (source === null) {
+    throw new Error("Could not create the canvas parity fixture.");
+  }
+
+  const reusedCanvas = new OffscreenCanvas(2, 2);
+  const mean = [0.485, 0.456, 0.406];
+  const std = [0.229, 0.224, 0.225];
+  let samples = 0;
+
+  for (const phase of [0, 1]) {
+    source.clearRect(0, 0, 2, 2);
+    source.fillStyle = phase === 0 ? "#d62727" : "rgba(0, 0, 255, 0.5)";
+    source.fillRect(0, 0, phase === 0 ? 2 : 1, phase === 0 ? 2 : 1);
+
+    const frame = new VideoFrame(sourceCanvas, { timestamp: phase * 33333 });
+
+    try {
+      const fresh = frameToNchw(frame, 2, mean, std);
+      const reused = frameToNchw(frame, 2, mean, std, reusedCanvas);
+
+      if (fresh.length !== reused.length) {
+        throw new Error("The reused canvas changed the normalized frame shape.");
+      }
+
+      for (let index = 0; index < fresh.length; index += 1) {
+        if (!Object.is(fresh[index], reused[index])) {
+          throw new Error(`Canvas reuse changed normalized pixel ${index} of frame ${phase}.`);
+        }
+
+        samples += 1;
+      }
+    } finally {
+      frame.close();
+    }
+  }
+
+  return { name: "vision-canvas-parity", frames: 2, samples, passed: true };
 };
 
 const inspect = async (blob: Blob) => {
@@ -1866,7 +1910,7 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 };
 
 const main = async () => {
-  const reports = [];
+  const reports = [verifyVisionCanvasParity()];
 
   let bearFile:
     File |
