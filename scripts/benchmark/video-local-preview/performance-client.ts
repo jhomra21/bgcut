@@ -1910,7 +1910,9 @@ const benchmark = async (name: string, file: File, points: readonly { x: number;
 };
 
 const main = async () => {
-  const reports = [verifyVisionCanvasParity()];
+  const reports = [];
+
+  reports.push(verifyVisionCanvasParity());
 
   let bearFile:
     File |
