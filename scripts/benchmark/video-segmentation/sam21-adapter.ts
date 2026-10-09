@@ -1036,7 +1036,7 @@ export const createSam21Adapter =
 
         recordTiming("vision-preprocess", preprocessStartedAt);
 
-        const pixelShape = [
+        const visionInputDimensions = [
           1,
           3,
           candidate.inputSize,
@@ -1066,7 +1066,7 @@ export const createSam21Adapter =
               visionInputBuffer,
               {
                 dataType: "float32",
-                dims: pixelShape,
+                dims: visionInputDimensions,
               },
             );
           }
@@ -1083,7 +1083,7 @@ export const createSam21Adapter =
 
           recordTiming("vision-input-upload", uploadStartedAt);
         } else {
-          pixelValues = new ort.Tensor("float32", normalized, pixelShape);
+          pixelValues = new ort.Tensor("float32", normalized, visionInputDimensions);
         }
 
         const runStartedAt =
