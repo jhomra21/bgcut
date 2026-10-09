@@ -368,9 +368,11 @@ export const frameToNchw =
       );
     }
 
-    // A reused surface may still contain pixels from the preceding frame.
-    // Clear it so transparent source frames behave exactly as a fresh canvas.
-    context.clearRect(0, 0, imageSize, imageSize);
+    // Only a reused canvas needs clearing. The regular per-frame allocation
+    // path stays unchanged; clearing prevents alpha pixels retaining old frames.
+    if (reusableCanvas !== undefined) {
+      context.clearRect(0, 0, imageSize, imageSize);
+    }
 
     context.drawImage(
       frame,
