@@ -2203,7 +2203,7 @@ const main = async () => {
     item.trackedVision === true
   );
 
-  if (specializedVision === undefined ||
+  if (baselineVision === undefined || specializedVision === undefined ||
       specializedVision.frameScores.length !== baselineVision.frameScores.length) {
     throw new Error("Specialized tracked vision graph is missing its CPU baseline.");
   }
