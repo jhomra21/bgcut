@@ -99,6 +99,8 @@ type SamTrackingSessions = {
     ort.InferenceSession;
   readonly trackedStep?:
     ort.InferenceSession;
+  readonly trackedVisionEncoder?:
+    ort.InferenceSession;
 };
 
 type SamVision = {
@@ -818,11 +820,24 @@ export const createSam21Adapter =
       ort.InferenceSession |
       undefined;
 
+    let trackedVisionEncoder:
+      ort.InferenceSession |
+      undefined;
+
     const loadTrackingSessions =
       async (): Promise<
         SamTrackingSessions
       > => {
         try {
+          if (options?.trackedVisionUrl !== undefined) {
+            // A requested benchmark must not silently fall back if the
+            // generated graph fails to load.
+            trackedVisionEncoder = await createVideoSessionFromUrl(
+              options.trackedVisionUrl,
+              "SAM 2.1 tracked vision encoder",
+            );
+          }
+
           const memoryAttention =
             await load(
               "memory-attention",
@@ -893,6 +908,7 @@ export const createSam21Adapter =
             trackedMaskDecoder,
             trackedMemoryEncoder,
             trackedStep,
+            trackedVisionEncoder,
           };
         } catch (error) {
           await closeVideoSessions({
@@ -912,6 +928,8 @@ export const createSam21Adapter =
               trackedMaskDecoder,
             "tracked-memory-encoder":
               trackedMemoryEncoder,
+            "tracked-vision-encoder":
+              trackedVisionEncoder,
           });
 
           try {
@@ -1098,13 +1116,27 @@ export const createSam21Adapter =
           visionPosition ===
           undefined;
 
+        const trackingEncoder =
+          !includePromptOutput && !needsPosition &&
+          options?.trackedVisionUrl !== undefined
+            ? (await getTrackingSessions()).trackedVisionEncoder
+            : undefined;
+
+        if (!includePromptOutput && !needsPosition &&
+            options?.trackedVisionUrl !== undefined &&
+            trackingEncoder === undefined) {
+          throw new Error("Requested SAM tracked vision encoder was not loaded.");
+        }
+
         const outputs =
-          await promptSessions.visionEncoder.run(
+          await (trackingEncoder ?? promptSessions.visionEncoder).run(
             {
               pixel_values:
                 pixelValues,
             },
-            includePromptOutput
+            trackingEncoder !== undefined
+              ? TRACKED_VISION_OUTPUTS
+              : includePromptOutput
               ? (
                   needsPosition
                     ? PROMPT_VISION_OUTPUTS_WITH_POSITION
@@ -1118,7 +1150,9 @@ export const createSam21Adapter =
           );
 
         recordTiming(
-          "vision-encoder",
+          trackingEncoder === undefined
+            ? "vision-encoder"
+            : "tracked-vision-encoder",
           runStartedAt,
         );
 
@@ -2172,6 +2206,8 @@ export const createSam21Adapter =
             trackedMaskDecoder,
           "tracked-memory-encoder":
             trackedMemoryEncoder,
+          "tracked-vision-encoder":
+            trackedVisionEncoder,
         });
 
         try {
