@@ -754,6 +754,7 @@ export const createSam21Adapter =
           candidate,
           role,
           role === "vision-encoder" && options?.visionGraphCapture === true,
+          role === "vision-encoder" && options?.visionGpuOutputs === true,
         );
 
       loaded.set(
