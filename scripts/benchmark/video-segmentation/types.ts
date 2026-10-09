@@ -186,6 +186,9 @@ export type VideoSegmentationAdapterOptions = {
     string;
   readonly trackedStepUrl?:
     string;
+  /** Benchmark-only: pruned SAM vision encoder graph for tracked frames. */
+  readonly trackedVisionUrl?:
+    string;
 };
 
 export type VideoSegmentationAdapterFactory = (
