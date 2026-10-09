@@ -926,6 +926,11 @@ const benchmarkPromptTracker = async (
       throw new Error("The fused SAM graph was requested but did not run.");
     }
 
+    if (options?.trackedVisionUrl !== undefined &&
+        (graphTimings?.["tracked-vision-encoder"]?.calls ?? 0) !== timestamps.length - 1) {
+      throw new Error("The specialized SAM tracked vision graph was not used for every tracked frame.");
+    }
+
     const graphMs =
       graphTimings ===
       undefined
@@ -955,6 +960,8 @@ const benchmarkPromptTracker = async (
         options?.trackedMaskDecoderUrl !== undefined,
       fusedStep:
         options?.trackedStepUrl !== undefined,
+      trackedVision:
+        options?.trackedVisionUrl !== undefined,
       visionGraphCapture:
         options?.visionGraphCapture === true,
       visionCanvasReuse:
@@ -2134,6 +2141,13 @@ const main = async () => {
         candidateId: "sam21-tiny",
         options: {
           trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+          trackedVisionUrl: "/specialized/sam21-tracked-vision.onnx",
+        },
+      },
+      {
+        candidateId: "sam21-tiny",
+        options: {
+          trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
           visionGpuInput: true,
         },
       },
@@ -2182,6 +2196,28 @@ const main = async () => {
     item.visionGpuInput === false &&
     item.visionGpuOutputs === false
   );
+
+  const specializedVision = promptTrackerCases.find((item) =>
+    item.candidate === "sam21-tiny" &&
+    item.fusedStep &&
+    item.trackedVision === true
+  );
+
+  if (specializedVision === undefined ||
+      specializedVision.frameScores.length !== baselineVision.frameScores.length) {
+    throw new Error("Specialized tracked vision graph is missing its CPU baseline.");
+  }
+
+  for (let frameIndex = 0; frameIndex < baselineVision.frameScores.length; frameIndex += 1) {
+    const expected = baselineVision.frameScores[frameIndex];
+    const actual = specializedVision.frameScores[frameIndex];
+
+    if (expected === undefined || actual === undefined ||
+        Math.abs(expected.iou - actual.iou) > 0.002 ||
+        Math.abs(expected.boundaryF - actual.boundaryF) > 0.002) {
+      throw new Error(`Tracked-only SAM vision graph changed mask quality at frame ${frameIndex}.`);
+    }
+  }
 
   const gpuFeatureVision = promptTrackerCases.find((item) =>
     item.candidate === "sam21-tiny" &&
