@@ -226,6 +226,7 @@ export const createVideoSession =
     candidate: VideoSegmentationCandidate,
     role: VideoModelGraphRole,
     captureGraph = false,
+    visionGpuOutputs = false,
   ): Promise<ort.InferenceSession> => {
     const artifact =
       artifactFor(
@@ -302,6 +303,17 @@ export const createVideoSession =
           "all",
         enableGraphCapture: captureGraph,
       };
+
+    if (role === "vision-encoder" && visionGpuOutputs) {
+      // These feature tensors feed only GPU-backed decoder/temporal models.
+      // feats2 stays on CPU because memory attention transposes its tokens
+      // using the host channel layout. The positional embedding is cached.
+      sessionOptions.preferredOutputLocation = {
+        feats0: "gpu-buffer",
+        feats1: "gpu-buffer",
+        feats2_no_mem: "gpu-buffer",
+      };
+    }
 
     if (
       externalData.length >
