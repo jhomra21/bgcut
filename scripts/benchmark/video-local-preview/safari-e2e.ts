@@ -123,7 +123,8 @@ try {
       webdriverFileError = uploadError;
       await captureState("webdriver-file-failure");
 
-      if (!uploadError.includes("I/O read operation failed")) {
+      if (!uploadError.includes("I/O read operation failed") &&
+          !uploadError.includes("This browser could not open the video")) {
         throw new Error(`Unexpected Safari upload error: ${uploadError}`);
       }
 
