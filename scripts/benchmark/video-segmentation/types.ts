@@ -170,6 +170,8 @@ export type VideoSegmentationAdapter = {
 };
 
 export type VideoSegmentationAdapterOptions = {
+  /** Benchmark-only: try WebGPU command graph capture on the vision encoder. */
+  readonly visionGraphCapture?: boolean;
   readonly trackedMaskDecoderUrl?:
     string;
   readonly trackedMemoryEncoderUrl?:
