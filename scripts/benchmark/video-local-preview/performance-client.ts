@@ -956,7 +956,7 @@ const benchmarkPromptTracker = async (
       visionGraphCapture:
         options?.visionGraphCapture === true,
       visionCanvasReuse:
-        candidateId === "sam21-tiny" && options?.visionCanvasReuse !== false,
+        options?.visionCanvasReuse === true,
       preprocessMs:
         graphTimings?.["vision-preprocess"]?.totalMs,
       graphTimings,
