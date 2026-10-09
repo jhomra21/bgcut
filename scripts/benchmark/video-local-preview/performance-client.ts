@@ -1030,6 +1030,86 @@ const benchmarkPromptTracker = async (
   }
 };
 
+// Alternate the candidate order so cold sessions, GPU contention, and
+// allocation pressure cannot consistently favor the same transfer path.
+const benchmarkVisionFeaturePairs = async (bearFile: File) => {
+  const point = { x: 0.4, y: 0.65, label: 1 as const };
+  const commonOptions = {
+    trackedStepUrl: "/specialized/sam21-tracked-step.onnx",
+  };
+  const rounds = [];
+  const ratios: number[] = [];
+  const orderByRound = [
+    ["cpu", "gpu"],
+    ["gpu", "cpu"],
+    ["gpu", "cpu"],
+    ["cpu", "gpu"],
+  ] as const;
+
+  for (const order of orderByRound) {
+    const first = await benchmarkPromptTracker(bearFile, "sam21-tiny", point, {
+      ...commonOptions,
+      visionGpuOutputs: order[0] === "gpu",
+    });
+    const second = await benchmarkPromptTracker(bearFile, "sam21-tiny", point, {
+      ...commonOptions,
+      visionGpuOutputs: order[1] === "gpu",
+    });
+    const cpu = order[0] === "cpu" ? first : second;
+    const gpu = order[0] === "gpu" ? first : second;
+
+    if (cpu.frameScores.length !== gpu.frameScores.length) {
+      throw new Error("Paired GPU feature trial decoded a different number of frames.");
+    }
+
+    for (let index = 0; index < cpu.frameScores.length; index += 1) {
+      const expected = cpu.frameScores[index];
+      const actual = gpu.frameScores[index];
+
+      if (expected === undefined || actual === undefined ||
+          Math.abs(expected.iou - actual.iou) > 0.002 ||
+          Math.abs(expected.boundaryF - actual.boundaryF) > 0.002) {
+        throw new Error(`Paired GPU feature trial changed mask quality at frame ${index}.`);
+      }
+    }
+
+    const ratio = gpu.trackingFps / cpu.trackingFps;
+
+    if (!Number.isFinite(ratio) || ratio <= 0) {
+      throw new Error("Paired GPU feature throughput must be finite and positive.");
+    }
+
+    ratios.push(ratio);
+    rounds.push({
+      order,
+      frameCount: cpu.frameScores.length,
+      cpuTrackingFps: cpu.trackingFps,
+      gpuTrackingFps: gpu.trackingFps,
+      gpuToCpuSpeedup: ratio,
+      cpuVisionMs: cpu.graphTimings?.["vision-encoder"]?.totalMs,
+      gpuVisionMs: gpu.graphTimings?.["vision-encoder"]?.totalMs,
+      meanIou: cpu.meanIou,
+      meanBoundaryF: cpu.meanBoundaryF,
+      parityPassed: true,
+    });
+  }
+
+  const sortedRatios = [...ratios].sort((a, b) => a - b);
+  const medianRatio = (sortedRatios[1] + sortedRatios[2]) / 2;
+
+  return {
+    name: "gpu-vision-feature-pairs",
+    repetitions: rounds.length,
+    testClip: "bear",
+    orderBalanced: true,
+    medianGpuToCpuSpeedup: medianRatio,
+    fasterGpuPairs: ratios.filter((ratio) => ratio > 1).length,
+    minGpuToCpuSpeedup: sortedRatios[0],
+    maxGpuToCpuSpeedup: sortedRatios[3],
+    rounds,
+  };
+};
+
 const benchmark = async (name: string, file: File, points: readonly { x: number; y: number; label: 1 }[]) => {
   const editor =
     createVideoSelection(
@@ -2125,6 +2205,8 @@ const main = async () => {
     cases:
       promptTrackerCases,
   });
+
+  reports.push(await benchmarkVisionFeaturePairs(bearFile));
 
   const sixty = await generatedSixty();
   await save("genuine-sixty-input.mp4", sixty);
