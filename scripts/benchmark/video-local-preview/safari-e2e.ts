@@ -118,11 +118,13 @@ try {
     };`);
 
     if (!uploadState.ready) {
-      webdriverFileError = uploadState.error ?? "WebDriver file was not accepted";
+      const uploadError = uploadState.error ?? "WebDriver file was not accepted";
+
+      webdriverFileError = uploadError;
       await captureState("webdriver-file-failure");
 
-      if (!webdriverFileError.includes("I/O read operation failed")) {
-        throw new Error(`Unexpected Safari upload error: ${webdriverFileError}`);
+      if (!uploadError.includes("I/O read operation failed")) {
+        throw new Error(`Unexpected Safari upload error: ${uploadError}`);
       }
 
       sourceStrategy = "browser-file";
