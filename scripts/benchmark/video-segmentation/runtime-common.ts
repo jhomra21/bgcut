@@ -225,6 +225,7 @@ export const createVideoSession =
   async (
     candidate: VideoSegmentationCandidate,
     role: VideoModelGraphRole,
+    captureGraph = false,
   ): Promise<ort.InferenceSession> => {
     const artifact =
       artifactFor(
@@ -299,6 +300,7 @@ export const createVideoSession =
         ],
         graphOptimizationLevel:
           "all",
+        enableGraphCapture: captureGraph,
       };
 
     if (
