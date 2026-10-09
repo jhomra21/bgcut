@@ -1,5 +1,7 @@
 import * as ort from "onnxruntime-web/webgpu";
 
+import { createSamGpuTokenTransposer } from "./sam21-gpu-tokens";
+
 import {
   channelsToTokens,
   closeVideoSessions,
@@ -755,6 +757,7 @@ export const createSam21Adapter =
           role,
           role === "vision-encoder" && options?.visionGraphCapture === true,
           role === "vision-encoder" && options?.visionGpuOutputs === true,
+          role === "vision-encoder" && options?.visionGpuAttention === true,
         );
 
       loaded.set(
