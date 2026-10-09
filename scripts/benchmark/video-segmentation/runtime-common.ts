@@ -227,6 +227,7 @@ export const createVideoSession =
     role: VideoModelGraphRole,
     captureGraph = false,
     visionGpuOutputs = false,
+    visionGpuAttention = false,
   ): Promise<ort.InferenceSession> => {
     const artifact =
       artifactFor(
@@ -304,14 +305,15 @@ export const createVideoSession =
         enableGraphCapture: captureGraph,
       };
 
-    if (role === "vision-encoder" && visionGpuOutputs) {
+    if (role === "vision-encoder" && (visionGpuOutputs || visionGpuAttention)) {
       // These feature tensors feed only GPU-backed decoder/temporal models.
-      // feats2 stays on CPU because memory attention transposes its tokens
-      // using the host channel layout. The positional embedding is cached.
+      // The attention probe also keeps feats2 on the GPU to transpose its
+      // tokens without a CPU readback. The positional embedding stays on CPU.
       sessionOptions.preferredOutputLocation = {
         feats0: "gpu-buffer",
         feats1: "gpu-buffer",
         feats2_no_mem: "gpu-buffer",
+        ...(visionGpuAttention ? { feats2: "gpu-buffer" as const } : {}),
       };
     }
 
