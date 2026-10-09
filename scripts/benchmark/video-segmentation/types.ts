@@ -178,6 +178,8 @@ export type VideoSegmentationAdapterOptions = {
   readonly visionGpuInput?: boolean;
   /** Benchmark-only: keep decoder-facing SAM vision features on WebGPU. */
   readonly visionGpuOutputs?: boolean;
+  /** Benchmark-only: transpose SAM memory-attention feature tokens on GPU. */
+  readonly visionGpuAttention?: boolean;
   readonly trackedMaskDecoderUrl?:
     string;
   readonly trackedMemoryEncoderUrl?:
