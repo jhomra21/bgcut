@@ -1046,7 +1046,7 @@ export const createSam21Adapter =
         let pixelValues: ort.Tensor;
 
         if (options?.visionGpuInput === true) {
-          const device = ort.env.webgpu.device;
+          const device = await ort.env.webgpu.device;
 
           if (device === undefined) {
             throw new Error("The SAM GPU-input probe requires an active WebGPU device.");
@@ -1055,15 +1055,16 @@ export const createSam21Adapter =
           const uploadStartedAt = performance.now();
 
           if (visionInputBuffer === undefined) {
-            visionInputBuffer = device.createBuffer({
+            const buffer = device.createBuffer({
               size: normalized.byteLength,
               usage: GPUBufferUsage.STORAGE |
                 GPUBufferUsage.COPY_DST |
                 GPUBufferUsage.COPY_SRC,
             });
 
+            visionInputBuffer = buffer;
             visionInputTensor = ort.Tensor.fromGpuBuffer(
-              visionInputBuffer,
+              buffer,
               {
                 dataType: "float32",
                 dims: visionInputDimensions,
