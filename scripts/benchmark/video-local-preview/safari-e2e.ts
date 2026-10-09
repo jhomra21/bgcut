@@ -9,6 +9,8 @@ const output = resolve(process.argv[4] ?? "/tmp/bgcut-safari-video");
 
 const driver = process.argv[5] ?? "http://127.0.0.1:4450";
 
+const fixtureOrigin = process.argv[6] ?? "http://127.0.0.1:4196";
+
 if (fixture === undefined) {
   throw new Error("Usage: bun run safari-e2e.ts <bear.mp4> [app-origin] [artifact-dir] [webdriver-origin]");
 }
@@ -89,12 +91,57 @@ const screenshot = async (name: string) => {
   await Bun.write(`${output}/${name}.png`, Buffer.from(bytes, "base64"));
 };
 
+let sourceStrategy: "webdriver-file-upload" | "browser-file" = "webdriver-file-upload";
+let webdriverFileError: string | undefined;
+
 try {
   await command("/url", JSON.stringify({ url: origin }));
   const input = await command("/element", JSON.stringify({ using: "css selector", value: "#source-file-input" }));
   await command(`/element/${input["element-6066-11e4-a52e-4f735466cecf"]}/value`, JSON.stringify({ text: resolve(fixture) }));
+
+  // A Safari WebDriver file can be visible to the input while its bytes are
+  // inaccessible to the browser's Blob API. Don't classify that CI-specific
+  // filesystem failure as a segmentation or export failure.
   try {
-    await waitFor('document.querySelector(".video-lab-selection-frame video.is-ready")', 35);
+    await waitFor(
+      'document.querySelector(".video-lab-selection-frame video.is-ready") || document.querySelector(".error-card")',
+      35,
+    );
+    const uploadState = await evaluate(`return {
+      ready: Boolean(document.querySelector(".video-lab-selection-frame video.is-ready")),
+      error: document.querySelector(".error-card")?.textContent?.trim() ?? null
+    };`);
+    if (!uploadState.ready) {
+      webdriverFileError = uploadState.error ?? "WebDriver file was not accepted";
+      await captureState("webdriver-file-failure");
+      if (!webdriverFileError.includes("I/O read operation failed")) {
+        throw new Error(`Unexpected Safari upload error: ${webdriverFileError}`);
+      }
+
+      sourceStrategy = "browser-file";
+      const synthetic = await evaluateAsync(`
+        const done = arguments[arguments.length - 1];
+        fetch(${JSON.stringify(fixtureOrigin + "/quality/bear.mp4")})
+          .then(response => {
+            if (!response.ok) throw new Error("Fixture fetch failed: HTTP " + response.status);
+            return response.blob();
+          })
+          .then(blob => {
+            const file = new File([blob], "bear.mp4", {type: "video/mp4"});
+            const data = new DataTransfer();
+            data.items.add(file);
+            const input = document.querySelector("#source-file-input");
+            input.files = data.files;
+            input.dispatchEvent(new Event("change", {bubbles: true}));
+            done({size: file.size, type: file.type});
+          })
+          .catch(error => done({error: String(error)}));
+      `);
+      if (synthetic.error || synthetic.size < 100000) {
+        throw new Error(`Could not create Safari browser File: ${JSON.stringify(synthetic)}`);
+      }
+      await waitFor('document.querySelector(".video-lab-selection-frame video.is-ready")', 35);
+    }
   } catch (error) {
     const state = await captureState("selection-readiness-failure");
     throw new Error(`Safari selection never became ready: ${JSON.stringify(state)}`, {
@@ -183,7 +230,7 @@ try {
 
   await Bun.write(`${output}/bear.mp4`, Buffer.from(encoded, "base64"));
   await screenshot("playable-result");
-  await Bun.write(`${output}/result.json`, JSON.stringify({ cold, refinement, filename, fusedGraphRequested, playback, decoded }, null, 2));
+  await Bun.write(`${output}/result.json`, JSON.stringify({ sourceStrategy, webdriverFileError, cold, refinement, filename, fusedGraphRequested, playback, decoded }, null, 2));
   console.log(`Safari preview and native playback acceptance passed: ${output}`);
 } finally {
   await request(base, "DELETE");
