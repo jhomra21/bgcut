@@ -39,14 +39,49 @@ const evaluate = (script: string) => command("/execute/sync", JSON.stringify({ s
 
 const evaluateAsync = (script: string) => command("/execute/async", JSON.stringify({ script, args: [] }));
 
-const waitFor = async (expression: string) => {
-  for (let attempt = 0; attempt < 150; attempt += 1) {
+const waitFor = async (expression: string, attempts = 150) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (await evaluate(`return Boolean(${expression});`)) return;
-
     await Bun.sleep(1000);
   }
-
   throw new Error(`Safari timed out: ${expression}`);
+};
+
+const captureState = async (name: string) => {
+  const state = await evaluate(`return (() => {
+    const input = document.querySelector("#source-file-input");
+    const video = document.querySelector(".video-lab-selection-frame video");
+    const state = document.querySelector(".video-lab");
+    const error = document.querySelector(".error-card");
+    return {
+      url: location.href,
+      title: document.title,
+      file: input?.files?.[0] ? {
+        name: input.files[0].name, size: input.files[0].size,
+        type: input.files[0].type
+      } : null,
+      editorPresent: Boolean(state),
+      editorText: state?.innerText?.slice(0, 2200) ?? null,
+      error: error?.innerText ?? null,
+      video: video ? {
+        readyState: video.readyState, networkState: video.networkState,
+        errorCode: video.error?.code ?? null,
+        errorMessage: video.error?.message ?? null,
+        currentTime: video.currentTime,
+        duration: video.duration, paused: video.paused,
+        videoWidth: video.videoWidth, videoHeight: video.videoHeight,
+        currentSrc: video.currentSrc, className: video.className
+      } : null,
+      canPlayH264: document.createElement("video").canPlayType(
+        'video/mp4; codecs="avc1.64001e"'
+      ),
+      frameStatus: document.querySelector(".video-lab-frame-status")?.dataset.state,
+      modelStatus: document.querySelector(".video-lab-model-status")?.dataset.state
+    };
+  })();`);
+  await Bun.write(`${output}/${name}.json`, JSON.stringify(state, null, 2));
+  await screenshot(name);
+  return state;
 };
 
 const screenshot = async (name: string) => {
@@ -58,7 +93,14 @@ try {
   await command("/url", JSON.stringify({ url: origin }));
   const input = await command("/element", JSON.stringify({ using: "css selector", value: "#source-file-input" }));
   await command(`/element/${input["element-6066-11e4-a52e-4f735466cecf"]}/value`, JSON.stringify({ text: resolve(fixture) }));
-  await waitFor('document.querySelector("video.is-ready")');
+  try {
+    await waitFor('document.querySelector(".video-lab-selection-frame video.is-ready")', 35);
+  } catch (error) {
+    const state = await captureState("selection-readiness-failure");
+    throw new Error(`Safari selection never became ready: ${JSON.stringify(state)}`, {
+      cause: error
+    });
+  }
 
   const cold = await evaluate(`return {
     model:document.querySelector(".video-lab-model-status").textContent,
