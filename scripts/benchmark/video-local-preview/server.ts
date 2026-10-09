@@ -286,6 +286,7 @@ const app =
         // fetching this known fixture into a File on the app page.
         const headers = new Headers(quality.headers);
         headers.set("access-control-allow-origin", "*");
+
         return new Response(quality.body, {
           status: quality.status,
           statusText: quality.statusText,
