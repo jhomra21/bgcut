@@ -46,6 +46,7 @@ const waitFor = async (expression: string, attempts = 150) => {
     if (await evaluate(`return Boolean(${expression});`)) return;
     await Bun.sleep(1000);
   }
+
   throw new Error(`Safari timed out: ${expression}`);
 };
 
@@ -81,8 +82,10 @@ const captureState = async (name: string) => {
       modelStatus: document.querySelector(".video-lab-model-status")?.dataset.state
     };
   })();`);
+
   await Bun.write(`${output}/${name}.json`, JSON.stringify(state, null, 2));
   await screenshot(name);
+
   return state;
 };
 
@@ -92,6 +95,7 @@ const screenshot = async (name: string) => {
 };
 
 let sourceStrategy: "webdriver-file-upload" | "browser-file" = "webdriver-file-upload";
+
 let webdriverFileError: string | undefined;
 
 try {
@@ -111,14 +115,17 @@ try {
       ready: Boolean(document.querySelector(".video-lab-selection-frame video.is-ready")),
       error: document.querySelector(".error-card")?.textContent?.trim() ?? null
     };`);
+
     if (!uploadState.ready) {
       webdriverFileError = uploadState.error ?? "WebDriver file was not accepted";
       await captureState("webdriver-file-failure");
+
       if (!webdriverFileError.includes("I/O read operation failed")) {
         throw new Error(`Unexpected Safari upload error: ${webdriverFileError}`);
       }
 
       sourceStrategy = "browser-file";
+
       const synthetic = await evaluateAsync(`
         const done = arguments[arguments.length - 1];
         fetch(${JSON.stringify(fixtureOrigin + "/quality/bear.mp4")})
@@ -137,9 +144,11 @@ try {
           })
           .catch(error => done({error: String(error)}));
       `);
+
       if (synthetic.error || synthetic.size < 100000) {
         throw new Error(`Could not create Safari browser File: ${JSON.stringify(synthetic)}`);
       }
+
       await waitFor('document.querySelector(".video-lab-selection-frame video.is-ready")', 35);
     }
   } catch (error) {
