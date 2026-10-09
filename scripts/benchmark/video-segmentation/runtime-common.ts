@@ -309,17 +309,15 @@ export const createVideoSession =
       // These feature tensors feed only GPU-backed decoder/temporal models.
       // The attention probe also keeps feats2 on the GPU to transpose its
       // tokens without a CPU readback. The positional embedding stays on CPU.
-      const locations: Record<string, "gpu-buffer"> = {
+      const locations = {
         feats0: "gpu-buffer",
         feats1: "gpu-buffer",
         feats2_no_mem: "gpu-buffer",
-      };
+      } as const;
 
-      if (visionGpuAttention) {
-        locations.feats2 = "gpu-buffer";
-      }
-
-      sessionOptions.preferredOutputLocation = locations;
+      sessionOptions.preferredOutputLocation = visionGpuAttention
+        ? { ...locations, feats2: "gpu-buffer" }
+        : locations;
     }
 
     if (
