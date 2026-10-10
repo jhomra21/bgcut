@@ -565,3 +565,96 @@ jobs:
           name: video-tracked-decoder
           path: ${{ runner.temp }}/video-tracked-decoder
           if-no-files-found: error
+
+  model-candidates:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Download pinned EfficientTAM-Ti encoder
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-candidates"
+          mkdir -p "$ROOT"
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://huggingface.co/egordm/efficienttam-ti-512/resolve/40788ab3b74e96ad7b5db2a809f654b9f99c142e/fp16/image_encoder.onnx" \
+            --output "$ROOT/efficienttam-ti-image-encoder.onnx"
+          printf '%s  %s\n' \
+            "6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812" \
+            "$ROOT/efficienttam-ti-image-encoder.onnx" | shasum -a 256 --check -
+          test "$(stat -f%z "$ROOT/efficienttam-ti-image-encoder.onnx")" = "12774095"
+
+      - name: Benchmark WebGPU candidate encoder
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-candidates"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4198 model-candidates >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4198/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4198/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..600}; do
+            if [[ -s "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -s "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for EfficientTAM candidate encoder benchmark." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-model-candidates
+          path: ${{ runner.temp }}/video-model-candidates
+          if-no-files-found: warn
