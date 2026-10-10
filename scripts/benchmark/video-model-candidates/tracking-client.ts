@@ -166,27 +166,44 @@ const promptInputs = (x?: number, y?: number) => ({
   has_mask: new ort.Tensor("float32", Float32Array.of(0), [1]),
 });
 
-const readableHalf = (tensor: ort.Tensor | undefined, name: string): Uint16Array => {
-  if (tensor?.type === "float16" && tensor.data instanceof Uint16Array) {
-    return tensor.data;
+const readableHalf = async (
+  tensor: ort.Tensor | undefined,
+  name: string,
+): Promise<Uint16Array> => {
+  if (tensor === undefined) {
+    throw new Error(`EfficientTAM ${name} is missing.`);
   }
 
-  if (tensor?.type === "float32" && tensor.data instanceof Float32Array) {
+  // WebGPU tensors and native Float16Array values are not necessarily
+  // Uint16Array instances. Read and reinterpret their storage explicitly.
+  const data = await tensor.getData();
+
+  if (!ArrayBuffer.isView(data)) {
+    throw new Error(`EfficientTAM ${name} returned an unsupported ${tensor.type} data representation.`);
+  }
+
+  if (tensor.type === "float16" && data.byteLength % 2 === 0) {
+    return new Uint16Array(data.buffer, data.byteOffset, data.byteLength / 2).slice();
+  }
+
+  if (tensor.type === "float32" && data.byteLength % 4 === 0) {
     // The FP16 bundle may return float32 logits after interpolating masks.
-    return floatToHalf(tensor.data);
+    return floatToHalf(new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4));
   }
 
-  throw new Error(`EfficientTAM ${name} must expose CPU-readable float16 or float32 data.`);
+  throw new Error(
+    `EfficientTAM ${name}: unsupported ${tensor.type} ${data.constructor.name} at ${tensor.location}.`,
+  );
 };
 
-const selectMask = (outputs: Record<string, ort.Tensor>) => {
+const selectMask = async (outputs: Record<string, ort.Tensor>) => {
   const masksTensor = outputs.masks;
   const iouTensor = outputs.iou_pred;
   const ptrTensor = outputs.obj_ptrs;
 
-  const masks = readableHalf(masksTensor, "masks");
-  const scores = readableHalf(iouTensor, "iou_pred");
-  const pointers = readableHalf(ptrTensor, "obj_ptrs");
+  const masks = await readableHalf(masksTensor, "masks");
+  const scores = await readableHalf(iouTensor, "iou_pred");
+  const pointers = await readableHalf(ptrTensor, "obj_ptrs");
   const count = scores.length;
 
   requireDims(masksTensor, "masks", [1, count, SIDE, SIDE]);
@@ -407,7 +424,7 @@ const main = async () => {
             }
 
             try {
-              const selected = selectMask(decoded);
+              const selected = await selectMask(decoded);
               const maskInput = halfTensor(selected.mask, [1, 1, SIDE, SIDE]);
               let encoded: Record<string, ort.Tensor>;
 
