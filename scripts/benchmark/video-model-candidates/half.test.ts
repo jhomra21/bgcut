@@ -12,7 +12,7 @@ test("Float16 conversion preserves signed values and finite extremes", () => {
 });
 
 test("Float16 conversion handles subnormal and invalid floats", () => {
-  const source = Float32Array.of(2 ** -24, -2 ** -24, Number.POSITIVE_INFINITY, Number.NaN);
+  const source = Float32Array.of(2 ** -24, -(2 ** -24), Number.POSITIVE_INFINITY, Number.NaN);
   const half = floatToHalf(source);
 
   expect(half[0]).toBe(0x0001);
