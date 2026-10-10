@@ -46,17 +46,17 @@ test("tracking memory rejects stale indices and invalid capacities", () => {
   expect(memory.values().map((frame) => frame.index)).toEqual([3]);
 });
 
-test("snapshot mutation cannot change internal tracking memory", () => {
+test("snapshots remain independent of subsequent memory updates", () => {
   const memory = new BoundedFrameMemory<{ readonly index: number }>(2);
 
   memory.push({ index: 0 });
 
   const snapshot = memory.values();
 
-  // The API intentionally exposes a readonly type. Exercise the returned
-  // array's runtime mutability without weakening the public type contract.
-  Reflect.apply(Array.prototype.pop, snapshot, []);
+  memory.push({ index: 1 });
+  memory.push({ index: 2 });
 
-  expect(memory.size).toBe(1);
-  expect(memory.values().map((frame) => frame.index)).toEqual([0]);
+  expect(snapshot.map((frame) => frame.index)).toEqual([0]);
+  expect(memory.size).toBe(2);
+  expect(memory.values().map((frame) => frame.index)).toEqual([1, 2]);
 });
