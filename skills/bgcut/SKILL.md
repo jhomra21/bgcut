@@ -9,6 +9,8 @@ Use `bgcut` for local background removal. Source images stay on the user's machi
 
 This skill describes bgcut 0.6.1.
 
+The unreleased development UI also has an experimental video editor on the main media intake. It previews local click-selected subject masks and exports silent clips of up to 15 seconds using real source cadence capped at 60 fps, with trimming, quality, size, optional title metadata, transparent WebM or solid-background MP4. Safari defaults to explicitly opaque MP4 for playback; transparent WebM requires an alpha-capable player or editor. Original dimensions and high quality are the defaults; rate caps and other export controls are disclosed under settings. Playback rate is not processing throughput. Model and selected-frame warm-up start without a click and show readiness progress, and refinements preserve the previous highlight while updating. This is not a released hosted, packaged, CLI, or Node video contract. Do not pass video inputs to the public image-removal API.
+
 ## Install
 
 Run the packaged local app without a global install:

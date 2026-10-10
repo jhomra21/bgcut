@@ -2,6 +2,17 @@
 
 User-facing changes to bgcut are listed here.
 
+## Unreleased
+
+- Unified the local development image/video intake. Selecting a video opens its editor in the same workspace.
+- Added local one-click subject-mask previews, Keep/Exclude corrections, and reuse of SAM sessions for preview and independent multi-subject tracking.
+- Model loading starts alongside media inspection; the selected frame and prompt kernels warm before any click. Same-frame refinements retain the previous mask until the latest result is ready, and stale queued requests are canceled.
+- Safari defaults to explicitly opaque H.264 MP4 with native playback controls. Transparent WebM stays available with an upfront compatibility warning; results no longer duplicate a still preview and a large playback notice.
+- Added video quality, size, title metadata, and trim controls. A range of up to 15 seconds can start anywhere in the source; exports preserve real source cadence up to 60 fps without audio. WebM preserves transparency; MP4 uses an explicitly selected solid background and requires browser encoding support.
+- Default video export now uses source dimensions and high encoding quality. Real source timestamps preserve variable frame timing, with lower-rate caps rather than duplicated frames. Processing throughput is GPU-dependent, not a realtime 60 fps promise.
+- Put the primary action directly below viewport-bounded media, with Refine and Export/trim behind progressive disclosures.
+- Video remains experimental and is not enabled on the hosted website or exposed through the public CLI/Node removal API.
+
 ## 0.6.1 - 2026-10-01
 
 - Hosted pages now prerender from the same Solid component tree used in the browser and hydrate the existing DOM. The Cloudflare build produces 27 hydratable routes and checks the hydration script and CSP in its runtime smoke.

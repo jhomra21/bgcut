@@ -1,0 +1,861 @@
+name: video local preview
+
+on:
+  pull_request:
+
+concurrency:
+  group: video-local-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+
+      - name: Prepare local SAM tracked models
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bun run video:model:prepare
+          test -s .cache/bgcut-video/sam21-tracked-mask-decoder.onnx
+          test -s .cache/bgcut-video/sam21-tracked-mask-decoder.json
+          test -s .cache/bgcut-video/sam21-tracked-step.onnx
+          test -s .cache/bgcut-video/sam21-tracked-step.json
+
+      - name: Verify Vite serves ORT runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/vite-runtime"
+          mkdir -p "$ROOT"
+
+          bun run dev -- --host 127.0.0.1 --port 4194 --strictPort >"$ROOT/vite.log" 2>&1 &
+          VITE_PID=$!
+
+          cleanup() {
+            kill "$VITE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4194/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          bun -e '
+            import {
+              TRACKED_DECODER_PUBLIC_PATH,
+              TRACKED_STEP_PUBLIC_PATH,
+            } from "./src/shared/video-experimental-config.ts";
+            import {
+              ORT_WASM_MODULE_PUBLIC_PATH,
+              ORT_WASM_PUBLIC_PATH,
+              ORT_WEBGPU_WASM_PUBLIC_PATH,
+            } from "./src/shared/ort-assets.ts";
+
+            const origin = "http://127.0.0.1:4194";
+
+            for (const path of [
+              ORT_WEBGPU_WASM_PUBLIC_PATH,
+              ORT_WASM_PUBLIC_PATH,
+            ]) {
+              const response = await fetch(origin + path);
+              const contentType = response.headers.get("content-type") ?? "";
+              const bytes = new Uint8Array(await response.arrayBuffer());
+
+              if (!response.ok) {
+                throw new Error(path + " returned HTTP " + response.status + ".");
+              }
+
+              if (!contentType.startsWith("application/wasm")) {
+                throw new Error(path + " returned " + contentType + " instead of application/wasm.");
+              }
+
+              if (
+                bytes.length < 4 ||
+                bytes[0] !== 0x00 ||
+                bytes[1] !== 0x61 ||
+                bytes[2] !== 0x73 ||
+                bytes[3] !== 0x6d
+              ) {
+                throw new Error(path + " did not return a WebAssembly binary.");
+              }
+            }
+
+            const moduleResponse = await fetch(origin + ORT_WASM_MODULE_PUBLIC_PATH);
+            const moduleType = moduleResponse.headers.get("content-type") ?? "";
+            const moduleSource = await moduleResponse.text();
+
+            if (!moduleResponse.ok) {
+              throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned HTTP " + moduleResponse.status + ".");
+            }
+
+            if (!moduleType.startsWith("text/javascript")) {
+              throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned " + moduleType + " instead of JavaScript.");
+            }
+
+            if (moduleSource.length === 0 || moduleSource.trimStart().startsWith("<!")) {
+              throw new Error(ORT_WASM_MODULE_PUBLIC_PATH + " returned empty content or SPA HTML.");
+            }
+
+            for (const path of [
+              TRACKED_DECODER_PUBLIC_PATH,
+              TRACKED_STEP_PUBLIC_PATH,
+            ]) {
+              const response = await fetch(origin + path);
+              const contentType = response.headers.get("content-type") ?? "";
+              const bytes = new Uint8Array(await response.arrayBuffer());
+
+              if (!response.ok) {
+                throw new Error(path + " returned HTTP " + response.status + ".");
+              }
+
+              if (!contentType.startsWith("application/octet-stream")) {
+                throw new Error(path + " returned " + contentType + " instead of binary model data.");
+              }
+
+              if (bytes.length < 1024) {
+                throw new Error(path + " returned an unexpectedly small model.");
+              }
+            }
+          '
+
+      - name: Run local video preview acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-preview"
+          mkdir -p "$ROOT"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4195 >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4195/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          "$CHROME"             --headless=new             --enable-unsafe-webgpu             --disable-gpu-blocklist             --enable-webgpu-developer-features             --use-gpu-in-tests             http://127.0.0.1:4195/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..900}; do
+            if [[ -f "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              test -s "$ROOT/bear.webm"
+              test -s "$ROOT/bmx-trees.webm"
+              test -s "$ROOT/car-shadow.webm"
+              exit 0
+            fi
+
+            if [[ -f "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              echo "Chrome exited before video preview acceptance completed." >&2
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for video preview acceptance." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - name: Run Solid video UI acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-preview"
+          UI_ROOT="$ROOT/ui"
+          FIXTURE_ROOT="$ROOT/ui-fixture-proxy"
+          mkdir -p "$UI_ROOT" "$FIXTURE_ROOT"
+
+          bun add --global agent-browser@0.38.2
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$FIXTURE_ROOT" 4196 >"$ROOT/ui-fixture-server.log" 2>&1 &
+          FIXTURE_PID=$!
+
+          bun run dev -- --host 127.0.0.1 --port 5184 --strictPort >"$ROOT/ui-vite.log" 2>&1 &
+          VITE_PID=$!
+
+          cleanup() {
+            kill "$VITE_PID" 2>/dev/null || true
+            kill "$FIXTURE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4196/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:5184/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent --show-error             http://127.0.0.1:4196/quality/bear.mp4             --output "$ROOT/bear-ui.mp4"
+
+          test -s "$ROOT/bear-ui.mp4"
+
+          bun run scripts/benchmark/video-local-preview/ui-e2e.ts             "$ROOT/bear-ui.mp4"             http://127.0.0.1:5184             "$UI_ROOT"
+
+          test -s "$UI_ROOT/result.json"
+          test -s "$UI_ROOT/initial-readiness.png"
+          test -s "$UI_ROOT/desktop-mask.png"
+          test -s "$UI_ROOT/mobile-mask.png"
+          test -s "$UI_ROOT/mobile-result.png"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-local-preview
+          path: ${{ runner.temp }}/video-local-preview
+          if-no-files-found: error
+
+
+  safari:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+
+      - name: Verify Safari video and WebGPU capability
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-safari"
+          mkdir -p "$ROOT"
+          bun run video:model:prepare
+          test -s .cache/bgcut-video/sam21-tracked-step.onnx
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT/fixtures" 4196 >"$ROOT/fixtures.log" 2>&1 &
+          FIXTURE_PID=$!
+          bun run dev -- --host 127.0.0.1 --port 5184 --strictPort >"$ROOT/vite.log" 2>&1 &
+          VITE_PID=$!
+
+          cleanup() {
+            kill "${DRIVER_PID:-}" "$FIXTURE_PID" "$VITE_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4196/ >/dev/null &&
+               curl --fail --silent http://127.0.0.1:5184/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent --show-error \
+            http://127.0.0.1:4196/quality/bear.mp4 \
+            --output "$ROOT/bear.mp4"
+          test -s "$ROOT/bear.mp4"
+
+          sudo /usr/bin/safaridriver --enable
+          /usr/bin/safaridriver --port 4450 >"$ROOT/safaridriver.log" 2>&1 &
+          DRIVER_PID=$!
+          for _ in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4450/status >"$ROOT/safaridriver-status.json"; then
+              break
+            fi
+            if ! kill -0 "$DRIVER_PID" 2>/dev/null; then
+              cat "$ROOT/safaridriver.log" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          bun run scripts/benchmark/video-local-preview/safari-e2e.ts \
+            "$ROOT/bear.mp4" http://127.0.0.1:5184 "$ROOT" http://127.0.0.1:4450
+
+          test -s "$ROOT/result.json"
+          test -s "$ROOT/bear.mp4"
+          STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$ROOT/result.json")"
+
+          case "$STATUS" in
+            passed)
+              test -s "$ROOT/playable-result.png"
+              echo "Safari WebGPU segmentation and native MP4 export: passed." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            blocked-no-webgpu-adapter)
+              test -s "$ROOT/safari-media-playback.png"
+              python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["gpuAdapterAvailable"] is False and r["media"]["after"] > r["media"]["before"]' "$ROOT/result.json"
+              echo "Safari media decoding and playback: passed. WebGPU segmentation/export: blocked because the GitHub macOS runner has no GPU adapter; not accepted." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "Unexpected Safari acceptance status: $STATUS" >&2
+              exit 1
+              ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-local-safari
+          path: ${{ runner.temp }}/video-local-safari
+          if-no-files-found: warn
+
+  performance:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+
+      - name: Measure local video performance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-local-performance"
+          mkdir -p "$ROOT"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-decoder.py \
+            "$ROOT/sam21-tracked-mask-decoder.onnx" \
+            >"$ROOT/sam21-tracked-mask-decoder.json"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-step.py \
+            "$ROOT/sam21-tracked-step.onnx" \
+            >"$ROOT/sam21-tracked-step.json"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-vision.py \
+            "$ROOT/sam21-tracked-vision.onnx" \
+            >"$ROOT/sam21-tracked-vision.json"
+
+          test -s "$ROOT/sam21-tracked-vision.onnx"
+          test -s "$ROOT/sam21-tracked-vision.json"
+          test -s "$ROOT/sam21-tracked-step.onnx"
+          test -s "$ROOT/sam21-tracked-step.json"
+          test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
+          test -s "$ROOT/sam21-tracked-mask-decoder.json"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4197 performance >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4197/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4197/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..900}; do
+            if [[ -f "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              test -s "$ROOT/bear-6.mp4"
+              test -s "$ROOT/bear-source.mp4"
+              test -s "$ROOT/bmx-trees-6.mp4"
+              test -s "$ROOT/bmx-trees-source.mp4"
+              test -s "$ROOT/bmx-trees-source-track-12.mp4"
+              test -s "$ROOT/bmx-trees-source-track-8.mp4"
+              test -s "$ROOT/genuine-sixty-input.mp4"
+              test -s "$ROOT/sixty-source-track-60.mp4"
+              test -s "$ROOT/sixty-source-track-30.mp4"
+              test -s "$ROOT/sixty-source-track-24.mp4"
+              test -s "$ROOT/sixty-source-track-12.mp4"
+              test -s "$ROOT/vfr-nonzero-source.mp4"
+              exit 0
+            fi
+
+            if [[ -f "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              echo "Chrome exited before video performance acceptance completed." >&2
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for video performance acceptance." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-local-performance
+          path: ${{ runner.temp }}/video-local-performance
+          if-no-files-found: error
+
+
+  tracked-decoder:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+
+      - name: Validate specialized SAM tracked decoder
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$RUNNER_TEMP/video-tracked-decoder"
+          mkdir -p "$ROOT"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-decoder.py \
+            "$ROOT/sam21-tracked-mask-decoder.onnx" \
+            >"$ROOT/sam21-tracked-mask-decoder.json"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-memory-encoder.py \
+            "$ROOT/sam21-tracked-memory-encoder.onnx" \
+            >"$ROOT/sam21-tracked-memory-encoder.json"
+
+          uv run scripts/benchmark/video-segmentation/specialize-sam21-tracked-step.py \
+            "$ROOT/sam21-tracked-step.onnx" \
+            >"$ROOT/sam21-tracked-step.json"
+
+          test -s "$ROOT/sam21-tracked-mask-decoder.onnx"
+          test -s "$ROOT/sam21-tracked-mask-decoder.json"
+          test -s "$ROOT/sam21-tracked-memory-encoder.onnx"
+          test -s "$ROOT/sam21-tracked-memory-encoder.json"
+          test -s "$ROOT/sam21-tracked-step.onnx"
+          test -s "$ROOT/sam21-tracked-step.json"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4198 tracked-decoder >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4198/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [[ ! -x "$CHROME" ]]; then
+            echo "Google Chrome is not installed at $CHROME." >&2
+            exit 1
+          fi
+
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4198/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..900}; do
+            if [[ -f "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -f "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              echo "Chrome exited before tracked decoder validation completed." >&2
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for tracked decoder validation." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-tracked-decoder
+          path: ${{ runner.temp }}/video-tracked-decoder
+          if-no-files-found: error
+
+  model-candidates:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Download pinned EfficientTAM-Ti encoder
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-candidates"
+          mkdir -p "$ROOT"
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://huggingface.co/egordm/efficienttam-ti-512/resolve/40788ab3b74e96ad7b5db2a809f654b9f99c142e/fp16/image_encoder.onnx" \
+            --output "$ROOT/efficienttam-ti-image-encoder.onnx"
+          printf '%s  %s\n' \
+            "6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812" \
+            "$ROOT/efficienttam-ti-image-encoder.onnx" | shasum -a 256 --check -
+          test "$(stat -f%z "$ROOT/efficienttam-ti-image-encoder.onnx")" = "12774095"
+
+      - name: Benchmark WebGPU candidate encoder
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-candidates"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4198 model-candidates >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4198/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4198/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..600}; do
+            if [[ -s "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -s "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out waiting for EfficientTAM candidate encoder benchmark." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-model-candidates
+          path: ${{ runner.temp }}/video-model-candidates
+          if-no-files-found: warn
+
+  model-tracking:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Download verified EfficientTAM tracking bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-tracking"
+          mkdir -p "$ROOT"
+
+          while read -r filename output sha bytes; do
+            curl --fail --location --silent --show-error --retry 3 \
+              "https://huggingface.co/egordm/efficienttam-ti-512/resolve/40788ab3b74e96ad7b5db2a809f654b9f99c142e/fp16/$filename" \
+              --output "$ROOT/efficienttam-ti-$output"
+            printf '%s  %s\n' "$sha" "$ROOT/efficienttam-ti-$output" | shasum -a 256 --check -
+            test "$(stat -f%z "$ROOT/efficienttam-ti-$output")" = "$bytes"
+          done <<'MODELS'
+          image_encoder.onnx image_encoder.onnx 6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812 12774095
+          prompt_encoder.onnx prompt_encoder.onnx 525db5ac7deb9ce7ed98889a6b28b91e54b622d8fb132af26ca60b2886ed1f4a 44673
+          mask_decoder.onnx mask_decoder.onnx 8668f7f1b206a0ab9184a9e5a448ebcda47214303d083c5df3fee904aa96fc53 9393625
+          memory_encoder.onnx memory_encoder.onnx 9452c7c8b603806e0d793253ef576e5ccb9d0658e1548bf184ceaa2bce759355 2813090
+          memory_attention.onnx memory_attention.onnx b22b2144f3f48b21e66cc49bc6bb286bab2623695b39058031ccb5d97f56db9b 15342460
+          maskmem_tpos_enc.npy maskmem-tpos.npy 25bb49ba6d72e35a044c90a95933cd9527bc6940f9e1432148bcd3a8fa99a364 1024
+          MODELS
+
+      - name: Track real DAVIS frames with five ONNX modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-tracking"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4199 model-tracking >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4199/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+          for scenario in bear camel car-shadow car-shadow-proposal0 car-shadow-correct3; do
+            rm -f "$ROOT/result.json" "$ROOT/failure.json"
+
+            fixture="$scenario"
+            proposal_query=""
+
+            if [[ "$scenario" == "car-shadow" ]]; then
+              proposal_query="&frames=12"
+            elif [[ "$scenario" == "car-shadow-proposal0" ]]; then
+              fixture="car-shadow"
+              proposal_query="&proposal=0&frames=12&rewind=1&dual=1"
+            elif [[ "$scenario" == "car-shadow-correct3" ]]; then
+              fixture="car-shadow"
+              proposal_query="&frames=12&correctionAt=3&correctionProposal=0"
+            fi
+
+            "$CHROME" \
+              --headless=new \
+              --enable-unsafe-webgpu \
+              --disable-gpu-blocklist \
+              --enable-webgpu-developer-features \
+              --use-gpu-in-tests \
+              --user-data-dir="$RUNNER_TEMP/efficienttam-chrome-$scenario" \
+              "http://127.0.0.1:4199/?fixture=$fixture$proposal_query" >"$ROOT/chrome-$scenario.log" 2>&1 &
+            CHROME_PID=$!
+
+            completed=0
+
+            for _ in {1..600}; do
+              if [[ -s "$ROOT/result.json" ]]; then
+                cat "$ROOT/result.json"
+                mv "$ROOT/result.json" "$ROOT/result-$scenario.json"
+                completed=1
+                break
+              fi
+
+              if [[ -s "$ROOT/failure.json" ]]; then
+                cat "$ROOT/failure.json" >&2
+                exit 1
+              fi
+
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                cat "$ROOT/chrome-$scenario.log" >&2 || true
+                cat "$ROOT/server.log" >&2 || true
+                exit 1
+              fi
+
+              sleep 1
+            done
+
+            kill "$CHROME_PID" 2>/dev/null || true
+            wait "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+
+            if [[ "$completed" != 1 ]]; then
+              echo "Timed out tracking DAVIS $fixture with EfficientTAM." >&2
+              exit 1
+            fi
+          done
+
+          # Explicitly selected proposal 0 must recover the intended car
+          # without any ground-truth-driven choice inside the tracker.
+          bun -e '
+            const report = async (path) => {
+              const json = await Bun.file(path).json();
+              return json.reports.find((row) => row.name === "efficienttam-ti-fp16-temporal-smoke");
+            };
+            const [automatic, selected] = await Promise.all(
+              process.argv.slice(-2).map(report)
+            );
+            if (automatic?.fixture !== "car-shadow" ||
+                selected?.fixture !== "car-shadow" ||
+                automatic.seedProposal !== "auto" ||
+                selected.seedProposal !== 0 ||
+                automatic.frames.length !== 12 ||
+                selected.frames.length !== 12 ||
+                selected.frames[0]?.chosenProposal !== 0 ||
+                selected.frames.some((row) => row.memorySlots !== Math.min(row.index + 1, 7)) ||
+                selected.frames[11]?.memorySlots !== 7 ||
+                selected.rewind?.replayedFrames !== 12 ||
+                selected.rewind?.minMaskIou < 0.995 ||
+                selected.independent?.primaryMemoryIndices?.length !== 7 ||
+                selected.independent?.alternateMemoryIndices?.length !== 7 ||
+                selected.independent?.seedMaskIoU >= 0.7 ||
+                selected.independent?.alternateMeanTrackedIoU >= 0.3 ||
+                selected.meanTrackedIou < 0.85 ||
+                selected.meanTrackedIou - automatic.meanTrackedIou < 0.5) {
+              throw Error(JSON.stringify({
+                reason: "Selected EfficientTAM car-shadow proposal did not recover tracking",
+                auto: automatic?.meanTrackedIou,
+                selected: selected?.meanTrackedIou,
+                seeded: selected?.frames[0]?.chosenProposal,
+              }));
+            }
+            console.log(JSON.stringify({
+              status: "selected proposal tracking recovered",
+              autoMeanIou: automatic.meanTrackedIou,
+              selectedMeanIou: selected.meanTrackedIou,
+              rewindMinIou: selected.rewind.minMaskIou,
+              distinctSeedMaskIou: selected.independent.seedMaskIoU,
+              alternateTrackedMeanIou: selected.independent.alternateMeanTrackedIoU,
+            }));
+          ' "$ROOT/result-car-shadow.json" "$ROOT/result-car-shadow-proposal0.json"
+
+          # The first three frames intentionally follow the wrong automatic
+          # proposal. A simulated user correction at frame 3 must reset the
+          # temporal bank and recover the same subject using proposal 0.
+          bun -e '
+            const data = await Bun.file(process.argv.at(-1)).json();
+            const report = data.reports.find((entry) => entry.name === "efficienttam-ti-fp16-temporal-smoke");
+            const prefix = report.frames.slice(0, 3);
+            const suffix = report.frames.slice(3);
+            const average = (rows) => rows.reduce((sum, row) => sum + row.iou, 0) / rows.length;
+            if (report.correction?.index !== 3 ||
+                report.correction.proposal !== 0 ||
+                report.seedProposal !== "auto" ||
+                report.frames.length !== 12 ||
+                report.frames[3].corrected !== true ||
+                report.frames[3].memorySlots !== 1 ||
+                report.frames[4].memorySlots !== 2 ||
+                average(prefix) > 0.3 ||
+                average(suffix) < 0.85) {
+              throw Error(JSON.stringify({
+                reason: "EfficientTAM did not recover following a frame-3 user correction",
+                prefix: average(prefix),
+                suffix: average(suffix),
+              }));
+            }
+            console.log(JSON.stringify({
+              status: "EfficientTAM late correction recovered tracking",
+              uncorrectedMeanIou: average(prefix),
+              correctedMeanIou: average(suffix),
+            }));
+          ' "$ROOT/result-car-shadow-correct3.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-model-tracking
+          path: ${{ runner.temp }}/video-model-tracking
+          if-no-files-found: warn
