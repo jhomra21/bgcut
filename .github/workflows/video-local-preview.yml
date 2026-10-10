@@ -718,7 +718,7 @@ jobs:
 
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
-          for scenario in bear camel car-shadow car-shadow-proposal0; do
+          for scenario in bear camel car-shadow car-shadow-proposal0 car-shadow-correct3; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -729,6 +729,9 @@ jobs:
             elif [[ "$scenario" == "car-shadow-proposal0" ]]; then
               fixture="car-shadow"
               proposal_query="&proposal=0&frames=12&rewind=1"
+            elif [[ "$scenario" == "car-shadow-correct3" ]]; then
+              fixture="car-shadow"
+              proposal_query="&frames=12&correctionAt=3&correctionProposal=0"
             fi
 
             "$CHROME" \
@@ -812,6 +815,37 @@ jobs:
               rewindMinIou: selected.rewind.minMaskIou,
             }));
           ' "$ROOT/result-car-shadow.json" "$ROOT/result-car-shadow-proposal0.json"
+
+          # The first three frames intentionally follow the wrong automatic
+          # proposal. A simulated user correction at frame 3 must reset the
+          # temporal bank and recover the same subject using proposal 0.
+          bun -e '
+            const data = await Bun.file(process.argv.at(-1)).json();
+            const report = data.reports.find((entry) => entry.name === "efficienttam-ti-fp16-temporal-smoke");
+            const prefix = report.frames.slice(0, 3);
+            const suffix = report.frames.slice(3);
+            const average = (rows) => rows.reduce((sum, row) => sum + row.iou, 0) / rows.length;
+            if (report.correction?.index !== 3 ||
+                report.correction.proposal !== 0 ||
+                report.seedProposal !== "auto" ||
+                report.frames.length !== 12 ||
+                report.frames[3].corrected !== true ||
+                report.frames[3].memorySlots !== 1 ||
+                report.frames[4].memorySlots !== 2 ||
+                average(prefix) > 0.3 ||
+                average(suffix) < 0.85) {
+              throw Error(JSON.stringify({
+                reason: "EfficientTAM did not recover following a frame-3 user correction",
+                prefix: average(prefix),
+                suffix: average(suffix),
+              }));
+            }
+            console.log(JSON.stringify({
+              status: "EfficientTAM late correction recovered tracking",
+              uncorrectedMeanIou: average(prefix),
+              correctedMeanIou: average(suffix),
+            }));
+          ' "$ROOT/result-car-shadow-correct3.json"
 
       - uses: actions/upload-artifact@v4
         if: always()
