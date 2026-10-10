@@ -89,6 +89,12 @@ if (
 ) {
   clientFilename =
     "../video-model-candidates/client.ts";
+} else if (
+  mode ===
+  "model-tracking"
+) {
+  clientFilename =
+    "../video-model-candidates/tracking-client.ts";
 }
 
 const build =
@@ -242,6 +248,26 @@ const app =
               "/specialized/efficienttam-ti-image-encoder.onnx",
               "efficienttam-ti-image-encoder.onnx",
             ],
+            [
+              "/specialized/efficienttam-ti-prompt_encoder.onnx",
+              "efficienttam-ti-prompt_encoder.onnx",
+            ],
+            [
+              "/specialized/efficienttam-ti-mask_decoder.onnx",
+              "efficienttam-ti-mask_decoder.onnx",
+            ],
+            [
+              "/specialized/efficienttam-ti-memory_encoder.onnx",
+              "efficienttam-ti-memory_encoder.onnx",
+            ],
+            [
+              "/specialized/efficienttam-ti-memory_attention.onnx",
+              "efficienttam-ti-memory_attention.onnx",
+            ],
+            [
+              "/specialized/efficienttam-ti-maskmem-tpos.npy",
+              "efficienttam-ti-maskmem-tpos.npy",
+            ],
           ]);
 
         const filename =
@@ -284,6 +310,19 @@ const app =
             },
           );
         }
+      }
+
+      if (request.method === "GET" &&
+          url.pathname === "/specialized/efficienttam-ti-maskmem-tpos.npy") {
+        const asset = Bun.file(join(outputRoot, "efficienttam-ti-maskmem-tpos.npy"));
+
+        if (!(await asset.exists())) {
+          return new Response("EfficientTAM temporal position asset is unavailable.", { status: 404 });
+        }
+
+        return new Response(asset, {
+          headers: { "content-type": "application/octet-stream", "cache-control": "no-store" },
+        });
       }
 
       const quality =
