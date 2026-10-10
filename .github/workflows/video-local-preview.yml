@@ -718,8 +718,16 @@ jobs:
 
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
-          for fixture in bear camel car-shadow; do
+          for scenario in bear camel car-shadow car-shadow-proposal0; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
+
+            fixture="$scenario"
+            proposal_query=""
+
+            if [[ "$scenario" == "car-shadow-proposal0" ]]; then
+              fixture="car-shadow"
+              proposal_query="&proposal=0"
+            fi
 
             "$CHROME" \
               --headless=new \
@@ -727,8 +735,8 @@ jobs:
               --disable-gpu-blocklist \
               --enable-webgpu-developer-features \
               --use-gpu-in-tests \
-              --user-data-dir="$RUNNER_TEMP/efficienttam-chrome-$fixture" \
-              "http://127.0.0.1:4199/?fixture=$fixture" >"$ROOT/chrome-$fixture.log" 2>&1 &
+              --user-data-dir="$RUNNER_TEMP/efficienttam-chrome-$scenario" \
+              "http://127.0.0.1:4199/?fixture=$fixture$proposal_query" >"$ROOT/chrome-$scenario.log" 2>&1 &
             CHROME_PID=$!
 
             completed=0
@@ -736,7 +744,7 @@ jobs:
             for _ in {1..600}; do
               if [[ -s "$ROOT/result.json" ]]; then
                 cat "$ROOT/result.json"
-                mv "$ROOT/result.json" "$ROOT/result-$fixture.json"
+                mv "$ROOT/result.json" "$ROOT/result-$scenario.json"
                 completed=1
                 break
               fi
@@ -747,7 +755,7 @@ jobs:
               fi
 
               if ! kill -0 "$CHROME_PID" 2>/dev/null; then
-                cat "$ROOT/chrome-$fixture.log" >&2 || true
+                cat "$ROOT/chrome-$scenario.log" >&2 || true
                 cat "$ROOT/server.log" >&2 || true
                 exit 1
               fi
@@ -764,6 +772,38 @@ jobs:
               exit 1
             fi
           done
+
+          # Explicitly selected proposal 0 must recover the intended car
+          # without any ground-truth-driven choice inside the tracker.
+          bun -e '
+            const report = async (path) => {
+              const json = await Bun.file(path).json();
+              return json.reports.find((row) => row.name === "efficienttam-ti-fp16-temporal-smoke");
+            };
+            const [automatic, selected] = await Promise.all(
+              process.argv.slice(-2).map(report)
+            );
+            if (automatic?.fixture !== "car-shadow" ||
+                selected?.fixture !== "car-shadow" ||
+                automatic.seedProposal !== "auto" ||
+                selected.seedProposal !== 0 ||
+                selected.frames.length !== 8 ||
+                selected.frames[0]?.chosenProposal !== 0 ||
+                selected.meanTrackedIou < 0.85 ||
+                selected.meanTrackedIou - automatic.meanTrackedIou < 0.5) {
+              throw Error(JSON.stringify({
+                reason: "Selected EfficientTAM car-shadow proposal did not recover tracking",
+                auto: automatic?.meanTrackedIou,
+                selected: selected?.meanTrackedIou,
+                seeded: selected?.frames[0]?.chosenProposal,
+              }));
+            }
+            console.log(JSON.stringify({
+              status: "selected proposal tracking recovered",
+              autoMeanIou: automatic.meanTrackedIou,
+              selectedMeanIou: selected.meanTrackedIou,
+            }));
+          ' "$ROOT/result-car-shadow.json" "$ROOT/result-car-shadow-proposal0.json"
 
       - uses: actions/upload-artifact@v4
         if: always()
