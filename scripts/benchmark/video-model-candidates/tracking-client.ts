@@ -361,6 +361,16 @@ const requestedSeedProposal = (): number | undefined => {
   return Number(raw);
 };
 
+const requestedRewind = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("rewind");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") throw new Error("Rewind probe accepts only ?rewind=1.");
+
+  return true;
+};
+
 const requestedFrameCount = (): number => {
   const raw = new URL(globalThis.location.href).searchParams.get("frames");
 
@@ -381,6 +391,7 @@ const main = async () => {
   const fixture = fixtureFromLocation();
   const seedProposal = requestedSeedProposal();
   const frameCount = requestedFrameCount();
+  const verifyRewind = requestedRewind();
   const sessions = new Map<Role, ort.InferenceSession>();
   const loading = [];
   const started = performance.now();
@@ -443,9 +454,16 @@ const main = async () => {
     if (times.length < 2) throw new Error("EfficientTAM tracking needs at least two DAVIS frames.");
 
     const bank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
-    const results = [];
 
-    for (const [index, timestamp] of times.entries()) {
+    const runPass = async () => {
+      if (bank.size !== 0) {
+        throw new Error("EfficientTAM rewind pass inherited stale tracking memory.");
+      }
+
+      const results = [];
+      const frameMasks: Uint8Array[] = [];
+
+      for (const [index, timestamp] of times.entries()) {
       const frame = await source.frameAt(timestamp);
 
       if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
@@ -582,6 +600,9 @@ const main = async () => {
               const inferenceMs = performance.now() - frameStarted;
               const truth = await loadTruth(fixture, index);
               const binary = binaryMask(selected.mask, truth);
+
+              frameMasks.push(binary);
+
               const foreground = binary.reduce((total, value) => total + value, 0);
 
               // The ground truth evaluates candidate proposals here, but
@@ -630,6 +651,54 @@ const main = async () => {
       } finally {
         frame.close();
       }
+      }
+
+      return { results, frameMasks };
+    };
+
+    const initialPass = await runPass();
+    const results = initialPass.results;
+    let rewind:
+      | { readonly replayedFrames: number; readonly minMaskIou: number; readonly frameMaskIous: readonly number[] }
+      | undefined;
+
+    if (verifyRewind) {
+      const memoryBeforeRewind = bank.size;
+
+      if (memoryBeforeRewind === 0) {
+        throw new Error("Cannot verify EfficientTAM rewind without tracked memory.");
+      }
+
+      bank.clear();
+
+      const replayPass = await runPass();
+
+      if (replayPass.frameMasks.length !== initialPass.frameMasks.length ||
+          replayPass.results.length !== initialPass.results.length) {
+        throw new Error("Rewind replay did not process the original frame window.");
+      }
+
+      const frameMaskIous = initialPass.frameMasks.map((mask, index) => {
+        const replayed = replayPass.frameMasks[index];
+
+        if (replayed === undefined) {
+          throw new Error(`Rewind replay omitted frame ${index}.`);
+        }
+
+        return binaryMaskIou(mask, replayed);
+      });
+
+      const minMaskIou = Math.min(...frameMaskIous);
+
+      if (minMaskIou < 0.995) {
+        throw new Error(`EfficientTAM rewind changed mask outputs; minimum IoU ${minMaskIou}.`);
+      }
+
+      rewind = {
+        replayedFrames: replayPass.results.length,
+        minMaskIou,
+        frameMaskIous,
+      };
     }
 
     const tracked = results.slice(1);
@@ -640,6 +709,7 @@ const main = async () => {
       fixture,
       seedPoint: point,
       seedProposal: seedProposal ?? "auto",
+      rewind,
       requestedFrameCount: frameCount,
       model: "egordm/efficienttam-ti-512@40788ab3",
       status: "experimental; single-object forward tracking; model comparison only",
