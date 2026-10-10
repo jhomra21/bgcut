@@ -166,19 +166,27 @@ const promptInputs = (x?: number, y?: number) => ({
   has_mask: new ort.Tensor("float32", Float32Array.of(0), [1]),
 });
 
+const readableHalf = (tensor: ort.Tensor | undefined, name: string): Uint16Array => {
+  if (tensor?.type === "float16" && tensor.data instanceof Uint16Array) {
+    return tensor.data;
+  }
+
+  if (tensor?.type === "float32" && tensor.data instanceof Float32Array) {
+    // The FP16 bundle may return float32 logits after interpolating masks.
+    return floatToHalf(tensor.data);
+  }
+
+  throw new Error(`EfficientTAM ${name} must expose CPU-readable float16 or float32 data.`);
+};
+
 const selectMask = (outputs: Record<string, ort.Tensor>) => {
   const masksTensor = outputs.masks;
   const iouTensor = outputs.iou_pred;
   const ptrTensor = outputs.obj_ptrs;
 
-  if (masksTensor?.type !== "float16" || ptrTensor?.type !== "float16" ||
-      iouTensor?.type !== "float16") {
-    throw new Error("EfficientTAM decoder returned unexpected mask, score, or pointer dtype.");
-  }
-
-  const masks = requireHalf(outputs, "masks");
-  const scores = requireHalf(outputs, "iou_pred");
-  const pointers = requireHalf(outputs, "obj_ptrs");
+  const masks = readableHalf(masksTensor, "masks");
+  const scores = readableHalf(iouTensor, "iou_pred");
+  const pointers = readableHalf(ptrTensor, "obj_ptrs");
   const count = scores.length;
 
   requireDims(masksTensor, "masks", [1, count, SIDE, SIDE]);
