@@ -48,6 +48,18 @@ const requireHalf = (outputs: Record<string, ort.Tensor>, name: string): Uint16A
   return value.data;
 };
 
+const toHalf = (tensor: ort.Tensor, name: string): ort.Tensor => {
+  if (tensor.type === "float16") return tensor;
+
+  if (tensor.type !== "float32" || !(tensor.data instanceof Float32Array)) {
+    throw new Error(`EfficientTAM ${name} cannot be converted to Float16 from ${tensor.type}.`);
+  }
+
+  // The published prompt encoder exposes float32 embeddings, while the
+  // mask decoder accepts float16. Convert only this model-boundary tensor.
+  return halfTensor(floatToHalf(tensor.data), tensor.dims);
+};
+
 const requireDims = (tensor: ort.Tensor | undefined, name: string, dims: readonly number[]) => {
   if (tensor === undefined || tensor.dims.length !== dims.length ||
       tensor.dims.some((value, index) => value !== dims[index])) {
@@ -358,19 +370,32 @@ const main = async () => {
 
             const prompt = index === 0 ? clickEmbedding : noPointEmbedding;
 
-            const decoded = await get("mask_decoder").run({
-              image_embeddings: conditioned ?? raw,
-              sparse_prompt_embeddings: requireDims(
-                prompt.sparse_prompt_embeddings,
-                "sparse_prompt_embeddings",
-                [1, 3, 256],
-              ),
-              dense_prompt_embeddings: requireDims(
-                prompt.dense_prompt_embeddings,
-                "dense_prompt_embeddings",
-                [1, 256, FEATURE_SIDE, FEATURE_SIDE],
-              ),
-            });
+            const sparseSource = requireDims(
+              prompt.sparse_prompt_embeddings,
+              "sparse_prompt_embeddings",
+              [1, 3, 256],
+            );
+
+            const denseSource = requireDims(
+              prompt.dense_prompt_embeddings,
+              "dense_prompt_embeddings",
+              [1, 256, FEATURE_SIDE, FEATURE_SIDE],
+            );
+
+            const sparse = toHalf(sparseSource, "sparse_prompt_embeddings");
+            const dense = toHalf(denseSource, "dense_prompt_embeddings");
+            let decoded: Record<string, ort.Tensor>;
+
+            try {
+              decoded = await get("mask_decoder").run({
+                image_embeddings: conditioned ?? raw,
+                sparse_prompt_embeddings: sparse,
+                dense_prompt_embeddings: dense,
+              });
+            } finally {
+              if (sparse !== sparseSource) sparse.dispose();
+              if (dense !== denseSource) dense.dispose();
+            }
 
             try {
               const selected = selectMask(decoded);
