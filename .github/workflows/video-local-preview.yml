@@ -724,7 +724,9 @@ jobs:
             fixture="$scenario"
             proposal_query=""
 
-            if [[ "$scenario" == "car-shadow-proposal0" ]]; then
+            if [[ "$scenario" == "car-shadow" ]]; then
+              proposal_query="&frames=12"
+            elif [[ "$scenario" == "car-shadow-proposal0" ]]; then
               fixture="car-shadow"
               proposal_query="&proposal=0&frames=12"
             fi
@@ -787,6 +789,7 @@ jobs:
                 selected?.fixture !== "car-shadow" ||
                 automatic.seedProposal !== "auto" ||
                 selected.seedProposal !== 0 ||
+                automatic.frames.length !== 12 ||
                 selected.frames.length !== 12 ||
                 selected.frames[0]?.chosenProposal !== 0 ||
                 selected.frames.some((row) => row.memorySlots !== Math.min(row.index + 1, 7)) ||
