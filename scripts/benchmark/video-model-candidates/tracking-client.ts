@@ -431,6 +431,7 @@ const main = async () => {
               ownedMemory = assembledMemory(bank, index, temporal);
 
               const attentionStarted = performance.now();
+
               const attended = await get("memory_attention").run({
                 curr: raw,
                 curr_pos: position,
