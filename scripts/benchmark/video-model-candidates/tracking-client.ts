@@ -186,7 +186,10 @@ const readableHalf = async (
   );
 };
 
-const selectMask = async (outputs: Record<string, ort.Tensor>) => {
+const selectMask = async (
+  outputs: Record<string, ort.Tensor>,
+  requestedProposal?: number,
+) => {
   const masksTensor = outputs.masks;
   const iouTensor = outputs.iou_pred;
   const ptrTensor = outputs.obj_ptrs;
@@ -209,6 +212,15 @@ const selectMask = async (outputs: Record<string, ort.Tensor>) => {
     if (halfToFloat(scores[index] ?? 0) > halfToFloat(scores[winner] ?? 0)) {
       winner = index;
     }
+  }
+
+  if (requestedProposal !== undefined) {
+    if (!Number.isInteger(requestedProposal) ||
+        requestedProposal < 0 || requestedProposal >= count) {
+      throw new Error(`Requested proposal ${requestedProposal} is outside [0, ${count}).`);
+    }
+
+    winner = requestedProposal;
   }
 
   const score = halfToFloat(scores[winner] ?? 0);
@@ -336,10 +348,23 @@ const pointFromTruth = async (fixture: string) => {
   return { x: (bestX + 0.5) / truth.width, y: (bestY + 0.5) / truth.height };
 };
 
+const requestedSeedProposal = (): number | undefined => {
+  const raw = new URL(globalThis.location.href).searchParams.get("proposal");
+
+  if (raw === null) return undefined;
+
+  if (!/^(0|[1-9][0-9]*)$/u.test(raw)) {
+    throw new Error("Experimental seed proposal must be a nonnegative integer.");
+  }
+
+  return Number(raw);
+};
+
 const main = async () => {
   configureVideoOrt();
 
   const fixture = fixtureFromLocation();
+  const seedProposal = requestedSeedProposal();
   const sessions = new Map<Role, ort.InferenceSession>();
   const loading = [];
   const started = performance.now();
@@ -491,7 +516,13 @@ const main = async () => {
 
             try {
               const maskReadStarted = performance.now();
-              const selected = await selectMask(decoded);
+              // A user-chosen proposal is committed only on the seed frame.
+              // DAVIS truth is loaded *after* the model has selected and
+              // encoded the chosen mask; it never controls this choice.
+              const selected = await selectMask(
+                decoded,
+                index === 0 ? seedProposal : undefined,
+              );
 
               stageMs.maskReadback = performance.now() - maskReadStarted;
 
@@ -590,6 +621,7 @@ const main = async () => {
       name: "efficienttam-ti-fp16-temporal-smoke",
       fixture,
       seedPoint: point,
+      seedProposal: seedProposal ?? "auto",
       model: "egordm/efficienttam-ti-512@40788ab3",
       status: "experimental; single-object forward tracking; model comparison only",
       loading,
