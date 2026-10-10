@@ -519,6 +519,7 @@ const main = async () => {
               // A user-chosen proposal is committed only on the seed frame.
               // DAVIS truth is loaded *after* the model has selected and
               // encoded the chosen mask; it never controls this choice.
+
               const selected = await selectMask(
                 decoded,
                 index === 0 ? seedProposal : undefined,
