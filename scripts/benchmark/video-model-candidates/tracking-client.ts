@@ -363,7 +363,7 @@ const main = async () => {
               sparse_prompt_embeddings: requireDims(
                 prompt.sparse_prompt_embeddings,
                 "sparse_prompt_embeddings",
-                [1, 2, 256],
+                [1, 3, 256],
               ),
               dense_prompt_embeddings: requireDims(
                 prompt.dense_prompt_embeddings,
