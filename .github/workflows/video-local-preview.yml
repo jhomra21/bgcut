@@ -658,3 +658,103 @@ jobs:
           name: video-model-candidates
           path: ${{ runner.temp }}/video-model-candidates
           if-no-files-found: warn
+
+  model-tracking:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Download verified EfficientTAM tracking bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-tracking"
+          mkdir -p "$ROOT"
+
+          while read -r filename output sha bytes; do
+            curl --fail --location --silent --show-error --retry 3 \
+              "https://huggingface.co/egordm/efficienttam-ti-512/resolve/40788ab3b74e96ad7b5db2a809f654b9f99c142e/fp16/$filename" \
+              --output "$ROOT/efficienttam-ti-$output"
+            printf '%s  %s\n' "$sha" "$ROOT/efficienttam-ti-$output" | shasum -a 256 --check -
+            test "$(stat -f%z "$ROOT/efficienttam-ti-$output")" = "$bytes"
+          done <<'MODELS'
+          image_encoder.onnx image_encoder.onnx 6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812 12774095
+          prompt_encoder.onnx prompt_encoder.onnx 525db5ac7deb9ce7ed98889a6b28b91e54b622d8fb132af26ca60b2886ed1f4a 44673
+          mask_decoder.onnx mask_decoder.onnx 8668f7f1b206a0ab9184a9e5a448ebcda47214303d083c5df3fee904aa96fc53 9393625
+          memory_encoder.onnx memory_encoder.onnx 9452c7c8b603806e0d793253ef576e5ccb9d0658e1548bf184ceaa2bce759355 2813090
+          memory_attention.onnx memory_attention.onnx b22b2144f3f48b21e66cc49bc6bb286bab2623695b39058031ccb5d97f56db9b 15342460
+          maskmem_tpos_enc.npy maskmem-tpos.npy 25bb49ba6d72e35a044c90a95933cd9527bc6940f9e1432148bcd3a8fa99a364 1024
+          MODELS
+
+      - name: Track real DAVIS frames with five ONNX modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-model-tracking"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4199 model-tracking >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4199/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+          "$CHROME" \
+            --headless=new \
+            --enable-unsafe-webgpu \
+            --disable-gpu-blocklist \
+            --enable-webgpu-developer-features \
+            --use-gpu-in-tests \
+            http://127.0.0.1:4199/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..600}; do
+            if [[ -s "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -s "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out during EfficientTAM tracking smoke." >&2
+          cat "$ROOT/chrome.log" >&2 || true
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-model-tracking
+          path: ${{ runner.temp }}/video-model-tracking
+          if-no-files-found: warn
