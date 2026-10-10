@@ -361,6 +361,24 @@ const requestedSeedProposal = (): number | undefined => {
   return Number(raw);
 };
 
+const requestedCorrection = (): { readonly index: number; readonly proposal: number } | undefined => {
+  const params = new URL(globalThis.location.href).searchParams;
+  const raw = params.get("correctionAt");
+
+  if (raw === null) return undefined;
+
+  const index = Number(raw);
+  const proposal = Number(params.get("correctionProposal"));
+
+  if (!Number.isInteger(index) || index < 1 || index > 11 ||
+      !Number.isInteger(proposal) || proposal < 0 || proposal > 3 ||
+      params.get("correctionProposal") === null) {
+    throw new Error("EfficientTAM correction must supply frame 1..11 and proposal 0..3.");
+  }
+
+  return { index, proposal };
+};
+
 const requestedRewind = (): boolean => {
   const raw = new URL(globalThis.location.href).searchParams.get("rewind");
 
@@ -392,6 +410,12 @@ const main = async () => {
   const seedProposal = requestedSeedProposal();
   const frameCount = requestedFrameCount();
   const verifyRewind = requestedRewind();
+  const correction = requestedCorrection();
+
+  if (correction !== undefined && correction.index >= frameCount) {
+    throw new Error("EfficientTAM correction frame falls outside the requested window.");
+  }
+
   const sessions = new Map<Role, ort.InferenceSession>();
   const loading = [];
   const started = performance.now();
@@ -491,8 +515,15 @@ const main = async () => {
 
               let conditioned: ort.Tensor | undefined;
               let ownedMemory: ReturnType<typeof assembledMemory> | undefined;
+              const correcting = correction?.index === index;
 
-              if (index > 0) {
+              if (correcting) {
+                // A correction removes the old tracking history and starts
+                // fresh from the corrected subject's new first frame.
+                bank.clear();
+              }
+
+              if (bank.size > 0) {
                 ownedMemory = assembledMemory(bank.values(), index, temporal);
 
                 const attentionStarted = performance.now();
@@ -514,7 +545,7 @@ const main = async () => {
                 );
               }
 
-              const prompt = index === 0 ? clickEmbedding : noPointEmbedding;
+              const prompt = bank.size === 0 ? clickEmbedding : noPointEmbedding;
 
               const sparseSource = requireDims(
                 prompt.sparse_prompt_embeddings,
@@ -550,13 +581,13 @@ const main = async () => {
 
               try {
                 const maskReadStarted = performance.now();
-                // A user-chosen proposal is committed only on the seed frame.
-                // DAVIS truth is loaded *after* the model has selected and
-                // encoded the chosen mask; it never controls this choice.
+                // Only an explicit seed or correction selects a proposal.
+                // DAVIS truth is loaded after inference, never for selection.
 
                 const selected = await selectMask(
                   decoded,
-                  index === 0 ? seedProposal : undefined,
+                  index === 0 ? seedProposal :
+                    correcting ? correction.proposal : undefined,
                 );
 
                 stageMs.maskReadback = performance.now() - maskReadStarted;
@@ -627,6 +658,7 @@ const main = async () => {
                   stageMs,
                   seedProposalDiagnostics,
                   memorySlots: bank.size,
+                  corrected: correction?.index === index,
                   truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
                   proposals: selected.proposals,
                   chosenProposal: selected.winner,
@@ -710,6 +742,7 @@ const main = async () => {
       fixture,
       seedPoint: point,
       seedProposal: seedProposal ?? "auto",
+      correction,
       rewind,
       requestedFrameCount: frameCount,
       model: "egordm/efficienttam-ti-512@40788ab3",
