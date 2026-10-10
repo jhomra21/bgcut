@@ -464,193 +464,193 @@ const main = async () => {
       const frameMasks: Uint8Array[] = [];
 
       for (const [index, timestamp] of times.entries()) {
-      const frame = await source.frameAt(timestamp);
+        const frame = await source.frameAt(timestamp);
 
-      if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
+        if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
 
-      const frameStarted = performance.now();
-      const stageMs: Record<string, number> = {};
-
-      try {
-        const input = frameInput(frame.frame);
-
-        stageMs.preprocess = performance.now() - frameStarted;
+        const frameStarted = performance.now();
+        const stageMs: Record<string, number> = {};
 
         try {
-          const visionStarted = performance.now();
-          const vision = await get("image_encoder").run({ image: input });
+          const input = frameInput(frame.frame);
 
-          stageMs.visionEncoder = performance.now() - visionStarted;
+          stageMs.preprocess = performance.now() - frameStarted;
 
           try {
-            const raw = vision.vision_features;
-            const position = vision.vision_pos_enc;
+            const visionStarted = performance.now();
+            const vision = await get("image_encoder").run({ image: input });
 
-            requireDims(raw, "vision_features", [1, 256, FEATURE_SIDE, FEATURE_SIDE]);
-            requireDims(position, "vision_pos_enc", [1, 256, FEATURE_SIDE, FEATURE_SIDE]);
+            stageMs.visionEncoder = performance.now() - visionStarted;
 
-            let conditioned: ort.Tensor | undefined;
-            let ownedMemory: ReturnType<typeof assembledMemory> | undefined;
+            try {
+              const raw = vision.vision_features;
+              const position = vision.vision_pos_enc;
 
-            if (index > 0) {
-              ownedMemory = assembledMemory(bank.values(), index, temporal);
+              requireDims(raw, "vision_features", [1, 256, FEATURE_SIDE, FEATURE_SIDE]);
+              requireDims(position, "vision_pos_enc", [1, 256, FEATURE_SIDE, FEATURE_SIDE]);
 
-              const attentionStarted = performance.now();
+              let conditioned: ort.Tensor | undefined;
+              let ownedMemory: ReturnType<typeof assembledMemory> | undefined;
 
-              const attended = await get("memory_attention").run({
-                curr: raw,
-                curr_pos: position,
-                spatial_memory: ownedMemory.features,
-                spatial_memory_pos: ownedMemory.positions,
-                obj_ptr: ownedMemory.pointers,
-              });
+              if (index > 0) {
+                ownedMemory = assembledMemory(bank.values(), index, temporal);
 
-              stageMs.memoryAttention = performance.now() - attentionStarted;
+                const attentionStarted = performance.now();
 
-              conditioned = requireDims(
-                attended.output,
-                "memory_attention.output",
+                const attended = await get("memory_attention").run({
+                  curr: raw,
+                  curr_pos: position,
+                  spatial_memory: ownedMemory.features,
+                  spatial_memory_pos: ownedMemory.positions,
+                  obj_ptr: ownedMemory.pointers,
+                });
+
+                stageMs.memoryAttention = performance.now() - attentionStarted;
+
+                conditioned = requireDims(
+                  attended.output,
+                  "memory_attention.output",
+                  [1, 256, FEATURE_SIDE, FEATURE_SIDE],
+                );
+              }
+
+              const prompt = index === 0 ? clickEmbedding : noPointEmbedding;
+
+              const sparseSource = requireDims(
+                prompt.sparse_prompt_embeddings,
+                "sparse_prompt_embeddings",
+                [1, 3, 256],
+              );
+
+              const denseSource = requireDims(
+                prompt.dense_prompt_embeddings,
+                "dense_prompt_embeddings",
                 [1, 256, FEATURE_SIDE, FEATURE_SIDE],
               );
-            }
 
-            const prompt = index === 0 ? clickEmbedding : noPointEmbedding;
-
-            const sparseSource = requireDims(
-              prompt.sparse_prompt_embeddings,
-              "sparse_prompt_embeddings",
-              [1, 3, 256],
-            );
-
-            const denseSource = requireDims(
-              prompt.dense_prompt_embeddings,
-              "dense_prompt_embeddings",
-              [1, 256, FEATURE_SIDE, FEATURE_SIDE],
-            );
-
-            const sparse = toHalf(sparseSource, "sparse_prompt_embeddings");
-            const dense = toHalf(denseSource, "dense_prompt_embeddings");
-            let decoded: Record<string, ort.Tensor>;
-
-            try {
-              const maskStarted = performance.now();
-
-              decoded = await get("mask_decoder").run({
-                image_embeddings: conditioned ?? raw,
-                sparse_prompt_embeddings: sparse,
-                dense_prompt_embeddings: dense,
-              });
-
-              stageMs.maskDecoder = performance.now() - maskStarted;
-            } finally {
-              if (sparse !== sparseSource) sparse.dispose();
-
-              if (dense !== denseSource) dense.dispose();
-            }
-
-            try {
-              const maskReadStarted = performance.now();
-              // A user-chosen proposal is committed only on the seed frame.
-              // DAVIS truth is loaded *after* the model has selected and
-              // encoded the chosen mask; it never controls this choice.
-
-              const selected = await selectMask(
-                decoded,
-                index === 0 ? seedProposal : undefined,
-              );
-
-              stageMs.maskReadback = performance.now() - maskReadStarted;
-
-              const maskInput = halfTensor(selected.mask, [1, 1, SIDE, SIDE]);
-              let encoded: Record<string, ort.Tensor>;
+              const sparse = toHalf(sparseSource, "sparse_prompt_embeddings");
+              const dense = toHalf(denseSource, "dense_prompt_embeddings");
+              let decoded: Record<string, ort.Tensor>;
 
               try {
-                const memoryStarted = performance.now();
+                const maskStarted = performance.now();
 
-                encoded = await get("memory_encoder").run({
-                  pix_feat: raw,
-                  masks: maskInput,
+                decoded = await get("mask_decoder").run({
+                  image_embeddings: conditioned ?? raw,
+                  sparse_prompt_embeddings: sparse,
+                  dense_prompt_embeddings: dense,
                 });
 
-                stageMs.memoryEncoder = performance.now() - memoryStarted;
+                stageMs.maskDecoder = performance.now() - maskStarted;
               } finally {
-                maskInput.dispose();
+                if (sparse !== sparseSource) sparse.dispose();
+
+                if (dense !== denseSource) dense.dispose();
               }
 
               try {
-                const memoryReadStarted = performance.now();
+                const maskReadStarted = performance.now();
+                // A user-chosen proposal is committed only on the seed frame.
+                // DAVIS truth is loaded *after* the model has selected and
+                // encoded the chosen mask; it never controls this choice.
 
-                requireDims(encoded.vision_features, "memory.vision_features", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
-                requireDims(encoded.vision_pos_enc, "memory.vision_pos_enc", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
+                const selected = await selectMask(
+                  decoded,
+                  index === 0 ? seedProposal : undefined,
+                );
 
-                bank.push({
+                stageMs.maskReadback = performance.now() - maskReadStarted;
+
+                const maskInput = halfTensor(selected.mask, [1, 1, SIDE, SIDE]);
+                let encoded: Record<string, ort.Tensor>;
+
+                try {
+                  const memoryStarted = performance.now();
+
+                  encoded = await get("memory_encoder").run({
+                    pix_feat: raw,
+                    masks: maskInput,
+                  });
+
+                  stageMs.memoryEncoder = performance.now() - memoryStarted;
+                } finally {
+                  maskInput.dispose();
+                }
+
+                try {
+                  const memoryReadStarted = performance.now();
+
+                  requireDims(encoded.vision_features, "memory.vision_features", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
+                  requireDims(encoded.vision_pos_enc, "memory.vision_pos_enc", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
+
+                  bank.push({
+                    index,
+                    features: await readableHalf(encoded.vision_features, "memory.vision_features"),
+                    positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
+                    pointer: selected.pointer,
+                  });
+
+                  stageMs.memoryReadback = performance.now() - memoryReadStarted;
+                } finally {
+                  dispose(encoded);
+                }
+
+                // DAVIS PNG fetching and mask scoring are outside the inference
+                // interval. They must not inflate the measured model latency.
+                const inferenceMs = performance.now() - frameStarted;
+                const truth = await loadTruth(fixture, index);
+                const binary = binaryMask(selected.mask, truth);
+
+                frameMasks.push(binary);
+
+                const foreground = binary.reduce((total, value) => total + value, 0);
+
+                // The ground truth evaluates candidate proposals here, but
+                // never controls which proposal is committed for tracking.
+                const seedProposalDiagnostics = index === 0
+                  ? selected.alternatives.map((alternative) => {
+                      const proposed = binaryMask(alternative.mask, truth);
+
+                      return {
+                        index: alternative.index,
+                        predictedIou: alternative.predictedIou,
+                        actualIou: binaryMaskIou(proposed, truth.mask),
+                        foreground: proposed.reduce((sum, pixel) => sum + pixel, 0),
+                      };
+                    })
+                  : undefined;
+
+                results.push({
                   index,
-                  features: await readableHalf(encoded.vision_features, "memory.vision_features"),
-                  positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
-                  pointer: selected.pointer,
+                  timestamp,
+                  inferenceMs,
+                  stageMs,
+                  seedProposalDiagnostics,
+                  memorySlots: bank.size,
+                  truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
+                  proposals: selected.proposals,
+                  chosenProposal: selected.winner,
+                  score: selected.score,
+                  foreground,
+                  iou: binaryMaskIou(binary, truth.mask),
+                  boundaryF: davisBoundaryF(binary, truth.mask, truth.width, truth.height),
                 });
-
-                stageMs.memoryReadback = performance.now() - memoryReadStarted;
               } finally {
-                dispose(encoded);
+                dispose(decoded);
+                conditioned?.dispose();
+                ownedMemory?.features.dispose();
+                ownedMemory?.positions.dispose();
+                ownedMemory?.pointers.dispose();
               }
-
-              // DAVIS PNG fetching and mask scoring are outside the inference
-              // interval. They must not inflate the measured model latency.
-              const inferenceMs = performance.now() - frameStarted;
-              const truth = await loadTruth(fixture, index);
-              const binary = binaryMask(selected.mask, truth);
-
-              frameMasks.push(binary);
-
-              const foreground = binary.reduce((total, value) => total + value, 0);
-
-              // The ground truth evaluates candidate proposals here, but
-              // never controls which proposal is committed for tracking.
-              const seedProposalDiagnostics = index === 0
-                ? selected.alternatives.map((alternative) => {
-                    const proposed = binaryMask(alternative.mask, truth);
-
-                    return {
-                      index: alternative.index,
-                      predictedIou: alternative.predictedIou,
-                      actualIou: binaryMaskIou(proposed, truth.mask),
-                      foreground: proposed.reduce((sum, pixel) => sum + pixel, 0),
-                    };
-                  })
-                : undefined;
-
-              results.push({
-                index,
-                timestamp,
-                inferenceMs,
-                stageMs,
-                seedProposalDiagnostics,
-                memorySlots: bank.size,
-                truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
-                proposals: selected.proposals,
-                chosenProposal: selected.winner,
-                score: selected.score,
-                foreground,
-                iou: binaryMaskIou(binary, truth.mask),
-                boundaryF: davisBoundaryF(binary, truth.mask, truth.width, truth.height),
-              });
             } finally {
-              dispose(decoded);
-              conditioned?.dispose();
-              ownedMemory?.features.dispose();
-              ownedMemory?.positions.dispose();
-              ownedMemory?.pointers.dispose();
+              dispose(vision);
             }
           } finally {
-            dispose(vision);
+            input.dispose();
           }
         } finally {
-          input.dispose();
+          frame.close();
         }
-      } finally {
-        frame.close();
-      }
       }
 
       return { results, frameMasks };
@@ -658,6 +658,7 @@ const main = async () => {
 
     const initialPass = await runPass();
     const results = initialPass.results;
+
     let rewind:
       | { readonly replayedFrames: number; readonly minMaskIou: number; readonly frameMaskIous: readonly number[] }
       | undefined;
