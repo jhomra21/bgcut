@@ -83,6 +83,12 @@ if (
 ) {
   clientFilename =
     "tracked-decoder-client.ts";
+} else if (
+  mode ===
+  "model-candidates"
+) {
+  clientFilename =
+    "../video-model-candidates/client.ts";
 }
 
 const build =
@@ -231,6 +237,10 @@ const app =
             [
               "/specialized/sam21-tracked-vision.onnx",
               "sam21-tracked-vision.onnx",
+            ],
+            [
+              "/specialized/efficienttam-ti-image-encoder.onnx",
+              "efficienttam-ti-image-encoder.onnx",
             ],
           ]);
 
