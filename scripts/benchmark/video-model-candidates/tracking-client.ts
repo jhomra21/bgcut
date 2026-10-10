@@ -220,7 +220,13 @@ const selectMask = async (outputs: Record<string, ort.Tensor>) => {
   const mask = masks.slice(winner * SIDE * SIDE, (winner + 1) * SIDE * SIDE);
   const pointer = pointers.slice(winner * POINTER_CHANNELS, (winner + 1) * POINTER_CHANNELS);
 
-  return { mask, pointer, score, winner, proposals: count };
+  const alternatives = Array.from({ length: count }, (_, index) => ({
+    index,
+    predictedIou: halfToFloat(scores[index] ?? 0),
+    mask: masks.slice(index * SIDE * SIDE, (index + 1) * SIDE * SIDE),
+  }));
+
+  return { mask, pointer, score, winner, proposals: count, alternatives };
 };
 
 type Truth = { readonly mask: Uint8Array; readonly width: number; readonly height: number };
@@ -530,11 +536,28 @@ const main = async () => {
               const binary = binaryMask(selected.mask, truth);
               const foreground = binary.reduce((total, value) => total + value, 0);
 
+              // The ground truth evaluates candidate proposals here, but
+              // never controls which proposal is committed for tracking.
+              const seedProposalDiagnostics = index === 0
+                ? selected.alternatives.map((alternative) => {
+                    const proposed = binaryMask(alternative.mask, truth);
+
+                    return {
+                      index: alternative.index,
+                      predictedIou: alternative.predictedIou,
+                      actualIou: binaryMaskIou(proposed, truth.mask),
+                      foreground: proposed.reduce((sum, pixel) => sum + pixel, 0),
+                    };
+                  })
+                : undefined;
+
               results.push({
                 index,
                 timestamp,
                 inferenceMs,
                 stageMs,
+                seedProposalDiagnostics,
+                truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
                 proposals: selected.proposals,
                 chosenProposal: selected.winner,
                 score: selected.score,
