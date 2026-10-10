@@ -1,6 +1,7 @@
 import * as ort from "onnxruntime-web/webgpu";
 
 import { channelsToHalfTokens, floatToHalf, halfToFloat } from "./half";
+import { BoundedFrameMemory } from "./memory-bank";
 
 import { openMediaBunnyVideoSource } from "../video-segmentation/media-source";
 import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
@@ -441,7 +442,7 @@ const main = async () => {
 
     if (times.length < 2) throw new Error("EfficientTAM tracking needs at least two DAVIS frames.");
 
-    const bank: Memory[] = [];
+    const bank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
     const results = [];
 
     for (const [index, timestamp] of times.entries()) {
@@ -474,7 +475,7 @@ const main = async () => {
             let ownedMemory: ReturnType<typeof assembledMemory> | undefined;
 
             if (index > 0) {
-              ownedMemory = assembledMemory(bank, index, temporal);
+              ownedMemory = assembledMemory(bank.values(), index, temporal);
 
               const attentionStarted = performance.now();
 
@@ -571,10 +572,6 @@ const main = async () => {
                   pointer: selected.pointer,
                 });
 
-                if (bank.length > MAX_MEMORY_FRAMES) {
-                  bank.shift();
-                }
-
                 stageMs.memoryReadback = performance.now() - memoryReadStarted;
               } finally {
                 dispose(encoded);
@@ -608,7 +605,7 @@ const main = async () => {
                 inferenceMs,
                 stageMs,
                 seedProposalDiagnostics,
-                memorySlots: bank.length,
+                memorySlots: bank.size,
                 truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
                 proposals: selected.proposals,
                 chosenProposal: selected.winner,
