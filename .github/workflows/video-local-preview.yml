@@ -728,7 +728,7 @@ jobs:
               proposal_query="&frames=12"
             elif [[ "$scenario" == "car-shadow-proposal0" ]]; then
               fixture="car-shadow"
-              proposal_query="&proposal=0&frames=12&rewind=1"
+              proposal_query="&proposal=0&frames=12&rewind=1&dual=1"
             elif [[ "$scenario" == "car-shadow-correct3" ]]; then
               fixture="car-shadow"
               proposal_query="&frames=12&correctionAt=3&correctionProposal=0"
@@ -799,6 +799,10 @@ jobs:
                 selected.frames[11]?.memorySlots !== 7 ||
                 selected.rewind?.replayedFrames !== 12 ||
                 selected.rewind?.minMaskIou < 0.995 ||
+                selected.independent?.primaryMemoryIndices?.length !== 7 ||
+                selected.independent?.alternateMemoryIndices?.length !== 7 ||
+                selected.independent?.seedMaskIoU >= 0.7 ||
+                selected.independent?.alternateMeanTrackedIoU >= 0.3 ||
                 selected.meanTrackedIou < 0.85 ||
                 selected.meanTrackedIou - automatic.meanTrackedIou < 0.5) {
               throw Error(JSON.stringify({
@@ -813,6 +817,8 @@ jobs:
               autoMeanIou: automatic.meanTrackedIou,
               selectedMeanIou: selected.meanTrackedIou,
               rewindMinIou: selected.rewind.minMaskIou,
+              distinctSeedMaskIou: selected.independent.seedMaskIoU,
+              alternateTrackedMeanIou: selected.independent.alternateMeanTrackedIoU,
             }));
           ' "$ROOT/result-car-shadow.json" "$ROOT/result-car-shadow-proposal0.json"
 
