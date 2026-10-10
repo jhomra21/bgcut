@@ -400,14 +400,17 @@ const main = async () => {
 
             try {
               const selected = selectMask(decoded);
-              const truth = await loadTruth("bear", index);
-              const binary = binaryMask(selected.mask, truth);
-              const foreground = binary.reduce((total, value) => total + value, 0);
+              const maskInput = halfTensor(selected.mask, [1, 1, SIDE, SIDE]);
+              let encoded: Record<string, ort.Tensor>;
 
-              const encoded = await get("memory_encoder").run({
-                pix_feat: raw,
-                masks: halfTensor(selected.mask, [1, 1, SIDE, SIDE]),
-              });
+              try {
+                encoded = await get("memory_encoder").run({
+                  pix_feat: raw,
+                  masks: maskInput,
+                });
+              } finally {
+                maskInput.dispose();
+              }
 
               try {
                 requireDims(encoded.vision_features, "memory.vision_features", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
@@ -419,21 +422,28 @@ const main = async () => {
                   positions: requireHalf(encoded, "vision_pos_enc").slice(),
                   pointer: selected.pointer,
                 });
-
-                results.push({
-                  index,
-                  timestamp,
-                  inferenceMs: performance.now() - frameStarted,
-                  proposals: selected.proposals,
-                  chosenProposal: selected.winner,
-                  score: selected.score,
-                  foreground,
-                  iou: binaryMaskIou(binary, truth.mask),
-                  boundaryF: davisBoundaryF(binary, truth.mask, truth.width, truth.height),
-                });
               } finally {
                 dispose(encoded);
               }
+
+              // DAVIS PNG fetching and mask scoring are outside the inference
+              // interval. They must not inflate the measured model latency.
+              const inferenceMs = performance.now() - frameStarted;
+              const truth = await loadTruth("bear", index);
+              const binary = binaryMask(selected.mask, truth);
+              const foreground = binary.reduce((total, value) => total + value, 0);
+
+              results.push({
+                index,
+                timestamp,
+                inferenceMs,
+                proposals: selected.proposals,
+                chosenProposal: selected.winner,
+                score: selected.score,
+                foreground,
+                iou: binaryMaskIou(binary, truth.mask),
+                boundaryF: davisBoundaryF(binary, truth.mask, truth.width, truth.height),
+              });
             } finally {
               dispose(decoded);
               conditioned?.dispose();
