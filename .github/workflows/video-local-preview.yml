@@ -728,7 +728,7 @@ jobs:
               proposal_query="&frames=12"
             elif [[ "$scenario" == "car-shadow-proposal0" ]]; then
               fixture="car-shadow"
-              proposal_query="&proposal=0&frames=12"
+              proposal_query="&proposal=0&frames=12&rewind=1"
             fi
 
             "$CHROME" \
@@ -794,6 +794,8 @@ jobs:
                 selected.frames[0]?.chosenProposal !== 0 ||
                 selected.frames.some((row) => row.memorySlots !== Math.min(row.index + 1, 7)) ||
                 selected.frames[11]?.memorySlots !== 7 ||
+                selected.rewind?.replayedFrames !== 12 ||
+                selected.rewind?.minMaskIou < 0.995 ||
                 selected.meanTrackedIou < 0.85 ||
                 selected.meanTrackedIou - automatic.meanTrackedIou < 0.5) {
               throw Error(JSON.stringify({
@@ -807,6 +809,7 @@ jobs:
               status: "selected proposal tracking recovered",
               autoMeanIou: automatic.meanTrackedIou,
               selectedMeanIou: selected.meanTrackedIou,
+              rewindMinIou: selected.rewind.minMaskIou,
             }));
           ' "$ROOT/result-car-shadow.json" "$ROOT/result-car-shadow-proposal0.json"
 
