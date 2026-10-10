@@ -249,6 +249,10 @@ const app =
               "efficienttam-ti-image-encoder.onnx",
             ],
             [
+              "/specialized/efficienttam-ti-image_encoder.onnx",
+              "efficienttam-ti-image_encoder.onnx",
+            ],
+            [
               "/specialized/efficienttam-ti-prompt_encoder.onnx",
               "efficienttam-ti-prompt_encoder.onnx",
             ],
