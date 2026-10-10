@@ -39,6 +39,7 @@ export const halfToFloat = (half: number): number => {
   const mantissa = half & 0x3ff;
 
   if (exponent === 0x1f) return mantissa === 0 ? sign * Infinity : NaN;
+
   if (exponent === 0) return sign * 2 ** -14 * (mantissa / 1024);
 
   return sign * 2 ** (exponent - 15) * (1 + mantissa / 1024);
