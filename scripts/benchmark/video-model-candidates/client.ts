@@ -5,7 +5,9 @@ import { openMediaBunnyVideoSource } from "../video-segmentation/media-source";
 import { configureVideoOrt, frameToNchw } from "../video-segmentation/runtime-common";
 
 const MODEL_URL = "/specialized/efficienttam-ti-image-encoder.onnx";
+
 const MODEL_REVISION = "40788ab3b74e96ad7b5db2a809f654b9f99c142e";
+
 const MODEL_SHA256 = "6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812";
 
 const float32ToHalf = (values: Float32Array): Uint16Array => {
@@ -77,10 +79,12 @@ const measure = async (
 
   for (let index = 0; index < 6; index += 1) {
     const started = performance.now();
+
     const outputs = await session.run(
       { [inputName]: tensor },
       outputNames === undefined ? undefined : [...outputNames],
     );
+
     const elapsed = performance.now() - started;
 
     try {
@@ -107,6 +111,10 @@ const measure = async (
     outputs: signatures,
   };
 };
+
+type ProbeCase =
+  | (Awaited<ReturnType<typeof measure>> & { readonly loadMs: number })
+  | { readonly model: string; readonly unsupported: true; readonly reason: string };
 
 const main = async () => {
   configureVideoOrt();
@@ -141,13 +149,16 @@ const main = async () => {
     }
 
     const half = float32ToHalf(normalized);
+
+    const candidates: ProbeCase[] = [];
+
     const result = {
       name: "efficienttam-ti-512-encoder-probe",
       clip: "bear",
       modelRevision: MODEL_REVISION,
       modelSha256: MODEL_SHA256,
       fairComparison: "encoder only; model architectures and tensor dtypes differ; not a tracking or mask-quality result",
-      candidates: [] as object[],
+      candidates,
     };
 
     const candidateResponse = await fetch(MODEL_URL);
