@@ -38,16 +38,6 @@ type Memory = {
 const halfTensor = (data: Uint16Array, dims: readonly number[]) =>
   new ort.Tensor("float16", data, [...dims]);
 
-const requireHalf = (outputs: Record<string, ort.Tensor>, name: string): Uint16Array => {
-  const value = outputs[name];
-
-  if (value?.type !== "float16" || !(value.data instanceof Uint16Array)) {
-    throw new Error(`EfficientTAM ${name} must be a CPU-readable float16 tensor.`);
-  }
-
-  return value.data;
-};
-
 const toHalf = (tensor: ort.Tensor, name: string): ort.Tensor => {
   if (tensor.type === "float16") return tensor;
 
@@ -443,8 +433,8 @@ const main = async () => {
 
                 bank.push({
                   index,
-                  features: requireHalf(encoded, "vision_features").slice(),
-                  positions: requireHalf(encoded, "vision_pos_enc").slice(),
+                  features: await readableHalf(encoded.vision_features, "memory.vision_features"),
+                  positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
                   pointer: selected.pointer,
                 });
               } finally {
