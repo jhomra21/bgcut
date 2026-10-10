@@ -7,10 +7,15 @@ import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-met
 import { configureVideoOrt, frameToNchw } from "../video-segmentation/runtime-common";
 
 const SIDE = 512;
+
 const FEATURE_SIDE = 32;
+
 const TOKENS = FEATURE_SIDE * FEATURE_SIDE;
+
 const CHANNELS = 64;
+
 const POINTER_CHANNELS = 256;
+
 const MAX_MEMORY_FRAMES = 7;
 
 const roles = [
@@ -270,6 +275,7 @@ const main = async () => {
 
       const model = new Uint8Array(await response.arrayBuffer());
       const loadStarted = performance.now();
+
       const session = await ort.InferenceSession.create(model, {
         executionProviders: [{ name: "webgpu" }],
         graphOptimizationLevel: "all",
@@ -297,6 +303,7 @@ const main = async () => {
     const trackInputs = promptInputs();
     const clickEmbedding = await get("prompt_encoder").run(clickInputs);
     const noPointEmbedding = await get("prompt_encoder").run(trackInputs);
+
     const times = (await source.frameTimes(
       source.info.firstTimestamp,
       source.info.firstTimestamp + Math.min(0.5, source.info.duration),
@@ -350,6 +357,7 @@ const main = async () => {
             }
 
             const prompt = index === 0 ? clickEmbedding : noPointEmbedding;
+
             const decoded = await get("mask_decoder").run({
               image_embeddings: conditioned ?? raw,
               sparse_prompt_embeddings: requireDims(
@@ -369,6 +377,7 @@ const main = async () => {
               const truth = await loadTruth("bear", index);
               const binary = binaryMask(selected.mask, truth);
               const foreground = binary.reduce((total, value) => total + value, 0);
+
               const encoded = await get("memory_encoder").run({
                 pix_feat: raw,
                 masks: halfTensor(selected.mask, [1, 1, SIDE, SIDE]),
@@ -419,6 +428,7 @@ const main = async () => {
 
     const tracked = results.slice(1);
     const trackedMs = tracked.reduce((sum, value) => sum + value.inferenceMs, 0);
+
     const report = {
       name: "efficienttam-ti-fp16-temporal-smoke",
       model: "egordm/efficienttam-ti-512@40788ab3",
@@ -442,6 +452,7 @@ const main = async () => {
     dispose(noPointEmbedding);
 
     for (const input of Object.values(clickInputs)) input.dispose();
+
     for (const input of Object.values(trackInputs)) input.dispose();
   } finally {
     source.close();
