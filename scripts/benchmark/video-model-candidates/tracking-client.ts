@@ -394,6 +394,7 @@ const main = async () => {
               });
             } finally {
               if (sparse !== sparseSource) sparse.dispose();
+
               if (dense !== denseSource) dense.dispose();
             }
 
