@@ -360,11 +360,26 @@ const requestedSeedProposal = (): number | undefined => {
   return Number(raw);
 };
 
+const requestedFrameCount = (): number => {
+  const raw = new URL(globalThis.location.href).searchParams.get("frames");
+
+  if (raw === null) return 8;
+
+  const count = Number(raw);
+
+  if (!Number.isInteger(count) || count < 2 || count > 12) {
+    throw new Error("EfficientTAM quality fixture must request between 2 and 12 frames.");
+  }
+
+  return count;
+};
+
 const main = async () => {
   configureVideoOrt();
 
   const fixture = fixtureFromLocation();
   const seedProposal = requestedSeedProposal();
+  const frameCount = requestedFrameCount();
   const sessions = new Map<Role, ort.InferenceSession>();
   const loading = [];
   const started = performance.now();
@@ -422,7 +437,7 @@ const main = async () => {
       source.info.firstTimestamp,
       source.info.firstTimestamp + Math.min(0.5, source.info.duration),
       24,
-    )).slice(0, 8);
+    )).slice(0, frameCount);
 
     if (times.length < 2) throw new Error("EfficientTAM tracking needs at least two DAVIS frames.");
 
@@ -556,6 +571,10 @@ const main = async () => {
                   pointer: selected.pointer,
                 });
 
+                if (bank.length > MAX_MEMORY_FRAMES) {
+                  bank.shift();
+                }
+
                 stageMs.memoryReadback = performance.now() - memoryReadStarted;
               } finally {
                 dispose(encoded);
@@ -589,6 +608,7 @@ const main = async () => {
                 inferenceMs,
                 stageMs,
                 seedProposalDiagnostics,
+                memorySlots: bank.length,
                 truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
                 proposals: selected.proposals,
                 chosenProposal: selected.winner,
@@ -623,6 +643,7 @@ const main = async () => {
       fixture,
       seedPoint: point,
       seedProposal: seedProposal ?? "auto",
+      requestedFrameCount: frameCount,
       model: "egordm/efficienttam-ti-512@40788ab3",
       status: "experimental; single-object forward tracking; model comparison only",
       loading,
