@@ -1,5 +1,7 @@
 import * as ort from "onnxruntime-web/webgpu";
 
+import { floatToHalf } from "./half";
+
 import { VIDEO_SEGMENTATION_CANDIDATES } from "../video-segmentation/candidates";
 import { openMediaBunnyVideoSource } from "../video-segmentation/media-source";
 import { configureVideoOrt, frameToNchw } from "../video-segmentation/runtime-common";
@@ -9,40 +11,6 @@ const MODEL_URL = "/specialized/efficienttam-ti-image-encoder.onnx";
 const MODEL_REVISION = "40788ab3b74e96ad7b5db2a809f654b9f99c142e";
 
 const MODEL_SHA256 = "6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812";
-
-const float32ToHalf = (values: Float32Array): Uint16Array => {
-  const output = new Uint16Array(values.length);
-  const scratch = new ArrayBuffer(4);
-  const float = new Float32Array(scratch);
-  const bits = new Uint32Array(scratch);
-
-  for (let index = 0; index < values.length; index += 1) {
-    float[0] = values[index] ?? 0;
-
-    const raw = bits[0] ?? 0;
-    const sign = (raw >>> 16) & 0x8000;
-    const exponent = ((raw >>> 23) & 0xff) - 127 + 15;
-    const mantissa = raw & 0x7fffff;
-
-    if (exponent >= 31) {
-      output[index] = sign | 0x7c00 | (mantissa === 0 ? 0 : 0x0200);
-    } else if (exponent <= 0) {
-      if (exponent < -10) {
-        output[index] = sign;
-      } else {
-        const subnormal = (mantissa | 0x800000) >>> (1 - exponent);
-        const rounded = (subnormal + 0x0fff + ((subnormal >>> 13) & 1)) >>> 13;
-        output[index] = sign | rounded;
-      }
-    } else {
-      const rounded = mantissa + 0x0fff + ((mantissa >>> 13) & 1);
-      output[index] = sign | ((exponent + (rounded >>> 23)) << 10) |
-        ((rounded >>> 13) & 0x3ff);
-    }
-  }
-
-  return output;
-};
 
 const median = (values: number[]): number => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -147,7 +115,7 @@ const main = async () => {
       frame.close();
     }
 
-    const half = float32ToHalf(normalized);
+    const half = floatToHalf(normalized);
 
     const candidates: ProbeCase[] = [];
 
