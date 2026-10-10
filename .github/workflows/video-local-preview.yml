@@ -718,39 +718,52 @@ jobs:
 
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
-          "$CHROME" \
-            --headless=new \
-            --enable-unsafe-webgpu \
-            --disable-gpu-blocklist \
-            --enable-webgpu-developer-features \
-            --use-gpu-in-tests \
-            http://127.0.0.1:4199/ >"$ROOT/chrome.log" 2>&1 &
-          CHROME_PID=$!
+          for fixture in bear camel car-shadow; do
+            rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
-          for _ in {1..600}; do
-            if [[ -s "$ROOT/result.json" ]]; then
-              cat "$ROOT/result.json"
-              exit 0
-            fi
+            "$CHROME" \
+              --headless=new \
+              --enable-unsafe-webgpu \
+              --disable-gpu-blocklist \
+              --enable-webgpu-developer-features \
+              --use-gpu-in-tests \
+              --user-data-dir="$ROOT/chrome-profile-$fixture" \
+              "http://127.0.0.1:4199/?fixture=$fixture" >"$ROOT/chrome-$fixture.log" 2>&1 &
+            CHROME_PID=$!
 
-            if [[ -s "$ROOT/failure.json" ]]; then
-              cat "$ROOT/failure.json" >&2
+            completed=0
+
+            for _ in {1..600}; do
+              if [[ -s "$ROOT/result.json" ]]; then
+                cat "$ROOT/result.json"
+                mv "$ROOT/result.json" "$ROOT/result-$fixture.json"
+                completed=1
+                break
+              fi
+
+              if [[ -s "$ROOT/failure.json" ]]; then
+                cat "$ROOT/failure.json" >&2
+                exit 1
+              fi
+
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                cat "$ROOT/chrome-$fixture.log" >&2 || true
+                cat "$ROOT/server.log" >&2 || true
+                exit 1
+              fi
+
+              sleep 1
+            done
+
+            kill "$CHROME_PID" 2>/dev/null || true
+            wait "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+
+            if [[ "$completed" != 1 ]]; then
+              echo "Timed out tracking DAVIS $fixture with EfficientTAM." >&2
               exit 1
             fi
-
-            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
-              cat "$ROOT/chrome.log" >&2 || true
-              cat "$ROOT/server.log" >&2 || true
-              exit 1
-            fi
-
-            sleep 1
           done
-
-          echo "Timed out during EfficientTAM tracking smoke." >&2
-          cat "$ROOT/chrome.log" >&2 || true
-          cat "$ROOT/server.log" >&2 || true
-          exit 1
 
       - uses: actions/upload-artifact@v4
         if: always()
