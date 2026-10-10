@@ -40,13 +40,33 @@ The development-only `?proposal=0` parameter affects the seed frame
 only; automatic tracking handles subsequent frames. DAVIS annotations are
 used solely for quality measurements and never to choose runtime masks.
 
+Two additional model-level tests now pass on the same macOS WebGPU runner:
+
+- **Rewind:** after tracking the car through frame 11, clearing the seven-slot
+  memory bank and replaying the same twelve frames reproduced every binary mask.
+  The minimum frame-to-frame replay IoU was **1.0**. This checks state reset
+  and inference reproducibility; it is not an editor rewind interaction.
+- **Late correction:** letting the decoder choose the wrong car-shadow mask
+  through frame 2 gave mean IoU **0.1242**. At frame 3, the tracker discarded
+  that history and used the existing click with explicitly chosen proposal 0.
+  Mean IoU over frames 3–11 recovered to **0.9700**. DAVIS truth was used to
+  score masks afterward, never to choose the proposal.
+- **Independent hypotheses:** the same five ONNX sessions tracked two
+  different seed proposals through separate memory banks. Their initial
+  binary masks overlapped by only **0.1321 IoU**, and the alternate path
+  maintained its own trajectory (**0.1152** car-truth mean IoU). Replaying
+  the primary path after both runs still reproduced all original masks with
+  minimum IoU **1.0**. These are two mask hypotheses from *one click*,
+  processed sequentially, **not two distinct objects tracked concurrently**.
+
 **Do not replace SAM or auto-select proposal 0 from these results.** The
-bad mask exposes the unreliability of ranking proposals by their own predicted
-IoU in some scenes, not a universal proposal index. Real users must be able
-to inspect and choose alternative masks, and the model still needs correction,
-multi-subject, rewind and wider cross-DAVIS acceptance. A separate bounded
-per-subject memory abstraction now has unit coverage for eviction, independent
-subjects and reset; it is not yet proof of full multi-subject GPU tracking.
+failure comes from unreliable confidence ranking on at least one clip; it
+does not mean proposal 0 is generally best. Before connecting EfficientTAM
+to the Solid editor, users need mask-alternative selection, correction and
+rewind controls, and the candidate still needs true simultaneous
+multi-object validation plus wider DAVIS quality and performance comparisons.
+The research-only query parameters `?rewind=1`, `?dual=1` and
+`?correctionAt=3&correctionProposal=0` are acceptance probes, not public APIs.
 
 This work is experimental. It does not change bgcut's public browser, CLI, or Node.js API.
 
