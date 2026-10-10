@@ -80,10 +80,9 @@ const measure = async (
   for (let index = 0; index < 6; index += 1) {
     const started = performance.now();
 
-    const outputs = await session.run(
-      { [inputName]: tensor },
-      outputNames === undefined ? undefined : [...outputNames],
-    );
+    const outputs = outputNames === undefined
+      ? await session.run({ [inputName]: tensor })
+      : await session.run({ [inputName]: tensor }, [...outputNames]);
 
     const elapsed = performance.now() - started;
 
