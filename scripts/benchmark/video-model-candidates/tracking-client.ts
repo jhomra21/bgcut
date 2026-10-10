@@ -379,6 +379,16 @@ const requestedCorrection = (): { readonly index: number; readonly proposal: num
   return { index, proposal };
 };
 
+const requestedIndependentTracks = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("dual");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") throw new Error("Independent mask tracks accept only ?dual=1.");
+
+  return true;
+};
+
 const requestedRewind = (): boolean => {
   const raw = new URL(globalThis.location.href).searchParams.get("rewind");
 
@@ -410,6 +420,7 @@ const main = async () => {
   const seedProposal = requestedSeedProposal();
   const frameCount = requestedFrameCount();
   const verifyRewind = requestedRewind();
+  const independentTracks = requestedIndependentTracks();
   const correction = requestedCorrection();
 
   if (correction !== undefined && correction.index >= frameCount) {
@@ -479,8 +490,12 @@ const main = async () => {
 
     const bank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
 
-    const runPass = async () => {
-      if (bank.size !== 0) {
+    const runPass = async (
+      subjectBank = bank,
+      chosenSeedProposal = seedProposal,
+      allowCorrection = true,
+    ) => {
+      if (subjectBank.size !== 0) {
         throw new Error("EfficientTAM rewind pass inherited stale tracking memory.");
       }
 
@@ -515,16 +530,16 @@ const main = async () => {
 
               let conditioned: ort.Tensor | undefined;
               let ownedMemory: ReturnType<typeof assembledMemory> | undefined;
-              const correcting = correction?.index === index;
+              const correcting = allowCorrection && correction?.index === index;
 
               if (correcting) {
                 // A correction removes the old tracking history and starts
                 // fresh from the corrected subject's new first frame.
-                bank.clear();
+                subjectBank.clear();
               }
 
-              if (bank.size > 0) {
-                ownedMemory = assembledMemory(bank.values(), index, temporal);
+              if (subjectBank.size > 0) {
+                ownedMemory = assembledMemory(subjectBank.values(), index, temporal);
 
                 const attentionStarted = performance.now();
 
@@ -545,7 +560,7 @@ const main = async () => {
                 );
               }
 
-              const prompt = bank.size === 0 ? clickEmbedding : noPointEmbedding;
+              const prompt = subjectBank.size === 0 ? clickEmbedding : noPointEmbedding;
 
               const sparseSource = requireDims(
                 prompt.sparse_prompt_embeddings,
@@ -586,7 +601,7 @@ const main = async () => {
 
                 const selected = await selectMask(
                   decoded,
-                  index === 0 ? seedProposal :
+                  index === 0 ? chosenSeedProposal :
                     correcting ? correction.proposal : undefined,
                 );
 
@@ -614,7 +629,7 @@ const main = async () => {
                   requireDims(encoded.vision_features, "memory.vision_features", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
                   requireDims(encoded.vision_pos_enc, "memory.vision_pos_enc", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
 
-                  bank.push({
+                  subjectBank.push({
                     index,
                     features: await readableHalf(encoded.vision_features, "memory.vision_features"),
                     positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
@@ -657,7 +672,7 @@ const main = async () => {
                   inferenceMs,
                   stageMs,
                   seedProposalDiagnostics,
-                  memorySlots: bank.size,
+                  memorySlots: subjectBank.size,
                   corrected: correction?.index === index,
                   truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
                   proposals: selected.proposals,
@@ -690,6 +705,50 @@ const main = async () => {
 
     const initialPass = await runPass();
     const results = initialPass.results;
+    let independent:
+      | {
+          readonly primaryMemoryIndices: readonly number[];
+          readonly alternateMemoryIndices: readonly number[];
+          readonly seedMaskIoU: number;
+          readonly alternateMeanTrackedIoU: number;
+        }
+      | undefined;
+
+    if (independentTracks) {
+      if (seedProposal !== 0 || fixture !== "car-shadow") {
+        throw new Error("Independent mask tracks require car-shadow proposal 0.");
+      }
+
+      const primaryMemoryIndices = bank.values().map((frame) => frame.index);
+      const alternateBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+      const alternate = await runPass(alternateBank, 1, false);
+      const alternateMemoryIndices = alternateBank.values().map((frame) => frame.index);
+      const seedMask = initialPass.frameMasks[0];
+      const alternateSeedMask = alternate.frameMasks[0];
+
+      if (seedMask === undefined || alternateSeedMask === undefined) {
+        throw new Error("Independent mask tracks are missing seed frame masks.");
+      }
+
+      const seedMaskIoU = binaryMaskIou(seedMask, alternateSeedMask);
+      const alternateTracked = alternate.results.slice(1);
+
+      if (seedMaskIoU >= 0.7 ||
+          bank.values().some((frame, index) => frame.index !== primaryMemoryIndices[index]) ||
+          alternateMemoryIndices.length !== primaryMemoryIndices.length ||
+          alternateMemoryIndices.some((index, position) => index !== primaryMemoryIndices[position])) {
+        throw new Error("Independent mask tracks shared state or selected the same seed mask.");
+      }
+
+      independent = {
+        primaryMemoryIndices,
+        alternateMemoryIndices,
+        seedMaskIoU,
+        alternateMeanTrackedIoU:
+          alternateTracked.reduce((total, frame) => total + frame.iou, 0) /
+          alternateTracked.length,
+      };
+    }
 
     let rewind:
       | { readonly replayedFrames: number; readonly minMaskIou: number; readonly frameMaskIous: readonly number[] }
@@ -743,6 +802,7 @@ const main = async () => {
       seedPoint: point,
       seedProposal: seedProposal ?? "auto",
       correction,
+      independent,
       rewind,
       requestedFrameCount: frameCount,
       model: "egordm/efficienttam-ti-512@40788ab3",
