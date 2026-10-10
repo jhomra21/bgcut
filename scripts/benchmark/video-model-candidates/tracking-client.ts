@@ -279,18 +279,70 @@ const frameInput = (frame: VideoFrame) => halfTensor(
   [1, 3, SIDE, SIDE],
 );
 
+const fixtureFromLocation = (): "bear" | "camel" | "car-shadow" => {
+  const requested = new URL(globalThis.location.href).searchParams.get("fixture") ?? "bear";
+
+  if (requested !== "bear" && requested !== "camel" && requested !== "car-shadow") {
+    throw new Error(`Unsupported EfficientTAM DAVIS fixture: ${requested}.`);
+  }
+
+  return requested;
+};
+
+const pointFromTruth = async (fixture: string) => {
+  const truth = await loadTruth(fixture, 0);
+  let totalX = 0;
+  let totalY = 0;
+  let count = 0;
+
+  for (let y = 0; y < truth.height; y += 1) {
+    for (let x = 0; x < truth.width; x += 1) {
+      if (truth.mask[y * truth.width + x] === 0) continue;
+
+      totalX += x;
+      totalY += y;
+      count += 1;
+    }
+  }
+
+  if (count === 0) throw new Error(`DAVIS ${fixture} has no foreground seed pixels.`);
+
+  const centerX = totalX / count;
+  const centerY = totalY / count;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestX = 0;
+  let bestY = 0;
+
+  for (let y = 0; y < truth.height; y += 1) {
+    for (let x = 0; x < truth.width; x += 1) {
+      if (truth.mask[y * truth.width + x] === 0) continue;
+
+      const distance = (x - centerX) ** 2 + (y - centerY) ** 2;
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestX = x;
+        bestY = y;
+      }
+    }
+  }
+
+  return { x: (bestX + 0.5) / truth.width, y: (bestY + 0.5) / truth.height };
+};
+
 const main = async () => {
   configureVideoOrt();
 
+  const fixture = fixtureFromLocation();
   const sessions = new Map<Role, ort.InferenceSession>();
   const loading = [];
   const started = performance.now();
 
-  const fileResponse = await fetch("/quality/bear.mp4");
+  const fileResponse = await fetch(`/quality/${fixture}.mp4`);
 
-  if (!fileResponse.ok) throw new Error("The DAVIS bear fixture is unavailable.");
+  if (!fileResponse.ok) throw new Error(`The DAVIS ${fixture} fixture is unavailable.`);
 
-  const file = new File([await fileResponse.blob()], "bear.mp4", { type: "video/mp4" });
+  const file = new File([await fileResponse.blob()], `${fixture}.mp4`, { type: "video/mp4" });
   const source = await openMediaBunnyVideoSource(file);
   const temporal = await readTemporalPosition();
 
@@ -326,7 +378,11 @@ const main = async () => {
       return session;
     };
 
-    const clickInputs = promptInputs(0.4, 0.65);
+    const point = fixture === "bear"
+      ? { x: 0.4, y: 0.65 }
+      : await pointFromTruth(fixture);
+
+    const clickInputs = promptInputs(point.x, point.y);
     const trackInputs = promptInputs();
     const clickEmbedding = await get("prompt_encoder").run(clickInputs);
     const noPointEmbedding = await get("prompt_encoder").run(trackInputs);
@@ -348,12 +404,18 @@ const main = async () => {
       if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
 
       const frameStarted = performance.now();
+      const stageMs: Record<string, number> = {};
 
       try {
         const input = frameInput(frame.frame);
 
+        stageMs.preprocess = performance.now() - frameStarted;
+
         try {
+          const visionStarted = performance.now();
           const vision = await get("image_encoder").run({ image: input });
+
+          stageMs.visionEncoder = performance.now() - visionStarted;
 
           try {
             const raw = vision.vision_features;
@@ -368,6 +430,7 @@ const main = async () => {
             if (index > 0) {
               ownedMemory = assembledMemory(bank, index, temporal);
 
+              const attentionStarted = performance.now();
               const attended = await get("memory_attention").run({
                 curr: raw,
                 curr_pos: position,
@@ -375,6 +438,8 @@ const main = async () => {
                 spatial_memory_pos: ownedMemory.positions,
                 obj_ptr: ownedMemory.pointers,
               });
+
+              stageMs.memoryAttention = performance.now() - attentionStarted;
 
               conditioned = requireDims(
                 attended.output,
@@ -402,11 +467,15 @@ const main = async () => {
             let decoded: Record<string, ort.Tensor>;
 
             try {
+              const maskStarted = performance.now();
+
               decoded = await get("mask_decoder").run({
                 image_embeddings: conditioned ?? raw,
                 sparse_prompt_embeddings: sparse,
                 dense_prompt_embeddings: dense,
               });
+
+              stageMs.maskDecoder = performance.now() - maskStarted;
             } finally {
               if (sparse !== sparseSource) sparse.dispose();
 
@@ -414,20 +483,30 @@ const main = async () => {
             }
 
             try {
+              const maskReadStarted = performance.now();
               const selected = await selectMask(decoded);
+
+              stageMs.maskReadback = performance.now() - maskReadStarted;
+
               const maskInput = halfTensor(selected.mask, [1, 1, SIDE, SIDE]);
               let encoded: Record<string, ort.Tensor>;
 
               try {
+                const memoryStarted = performance.now();
+
                 encoded = await get("memory_encoder").run({
                   pix_feat: raw,
                   masks: maskInput,
                 });
+
+                stageMs.memoryEncoder = performance.now() - memoryStarted;
               } finally {
                 maskInput.dispose();
               }
 
               try {
+                const memoryReadStarted = performance.now();
+
                 requireDims(encoded.vision_features, "memory.vision_features", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
                 requireDims(encoded.vision_pos_enc, "memory.vision_pos_enc", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
 
@@ -437,6 +516,8 @@ const main = async () => {
                   positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
                   pointer: selected.pointer,
                 });
+
+                stageMs.memoryReadback = performance.now() - memoryReadStarted;
               } finally {
                 dispose(encoded);
               }
@@ -444,7 +525,7 @@ const main = async () => {
               // DAVIS PNG fetching and mask scoring are outside the inference
               // interval. They must not inflate the measured model latency.
               const inferenceMs = performance.now() - frameStarted;
-              const truth = await loadTruth("bear", index);
+              const truth = await loadTruth(fixture, index);
               const binary = binaryMask(selected.mask, truth);
               const foreground = binary.reduce((total, value) => total + value, 0);
 
@@ -452,6 +533,7 @@ const main = async () => {
                 index,
                 timestamp,
                 inferenceMs,
+                stageMs,
                 proposals: selected.proposals,
                 chosenProposal: selected.winner,
                 score: selected.score,
@@ -482,6 +564,8 @@ const main = async () => {
 
     const report = {
       name: "efficienttam-ti-fp16-temporal-smoke",
+      fixture,
+      seedPoint: point,
       model: "egordm/efficienttam-ti-512@40788ab3",
       status: "experimental; single-object forward tracking; model comparison only",
       loading,
