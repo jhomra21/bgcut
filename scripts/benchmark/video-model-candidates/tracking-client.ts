@@ -705,6 +705,7 @@ const main = async () => {
 
     const initialPass = await runPass();
     const results = initialPass.results;
+
     let independent:
       | {
           readonly primaryMemoryIndices: readonly number[];
