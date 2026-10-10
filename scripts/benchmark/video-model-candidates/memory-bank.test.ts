@@ -51,9 +51,11 @@ test("snapshot mutation cannot change internal tracking memory", () => {
 
   memory.push({ index: 0 });
 
-  const snapshot = memory.values() as { readonly index: number }[];
+  const snapshot = memory.values();
 
-  snapshot.pop();
+  // The API intentionally exposes a readonly type. Exercise the returned
+  // array's runtime mutability without weakening the public type contract.
+  Reflect.apply(Array.prototype.pop, snapshot, []);
 
   expect(memory.size).toBe(1);
   expect(memory.values().map((frame) => frame.index)).toEqual([0]);
