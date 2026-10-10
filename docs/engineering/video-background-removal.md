@@ -1,5 +1,53 @@
 # Video background removal research
 
+## EfficientTAM-Ti temporal tracking research — 2026-10-10
+
+The EfficientTAM-Ti 512 FP16 model is a separate research candidate, **not** an
+alternative enabled in the Solid editor. The editor still uses SAM 2.1 Tiny.
+The candidate's five ONNX sessions run in Chrome/WebGPU on macOS CI: image
+encoder, prompt encoder, mask decoder, memory encoder and memory attention.
+All five graphs are fetched from a pinned Hugging Face revision, with exact
+sizes and SHA-256 checks enforced before execution. Model assets are not
+committed or shipped to the public app.
+
+The isolated encoder benchmark measured **61.4 ms** median for EfficientTAM
+versus **136.1 ms** for SAM 2.1 Tiny on the same bear frame (five warmed runs
+per encoder). This is not a full tracking speedup. The complete EfficientTAM
+tracking prototype remains much slower than encoder-only inference; the
+WebGPU timing breakdown often finds memory attention more expensive than the
+vision encoder. Cold session loading and GPU warmup also affect first-frame
+latency.
+
+The first eight-frame forward-tracking experiments returned strong mean IoU
+and boundary F on **bear** (0.965 / 0.988) and **camel** (0.965 / 0.987), but
+failed on **car-shadow** (0.117 / 0.022). A per-proposal diagnostic located
+the mistake: the decoder ranked proposal 1 highest (predicted IoU 0.656,
+actual IoU 0.131); proposal 0 scored only 0.218 yet achieved an actual
+IoU of 0.970. With proposal 0 **explicitly selected as the seed**, tracking
+recovered without any ground-truth data passed to inference.
+
+A matched twelve-frame `car-shadow` run confirmed the distinction:
+
+| Seed choice | Tracked mean IoU | Tracked mean boundary F |
+| --- | ---: | ---: |
+| Decoder's highest predicted IoU | 0.1152 | 0.0238 |
+| Explicitly selected proposal 0 | **0.9740** | **0.9931** |
+
+The test now exercises more frames than the seven-slot memory budget,
+asserts eviction, and checks that explicit seed selection still exceeds
+0.85 mean IoU. It compares the same twelve timestamps for both choices.
+The development-only `?proposal=0` parameter affects the seed frame
+only; automatic tracking handles subsequent frames. DAVIS annotations are
+used solely for quality measurements and never to choose runtime masks.
+
+**Do not replace SAM or auto-select proposal 0 from these results.** The
+bad mask exposes the unreliability of ranking proposals by their own predicted
+IoU in some scenes, not a universal proposal index. Real users must be able
+to inspect and choose alternative masks, and the model still needs correction,
+multi-subject, rewind and wider cross-DAVIS acceptance. A separate bounded
+per-subject memory abstraction now has unit coverage for eviction, independent
+subjects and reset; it is not yet proof of full multi-subject GPU tracking.
+
 This work is experimental. It does not change bgcut's public browser, CLI, or Node.js API.
 
 ## Editor fused-step integration - 2026-10-08
