@@ -521,8 +521,12 @@ const main = async () => {
       const results: TrackingFrameResult[] = [];
       const frameMasks: Uint8Array[] = [];
 
-      const advance = async (index: number, timestamp: number) => {
-        const frame = await source.frameAt(timestamp);
+      const advance = async (
+        index: number,
+        timestamp: number,
+        sharedVision?: Record<string, ort.Tensor>,
+      ) => {
+        const frame = sharedVision === undefined ? await source.frameAt(timestamp) : undefined;
 
         if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
 
@@ -530,15 +534,22 @@ const main = async () => {
         const stageMs: Record<string, number> = {};
 
         try {
-          const input = frameInput(frame.frame);
+          const input = frame === undefined ? undefined : frameInput(frame.frame);
 
           stageMs.preprocess = performance.now() - frameStarted;
 
           try {
             const visionStarted = performance.now();
-            const vision = await get("image_encoder").run({ image: input });
+            const vision = sharedVision ?? (input === undefined
+              ? undefined
+              : await get("image_encoder").run({ image: input }));
 
-            stageMs.visionEncoder = performance.now() - visionStarted;
+            if (vision === undefined) {
+              throw new Error("A tracked frame requires decoded or shared vision features.");
+            }
+
+            stageMs.visionEncoder = sharedVision === undefined
+              ? performance.now() - visionStarted : 0;
 
             try {
               const raw = vision.vision_features;
@@ -709,13 +720,13 @@ const main = async () => {
                 ownedMemory?.pointers.dispose();
               }
             } finally {
-              dispose(vision);
+              if (sharedVision === undefined) dispose(vision);
             }
           } finally {
-            input.dispose();
+            input?.dispose();
           }
         } finally {
-          frame.close();
+          frame?.close();
         }
       };
 
@@ -749,6 +760,8 @@ const main = async () => {
           readonly interleavedMinAlternateMaskIoU: number;
           readonly interleavedPrimaryMemoryIndices: readonly number[];
           readonly interleavedAlternateMemoryIndices: readonly number[];
+          readonly sharedEncoderRuns: number;
+          readonly sharedEncoderMs: number;
         }
       | undefined;
 
@@ -784,10 +797,36 @@ const main = async () => {
       const interleavedAlternateBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
       const primary = createPass(interleavedPrimaryBank, 0, false);
       const secondary = createPass(interleavedAlternateBank, 1, false);
+      let sharedEncoderRuns = 0;
+      let sharedEncoderMs = 0;
 
       for (const [index, timestamp] of times.entries()) {
-        await primary.advance(index, timestamp);
-        await secondary.advance(index, timestamp);
+        const frame = await source.frameAt(timestamp);
+
+        if (frame === null) throw new Error(`Shared video frame ${index} could not be decoded.`);
+
+        try {
+          const input = frameInput(frame.frame);
+
+          try {
+            const started = performance.now();
+            const vision = await get("image_encoder").run({ image: input });
+
+            sharedEncoderRuns += 1;
+            sharedEncoderMs += performance.now() - started;
+
+            try {
+              await primary.advance(index, timestamp, vision);
+              await secondary.advance(index, timestamp, vision);
+            } finally {
+              dispose(vision);
+            }
+          } finally {
+            input.dispose();
+          }
+        } finally {
+          frame.close();
+        }
       }
 
       const compare = (actual: readonly Uint8Array[], expected: readonly Uint8Array[]) => {
@@ -811,7 +850,8 @@ const main = async () => {
       const interleavedPrimaryMemoryIndices = interleavedPrimaryBank.values().map((frame) => frame.index);
       const interleavedAlternateMemoryIndices = interleavedAlternateBank.values().map((frame) => frame.index);
 
-      if (interleavedMinPrimaryMaskIoU < 0.995 ||
+      if (sharedEncoderRuns !== times.length ||
+          interleavedMinPrimaryMaskIoU < 0.995 ||
           interleavedMinAlternateMaskIoU < 0.995 ||
           interleavedPrimaryMemoryIndices.some((index, pos) => index !== primaryMemoryIndices[pos]) ||
           interleavedAlternateMemoryIndices.some((index, pos) => index !== alternateMemoryIndices[pos])) {
@@ -826,6 +866,8 @@ const main = async () => {
         interleavedMinAlternateMaskIoU,
         interleavedPrimaryMemoryIndices,
         interleavedAlternateMemoryIndices,
+        sharedEncoderRuns,
+        sharedEncoderMs,
         alternateMeanTrackedIoU:
           alternateTracked.reduce((total, frame) => total + frame.iou, 0) /
           alternateTracked.length,
