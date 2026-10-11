@@ -490,7 +490,7 @@ const main = async () => {
 
     const bank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
 
-    const runPass = async (
+    const createPass = (
       subjectBank = bank,
       chosenSeedProposal = seedProposal,
       allowCorrection = true,
@@ -502,7 +502,7 @@ const main = async () => {
       const results = [];
       const frameMasks: Uint8Array[] = [];
 
-      for (const [index, timestamp] of times.entries()) {
+      const advance = async (index: number, timestamp: number) => {
         const frame = await source.frameAt(timestamp);
 
         if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
@@ -698,9 +698,23 @@ const main = async () => {
         } finally {
           frame.close();
         }
+      };
+
+      return { advance, results, frameMasks };
+    };
+
+    const runPass = async (
+      subjectBank = bank,
+      chosenSeedProposal = seedProposal,
+      allowCorrection = true,
+    ) => {
+      const pass = createPass(subjectBank, chosenSeedProposal, allowCorrection);
+
+      for (const [index, timestamp] of times.entries()) {
+        await pass.advance(index, timestamp);
       }
 
-      return { results, frameMasks };
+      return { results: pass.results, frameMasks: pass.frameMasks };
     };
 
     const initialPass = await runPass();
@@ -712,6 +726,10 @@ const main = async () => {
           readonly alternateMemoryIndices: readonly number[];
           readonly seedMaskIoU: number;
           readonly alternateMeanTrackedIoU: number;
+          readonly interleavedMinPrimaryMaskIoU: number;
+          readonly interleavedMinAlternateMaskIoU: number;
+          readonly interleavedPrimaryMemoryIndices: readonly number[];
+          readonly interleavedAlternateMemoryIndices: readonly number[];
         }
       | undefined;
 
@@ -741,10 +759,54 @@ const main = async () => {
         throw new Error("Independent mask tracks shared state or selected the same seed mask.");
       }
 
+      // Repeat both trajectories interleaved, frame by frame, on shared
+      // ONNX sessions. Compare with the independently run references.
+      const interleavedPrimaryBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+      const interleavedAlternateBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+      const primary = createPass(interleavedPrimaryBank, 0, false);
+      const secondary = createPass(interleavedAlternateBank, 1, false);
+
+      for (const [index, timestamp] of times.entries()) {
+        await primary.advance(index, timestamp);
+        await secondary.advance(index, timestamp);
+      }
+
+      const compare = (actual: readonly Uint8Array[], expected: readonly Uint8Array[]) => {
+        if (actual.length !== expected.length) {
+          throw new Error("Interleaved tracking and the sequential reference have different frame counts.");
+        }
+
+        return actual.map((mask, index) => {
+          const reference = expected[index];
+
+          if (reference === undefined) throw new Error("Missing sequential mask for interleave comparison.");
+
+          return binaryMaskIou(mask, reference);
+        });
+      };
+
+      const primaryParity = compare(primary.frameMasks, initialPass.frameMasks);
+      const alternateParity = compare(secondary.frameMasks, alternate.frameMasks);
+      const interleavedMinPrimaryMaskIoU = Math.min(...primaryParity);
+      const interleavedMinAlternateMaskIoU = Math.min(...alternateParity);
+      const interleavedPrimaryMemoryIndices = interleavedPrimaryBank.values().map((frame) => frame.index);
+      const interleavedAlternateMemoryIndices = interleavedAlternateBank.values().map((frame) => frame.index);
+
+      if (interleavedMinPrimaryMaskIoU < 0.995 ||
+          interleavedMinAlternateMaskIoU < 0.995 ||
+          interleavedPrimaryMemoryIndices.some((index, pos) => index !== primaryMemoryIndices[pos]) ||
+          interleavedAlternateMemoryIndices.some((index, pos) => index !== alternateMemoryIndices[pos])) {
+        throw new Error("Interleaved EfficientTAM masks or memory histories differ from sequential runs.");
+      }
+
       independent = {
         primaryMemoryIndices,
         alternateMemoryIndices,
         seedMaskIoU,
+        interleavedMinPrimaryMaskIoU,
+        interleavedMinAlternateMaskIoU,
+        interleavedPrimaryMemoryIndices,
+        interleavedAlternateMemoryIndices,
         alternateMeanTrackedIoU:
           alternateTracked.reduce((total, frame) => total + frame.iou, 0) /
           alternateTracked.length,
