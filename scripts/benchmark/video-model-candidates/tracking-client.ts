@@ -36,6 +36,28 @@ type Memory = {
   readonly pointer: Uint16Array;
 };
 
+type TrackingFrameResult = {
+  readonly index: number;
+  readonly timestamp: number;
+  readonly inferenceMs: number;
+  readonly stageMs: Readonly<Record<string, number>>;
+  readonly seedProposalDiagnostics?: readonly {
+    readonly index: number;
+    readonly predictedIou: number;
+    readonly actualIou: number;
+    readonly foreground: number;
+  }[];
+  readonly memorySlots: number;
+  readonly corrected: boolean;
+  readonly truthForeground: number;
+  readonly proposals: number;
+  readonly chosenProposal: number;
+  readonly score: number;
+  readonly foreground: number;
+  readonly iou: number;
+  readonly boundaryF: number;
+};
+
 const halfTensor = (data: Uint16Array, dims: readonly number[]) =>
   new ort.Tensor("float16", data, [...dims]);
 
@@ -499,7 +521,7 @@ const main = async () => {
         throw new Error("EfficientTAM rewind pass inherited stale tracking memory.");
       }
 
-      const results = [];
+      const results: TrackingFrameResult[] = [];
       const frameMasks: Uint8Array[] = [];
 
       const advance = async (index: number, timestamp: number) => {
