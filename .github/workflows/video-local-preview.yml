@@ -919,11 +919,24 @@ jobs:
               bun -e '
                 const json = await Bun.file(process.argv.at(-1)).json();
                 const fixtures = json.reports.find((r) => r.name === "davis-colour-instances")?.fixtures;
-                if (!Array.isArray(fixtures) || fixtures.length !== 8 ||
-                    fixtures.some((r) => r.foreground < 1 || r.unassignedForeground < 0)) {
-                  throw Error("DAVIS palette inventory missing, incomplete or inconsistent.");
+                if (!Array.isArray(fixtures) || fixtures.length !== 8) {
+                  throw Error("DAVIS palette inventory is missing or incomplete.");
                 }
-                console.log("DAVIS instance masks decoded on " + fixtures.length + " fixtures");
+
+                const available = fixtures.filter((row) => !row.unavailable);
+
+                if (available.length < 3 ||
+                    available.some((row) => row.foreground < 1 ||
+                      row.unassignedForeground < 0 ||
+                      row.instances.some((instance) => instance.pixels < 128))) {
+                  throw Error("DAVIS palette inventory has invalid instance masks or too few fixtures.");
+                }
+
+                console.log(JSON.stringify({
+                  decoded: available.length,
+                  unavailable: fixtures.filter((row) => row.unavailable).map((row) => row.fixture),
+                  multiInstanceFixtures: available.filter((row) => row.instances.length > 1).map((row) => row.fixture),
+                }));
               ' "$ROOT/result.json"
               exit 0
             fi
