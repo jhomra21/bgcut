@@ -31,8 +31,15 @@ test("DAVIS instance masks and synthetic click positions remain separate", () =>
     [255, 0, 0],
   ]);
   expect(instances.map((instance) => instance.pixels)).toEqual([3, 2]);
-  expect([...instances[0]!.mask]).toEqual([0, 1, 0, 1, 0, 1]);
-  expect([...instances[1]!.mask]).toEqual([1, 0, 1, 0, 0, 0]);
+  const green = instances[0];
+  const red = instances[1];
+
+  if (green === undefined || red === undefined) {
+    throw new Error("Two annotation instances were expected.");
+  }
+
+  expect([...green.mask]).toEqual([0, 1, 0, 1, 0, 1]);
+  expect([...red.mask]).toEqual([1, 0, 1, 0, 0, 0]);
 
   for (const instance of instances) {
     const x = Math.floor(instance.seed.x * 3);
