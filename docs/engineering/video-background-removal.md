@@ -59,10 +59,13 @@ Two additional model-level tests now pass on the same macOS WebGPU runner:
   interleaved-to-sequential mask IoU **1.0** on each path. The alternate still
   matched the poor automatic car selection (**0.1152** car-truth mean IoU).
   These are independent hypotheses from **one click**, not two objects with
-  separately located user prompts. A further experiment reuses one shared
-  vision encoder result per frame across the two paths rather than running
-  the encoder twice; performance and parity for that change are checked
-  separately.
+  separately located user prompts. The shared-encoder variant also
+  **passed**: one WebGPU encoder result was reused across the two subject
+  paths for each frame, yielding exactly **12 vision encoder runs for
+  24 per-subject frame updates**. Both subjects still reproduced their
+  sequential masks exactly (minimum per-frame mask IoU **1.0**).
+  Total shared-encoder time across those 12 runs was **827.4 ms** on the
+  macOS test runner; this is not a full pipeline FPS claim.
 
 The separate annotation-inventory CI probe established a limitation of
 the existing DAVIS-Edit mask mirror: **bear**, **camel**, **bmx-trees** and
