@@ -865,3 +865,90 @@ jobs:
           name: video-model-tracking
           path: ${{ runner.temp }}/video-model-tracking
           if-no-files-found: warn
+
+  annotation-inventory:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Inspect pinned DAVIS colour annotations
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-annotation-inventory"
+          mkdir -p "$ROOT"
+
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4196 annotation-inventory >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4196/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+          "$CHROME" \
+            --headless=new \
+            --disable-gpu \
+            --no-first-run \
+            --user-data-dir="$RUNNER_TEMP/video-annotation-inventory-chrome" \
+            http://127.0.0.1:4196/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..180}; do
+            if [[ -s "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+
+              bun -e '
+                const json = await Bun.file(process.argv.at(-1)).json();
+                const fixtures = json.reports.find((r) => r.name === "davis-colour-instances")?.fixtures;
+                if (!Array.isArray(fixtures) || fixtures.length !== 8 ||
+                    fixtures.some((r) => r.foreground < 1 || r.unassignedForeground < 0)) {
+                  throw Error("DAVIS palette inventory missing, incomplete or inconsistent.");
+                }
+                console.log("DAVIS instance masks decoded on " + fixtures.length + " fixtures");
+              ' "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -s "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Timed out inspecting DAVIS palette instances." >&2
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-annotation-inventory
+          path: ${{ runner.temp }}/video-annotation-inventory
+          if-no-files-found: warn
