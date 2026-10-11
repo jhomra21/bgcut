@@ -540,6 +540,7 @@ const main = async () => {
 
           try {
             const visionStarted = performance.now();
+
             const vision = sharedVision ?? (input === undefined
               ? undefined
               : await get("image_encoder").run({ image: input }));
