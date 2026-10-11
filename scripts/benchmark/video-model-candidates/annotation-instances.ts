@@ -72,6 +72,7 @@ export const annotationInstances = (
 
     for (let i = 0; i < mask.length; i += 1) {
       const offset = 4 * i;
+
       const pixelColor = ((rgba[offset] ?? 0) << 16) |
         ((rgba[offset + 1] ?? 0) << 8) | (rgba[offset + 2] ?? 0);
 
