@@ -803,6 +803,8 @@ jobs:
                 selected.independent?.alternateMemoryIndices?.length !== 7 ||
                 selected.independent?.interleavedPrimaryMemoryIndices?.length !== 7 ||
                 selected.independent?.interleavedAlternateMemoryIndices?.length !== 7 ||
+                selected.independent?.sharedEncoderRuns !== 12 ||
+                !Number.isFinite(selected.independent?.sharedEncoderMs) ||
                 selected.independent?.interleavedMinPrimaryMaskIoU < 0.995 ||
                 selected.independent?.interleavedMinAlternateMaskIoU < 0.995 ||
                 selected.independent?.seedMaskIoU >= 0.7 ||
@@ -825,6 +827,8 @@ jobs:
               alternateTrackedMeanIou: selected.independent.alternateMeanTrackedIoU,
               interleavedMinPrimaryMaskIoU: selected.independent.interleavedMinPrimaryMaskIoU,
               interleavedMinAlternateMaskIoU: selected.independent.interleavedMinAlternateMaskIoU,
+              sharedEncoderRuns: selected.independent.sharedEncoderRuns,
+              sharedEncoderMs: selected.independent.sharedEncoderMs,
             }));
           ' "$ROOT/result-car-shadow.json" "$ROOT/result-car-shadow-proposal0.json"
 
