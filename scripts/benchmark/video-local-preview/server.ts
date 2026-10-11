@@ -95,6 +95,12 @@ if (
 ) {
   clientFilename =
     "../video-model-candidates/tracking-client.ts";
+} else if (
+  mode ===
+  "annotation-inventory"
+) {
+  clientFilename =
+    "../video-model-candidates/annotation-client.ts";
 }
 
 const build =
