@@ -1,5 +1,6 @@
 import * as ort from "onnxruntime-web/webgpu";
 
+import { annotatedForeground } from "./annotation-instances";
 import { channelsToHalfTokens, floatToHalf, halfToFloat } from "./half";
 import { BoundedFrameMemory } from "./memory-bank";
 
@@ -284,11 +285,7 @@ const loadTruth = async (clip: string, index: number): Promise<Truth> => {
     context.drawImage(bitmap, 0, 0);
 
     const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-    const mask = new Uint8Array(bitmap.width * bitmap.height);
-
-    for (let pixel = 0; pixel < mask.length; pixel += 1) {
-      mask[pixel] = (pixels[pixel * 4] ?? 0) > 0 ? 1 : 0;
-    }
+    const mask = annotatedForeground(pixels);
 
     return { mask, width: bitmap.width, height: bitmap.height };
   } finally {
