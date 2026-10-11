@@ -56,7 +56,18 @@ const main = async () => {
   const reports = [];
 
   for (const fixture of fixtures) {
-    reports.push(await inspect(fixture));
+    try {
+      reports.push(await inspect(fixture));
+    } catch (error) {
+      // The pinned DAVIS-Edit mirror may not expose every DAVIS sequence.
+      // Keep the rest of the inventory instead of treating missing masks
+      // as a model- or annotation-decoding failure.
+      reports.push({
+        fixture,
+        unavailable: true,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   const response = await fetch("/result", {
