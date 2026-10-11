@@ -51,13 +51,31 @@ Two additional model-level tests now pass on the same macOS WebGPU runner:
   that history and used the existing click with explicitly chosen proposal 0.
   Mean IoU over frames 3–11 recovered to **0.9700**. DAVIS truth was used to
   score masks afterward, never to choose the proposal.
-- **Independent hypotheses:** the same five ONNX sessions tracked two
-  different seed proposals through separate memory banks. Their initial
-  binary masks overlapped by only **0.1321 IoU**, and the alternate path
-  maintained its own trajectory (**0.1152** car-truth mean IoU). Replaying
-  the primary path after both runs still reproduced all original masks with
-  minimum IoU **1.0**. These are two mask hypotheses from *one click*,
-  processed sequentially, **not two distinct objects tracked concurrently**.
+- **Independent and interleaved hypotheses:** the same five ONNX sessions
+  tracked two different proposals from one click in separate seven-frame
+  memory banks. Their seed masks had **0.1321 IoU** with each other. Running
+  each path separately and then alternating between paths **at every frame**
+  preserved the full twelve-frame binary mask sequence for both, with minimum
+  interleaved-to-sequential mask IoU **1.0** on each path. The alternate still
+  matched the poor automatic car selection (**0.1152** car-truth mean IoU).
+  These are independent hypotheses from **one click**, not two objects with
+  separately located user prompts. A further experiment reuses one shared
+  vision encoder result per frame across the two paths rather than running
+  the encoder twice; performance and parity for that change are checked
+  separately.
+
+The separate annotation-inventory CI probe established a limitation of
+the existing DAVIS-Edit mask mirror: **bear**, **camel**, **bmx-trees** and
+**cows** expose only a white foreground silhouette, not labelled individual
+objects. The first-frame masks for **breakdance**, **dance-twirl**, **judo** and
+**soapbox** were unavailable from that mirror (HTTP 500 via the fixture proxy).
+Green inventory CI status indicates successfully decoded available masks
+and explicitly recorded unavailable sequences, **not** multi-instance
+acceptance. DAVIS 2017's original annotations are indexed PNG masks carrying
+object IDs, so a verified original instance-label source is required before
+measuring separately prompted subjects. The research parser now handles
+distinct RGB palette colours and has synthetic unit tests, but the inspected
+remote mirror doesn't provide them.
 
 **Do not replace SAM or auto-select proposal 0 from these results.** The
 failure comes from unreliable confidence ranking on at least one clip; it
