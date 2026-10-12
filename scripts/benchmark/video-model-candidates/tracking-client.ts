@@ -165,15 +165,24 @@ const assembledMemory = (bank: readonly Memory[], frameIndex: number, temporal: 
   };
 };
 
-const promptInputs = (x?: number, y?: number) => ({
+const promptInputs = (
+  x?: number,
+  y?: number,
+  exclude?: { readonly x: number; readonly y: number },
+) => ({
   point_coords: new ort.Tensor(
     "float32",
-    Float32Array.of(x === undefined ? 0 : x * SIDE, y === undefined ? 0 : y * SIDE, 0, 0),
+    Float32Array.of(
+      x === undefined ? 0 : x * SIDE,
+      y === undefined ? 0 : y * SIDE,
+      exclude === undefined ? 0 : exclude.x * SIDE,
+      exclude === undefined ? 0 : exclude.y * SIDE,
+    ),
     [1, 2, 2],
   ),
   point_labels: new ort.Tensor(
     "int32",
-    Int32Array.of(x === undefined ? -1 : 1, -1),
+    Int32Array.of(x === undefined ? -1 : 1, exclude === undefined ? -1 : 0),
     [1, 2],
   ),
   mask_input: new ort.Tensor("float32", new Float32Array(128 * 128), [1, 1, 128, 128]),
@@ -425,6 +434,18 @@ const requestedSubjectProposals = (): readonly [number, number] | undefined => {
   return [first, second];
 };
 
+const requestedExcludeOther = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("excludeOther");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") {
+    throw new Error("Research-only cross-subject exclusion accepts only ?excludeOther=1.");
+  }
+
+  return true;
+};
+
 const requestedRealSubjects = (): boolean => {
   const raw = new URL(globalThis.location.href).searchParams.get("subjects");
 
@@ -509,6 +530,11 @@ const main = async () => {
   const independentTracks = requestedIndependentTracks();
   const realSubjects = requestedRealSubjects();
   const subjectProposals = requestedSubjectProposals();
+  const excludeOther = requestedExcludeOther();
+
+  if (excludeOther && !realSubjects) {
+    throw new Error("Cross-subject exclusion requires ?subjects=1.");
+  }
 
   if (subjectProposals !== undefined && !realSubjects) {
     throw new Error("Manual subject proposals require ?subjects=1.");
@@ -972,8 +998,13 @@ const main = async () => {
         throw new Error("Two indexed DAVIS object identities are required.");
       }
 
-      const firstInputs = promptInputs(firstRegion.seed.x, firstRegion.seed.y);
-      const secondInputs = promptInputs(secondRegion.seed.x, secondRegion.seed.y);
+      // Offline upper-bound experiment: the other object's DAVIS seed is a
+      // simulated user Exclude click. No annotations select a mask proposal
+      // or modify temporal memory after prompting.
+      const firstExclude = excludeOther ? secondRegion.seed : undefined;
+      const secondExclude = excludeOther ? firstRegion.seed : undefined;
+      const firstInputs = promptInputs(firstRegion.seed.x, firstRegion.seed.y, firstExclude);
+      const secondInputs = promptInputs(secondRegion.seed.x, secondRegion.seed.y, secondExclude);
       let firstClick: Record<string, ort.Tensor> | undefined;
       let secondClick: Record<string, ort.Tensor> | undefined;
 
@@ -992,7 +1023,17 @@ const main = async () => {
           throw new Error("Indexed multi-object tracking is missing its first masks.");
         }
 
-        const seedMaskIoU = binaryMaskIou(seedMaskA, seedMaskB);
+        const frameInterSubjectIoUs = first.frameMasks.map((mask, index) => {
+          const other = second.frameMasks[index];
+
+          if (other === undefined) throw new Error("Missing indexed second-object frame mask.");
+
+          return binaryMaskIou(mask, other);
+        });
+        const seedMaskIoU = frameInterSubjectIoUs[0];
+
+        if (seedMaskIoU === undefined) throw new Error("Missing indexed subject overlap.");
+
         const interleavedFirstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const interleavedSecondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
 
@@ -1078,6 +1119,9 @@ const main = async () => {
             reference,
             rgb: region.rgb,
             seed: region.seed,
+            excludedSeed: excludeOther
+              ? region.rgb === firstRegion.rgb ? secondRegion.seed : firstRegion.seed
+              : undefined,
             seedPixels: region.pixels,
             meanTrackedIoU: tracked.reduce((sum, row) => sum + row.iou, 0) / tracked.length,
             meanTrackedBoundaryF: tracked.reduce((sum, row) => sum + row.boundaryF, 0) / tracked.length,
@@ -1093,11 +1137,13 @@ const main = async () => {
           fixture,
           seedMode: subjectProposals === undefined ? "automatic" : "explicit offline-selected proposals",
           subjectProposals,
+          excludeOther,
           subjects: [
             summarize(firstRegion, first, "largest DAVIS instance"),
             summarize(secondRegion, second, "second DAVIS instance"),
           ],
           seedMaskIoU,
+          frameInterSubjectIoUs,
           sharedEncoderRuns,
           minMaskParity: [firstParity, secondParity],
           interleavedFrameUpdates: 2 * times.length,
