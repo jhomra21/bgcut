@@ -969,3 +969,116 @@ jobs:
           name: video-annotation-inventory
           path: ${{ runner.temp }}/video-annotation-inventory
           if-no-files-found: warn
+
+  indexed-davis-annotations:
+    if: github.head_ref == 'feat/video-local-preview'
+    runs-on: macos-26
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+
+      - name: Test ZIP range extraction against a local fixture
+        run: python3 -m unittest discover -s scripts/benchmark/video-model-candidates -p 'test_davis_range.py' -v
+
+      - name: Extract original indexed DAVIS annotation masks
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-indexed-annotations"
+          mkdir -p "$ROOT"
+          python3 scripts/benchmark/video-model-candidates/prepare-davis-indexed-annotations.py \
+            --output "$ROOT/original-masks" --frames 1 \
+            --sequences bear camel bmx-trees breakdance dance-twirl judo soapbox cows \
+            > "$ROOT/zip-range-report.json"
+          cat "$ROOT/zip-range-report.json"
+          test "$(find "$ROOT/original-masks" -name '00000.png' | wc -l | tr -d ' ')" = 8
+
+      - name: Inspect true DAVIS per-object annotations in Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-indexed-annotations"
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4195 indexed-annotation-inventory >"$ROOT/server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4195/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+          "$CHROME" \
+            --headless=new \
+            --disable-gpu \
+            --no-first-run \
+            --user-data-dir="$RUNNER_TEMP/video-indexed-annotations-chrome" \
+            http://127.0.0.1:4195/ >"$ROOT/chrome.log" 2>&1 &
+          CHROME_PID=$!
+
+          for _ in {1..180}; do
+            if [[ -s "$ROOT/result.json" ]]; then
+              cat "$ROOT/result.json"
+              bun -e '
+                const json = await Bun.file(process.argv.at(-1)).json();
+                const fixtures = json.reports.find((r) => r.name === "davis-colour-instances")?.fixtures;
+                if (!Array.isArray(fixtures) || fixtures.length !== 8 ||
+                    fixtures.some((row) => row.unavailable || row.unassignedForeground < 0)) {
+                  throw Error("Original DAVIS palette inventory must decode all 8 masks.");
+                }
+                const multi = fixtures.filter((row) => row.instances.length > 1);
+                if (multi.length < 2) {
+                  throw Error("Original DAVIS masks did not expose expected independent objects.");
+                }
+                console.log(JSON.stringify({
+                  source: "official indexed DAVIS 2017 trainval archive",
+                  decoded: fixtures.length,
+                  multiObjectFixtures: multi.map((row) => row.fixture),
+                }));
+              ' "$ROOT/result.json"
+              exit 0
+            fi
+
+            if [[ -s "$ROOT/failure.json" ]]; then
+              cat "$ROOT/failure.json" >&2
+              exit 1
+            fi
+
+            if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+              cat "$ROOT/chrome.log" >&2 || true
+              cat "$ROOT/server.log" >&2 || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out on original DAVIS indexed annotation inventory." >&2
+          cat "$ROOT/server.log" >&2 || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: indexed-davis-annotations
+          path: |
+            ${{ runner.temp }}/video-indexed-annotations/result.json
+            ${{ runner.temp }}/video-indexed-annotations/failure.json
+            ${{ runner.temp }}/video-indexed-annotations/zip-range-report.json
+            ${{ runner.temp }}/video-indexed-annotations/original-masks/manifest.json
+            ${{ runner.temp }}/video-indexed-annotations/server.log
+            ${{ runner.temp }}/video-indexed-annotations/chrome.log
+          if-no-files-found: warn
