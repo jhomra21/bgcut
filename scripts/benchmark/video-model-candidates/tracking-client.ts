@@ -1045,6 +1045,8 @@ const main = async () => {
             meanTrackedBoundaryF: tracked.reduce((sum, row) => sum + row.boundaryF, 0) / tracked.length,
             seedIoU: run.results[0]?.iou,
             seedProposal: run.results[0]?.chosenProposal,
+            seedAlternatives: run.results[0]?.seedProposalDiagnostics,
+            frameIoUs: run.results.map((row) => row.iou),
             memoryIndices: run.results.map((row) => row.memorySlots),
           };
         };
