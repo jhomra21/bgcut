@@ -1166,6 +1166,10 @@ jobs:
                     seedMaskIoU: real.seedMaskIoU,
                     objects: real.subjects.map((row) => ({
                       rgb: row.rgb,
+                      seedIoU: row.seedIoU,
+                      seedProposal: row.seedProposal,
+                      seedAlternatives: row.seedAlternatives,
+                      frameIoUs: row.frameIoUs,
                       meanTrackedIoU: row.meanTrackedIoU,
                       meanTrackedBoundaryF: row.meanTrackedBoundaryF,
                     })),
