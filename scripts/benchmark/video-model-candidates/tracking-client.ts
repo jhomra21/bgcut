@@ -995,6 +995,7 @@ const main = async () => {
         const seedMaskIoU = binaryMaskIou(seedMaskA, seedMaskB);
         const interleavedFirstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const interleavedSecondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+
         const firstPass = createPass(
           interleavedFirstBank,
           subjectProposals?.[0],
@@ -1002,6 +1003,7 @@ const main = async () => {
           firstClick,
           firstRegion.rgb,
         );
+
         const secondPass = createPass(
           interleavedSecondBank,
           subjectProposals?.[1],
@@ -1009,6 +1011,7 @@ const main = async () => {
           secondClick,
           secondRegion.rgb,
         );
+
         let sharedEncoderRuns = 0;
 
         for (const [index, timestamp] of times.entries()) {
