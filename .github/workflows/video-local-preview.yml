@@ -1133,17 +1133,29 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for fixture in bmx-trees judo; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
+
+            fixture="$scenario"
+            proposal_query=""
+
+            if [[ "$scenario" == "bmx-trees-manual" ]]; then
+              fixture="bmx-trees"
+              proposal_query="&subjectProposals=0,2"
+            elif [[ "$scenario" == "judo-manual" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0"
+            fi
+
             "$CHROME" \
               --headless=new \
               --enable-unsafe-webgpu \
               --disable-gpu-blocklist \
               --enable-webgpu-developer-features \
               --use-gpu-in-tests \
-              --user-data-dir="$RUNNER_TEMP/efficienttam-indexed-$fixture" \
-              "http://127.0.0.1:4194/?fixture=$fixture&subjects=1&frames=12" \
-              >"$ROOT/tracking-chrome-$fixture.log" 2>&1 &
+              --user-data-dir="$RUNNER_TEMP/efficienttam-indexed-$scenario" \
+              "http://127.0.0.1:4194/?fixture=$fixture&subjects=1&frames=12$proposal_query" \
+              >"$ROOT/tracking-chrome-$scenario.log" 2>&1 &
             CHROME_PID=$!
             completed=0
 
@@ -1163,7 +1175,9 @@ jobs:
                   }
                   console.log(JSON.stringify({
                     fixture: real.fixture,
-                    seedMaskIoU: real.seedMaskIoU,
+                    seedMode: real.seedMode,
+              subjectProposals: real.subjectProposals,
+              seedMaskIoU: real.seedMaskIoU,
                     objects: real.subjects.map((row) => ({
                       rgb: row.rgb,
                       seedIoU: row.seedIoU,
@@ -1177,7 +1191,7 @@ jobs:
                     minMaskParity: real.minMaskParity,
                   }));
                 ' "$ROOT/result.json"
-                mv "$ROOT/result.json" "$ROOT/result-indexed-$fixture.json"
+                mv "$ROOT/result.json" "$ROOT/result-indexed-$scenario.json"
                 completed=1
                 break
               fi
@@ -1188,7 +1202,7 @@ jobs:
               fi
 
               if ! kill -0 "$CHROME_PID" 2>/dev/null; then
-                cat "$ROOT/tracking-chrome-$fixture.log" >&2 || true
+                cat "$ROOT/tracking-chrome-$scenario.log" >&2 || true
                 cat "$ROOT/tracking-server.log" >&2 || true
                 exit 1
               fi
