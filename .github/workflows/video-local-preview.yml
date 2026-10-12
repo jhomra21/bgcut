@@ -973,7 +973,7 @@ jobs:
   indexed-davis-annotations:
     if: github.head_ref == 'feat/video-local-preview'
     runs-on: macos-26
-    timeout-minutes: 18
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
@@ -1050,6 +1050,7 @@ jobs:
                   multiObjectFixtures: multi.map((row) => row.fixture),
                 }));
               ' "$ROOT/result.json"
+              mv "$ROOT/result.json" "$ROOT/result-indexed-inventory.json"
               exit 0
             fi
 
@@ -1070,12 +1071,144 @@ jobs:
           cat "$ROOT/server.log" >&2 || true
           exit 1
 
+
+      - name: Extract twelve frames of two-object indexed DAVIS labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-indexed-annotations"
+          python3 scripts/benchmark/video-model-candidates/prepare-davis-indexed-annotations.py \
+            --output "$ROOT/original-masks" --frames 12 \
+            --sequences bmx-trees judo \
+            >"$ROOT/zip-range-tracking-report.json"
+          test "$(find "$ROOT/original-masks/bmx-trees" -name '*.png' | wc -l | tr -d ' ')" = 12
+          test "$(find "$ROOT/original-masks/judo" -name '*.png' | wc -l | tr -d ' ')" = 12
+
+      - name: Download verified EfficientTAM tracking bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-indexed-annotations"
+          mkdir -p "$ROOT"
+
+          while read -r filename output sha bytes; do
+            curl --fail --location --silent --show-error --retry 3 \
+              "https://huggingface.co/egordm/efficienttam-ti-512/resolve/40788ab3b74e96ad7b5db2a809f654b9f99c142e/fp16/$filename" \
+              --output "$ROOT/efficienttam-ti-$output"
+            printf '%s  %s\n' "$sha" "$ROOT/efficienttam-ti-$output" | shasum -a 256 --check -
+            test "$(stat -f%z "$ROOT/efficienttam-ti-$output")" = "$bytes"
+          done <<'MODELS'
+          image_encoder.onnx image_encoder.onnx 6d75656b6c2501819269ec76ecc18bf555695e91b67def84fb052f97dcbbb812 12774095
+          prompt_encoder.onnx prompt_encoder.onnx 525db5ac7deb9ce7ed98889a6b28b91e54b622d8fb132af26ca60b2886ed1f4a 44673
+          mask_decoder.onnx mask_decoder.onnx 8668f7f1b206a0ab9184a9e5a448ebcda47214303d083c5df3fee904aa96fc53 9393625
+          memory_encoder.onnx memory_encoder.onnx 9452c7c8b603806e0d793253ef576e5ccb9d0658e1548bf184ceaa2bce759355 2813090
+          memory_attention.onnx memory_attention.onnx b22b2144f3f48b21e66cc49bc6bb286bab2623695b39058031ccb5d97f56db9b 15342460
+          maskmem_tpos_enc.npy maskmem-tpos.npy 25bb49ba6d72e35a044c90a95933cd9527bc6940f9e1432148bcd3a8fa99a364 1024
+          MODELS
+
+
+      - name: Independently prompt two DAVIS subjects using shared WebGPU encoding
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/video-indexed-annotations"
+          bun run scripts/benchmark/video-local-preview/server.ts "$ROOT" 4194 indexed-model-tracking >"$ROOT/tracking-server.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            if [[ -n "${CHROME_PID:-}" ]]; then
+              kill "$CHROME_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for _ in {1..120}; do
+            if curl --fail --silent http://127.0.0.1:4194/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          test -x "$CHROME"
+
+          for fixture in bmx-trees judo; do
+            rm -f "$ROOT/result.json" "$ROOT/failure.json"
+            "$CHROME" \
+              --headless=new \
+              --enable-unsafe-webgpu \
+              --disable-gpu-blocklist \
+              --enable-webgpu-developer-features \
+              --use-gpu-in-tests \
+              --user-data-dir="$RUNNER_TEMP/efficienttam-indexed-$fixture" \
+              "http://127.0.0.1:4194/?fixture=$fixture&subjects=1&frames=12" \
+              >"$ROOT/tracking-chrome-$fixture.log" 2>&1 &
+            CHROME_PID=$!
+            completed=0
+
+            for _ in {1..600}; do
+              if [[ -s "$ROOT/result.json" ]]; then
+                bun -e '
+                  const result = await Bun.file(process.argv.at(-1)).json();
+                  const report = result.reports.find((row) => row.name === "efficienttam-ti-fp16-temporal-smoke");
+                  const real = report?.realObjects;
+                  if (!real || real.fixture !== report.fixture ||
+                      real.subjects.length !== 2 ||
+                      real.sharedEncoderRuns !== 12 ||
+                      real.interleavedFrameUpdates !== 24 ||
+                      real.minMaskParity.some((value) => value < 0.995) ||
+                      real.subjects[0]?.rgb.join(",") === real.subjects[1]?.rgb.join(",")) {
+                    throw Error("Two independently labelled DAVIS subjects did not preserve temporal parity.");
+                  }
+                  console.log(JSON.stringify({
+                    fixture: real.fixture,
+                    seedMaskIoU: real.seedMaskIoU,
+                    objects: real.subjects.map((row) => ({
+                      rgb: row.rgb,
+                      meanTrackedIoU: row.meanTrackedIoU,
+                      meanTrackedBoundaryF: row.meanTrackedBoundaryF,
+                    })),
+                    sharedEncoderRuns: real.sharedEncoderRuns,
+                    minMaskParity: real.minMaskParity,
+                  }));
+                ' "$ROOT/result.json"
+                mv "$ROOT/result.json" "$ROOT/result-indexed-$fixture.json"
+                completed=1
+                break
+              fi
+
+              if [[ -s "$ROOT/failure.json" ]]; then
+                cat "$ROOT/failure.json" >&2
+                exit 1
+              fi
+
+              if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+                cat "$ROOT/tracking-chrome-$fixture.log" >&2 || true
+                cat "$ROOT/tracking-server.log" >&2 || true
+                exit 1
+              fi
+              sleep 1
+            done
+
+            kill "$CHROME_PID" 2>/dev/null || true
+            wait "$CHROME_PID" 2>/dev/null || true
+            unset CHROME_PID
+
+            if [[ "$completed" != 1 ]]; then
+              echo "Timed out on independent indexed DAVIS $fixture subjects." >&2
+              exit 1
+            fi
+          done
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: indexed-davis-annotations
           path: |
-            ${{ runner.temp }}/video-indexed-annotations/result.json
+            ${{ runner.temp }}/video-indexed-annotations/result-indexed-*.json
+            ${{ runner.temp }}/video-indexed-annotations/zip-range-tracking-report.json
+            ${{ runner.temp }}/video-indexed-annotations/tracking-server.log
             ${{ runner.temp }}/video-indexed-annotations/failure.json
             ${{ runner.temp }}/video-indexed-annotations/zip-range-report.json
             ${{ runner.temp }}/video-indexed-annotations/original-masks/manifest.json
