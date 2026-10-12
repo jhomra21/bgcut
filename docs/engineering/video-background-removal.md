@@ -93,9 +93,42 @@ labelled red/green foreground regions in **bmx-trees**, **judo** and
 **soapbox**; all eight requested masks decoded. This validates provenance
 and per-object labels, not the model's multi-object quality. The source
 is non-commercial research data; annotated frames are neither committed
-nor distributed as application assets. The next isolated test uses these
-labels to prompt and score two real, distinct objects on shared WebGPU
-inference, rather than comparing two proposals from one click.
+nor distributed as application assets.
+
+### Original DAVIS two-object tracking (October 12)
+
+Each clip now runs two separately prompted object identities with independent
+seven-frame memories and one shared vision-encoder pass per video frame.
+Across twelve frames on each clip, the two interleaved tracks reproduced their
+individually executed reference masks exactly (minimum mask IoU 1.0).
+That confirms state isolation, **not** useful segmentation quality.
+
+Selecting an alternative first-frame proposal recovers some quality, but
+the results still deteriorate during temporal tracking:
+
+| Clip / object | Automatic seed IoU | Manual seed IoU | Automatic tracked IoU | Manual tracked IoU |
+| --- | ---: | ---: | ---: | ---: |
+| bmx-trees / 1 | 0.372 | 0.787 | 0.336 | 0.514 |
+| bmx-trees / 2 | 0.338 | 0.338 | 0.438 | 0.438 |
+| judo / 1 | 0.025 | 0.849 | 0.024 | 0.506 |
+| judo / 2 | 0.602 | 0.602 | 0.617 | 0.617 |
+
+The explicitly selected seed proposals (bmx-trees 0/2; judo 0/0) were
+chosen **offline using reference labels** to measure an upper bound. DAVIS
+truth was not consulted by model inference or automatic selection. In the
+judo first-object run, tracked IoU was about 0.47 by the end despite the
+0.849 seed. Mask-proposal selection is not the only remaining problem.
+
+The next isolated experiment adds an **Exclude click** on the other
+object's seed point to each independently prompted object. It keeps the
+same manually selected mask proposals, twelve frames, independent temporal
+memories and shared encoder. This is a supervised simulated user action,
+not an automatic strategy: original indexed DAVIS labels locate the
+other object's seed point. The new benchmark records cross-subject mask
+overlap on every frame, sequential/interleaved parity and per-object
+quality. Comparing identical proposal indices with and without Exclude
+helps distinguish ambiguous prompts from temporal drift. No change is
+made to the SAM-backed Solid editor.
 
 **Do not replace SAM or auto-select proposal 0 from these results.** The
 failure comes from unreliable confidence ranking on at least one clip; it
