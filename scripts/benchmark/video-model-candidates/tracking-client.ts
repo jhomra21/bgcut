@@ -407,6 +407,24 @@ const requestedCorrection = (): { readonly index: number; readonly proposal: num
   return { index, proposal };
 };
 
+const requestedSubjectProposals = (): readonly [number, number] | undefined => {
+  const raw = new URL(globalThis.location.href).searchParams.get("subjectProposals");
+
+  if (raw === null) return undefined;
+
+  if (!/^[0-3],[0-3]$/u.test(raw)) {
+    throw new Error("Independent object seed proposals must be a pair of indices 0..3.");
+  }
+
+  const [first, second] = raw.split(",").map(Number);
+
+  if (first === undefined || second === undefined) {
+    throw new Error("Two subject proposals are required.");
+  }
+
+  return [first, second];
+};
+
 const requestedRealSubjects = (): boolean => {
   const raw = new URL(globalThis.location.href).searchParams.get("subjects");
 
@@ -490,6 +508,11 @@ const main = async () => {
   const verifyRewind = requestedRewind();
   const independentTracks = requestedIndependentTracks();
   const realSubjects = requestedRealSubjects();
+  const subjectProposals = requestedSubjectProposals();
+
+  if (subjectProposals !== undefined && !realSubjects) {
+    throw new Error("Manual subject proposals require ?subjects=1.");
+  }
 
   if (realSubjects && fixture !== "bmx-trees" && fixture !== "judo") {
     throw new Error("Original DAVIS real-subject trials support only bmx-trees and judo.");
@@ -960,8 +983,8 @@ const main = async () => {
 
         const firstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const secondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
-        const first = await runPass(firstBank, undefined, false, firstClick, firstRegion.rgb);
-        const second = await runPass(secondBank, undefined, false, secondClick, secondRegion.rgb);
+        const first = await runPass(firstBank, subjectProposals?.[0], false, firstClick, firstRegion.rgb);
+        const second = await runPass(secondBank, subjectProposals?.[1], false, secondClick, secondRegion.rgb);
         const seedMaskA = first.frameMasks[0];
         const seedMaskB = second.frameMasks[0];
 
@@ -972,8 +995,20 @@ const main = async () => {
         const seedMaskIoU = binaryMaskIou(seedMaskA, seedMaskB);
         const interleavedFirstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const interleavedSecondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
-        const firstPass = createPass(interleavedFirstBank, undefined, false, firstClick, firstRegion.rgb);
-        const secondPass = createPass(interleavedSecondBank, undefined, false, secondClick, secondRegion.rgb);
+        const firstPass = createPass(
+          interleavedFirstBank,
+          subjectProposals?.[0],
+          false,
+          firstClick,
+          firstRegion.rgb,
+        );
+        const secondPass = createPass(
+          interleavedSecondBank,
+          subjectProposals?.[1],
+          false,
+          secondClick,
+          secondRegion.rgb,
+        );
         let sharedEncoderRuns = 0;
 
         for (const [index, timestamp] of times.entries()) {
@@ -1053,6 +1088,8 @@ const main = async () => {
 
         return {
           fixture,
+          seedMode: subjectProposals === undefined ? "automatic" : "explicit offline-selected proposals",
+          subjectProposals,
           subjects: [
             summarize(firstRegion, first, "largest DAVIS instance"),
             summarize(secondRegion, second, "second DAVIS instance"),
