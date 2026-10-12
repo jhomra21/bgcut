@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { annotatedForeground, annotationInstances } from "./annotation-instances";
+import { annotatedForeground, annotationInstanceMask, annotationInstances } from "./annotation-instances";
 
 test("DAVIS foreground union includes every nonblack palette channel", () => {
   const rgba = Uint8ClampedArray.of(
@@ -55,4 +55,20 @@ test("DAVIS instance parsing rejects invalid or inconsistent geometry", () => {
   expect(() => annotationInstances(pixels, 2, 2)).toThrow();
   expect(() => annotationInstances(pixels, 1, 1, 0)).toThrow();
   expect(() => annotatedForeground(Uint8ClampedArray.of(0, 1, 0))).toThrow();
+});
+
+test("indexed DAVIS red and green foreground masks stay independently labelled", () => {
+  const rgba = Uint8ClampedArray.of(
+    128, 0, 0, 255,
+    0, 128, 0, 255,
+    128, 0, 0, 255,
+    0, 128, 0, 255,
+    0, 0, 0, 255,
+    0, 128, 0, 0,
+  );
+
+  expect([...annotationInstanceMask(rgba, [128, 0, 0])]).toEqual([1, 0, 1, 0, 0, 0]);
+  expect([...annotationInstanceMask(rgba, [0, 128, 0])]).toEqual([0, 1, 0, 1, 0, 0]);
+  expect(() => annotationInstanceMask(rgba, [0, 0, 0])).toThrow();
+  expect(() => annotationInstanceMask(Uint8ClampedArray.of(1, 2), [128, 0, 0])).toThrow();
 });
