@@ -1,6 +1,6 @@
 import * as ort from "onnxruntime-web/webgpu";
 
-import { annotatedForeground } from "./annotation-instances";
+import { annotatedForeground, annotationInstanceMask, annotationInstances } from "./annotation-instances";
 import { channelsToHalfTokens, floatToHalf, halfToFloat } from "./half";
 import { BoundedFrameMemory } from "./memory-bank";
 
@@ -267,7 +267,11 @@ const selectMask = async (
 
 type Truth = { readonly mask: Uint8Array; readonly width: number; readonly height: number };
 
-const loadTruth = async (clip: string, index: number): Promise<Truth> => {
+const loadTruth = async (
+  clip: string,
+  index: number,
+  objectColour?: readonly [number, number, number],
+): Promise<Truth> => {
   const response = await fetch(`/quality/${clip}/${String(index).padStart(5, "0")}.png`);
 
   if (!response.ok) {
@@ -285,7 +289,9 @@ const loadTruth = async (clip: string, index: number): Promise<Truth> => {
     context.drawImage(bitmap, 0, 0);
 
     const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-    const mask = annotatedForeground(pixels);
+    const mask = objectColour === undefined
+      ? annotatedForeground(pixels)
+      : annotationInstanceMask(pixels, objectColour);
 
     return { mask, width: bitmap.width, height: bitmap.height };
   } finally {
@@ -317,10 +323,12 @@ const frameInput = (frame: VideoFrame) => halfTensor(
   [1, 3, SIDE, SIDE],
 );
 
-const fixtureFromLocation = (): "bear" | "camel" | "car-shadow" => {
+const fixtureFromLocation = (): "bear" | "camel" | "car-shadow" | "bmx-trees" | "judo" => {
   const requested = new URL(globalThis.location.href).searchParams.get("fixture") ?? "bear";
 
-  if (requested !== "bear" && requested !== "camel" && requested !== "car-shadow") {
+  if (requested !== "bear" && requested !== "camel" &&
+      requested !== "car-shadow" && requested !== "bmx-trees" &&
+      requested !== "judo") {
     throw new Error(`Unsupported EfficientTAM DAVIS fixture: ${requested}.`);
   }
 
@@ -398,6 +406,46 @@ const requestedCorrection = (): { readonly index: number; readonly proposal: num
   return { index, proposal };
 };
 
+const requestedRealSubjects = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("subjects");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") throw new Error("Independent object quality accepts only ?subjects=1.");
+
+  return true;
+};
+
+const originalSubjectSeeds = async (fixture: string) => {
+  const response = await fetch(`/quality/${fixture}/00000.png`);
+
+  if (!response.ok) {
+    throw new Error(`Cannot read original DAVIS per-object annotations: ${fixture}.`);
+  }
+
+  const bitmap = await createImageBitmap(await response.blob());
+
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    if (context === null) throw new Error("Original DAVIS annotation canvas unavailable.");
+
+    context.drawImage(bitmap, 0, 0);
+
+    const data = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    const regions = annotationInstances(data, bitmap.width, bitmap.height, 256);
+
+    if (regions.length < 2) {
+      throw new Error(`Expected at least two distinct original DAVIS objects in ${fixture}.`);
+    }
+
+    return regions.slice(0, 2).map(({ rgb, seed, pixels }) => ({ rgb, seed, pixels }));
+  } finally {
+    bitmap.close();
+  }
+};
+
 const requestedIndependentTracks = (): boolean => {
   const raw = new URL(globalThis.location.href).searchParams.get("dual");
 
@@ -440,6 +488,11 @@ const main = async () => {
   const frameCount = requestedFrameCount();
   const verifyRewind = requestedRewind();
   const independentTracks = requestedIndependentTracks();
+  const realSubjects = requestedRealSubjects();
+
+  if (realSubjects && fixture !== "bmx-trees" && fixture !== "judo") {
+    throw new Error("Original DAVIS real-subject trials support only bmx-trees and judo.");
+  }
   const correction = requestedCorrection();
 
   if (correction !== undefined && correction.index >= frameCount) {
@@ -513,6 +566,8 @@ const main = async () => {
       subjectBank = bank,
       chosenSeedProposal = seedProposal,
       allowCorrection = true,
+      subjectPrompt = clickEmbedding,
+      objectColour?: readonly [number, number, number],
     ) => {
       if (subjectBank.size !== 0) {
         throw new Error("EfficientTAM rewind pass inherited stale tracking memory.");
@@ -591,7 +646,7 @@ const main = async () => {
                 );
               }
 
-              const prompt = subjectBank.size === 0 ? clickEmbedding : noPointEmbedding;
+              const prompt = subjectBank.size === 0 ? subjectPrompt : noPointEmbedding;
 
               const sparseSource = requireDims(
                 prompt.sparse_prompt_embeddings,
@@ -675,7 +730,7 @@ const main = async () => {
                 // DAVIS PNG fetching and mask scoring are outside the inference
                 // interval. They must not inflate the measured model latency.
                 const inferenceMs = performance.now() - frameStarted;
-                const truth = await loadTruth(fixture, index);
+                const truth = await loadTruth(fixture, index, objectColour);
                 const binary = binaryMask(selected.mask, truth);
 
                 frameMasks.push(binary);
@@ -738,8 +793,16 @@ const main = async () => {
       subjectBank = bank,
       chosenSeedProposal = seedProposal,
       allowCorrection = true,
+      subjectPrompt = clickEmbedding,
+      objectColour?: readonly [number, number, number],
     ) => {
-      const pass = createPass(subjectBank, chosenSeedProposal, allowCorrection);
+      const pass = createPass(
+        subjectBank,
+        chosenSeedProposal,
+        allowCorrection,
+        subjectPrompt,
+        objectColour,
+      );
 
       for (const [index, timestamp] of times.entries()) {
         await pass.advance(index, timestamp);
