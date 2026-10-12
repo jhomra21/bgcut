@@ -95,6 +95,12 @@ if (
 ) {
   clientFilename =
     "../video-model-candidates/tracking-client.ts";
+} else if (
+  mode ===
+  "indexed-model-tracking"
+) {
+  clientFilename =
+    "../video-model-candidates/tracking-client.ts";
 }
 else if (
   mode ===
@@ -345,7 +351,8 @@ const app =
       const quality =
         await proxyQualityFixtureRequest(
           request,
-          mode === "indexed-annotation-inventory"
+          mode === "indexed-annotation-inventory" ||
+          mode === "indexed-model-tracking"
             ? { maskRoot: join(outputRoot, "original-masks") }
             : {},
         );
