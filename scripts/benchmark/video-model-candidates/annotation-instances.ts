@@ -105,3 +105,31 @@ export const annotationInstances = (
 
   return instances.sort((a, b) => b.pixels - a.pixels);
 };
+
+/** Recover exactly one DAVIS palette-labelled object at any frame. */
+export const annotationInstanceMask = (
+  rgba: Uint8ClampedArray,
+  rgb: readonly [number, number, number],
+): Uint8Array => {
+  if (rgba.length % 4 !== 0) {
+    throw new Error("Annotation instance RGBA buffer is incomplete.");
+  }
+
+  if (rgb.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255) ||
+      rgb.every((channel) => channel === 0)) {
+    throw new Error("Invalid foreground instance palette colour.");
+  }
+
+  const mask = new Uint8Array(rgba.length / 4);
+
+  for (let index = 0; index < mask.length; index += 1) {
+    const offset = 4 * index;
+
+    mask[index] = (rgba[offset + 3] ?? 0) > 0 &&
+      rgba[offset] === rgb[0] &&
+      rgba[offset + 1] === rgb[1] &&
+      rgba[offset + 2] === rgb[2] ? 1 : 0;
+  }
+
+  return mask;
+};
