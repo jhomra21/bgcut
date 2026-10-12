@@ -1133,7 +1133,7 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -1145,6 +1145,12 @@ jobs:
             elif [[ "$scenario" == "judo-manual" ]]; then
               fixture="judo"
               proposal_query="&subjectProposals=0,0"
+            elif [[ "$scenario" == "bmx-trees-manual-exclude" ]]; then
+              fixture="bmx-trees"
+              proposal_query="&subjectProposals=0,2&excludeOther=1"
+            elif [[ "$scenario" == "judo-manual-exclude" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0&excludeOther=1"
             fi
 
             "$CHROME" \
@@ -1162,22 +1168,32 @@ jobs:
             for _ in {1..600}; do
               if [[ -s "$ROOT/result.json" ]]; then
                 bun -e '
+                  const scenario = process.argv.at(-2);
                   const result = await Bun.file(process.argv.at(-1)).json();
                   const report = result.reports.find((row) => row.name === "efficienttam-ti-fp16-temporal-smoke");
                   const real = report?.realObjects;
+                  const excludeOther = scenario.endsWith("-exclude");
                   if (!real || real.fixture !== report.fixture ||
                       real.subjects.length !== 2 ||
+                      real.excludeOther !== excludeOther ||
+                      real.subjects.some((row) => Boolean(row.excludedSeed) !== excludeOther) ||
                       real.sharedEncoderRuns !== 12 ||
                       real.interleavedFrameUpdates !== 24 ||
                       real.minMaskParity.some((value) => value < 0.995) ||
+                      real.frameInterSubjectIoUs.length !== 12 ||
+                      real.frameInterSubjectIoUs.some((value) => !Number.isFinite(value) || value < 0 || value > 1) ||
+                      Math.abs(real.frameInterSubjectIoUs[0] - real.seedMaskIoU) > 1e-8 ||
                       real.subjects[0]?.rgb.join(",") === real.subjects[1]?.rgb.join(",")) {
-                    throw Error("Two independently labelled DAVIS subjects did not preserve temporal parity.");
+                    throw Error("Two independently labelled DAVIS subjects did not preserve temporal parity and exclusion metadata.");
                   }
                   console.log(JSON.stringify({
+                    scenario,
                     fixture: real.fixture,
                     seedMode: real.seedMode,
-              subjectProposals: real.subjectProposals,
-              seedMaskIoU: real.seedMaskIoU,
+                    subjectProposals: real.subjectProposals,
+                    excludeOther: real.excludeOther,
+                    seedMaskIoU: real.seedMaskIoU,
+                    frameInterSubjectIoUs: real.frameInterSubjectIoUs,
                     objects: real.subjects.map((row) => ({
                       rgb: row.rgb,
                       seedIoU: row.seedIoU,
@@ -1190,7 +1206,7 @@ jobs:
                     sharedEncoderRuns: real.sharedEncoderRuns,
                     minMaskParity: real.minMaskParity,
                   }));
-                ' "$ROOT/result.json"
+                ' "$scenario" "$ROOT/result.json"
                 mv "$ROOT/result.json" "$ROOT/result-indexed-$scenario.json"
                 completed=1
                 break
