@@ -938,6 +938,139 @@ const main = async () => {
       };
     }
 
+    const runRealSubjects = async () => {
+      const regions = await originalSubjectSeeds(fixture);
+      const firstRegion = regions[0];
+      const secondRegion = regions[1];
+
+      if (firstRegion === undefined || secondRegion === undefined) {
+        throw new Error("Two indexed DAVIS object identities are required.");
+      }
+
+      const firstInputs = promptInputs(firstRegion.seed.x, firstRegion.seed.y);
+      const secondInputs = promptInputs(secondRegion.seed.x, secondRegion.seed.y);
+      let firstClick: Record<string, ort.Tensor> | undefined;
+      let secondClick: Record<string, ort.Tensor> | undefined;
+
+      try {
+        firstClick = await get("prompt_encoder").run(firstInputs);
+        secondClick = await get("prompt_encoder").run(secondInputs);
+
+        const firstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const secondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const first = await runPass(firstBank, undefined, false, firstClick, firstRegion.rgb);
+        const second = await runPass(secondBank, undefined, false, secondClick, secondRegion.rgb);
+        const seedMaskA = first.frameMasks[0];
+        const seedMaskB = second.frameMasks[0];
+
+        if (seedMaskA === undefined || seedMaskB === undefined) {
+          throw new Error("Indexed multi-object tracking is missing its first masks.");
+        }
+
+        const seedMaskIoU = binaryMaskIou(seedMaskA, seedMaskB);
+        const interleavedFirstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const interleavedSecondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const firstPass = createPass(interleavedFirstBank, undefined, false, firstClick, firstRegion.rgb);
+        const secondPass = createPass(interleavedSecondBank, undefined, false, secondClick, secondRegion.rgb);
+        let sharedEncoderRuns = 0;
+
+        for (const [index, timestamp] of times.entries()) {
+          const frame = await source.frameAt(timestamp);
+
+          if (frame === null) {
+            throw new Error(`Indexed DAVIS ${fixture} frame ${index} was not decoded.`);
+          }
+
+          try {
+            const input = frameInput(frame.frame);
+
+            try {
+              const vision = await get("image_encoder").run({ image: input });
+
+              sharedEncoderRuns += 1;
+
+              try {
+                await firstPass.advance(index, timestamp, vision);
+                await secondPass.advance(index, timestamp, vision);
+              } finally {
+                dispose(vision);
+              }
+            } finally {
+              input.dispose();
+            }
+          } finally {
+            frame.close();
+          }
+        }
+
+        const parity = (actual: readonly Uint8Array[], expected: readonly Uint8Array[]) => {
+          if (actual.length !== expected.length) {
+            throw new Error("Original DAVIS interleaved runs have different frame counts.");
+          }
+
+          return Math.min(...actual.map((mask, index) => {
+            const reference = expected[index];
+
+            if (reference === undefined) throw new Error("Missing original DAVIS reference mask.");
+
+            return binaryMaskIou(mask, reference);
+          }));
+        };
+
+        const firstParity = parity(firstPass.frameMasks, first.frameMasks);
+        const secondParity = parity(secondPass.frameMasks, second.frameMasks);
+
+        if (firstParity < 0.995 || secondParity < 0.995 ||
+            sharedEncoderRuns !== times.length ||
+            interleavedFirstBank.size !== firstBank.size ||
+            interleavedSecondBank.size !== secondBank.size) {
+          throw new Error("Two independently clicked DAVIS objects diverged during shared-vision tracking.");
+        }
+
+        const summarize = (
+          region: typeof firstRegion,
+          run: typeof first,
+          reference: string,
+        ) => {
+          const tracked = run.results.slice(1);
+
+          return {
+            reference,
+            rgb: region.rgb,
+            seed: region.seed,
+            seedPixels: region.pixels,
+            meanTrackedIoU: tracked.reduce((sum, row) => sum + row.iou, 0) / tracked.length,
+            meanTrackedBoundaryF: tracked.reduce((sum, row) => sum + row.boundaryF, 0) / tracked.length,
+            seedIoU: run.results[0]?.iou,
+            seedProposal: run.results[0]?.chosenProposal,
+            memoryIndices: run.results.map((row) => row.memorySlots),
+          };
+        };
+
+        return {
+          fixture,
+          subjects: [
+            summarize(firstRegion, first, "largest DAVIS instance"),
+            summarize(secondRegion, second, "second DAVIS instance"),
+          ],
+          seedMaskIoU,
+          sharedEncoderRuns,
+          minMaskParity: [firstParity, secondParity],
+          interleavedFrameUpdates: 2 * times.length,
+        };
+      } finally {
+        if (firstClick !== undefined) dispose(firstClick);
+
+        if (secondClick !== undefined) dispose(secondClick);
+
+        for (const input of Object.values(firstInputs)) input.dispose();
+
+        for (const input of Object.values(secondInputs)) input.dispose();
+      }
+    };
+
+    const realObjects = realSubjects ? await runRealSubjects() : undefined;
+
     let rewind:
       | { readonly replayedFrames: number; readonly minMaskIou: number; readonly frameMaskIous: readonly number[] }
       | undefined;
@@ -991,6 +1124,7 @@ const main = async () => {
       seedProposal: seedProposal ?? "auto",
       correction,
       independent,
+      realObjects,
       rewind,
       requestedFrameCount: frameCount,
       model: "egordm/efficienttam-ti-512@40788ab3",
