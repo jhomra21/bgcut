@@ -289,6 +289,7 @@ const loadTruth = async (
     context.drawImage(bitmap, 0, 0);
 
     const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+
     const mask = objectColour === undefined
       ? annotatedForeground(pixels)
       : annotationInstanceMask(pixels, objectColour);
@@ -493,6 +494,7 @@ const main = async () => {
   if (realSubjects && fixture !== "bmx-trees" && fixture !== "judo") {
     throw new Error("Original DAVIS real-subject trials support only bmx-trees and judo.");
   }
+
   const correction = requestedCorrection();
 
   if (correction !== undefined && correction.index >= frameCount) {
