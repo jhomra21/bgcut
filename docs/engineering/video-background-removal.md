@@ -80,6 +80,23 @@ measuring separately prompted subjects. The research parser now handles
 distinct RGB palette colours and has synthetic unit tests, but the inspected
 remote mirror doesn't provide them.
 
+**Original indexed DAVIS masks are now verified (October 12).** Rather than
+treating the binary mirror as ground truth, a research-only extractor reads
+small byte ranges of the [official DAVIS 2017 trainval 480p ZIP](
+https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-trainval-480p.zip
+). It refuses any server that ignores HTTP Range requests, verifies each
+ZIP member's CRC32, validates the PNG signature and records SHA-256 in a
+local manifest. On macOS CI it retrieved eight original first-frame indexed
+annotations while transferring **8,586,029 bytes** from an
+**832,766,765-byte** archive. Browser decoding confirmed separately
+labelled red/green foreground regions in **bmx-trees**, **judo** and
+**soapbox**; all eight requested masks decoded. This validates provenance
+and per-object labels, not the model's multi-object quality. The source
+is non-commercial research data; annotated frames are neither committed
+nor distributed as application assets. The next isolated test uses these
+labels to prompt and score two real, distinct objects on shared WebGPU
+inference, rather than comparing two proposals from one click.
+
 **Do not replace SAM or auto-select proposal 0 from these results.** The
 failure comes from unreliable confidence ranking on at least one clip; it
 does not mean proposal 0 is generally best. Before connecting EfficientTAM
