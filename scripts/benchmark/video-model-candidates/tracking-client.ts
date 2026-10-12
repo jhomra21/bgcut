@@ -1030,6 +1030,7 @@ const main = async () => {
 
           return binaryMaskIou(mask, other);
         });
+
         const seedMaskIoU = frameInterSubjectIoUs[0];
 
         if (seedMaskIoU === undefined) throw new Error("Missing indexed subject overlap.");
@@ -1120,7 +1121,7 @@ const main = async () => {
             rgb: region.rgb,
             seed: region.seed,
             excludedSeed: excludeOther
-              ? region.rgb === firstRegion.rgb ? secondRegion.seed : firstRegion.seed
+              ? region === firstRegion ? secondRegion.seed : firstRegion.seed
               : undefined,
             seedPixels: region.pixels,
             meanTrackedIoU: tracked.reduce((sum, row) => sum + row.iou, 0) / tracked.length,
