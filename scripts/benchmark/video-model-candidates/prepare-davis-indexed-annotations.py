@@ -114,8 +114,8 @@ class HttpRangeFile(io.RawIOBase):
 
 
 def extract(url: str, output: Path, sequences: list[str], frames: int) -> dict:
-    if not sequences or frames < 1 or frames > 12:
-        raise ValueError("Specify at least one sequence and 1–12 frames.")
+    if not sequences or frames < 1 or frames > 24:
+        raise ValueError("Specify at least one sequence and 1–24 frames.")
     if any(not re.fullmatch(r"[a-z][a-z0-9-]*", name) for name in sequences):
         raise ValueError("Invalid DAVIS sequence name.")
 
