@@ -1180,6 +1180,20 @@ jobs:
                       real.sharedEncoderRuns !== 12 ||
                       real.interleavedFrameUpdates !== 24 ||
                       real.minMaskParity.some((value) => value < 0.995) ||
+                      real.subjects.some((row) =>
+                        row.frameIoUs.length !== 12 ||
+                        row.frameChosenProposals.length !== 12 ||
+                        row.frameBestAvailableIoUs.length !== 12 ||
+                        row.frameProposalDiagnostics.length !== 12 ||
+                        row.frameIoUs.some((iou, index) => {
+                          const chosen = row.frameChosenProposals[index];
+                          const alternatives = row.frameProposalDiagnostics[index];
+                          const match = alternatives?.find((candidate) => candidate.index === chosen);
+                          const best = row.frameBestAvailableIoUs[index];
+                          return !match || !Number.isFinite(best) ||
+                            Math.abs(match.actualIou - iou) > 1e-8 || best + 1e-8 < iou;
+                        })
+                      ) ||
                       real.frameInterSubjectIoUs.length !== 12 ||
                       real.frameInterSubjectIoUs.some((value) => !Number.isFinite(value) || value < 0 || value > 1) ||
                       Math.abs(real.frameInterSubjectIoUs[0] - real.seedMaskIoU) > 1e-8 ||
@@ -1200,6 +1214,9 @@ jobs:
                       seedProposal: row.seedProposal,
                       seedAlternatives: row.seedAlternatives,
                       frameIoUs: row.frameIoUs,
+                      frameChosenProposals: row.frameChosenProposals,
+                      frameBestAvailableIoUs: row.frameBestAvailableIoUs,
+                      meanTrackedBestAvailableIoU: row.meanTrackedBestAvailableIoU,
                       meanTrackedIoU: row.meanTrackedIoU,
                       meanTrackedBoundaryF: row.meanTrackedBoundaryF,
                     })),
