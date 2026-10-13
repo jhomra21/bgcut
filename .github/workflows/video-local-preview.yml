@@ -973,7 +973,7 @@ jobs:
   indexed-davis-annotations:
     if: github.head_ref == 'feat/video-local-preview'
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
@@ -1072,17 +1072,17 @@ jobs:
           exit 1
 
 
-      - name: Extract twelve frames of two-object indexed DAVIS labels
+      - name: Extract 24 frames of two-object indexed DAVIS labels
         shell: bash
         run: |
           set -euo pipefail
           ROOT="$RUNNER_TEMP/video-indexed-annotations"
           python3 scripts/benchmark/video-model-candidates/prepare-davis-indexed-annotations.py \
-            --output "$ROOT/original-masks" --frames 12 \
+            --output "$ROOT/original-masks" --frames 24 \
             --sequences bmx-trees judo \
             >"$ROOT/zip-range-tracking-report.json"
-          test "$(find "$ROOT/original-masks/bmx-trees" -name '*.png' | wc -l | tr -d ' ')" = 12
-          test "$(find "$ROOT/original-masks/judo" -name '*.png' | wc -l | tr -d ' ')" = 12
+          test "$(find "$ROOT/original-masks/bmx-trees" -name '*.png' | wc -l | tr -d ' ')" = 24
+          test "$(find "$ROOT/original-masks/judo" -name '*.png' | wc -l | tr -d ' ')" = 24
 
       - name: Download verified EfficientTAM tracking bundle
         shell: bash
@@ -1133,11 +1133,16 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
             proposal_query=""
+            frames=12
+
+            if [[ "$scenario" == *-long ]]; then
+              frames=24
+            fi
 
             if [[ "$scenario" == "bmx-trees-manual" ]]; then
               fixture="bmx-trees"
@@ -1160,6 +1165,18 @@ jobs:
             elif [[ "$scenario" == "judo-manual-exclude-temporal" ]]; then
               fixture="judo"
               proposal_query="&subjectProposals=0,0&excludeOther=1&trackedSelection=temporal"
+            elif [[ "$scenario" == "bmx-trees-manual-long" ]]; then
+              fixture="bmx-trees"
+              proposal_query="&subjectProposals=0,2"
+            elif [[ "$scenario" == "bmx-trees-manual-temporal-long" ]]; then
+              fixture="bmx-trees"
+              proposal_query="&subjectProposals=0,2&trackedSelection=temporal"
+            elif [[ "$scenario" == "judo-manual-long" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0"
+            elif [[ "$scenario" == "judo-manual-temporal-long" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0&trackedSelection=temporal"
             fi
 
             "$CHROME" \
@@ -1169,7 +1186,7 @@ jobs:
               --enable-webgpu-developer-features \
               --use-gpu-in-tests \
               --user-data-dir="$RUNNER_TEMP/efficienttam-indexed-$scenario" \
-              "http://127.0.0.1:4194/?fixture=$fixture&subjects=1&frames=12$proposal_query" \
+              "http://127.0.0.1:4194/?fixture=$fixture&subjects=1&frames=$frames$proposal_query" \
               >"$ROOT/tracking-chrome-$scenario.log" 2>&1 &
             CHROME_PID=$!
             completed=0
@@ -1182,27 +1199,28 @@ jobs:
                   const report = result.reports.find((row) => row.name === "efficienttam-ti-fp16-temporal-smoke");
                   const real = report?.realObjects;
                   const excludeOther = scenario.includes("-exclude");
-                  const trackedSelection = scenario.endsWith("-temporal") ? "temporal" : "confidence";
+                  const trackedSelection = scenario.includes("-temporal") ? "temporal" : "confidence";
+                  const expectedFrames = scenario.endsWith("-long") ? 24 : 12;
                   if (!real || real.fixture !== report.fixture ||
                       real.subjects.length !== 2 ||
                       real.excludeOther !== excludeOther ||
                       real.trackedSelection !== trackedSelection ||
                       real.subjects.some((row) => Boolean(row.excludedSeed) !== excludeOther) ||
-                      real.sharedEncoderRuns !== 12 ||
-                      real.interleavedFrameUpdates !== 24 ||
+                      real.sharedEncoderRuns !== expectedFrames ||
+                      real.interleavedFrameUpdates !== 2 * expectedFrames ||
                       real.minMaskParity.some((value) => value < 0.995) ||
                       real.subjects.some((row) =>
-                        row.frameIoUs.length !== 12 ||
-                        row.frameChosenProposals.length !== 12 ||
-                        row.frameSelectionMethods.length !== 12 ||
-                        row.frameTemporalIoUs.length !== 12 ||
+                        row.frameIoUs.length !== expectedFrames ||
+                        row.frameChosenProposals.length !== expectedFrames ||
+                        row.frameSelectionMethods.length !== expectedFrames ||
+                        row.frameTemporalIoUs.length !== expectedFrames ||
                         row.frameSelectionMethods.slice(1).some((mode, index) =>
                           mode !== "predicted-iou" && mode !== "temporal-iou" ||
                           (trackedSelection === "confidence" && mode === "temporal-iou") ||
                           (mode === "temporal-iou" && !(row.frameTemporalIoUs[index + 1] >= 0.1))
                         ) ||
-                        row.frameBestAvailableIoUs.length !== 12 ||
-                        row.frameProposalDiagnostics.length !== 12 ||
+                        row.frameBestAvailableIoUs.length !== expectedFrames ||
+                        row.frameProposalDiagnostics.length !== expectedFrames ||
                         row.frameIoUs.some((iou, index) => {
                           const chosen = row.frameChosenProposals[index];
                           const alternatives = row.frameProposalDiagnostics[index];
@@ -1212,7 +1230,7 @@ jobs:
                             Math.abs(match.actualIou - iou) > 1e-8 || best + 1e-8 < iou;
                         })
                       ) ||
-                      real.frameInterSubjectIoUs.length !== 12 ||
+                      real.frameInterSubjectIoUs.length !== expectedFrames ||
                       real.frameInterSubjectIoUs.some((value) => !Number.isFinite(value) || value < 0 || value > 1) ||
                       Math.abs(real.frameInterSubjectIoUs[0] - real.seedMaskIoU) > 1e-8 ||
                       real.subjects[0]?.rgb.join(",") === real.subjects[1]?.rgb.join(",")) {
@@ -1220,6 +1238,7 @@ jobs:
                   }
                   console.log(JSON.stringify({
                     scenario,
+                    expectedFrames,
                     fixture: real.fixture,
                     seedMode: real.seedMode,
                     subjectProposals: real.subjectProposals,
