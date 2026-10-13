@@ -303,6 +303,7 @@ const selectMask = async (
   } else if (previousMask !== undefined) {
     const scoresByOverlap = alternatives.map((candidate) =>
       temporalMaskIoU(previousMask, candidate.mask));
+
     const bestOverlap = Math.max(...scoresByOverlap);
 
     // If all proposals are disjoint from the last frame, fall back to
@@ -843,6 +844,7 @@ const main = async () => {
                     positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
                     pointer: selected.pointer,
                   });
+
                   previousMask = selected.mask;
 
                   stageMs.memoryReadback = performance.now() - memoryReadStarted;
