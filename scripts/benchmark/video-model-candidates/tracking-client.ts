@@ -48,6 +48,12 @@ type TrackingFrameResult = {
     readonly actualIou: number;
     readonly foreground: number;
   }[];
+  readonly proposalDiagnostics?: readonly {
+    readonly index: number;
+    readonly predictedIou: number;
+    readonly actualIou: number;
+    readonly foreground: number;
+  }[];
   readonly memorySlots: number;
   readonly corrected: boolean;
   readonly truthForeground: number;
@@ -790,7 +796,7 @@ const main = async () => {
 
                 // The ground truth evaluates candidate proposals here, but
                 // never controls which proposal is committed for tracking.
-                const seedProposalDiagnostics = index === 0
+                const proposalDiagnostics = index === 0 || objectColour !== undefined
                   ? selected.alternatives.map((alternative) => {
                       const proposed = binaryMask(alternative.mask, truth);
 
@@ -808,7 +814,8 @@ const main = async () => {
                   timestamp,
                   inferenceMs,
                   stageMs,
-                  seedProposalDiagnostics,
+                  seedProposalDiagnostics: index === 0 ? proposalDiagnostics : undefined,
+                  proposalDiagnostics,
                   memorySlots: subjectBank.size,
                   corrected: correction?.index === index,
                   truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
@@ -1115,6 +1122,21 @@ const main = async () => {
           reference: string,
         ) => {
           const tracked = run.results.slice(1);
+          const frameBestAvailableIoUs = run.results.map((row) => {
+            if (row.proposalDiagnostics === undefined || row.proposalDiagnostics.length === 0) {
+              throw new Error("Indexed frame is missing its proposal-quality diagnostics.");
+            }
+
+            const selected = row.proposalDiagnostics.find((candidate) => candidate.index === row.chosenProposal);
+
+            if (selected === undefined || Math.abs(selected.actualIou - row.iou) > 1e-8) {
+              throw new Error("Indexed tracked mask differs from the recorded selected proposal.");
+            }
+
+            return Math.max(...row.proposalDiagnostics.map((candidate) => candidate.actualIou));
+          });
+
+          const trackedBestAvailableIoUs = frameBestAvailableIoUs.slice(1);
 
           return {
             reference,
@@ -1126,10 +1148,15 @@ const main = async () => {
             seedPixels: region.pixels,
             meanTrackedIoU: tracked.reduce((sum, row) => sum + row.iou, 0) / tracked.length,
             meanTrackedBoundaryF: tracked.reduce((sum, row) => sum + row.boundaryF, 0) / tracked.length,
+            meanTrackedBestAvailableIoU: trackedBestAvailableIoUs.reduce((sum, iou) => sum + iou, 0) /
+              trackedBestAvailableIoUs.length,
             seedIoU: run.results[0]?.iou,
             seedProposal: run.results[0]?.chosenProposal,
             seedAlternatives: run.results[0]?.seedProposalDiagnostics,
             frameIoUs: run.results.map((row) => row.iou),
+            frameBestAvailableIoUs,
+            frameChosenProposals: run.results.map((row) => row.chosenProposal),
+            frameProposalDiagnostics: run.results.map((row) => row.proposalDiagnostics),
             memoryIndices: run.results.map((row) => row.memorySlots),
           };
         };
