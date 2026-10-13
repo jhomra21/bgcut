@@ -1133,7 +1133,7 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -1151,6 +1151,15 @@ jobs:
             elif [[ "$scenario" == "judo-manual-exclude" ]]; then
               fixture="judo"
               proposal_query="&subjectProposals=0,0&excludeOther=1"
+            elif [[ "$scenario" == "bmx-trees-manual-temporal" ]]; then
+              fixture="bmx-trees"
+              proposal_query="&subjectProposals=0,2&trackedSelection=temporal"
+            elif [[ "$scenario" == "judo-manual-temporal" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0&trackedSelection=temporal"
+            elif [[ "$scenario" == "judo-manual-exclude-temporal" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0&excludeOther=1&trackedSelection=temporal"
             fi
 
             "$CHROME" \
@@ -1172,10 +1181,12 @@ jobs:
                   const result = await Bun.file(process.argv.at(-1)).json();
                   const report = result.reports.find((row) => row.name === "efficienttam-ti-fp16-temporal-smoke");
                   const real = report?.realObjects;
-                  const excludeOther = scenario.endsWith("-exclude");
+                  const excludeOther = scenario.includes("-exclude");
+                  const trackedSelection = scenario.endsWith("-temporal") ? "temporal" : "confidence";
                   if (!real || real.fixture !== report.fixture ||
                       real.subjects.length !== 2 ||
                       real.excludeOther !== excludeOther ||
+                      real.trackedSelection !== trackedSelection ||
                       real.subjects.some((row) => Boolean(row.excludedSeed) !== excludeOther) ||
                       real.sharedEncoderRuns !== 12 ||
                       real.interleavedFrameUpdates !== 24 ||
@@ -1183,6 +1194,13 @@ jobs:
                       real.subjects.some((row) =>
                         row.frameIoUs.length !== 12 ||
                         row.frameChosenProposals.length !== 12 ||
+                        row.frameSelectionMethods.length !== 12 ||
+                        row.frameTemporalIoUs.length !== 12 ||
+                        row.frameSelectionMethods.slice(1).some((mode, index) =>
+                          mode !== "predicted-iou" && mode !== "temporal-iou" ||
+                          (trackedSelection === "confidence" && mode === "temporal-iou") ||
+                          (mode === "temporal-iou" && !(row.frameTemporalIoUs[index + 1] >= 0.1))
+                        ) ||
                         row.frameBestAvailableIoUs.length !== 12 ||
                         row.frameProposalDiagnostics.length !== 12 ||
                         row.frameIoUs.some((iou, index) => {
@@ -1206,6 +1224,7 @@ jobs:
                     seedMode: real.seedMode,
                     subjectProposals: real.subjectProposals,
                     excludeOther: real.excludeOther,
+                    trackedSelection: real.trackedSelection,
                     seedMaskIoU: real.seedMaskIoU,
                     frameInterSubjectIoUs: real.frameInterSubjectIoUs,
                     objects: real.subjects.map((row) => ({
@@ -1215,6 +1234,7 @@ jobs:
                       seedAlternatives: row.seedAlternatives,
                       frameIoUs: row.frameIoUs,
                       frameChosenProposals: row.frameChosenProposals,
+                      frameSelectionMethods: row.frameSelectionMethods,
                       frameBestAvailableIoUs: row.frameBestAvailableIoUs,
                       meanTrackedBestAvailableIoU: row.meanTrackedBestAvailableIoU,
                       meanTrackedIoU: row.meanTrackedIoU,
