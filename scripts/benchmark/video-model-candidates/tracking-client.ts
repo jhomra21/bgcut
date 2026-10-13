@@ -56,6 +56,8 @@ type TrackingFrameResult = {
   }[];
   readonly memorySlots: number;
   readonly corrected: boolean;
+  readonly selectionMethod: "predicted-iou" | "explicit" | "temporal-iou";
+  readonly temporalIoU?: number;
   readonly truthForeground: number;
   readonly proposals: number;
   readonly chosenProposal: number;
@@ -225,9 +227,37 @@ const readableHalf = async (
   );
 };
 
+// Research-only previous-mask matching. It uses no DAVIS annotations.
+const temporalMaskIoU = (previous: Uint16Array, candidate: Uint16Array) => {
+  if (previous.length !== SIDE * SIDE || candidate.length !== SIDE * SIDE) {
+    throw new Error("EfficientTAM temporal proposal masks have different dimensions.");
+  }
+
+  let union = 0;
+  let intersection = 0;
+
+  // Sample a 128 x 128 grid to avoid a full mask readback comparison.
+  for (let y = 0; y < SIDE; y += 4) {
+    for (let x = 0; x < SIDE; x += 4) {
+      const offset = y * SIDE + x;
+      const past = previous[offset] ?? 0;
+      const next = candidate[offset] ?? 0;
+      const pastActive = past !== 0 && (past & 0x8000) === 0;
+      const nextActive = next !== 0 && (next & 0x8000) === 0;
+
+      if (pastActive || nextActive) union += 1;
+
+      if (pastActive && nextActive) intersection += 1;
+    }
+  }
+
+  return union === 0 ? 0 : intersection / union;
+};
+
 const selectMask = async (
   outputs: Record<string, ort.Tensor>,
   requestedProposal?: number,
+  previousMask?: Uint16Array,
 ) => {
   const masksTensor = outputs.masks;
   const iouTensor = outputs.iou_pred;
@@ -253,6 +283,15 @@ const selectMask = async (
     }
   }
 
+  const alternatives = Array.from({ length: count }, (_, index) => ({
+    index,
+    predictedIou: halfToFloat(scores[index] ?? 0),
+    mask: masks.slice(index * SIDE * SIDE, (index + 1) * SIDE * SIDE),
+  }));
+
+  let selectionMethod: "predicted-iou" | "explicit" | "temporal-iou" = "predicted-iou";
+  let temporalIoU: number | undefined;
+
   if (requestedProposal !== undefined) {
     if (!Number.isInteger(requestedProposal) ||
         requestedProposal < 0 || requestedProposal >= count) {
@@ -260,6 +299,20 @@ const selectMask = async (
     }
 
     winner = requestedProposal;
+    selectionMethod = "explicit";
+  } else if (previousMask !== undefined) {
+    const scoresByOverlap = alternatives.map((candidate) =>
+      temporalMaskIoU(previousMask, candidate.mask));
+    const bestOverlap = Math.max(...scoresByOverlap);
+
+    // If all proposals are disjoint from the last frame, fall back to
+    // the model's predicted-IoU ranking rather than matching empty masks.
+    if (bestOverlap >= 0.1) {
+      winner = scoresByOverlap.indexOf(bestOverlap);
+      selectionMethod = "temporal-iou";
+    }
+
+    temporalIoU = scoresByOverlap[winner];
   }
 
   const score = halfToFloat(scores[winner] ?? 0);
@@ -271,13 +324,7 @@ const selectMask = async (
   const mask = masks.slice(winner * SIDE * SIDE, (winner + 1) * SIDE * SIDE);
   const pointer = pointers.slice(winner * POINTER_CHANNELS, (winner + 1) * POINTER_CHANNELS);
 
-  const alternatives = Array.from({ length: count }, (_, index) => ({
-    index,
-    predictedIou: halfToFloat(scores[index] ?? 0),
-    mask: masks.slice(index * SIDE * SIDE, (index + 1) * SIDE * SIDE),
-  }));
-
-  return { mask, pointer, score, winner, proposals: count, alternatives };
+  return { mask, pointer, score, winner, proposals: count, alternatives, selectionMethod, temporalIoU };
 };
 
 type Truth = { readonly mask: Uint8Array; readonly width: number; readonly height: number };
@@ -440,6 +487,16 @@ const requestedSubjectProposals = (): readonly [number, number] | undefined => {
   return [first, second];
 };
 
+const requestedTrackedSelection = (): "confidence" | "temporal" => {
+  const raw = new URL(globalThis.location.href).searchParams.get("trackedSelection");
+
+  if (raw === null || raw === "confidence") return "confidence";
+
+  if (raw === "temporal") return "temporal";
+
+  throw new Error("Tracked proposal selection must be confidence or temporal.");
+};
+
 const requestedExcludeOther = (): boolean => {
   const raw = new URL(globalThis.location.href).searchParams.get("excludeOther");
 
@@ -537,6 +594,11 @@ const main = async () => {
   const realSubjects = requestedRealSubjects();
   const subjectProposals = requestedSubjectProposals();
   const excludeOther = requestedExcludeOther();
+  const trackedSelection = requestedTrackedSelection();
+
+  if (trackedSelection !== "confidence" && !realSubjects) {
+    throw new Error("Temporal proposal selection requires ?subjects=1.");
+  }
 
   if (excludeOther && !realSubjects) {
     throw new Error("Cross-subject exclusion requires ?subjects=1.");
@@ -632,6 +694,7 @@ const main = async () => {
 
       const results: TrackingFrameResult[] = [];
       const frameMasks: Uint8Array[] = [];
+      let previousMask: Uint16Array | undefined;
 
       const advance = async (
         index: number,
@@ -679,6 +742,7 @@ const main = async () => {
                 // A correction removes the old tracking history and starts
                 // fresh from the corrected subject's new first frame.
                 subjectBank.clear();
+                previousMask = undefined;
               }
 
               if (subjectBank.size > 0) {
@@ -746,6 +810,7 @@ const main = async () => {
                   decoded,
                   index === 0 ? chosenSeedProposal :
                     correcting ? correction.proposal : undefined,
+                  trackedSelection === "temporal" ? previousMask : undefined,
                 );
 
                 stageMs.maskReadback = performance.now() - maskReadStarted;
@@ -778,6 +843,7 @@ const main = async () => {
                     positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
                     pointer: selected.pointer,
                   });
+                  previousMask = selected.mask;
 
                   stageMs.memoryReadback = performance.now() - memoryReadStarted;
                 } finally {
@@ -818,6 +884,8 @@ const main = async () => {
                   proposalDiagnostics,
                   memorySlots: subjectBank.size,
                   corrected: correction?.index === index,
+                  selectionMethod: selected.selectionMethod,
+                  temporalIoU: selected.temporalIoU,
                   truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
                   proposals: selected.proposals,
                   chosenProposal: selected.winner,
@@ -1157,6 +1225,8 @@ const main = async () => {
             frameIoUs: run.results.map((row) => row.iou),
             frameBestAvailableIoUs,
             frameChosenProposals: run.results.map((row) => row.chosenProposal),
+            frameSelectionMethods: run.results.map((row) => row.selectionMethod),
+            frameTemporalIoUs: run.results.map((row) => row.temporalIoU ?? null),
             frameProposalDiagnostics: run.results.map((row) => row.proposalDiagnostics),
             memoryIndices: run.results.map((row) => row.memorySlots),
           };
@@ -1167,6 +1237,7 @@ const main = async () => {
           seedMode: subjectProposals === undefined ? "automatic" : "explicit offline-selected proposals",
           subjectProposals,
           excludeOther,
+          trackedSelection,
           subjects: [
             summarize(firstRegion, first, "largest DAVIS instance"),
             summarize(secondRegion, second, "second DAVIS instance"),
