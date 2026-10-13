@@ -119,23 +119,59 @@ truth was not consulted by model inference or automatic selection. In the
 judo first-object run, tracked IoU was about 0.47 by the end despite the
 0.849 seed. Mask-proposal selection is not the only remaining problem.
 
-The next isolated experiment adds an **Exclude click** on the other
-object's seed point to each independently prompted object. It keeps the
-same manually selected mask proposals, twelve frames, independent temporal
-memories and shared encoder. This is a supervised simulated user action,
-not an automatic strategy: original indexed DAVIS labels locate the
-other object's seed point. The new benchmark records cross-subject mask
-overlap on every frame, sequential/interleaved parity and per-object
-quality. Comparing identical proposal indices with and without Exclude
-helps distinguish ambiguous prompts from temporal drift. No change is
-made to the SAM-backed Solid editor.
+### Negative-click results (October 12)
+
+An isolated WebGPU run gave each subject a positive click on its own
+DAVIS seed and, in the second condition, an Exclude click on the other
+object's seed. Both conditions used the same explicitly chosen seed
+proposal indices, the same twelve frames and separate temporal memories.
+The model never accessed annotations during inference beyond those
+simulated user clicks.
+
+| Clip and subject | Selected proposal alone, tracked IoU | With Exclude, tracked IoU |
+| --- | ---: | ---: |
+| bmx-trees / 1 | 0.514 | 0.500 |
+| bmx-trees / 2 | 0.438 | 0.441 |
+| judo / 1 | 0.506 | 0.513 |
+| judo / 2 | 0.617 | **0.865** |
+
+For judo, average overlap between the two predicted subject masks fell
+from **0.0338 to 0.0034 IoU**. This result came mainly from the second
+object: its tracked IoU improved by 0.248. The first object's track
+still fell to about 0.47 IoU after a good initial seed. The bmx-trees
+results were almost unchanged. Negative clicks help some ambiguous
+subjects, but do not fix temporal degradation in general.
+
+These are **research-only, supervised simulated clicks**. Original DAVIS
+labels supplied the other object's point. A real editor user could place
+that Exclude click manually, but this benchmark does not discover the
+point automatically and does not show general quality improvement.
+
+### Per-frame proposal diagnosis
+
+The next GPU comparison scores every mask proposal returned by
+EfficientTAM's decoder on every tracked frame, after inference. It
+records the chosen proposal index, its actual DAVIS IoU and the best
+available proposal IoU. **Reference annotations only score the masks.**
+They never change which proposal the tracker commits or which features
+enter temporal memory.
+
+The best-per-frame score is an upper bound conditioned on the *actual*
+tracking memory. It cannot be read as the quality of a different
+temporally propagated track, because selecting another proposal would
+change subsequent memory. This distinction should tell us whether the
+poor later frames are caused by decoder ranking or by the underlying
+memory-conditioned mask candidates.
+
+No change is made to the SAM-backed Solid editor.
 
 **Do not replace SAM or auto-select proposal 0 from these results.** The
 failure comes from unreliable confidence ranking on at least one clip; it
 does not mean proposal 0 is generally best. Before connecting EfficientTAM
 to the Solid editor, users need mask-alternative selection, correction and
-rewind controls, and the candidate still needs true simultaneous
-multi-object validation plus wider DAVIS quality and performance comparisons.
+rewind controls. Two real subjects now pass memory-isolation checks, but
+the candidate still needs better multi-object segmentation quality and
+wider DAVIS and performance comparisons.
 The research-only query parameters `?rewind=1`, `?dual=1` and
 `?correctionAt=3&correctionProposal=0` are acceptance probes, not public APIs.
 
