@@ -577,8 +577,8 @@ const requestedFrameCount = (): number => {
 
   const count = Number(raw);
 
-  if (!Number.isInteger(count) || count < 2 || count > 12) {
-    throw new Error("EfficientTAM quality fixture must request between 2 and 12 frames.");
+  if (!Number.isInteger(count) || count < 2 || count > 24) {
+    throw new Error("EfficientTAM quality fixture must request between 2 and 24 frames.");
   }
 
   return count;
@@ -674,7 +674,7 @@ const main = async () => {
 
     const times = (await source.frameTimes(
       source.info.firstTimestamp,
-      source.info.firstTimestamp + Math.min(0.5, source.info.duration),
+      source.info.firstTimestamp + Math.min(1, source.info.duration),
       24,
     )).slice(0, frameCount);
 
