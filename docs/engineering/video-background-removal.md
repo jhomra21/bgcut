@@ -147,21 +147,55 @@ labels supplied the other object's point. A real editor user could place
 that Exclude click manually, but this benchmark does not discover the
 point automatically and does not show general quality improvement.
 
-### Per-frame proposal diagnosis
+### Per-frame alternatives and temporal selection (October 13)
 
-The next GPU comparison scores every mask proposal returned by
-EfficientTAM's decoder on every tracked frame, after inference. It
-records the chosen proposal index, its actual DAVIS IoU and the best
-available proposal IoU. **Reference annotations only score the masks.**
-They never change which proposal the tracker commits or which features
-enter temporal memory.
+The browser now scores all decoder proposals on every tracked frame, after
+inference. Indexed DAVIS labels measure their actual IoU, but never influence
+proposal selection or the temporal-memory encoder. On a fixed tracking
+history, the gap between the selected proposal and the best available
+proposal can be large:
 
-The best-per-frame score is an upper bound conditioned on the *actual*
-tracking memory. It cannot be read as the quality of a different
-temporally propagated track, because selecting another proposal would
-change subsequent memory. This distinction should tell us whether the
-poor later frames are caused by decoder ranking or by the underlying
-memory-conditioned mask candidates.
+| Clip / tracked subject | Confidence-selected IoU | Best available IoU on those frames |
+| --- | ---: | ---: |
+| bmx-trees / 1, explicit seed | 0.514 | 0.777 |
+| bmx-trees / 2, explicit seed | 0.438 | 0.524 |
+| judo / 1, explicit seed | 0.506 | 0.852 |
+| judo / 2, explicit seed | 0.617 | 0.791 |
+
+These best-available numbers are **post-inference oracle measurements,
+not achievable run results**. If the tracker commits a different mask,
+subsequent frames see different temporal memories.
+
+The next experiment used a research-only
+`?trackedSelection=temporal` option. It compares each current candidate
+with the previous committed mask on a sampled 128-by-128 grid and picks
+the candidate with the highest mask IoU. If every overlap is below 0.1,
+it falls back to the model's predicted confidence. The first frame still
+uses its explicitly selected proposal. This comparison needs no DAVIS
+labels and reuses decoder results already produced for the frame.
+
+| Clip / tracked subject | Confidence-selected IoU | Temporal-selection IoU |
+| --- | ---: | ---: |
+| bmx-trees / 1, explicit seed | 0.514 | **0.831** |
+| bmx-trees / 2, explicit seed | 0.438 | 0.438 |
+| judo / 1, explicit seed | 0.506 | **0.819** |
+| judo / 2, explicit seed | **0.617** | 0.594 |
+| judo / 1, explicit seed + Exclude | 0.513 | **0.825** |
+| judo / 2, explicit seed + Exclude | 0.865 | 0.865 |
+
+The strong gains for both first subjects are from **fully propagated
+tracking runs**, not oracle scoring. The regression on the second judo
+subject shows why temporal overlap should not simply replace the
+existing policy. This experiment still uses manually chosen first-frame
+proposal indices selected offline against DAVIS annotations. It does
+not solve the unreliable automatic seed ranking.
+
+The nine indexed DAVIS scenarios passed real Chrome/WebGPU inference,
+independent sequential versus shared-encoder replay parity, and
+twelve-frame per-subject quality checks. The clips cover only about
+half a second each. A longer-run comparison is needed before any editor
+integration. The reference data are research-only, so these experiments
+must not ship their annotations or scoring code as application assets.
 
 No change is made to the SAM-backed Solid editor.
 
