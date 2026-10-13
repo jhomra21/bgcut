@@ -1122,6 +1122,7 @@ const main = async () => {
           reference: string,
         ) => {
           const tracked = run.results.slice(1);
+
           const frameBestAvailableIoUs = run.results.map((row) => {
             if (row.proposalDiagnostics === undefined || row.proposalDiagnostics.length === 0) {
               throw new Error("Indexed frame is missing its proposal-quality diagnostics.");
