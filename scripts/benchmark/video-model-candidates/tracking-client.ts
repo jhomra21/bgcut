@@ -56,7 +56,7 @@ type TrackingFrameResult = {
   }[];
   readonly memorySlots: number;
   readonly corrected: boolean;
-  readonly selectionMethod: "predicted-iou" | "explicit" | "temporal-iou";
+  readonly selectionMethod: "predicted-iou" | "explicit" | "temporal-iou" | "seed-point-largest";
   readonly temporalIoU?: number;
   readonly truthForeground: number;
   readonly proposals: number;
@@ -254,10 +254,25 @@ const temporalMaskIoU = (previous: Uint16Array, candidate: Uint16Array) => {
   return union === 0 ? 0 : intersection / union;
 };
 
+type NormalizedPoint = { readonly x: number; readonly y: number };
+type SeedSelectionHint = {
+  readonly include: NormalizedPoint;
+  readonly exclude?: NormalizedPoint;
+};
+
+const includesSeedPoint = (mask: Uint16Array, point: NormalizedPoint): boolean => {
+  const x = Math.max(0, Math.min(SIDE - 1, Math.floor(point.x * SIDE)));
+  const y = Math.max(0, Math.min(SIDE - 1, Math.floor(point.y * SIDE)));
+  const value = mask[y * SIDE + x] ?? 0;
+
+  return value !== 0 && (value & 0x8000) === 0;
+};
+
 const selectMask = async (
   outputs: Record<string, ort.Tensor>,
   requestedProposal?: number,
   previousMask?: Uint16Array,
+  seedHint?: SeedSelectionHint,
 ) => {
   const masksTensor = outputs.masks;
   const iouTensor = outputs.iou_pred;
@@ -289,7 +304,7 @@ const selectMask = async (
     mask: masks.slice(index * SIDE * SIDE, (index + 1) * SIDE * SIDE),
   }));
 
-  let selectionMethod: "predicted-iou" | "explicit" | "temporal-iou" = "predicted-iou";
+  let selectionMethod: TrackingFrameResult["selectionMethod"] = "predicted-iou";
   let temporalIoU: number | undefined;
 
   if (requestedProposal !== undefined) {
@@ -314,6 +329,26 @@ const selectMask = async (
     }
 
     temporalIoU = scoresByOverlap[winner];
+  } else if (seedHint !== undefined) {
+    // Experimental seed policy. No DAVIS labels are consulted.
+    const matching = alternatives
+      .filter((candidate) =>
+        includesSeedPoint(candidate.mask, seedHint.include) &&
+        (seedHint.exclude === undefined || !includesSeedPoint(candidate.mask, seedHint.exclude)))
+      .map((candidate) => ({
+        index: candidate.index,
+        area: candidate.mask.reduce(
+          (sum, value) => sum + Number(value !== 0 && (value & 0x8000) === 0),
+          0,
+        ),
+      }))
+      .filter((candidate) => candidate.area <= SIDE * SIDE * 0.75);
+
+    if (matching.length > 0) {
+      winner = matching.reduce((selected, current) =>
+        current.area > selected.area ? current : selected).index;
+      selectionMethod = "seed-point-largest";
+    }
   }
 
   const score = halfToFloat(scores[winner] ?? 0);
@@ -488,6 +523,16 @@ const requestedSubjectProposals = (): readonly [number, number] | undefined => {
   return [first, second];
 };
 
+const requestedSeedSelection = (): "confidence" | "point-largest" => {
+  const raw = new URL(globalThis.location.href).searchParams.get("seedSelection");
+
+  if (raw === null || raw === "confidence") return "confidence";
+
+  if (raw === "point-largest") return "point-largest";
+
+  throw new Error("Research-only seed selection must be confidence or point-largest.");
+};
+
 const requestedTrackedSelection = (): "confidence" | "temporal" => {
   const raw = new URL(globalThis.location.href).searchParams.get("trackedSelection");
 
@@ -596,6 +641,15 @@ const main = async () => {
   const subjectProposals = requestedSubjectProposals();
   const excludeOther = requestedExcludeOther();
   const trackedSelection = requestedTrackedSelection();
+  const seedSelection = requestedSeedSelection();
+
+  if (seedSelection !== "confidence" && !realSubjects) {
+    throw new Error("Click-supported automatic seed selection requires ?subjects=1.");
+  }
+
+  if (seedSelection !== "confidence" && subjectProposals !== undefined) {
+    throw new Error("Automatic seed selection cannot use explicit proposal indices.");
+  }
 
   if (trackedSelection !== "confidence" && !realSubjects) {
     throw new Error("Temporal proposal selection requires ?subjects=1.");
@@ -688,6 +742,7 @@ const main = async () => {
       allowCorrection = true,
       subjectPrompt = clickEmbedding,
       objectColour?: readonly [number, number, number],
+      seedHint?: SeedSelectionHint,
     ) => {
       if (subjectBank.size !== 0) {
         throw new Error("EfficientTAM rewind pass inherited stale tracking memory.");
@@ -812,6 +867,7 @@ const main = async () => {
                   index === 0 ? chosenSeedProposal :
                     correcting ? correction.proposal : undefined,
                   trackedSelection === "temporal" ? previousMask : undefined,
+                  index === 0 && seedSelection === "point-largest" ? seedHint : undefined,
                 );
 
                 stageMs.maskReadback = performance.now() - maskReadStarted;
@@ -923,6 +979,7 @@ const main = async () => {
       allowCorrection = true,
       subjectPrompt = clickEmbedding,
       objectColour?: readonly [number, number, number],
+      seedHint?: SeedSelectionHint,
     ) => {
       const pass = createPass(
         subjectBank,
@@ -930,6 +987,7 @@ const main = async () => {
         allowCorrection,
         subjectPrompt,
         objectColour,
+        seedHint,
       );
 
       for (const [index, timestamp] of times.entries()) {
@@ -1091,8 +1149,10 @@ const main = async () => {
 
         const firstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const secondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
-        const first = await runPass(firstBank, subjectProposals?.[0], false, firstClick, firstRegion.rgb);
-        const second = await runPass(secondBank, subjectProposals?.[1], false, secondClick, secondRegion.rgb);
+        const firstHint = { include: firstRegion.seed, exclude: firstExclude };
+        const secondHint = { include: secondRegion.seed, exclude: secondExclude };
+        const first = await runPass(firstBank, subjectProposals?.[0], false, firstClick, firstRegion.rgb, firstHint);
+        const second = await runPass(secondBank, subjectProposals?.[1], false, secondClick, secondRegion.rgb, secondHint);
         const seedMaskA = first.frameMasks[0];
         const seedMaskB = second.frameMasks[0];
 
@@ -1121,6 +1181,7 @@ const main = async () => {
           false,
           firstClick,
           firstRegion.rgb,
+          firstHint,
         );
 
         const secondPass = createPass(
@@ -1129,6 +1190,7 @@ const main = async () => {
           false,
           secondClick,
           secondRegion.rgb,
+          secondHint,
         );
 
         let sharedEncoderRuns = 0;
@@ -1240,6 +1302,7 @@ const main = async () => {
           subjectProposals,
           excludeOther,
           trackedSelection,
+          seedSelection,
           subjects: [
             summarize(firstRegion, first, "largest DAVIS instance"),
             summarize(secondRegion, second, "second DAVIS instance"),
