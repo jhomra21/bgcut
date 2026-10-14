@@ -255,6 +255,7 @@ const temporalMaskIoU = (previous: Uint16Array, candidate: Uint16Array) => {
 };
 
 type NormalizedPoint = { readonly x: number; readonly y: number };
+
 type SeedSelectionHint = {
   readonly include: NormalizedPoint;
   readonly exclude?: NormalizedPoint;
