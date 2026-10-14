@@ -1079,10 +1079,11 @@ jobs:
           ROOT="$RUNNER_TEMP/video-indexed-annotations"
           python3 scripts/benchmark/video-model-candidates/prepare-davis-indexed-annotations.py \
             --output "$ROOT/original-masks" --frames 24 \
-            --sequences bmx-trees judo \
+            --sequences bmx-trees judo soapbox \
             >"$ROOT/zip-range-tracking-report.json"
           test "$(find "$ROOT/original-masks/bmx-trees" -name '*.png' | wc -l | tr -d ' ')" = 24
           test "$(find "$ROOT/original-masks/judo" -name '*.png' | wc -l | tr -d ' ')" = 24
+          test "$(find "$ROOT/original-masks/soapbox" -name '*.png' | wc -l | tr -d ' ')" = 24
 
       - name: Download verified EfficientTAM tracking bundle
         shell: bash
@@ -1141,7 +1142,7 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long soapbox soapbox-temporal soapbox-exclude-temporal; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -1191,6 +1192,12 @@ jobs:
             elif [[ "$scenario" == "judo-manual-exclude-temporal-long" ]]; then
               fixture="judo"
               proposal_query="&subjectProposals=0,0&excludeOther=1&trackedSelection=temporal"
+            elif [[ "$scenario" == "soapbox-temporal" ]]; then
+              fixture="soapbox"
+              proposal_query="&trackedSelection=temporal"
+            elif [[ "$scenario" == "soapbox-exclude-temporal" ]]; then
+              fixture="soapbox"
+              proposal_query="&excludeOther=1&trackedSelection=temporal"
             fi
 
             "$CHROME" \
