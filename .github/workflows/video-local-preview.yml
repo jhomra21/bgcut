@@ -1141,7 +1141,7 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -1185,6 +1185,12 @@ jobs:
             elif [[ "$scenario" == "judo-manual-temporal-long" ]]; then
               fixture="judo"
               proposal_query="&subjectProposals=0,0&trackedSelection=temporal"
+            elif [[ "$scenario" == "judo-manual-exclude-long" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0&excludeOther=1"
+            elif [[ "$scenario" == "judo-manual-exclude-temporal-long" ]]; then
+              fixture="judo"
+              proposal_query="&subjectProposals=0,0&excludeOther=1&trackedSelection=temporal"
             fi
 
             "$CHROME" \
