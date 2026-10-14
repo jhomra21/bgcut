@@ -1130,6 +1130,14 @@ jobs:
             sleep 1
           done
 
+          # Exercise the real HTTP path before starting long GPU experiments.
+          curl --fail --silent --show-error \
+            http://127.0.0.1:4194/quality/bmx-trees/00023.png \
+            --output "$ROOT/served-frame23.png"
+          cmp "$ROOT/original-masks/bmx-trees/00023.png" "$ROOT/served-frame23.png"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://127.0.0.1:4194/quality/bmx-trees/00024.png)" = "404"
+
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
