@@ -190,12 +190,46 @@ existing policy. This experiment still uses manually chosen first-frame
 proposal indices selected offline against DAVIS annotations. It does
 not solve the unreliable automatic seed ranking.
 
-The nine indexed DAVIS scenarios passed real Chrome/WebGPU inference,
+The original nine 12-frame scenarios passed real Chrome/WebGPU inference,
 independent sequential versus shared-encoder replay parity, and
-twelve-frame per-subject quality checks. The clips cover only about
-half a second each. A longer-run comparison is needed before any editor
-integration. The reference data are research-only, so these experiments
-must not ship their annotations or scoring code as application assets.
+per-subject quality checks.
+
+### One-second follow-up (October 14)
+
+The first 24-frame attempt failed because the quality fixture HTTP proxy
+rejected mask number 12 despite the verified source extractor having
+written all 24 indexed masks. The proxy now supports 24 masks **only** for
+the local research fixture root. Normal quality fixtures still accept
+12. CI also byte-compares an HTTP-served original frame 23 against the
+extracted PNG and rejects frame 24. The repaired full video workflow is
+green.
+
+The longer run verifies that temporal consistency can retain a useful
+mask across an entire second, but exposes failures that were hidden in
+the half-second trial:
+
+| Clip / object | 23 tracked frames, confidence IoU | 23 tracked frames, temporal IoU |
+| --- | ---: | ---: |
+| bmx-trees / 1 | 0.529 | **0.741** |
+| bmx-trees / 2 | 0.413 | 0.412 |
+| judo / 1 | 0.464 | **0.823** |
+| judo / 2 | **0.711** | 0.565 |
+
+Judo subject 1 finishes at 0.919 IoU with temporal selection versus
+0.355 using decoder confidence. Conversely, subject 2 loses 0.147
+mean IoU with temporal selection. Average inter-subject mask overlap
+rises from 0.0169 to **0.2123 IoU**. Higher per-object accuracy for one
+subject does not imply correct two-object separation.
+
+The next paired, 24-frame research runs repeat Judo with simulated
+negative clicks on the other indexed subject's seed. They measure whether
+the earlier 12-frame reduction in overlap persists over one second.
+
+These results still depend on manually selected first-frame proposal
+indices, chosen offline with reference annotations. No source mask is
+used for runtime selection. The reference data are research-only, so
+these experiments must not ship their annotations or scoring code as
+application assets.
 
 No change is made to the SAM-backed Solid editor.
 
