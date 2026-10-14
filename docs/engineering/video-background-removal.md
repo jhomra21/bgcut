@@ -221,9 +221,33 @@ mean IoU with temporal selection. Average inter-subject mask overlap
 rises from 0.0169 to **0.2123 IoU**. Higher per-object accuracy for one
 subject does not imply correct two-object separation.
 
-The next paired, 24-frame research runs repeat Judo with simulated
-negative clicks on the other indexed subject's seed. They measure whether
-the earlier 12-frame reduction in overlap persists over one second.
+### Exclude plus temporal selection over one second (October 14)
+
+The subsequent two Judo trials combined manually chosen seed proposals
+with a negative point on the other subject's annotated seed location,
+as if a user placed an Exclude click. The full macOS WebGPU experiment
+passed; annotations supplied the simulated click positions, but
+**never selected the tracked masks**.
+
+| Judo / subject | Confidence alone | Temporal alone | Exclude + confidence | Exclude + temporal |
+| --- | ---: | ---: | ---: | ---: |
+| 1, mean IoU over 23 tracked frames | 0.464 | 0.823 | 0.457 | **0.826** |
+| 2, mean IoU over 23 tracked frames | 0.711 | 0.565 | 0.814 | **0.819** |
+
+The two independent subject masks overlapped by **0.2123 average IoU**
+with temporal selection alone, versus **0.0093** when combined with
+Exclude. Both subjects retain about 0.82 mean IoU through the full
+second with the combined method. Subject 1 finished at 0.919, while
+subject 2 finished at 0.747. The outcome is stronger than either
+method alone on Judo, but it remains a single video with two subjects.
+
+The combined policy still relies on a simulated manual Exclude click
+and offline-selected first-frame proposal IDs. It is not an automatic
+background-removal method, and does not justify replacing the
+SAM-backed editor without broader clips, true user-picked proposals,
+and a longer timeline. It does establish that this specific set of
+prompts and per-frame selections can maintain two separate subjects
+for one second in the isolated five-module EfficientTAM WebGPU run.
 
 These results still depend on manually selected first-frame proposal
 indices, chosen offline with reference annotations. No source mask is
