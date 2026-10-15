@@ -1142,7 +1142,7 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long soapbox soapbox-temporal soapbox-exclude-temporal bmx-trees-seed-largest judo-seed-largest judo-seed-largest-temporal judo-exclude-seed-largest-temporal soapbox-seed-largest-temporal; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long soapbox soapbox-temporal soapbox-exclude-temporal bmx-trees-seed-largest judo-seed-largest judo-seed-largest-temporal judo-exclude-seed-largest-temporal soapbox-seed-largest-temporal bmx-trees-seed-weight40-temporal bmx-trees-seed-weight40-temporal-long judo-seed-weight40-temporal judo-exclude-seed-weight40-temporal-long soapbox-seed-weight20-temporal soapbox-seed-weight40-temporal soapbox-seed-weight60-temporal soapbox-exclude-seed-weight40-temporal soapbox-seed-weight40-temporal-long; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -1213,6 +1213,16 @@ jobs:
             elif [[ "$scenario" == "soapbox-seed-largest-temporal" ]]; then
               fixture="soapbox"
               proposal_query="&seedSelection=point-largest&trackedSelection=temporal"
+            elif [[ "$scenario" == *-seed-weight* ]]; then
+              fixture="${scenario%%-seed-weight*}"
+              weight="${scenario#*-seed-weight}"
+              weight="${weight%%-*}"
+              proposal_query="&seedSelection=area-confidence&seedAreaWeight=0.$weight&trackedSelection=temporal"
+
+              if [[ "$scenario" == *-exclude-* ]]; then
+                fixture="${scenario%%-exclude-*}"
+                proposal_query="$proposal_query&excludeOther=1"
+              fi
             fi
 
             "$CHROME" \
@@ -1236,17 +1246,23 @@ jobs:
                   const real = report?.realObjects;
                   const excludeOther = scenario.includes("-exclude");
                   const trackedSelection = scenario.includes("-temporal") ? "temporal" : "confidence";
-                  const seedSelection = scenario.includes("-seed-largest") ? "point-largest" : "confidence";
+                  const seedSelection = scenario.includes("-seed-largest") ? "point-largest" :
+                    scenario.includes("-seed-weight") ? "area-confidence" : "confidence";
+                  const seedWeightMatch = /-seed-weight(\d{2})-/.exec(scenario);
+                  const seedAreaWeight = seedWeightMatch ? Number(seedWeightMatch[1]) / 100 : 0;
                   const expectedFrames = scenario.endsWith("-long") ? 24 : 12;
                   if (!real || real.fixture !== report.fixture ||
                       real.subjects.length !== 2 ||
                       real.excludeOther !== excludeOther ||
                       real.trackedSelection !== trackedSelection ||
                       real.seedSelection !== seedSelection ||
-                      (seedSelection === "point-largest" && real.subjects.some((row) =>
-                        row.frameSelectionMethods[0] !== "seed-point-largest" &&
-                        row.frameSelectionMethods[0] !== "predicted-iou"
-                      )) ||
+                      Math.abs(real.seedAreaWeight - seedAreaWeight) > 1e-8 ||
+                      real.subjects.some((row) =>
+                        seedSelection === "confidence" ? false :
+                          row.frameSelectionMethods[0] !== (seedSelection === "point-largest"
+                            ? "seed-point-largest" : "seed-area-confidence") &&
+                          row.frameSelectionMethods[0] !== "predicted-iou"
+                      ) ||
                       real.subjects.some((row) => Boolean(row.excludedSeed) !== excludeOther) ||
                       real.sharedEncoderRuns !== expectedFrames ||
                       real.interleavedFrameUpdates !== 2 * expectedFrames ||
@@ -1287,6 +1303,7 @@ jobs:
                     excludeOther: real.excludeOther,
                     trackedSelection: real.trackedSelection,
                     seedSelection: real.seedSelection,
+                    seedAreaWeight: real.seedAreaWeight,
                     seedMaskIoU: real.seedMaskIoU,
                     frameInterSubjectIoUs: real.frameInterSubjectIoUs,
                     objects: real.subjects.map((row) => ({
