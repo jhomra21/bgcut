@@ -1183,12 +1183,15 @@ const main = async () => {
         const firstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const secondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const hintMode = seedSelection === "area-confidence" ? "area-confidence" : "point-largest";
+
         const firstHint: SeedSelectionHint = {
           include: firstRegion.seed, exclude: firstExclude, mode: hintMode, areaWeight: seedAreaWeight,
         };
+
         const secondHint: SeedSelectionHint = {
           include: secondRegion.seed, exclude: secondExclude, mode: hintMode, areaWeight: seedAreaWeight,
         };
+
         const first = await runPass(firstBank, subjectProposals?.[0], false, firstClick, firstRegion.rgb, firstHint);
         const second = await runPass(secondBank, subjectProposals?.[1], false, secondClick, secondRegion.rgb, secondHint);
         const seedMaskA = first.frameMasks[0];
