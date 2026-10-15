@@ -434,12 +434,14 @@ const frameInput = (frame: VideoFrame) => halfTensor(
   [1, 3, SIDE, SIDE],
 );
 
-const fixtureFromLocation = (): "bear" | "camel" | "car-shadow" | "bmx-trees" | "judo" | "soapbox" => {
+const fixtureFromLocation = () => {
   const requested = new URL(globalThis.location.href).searchParams.get("fixture") ?? "bear";
+  const accepted = [
+    "bear", "camel", "car-shadow", "bmx-trees", "judo", "soapbox",
+    "pigs", "gold-fish", "dogs-jump", "bike-packing",
+  ];
 
-  if (requested !== "bear" && requested !== "camel" &&
-      requested !== "car-shadow" && requested !== "bmx-trees" &&
-      requested !== "judo" && requested !== "soapbox") {
+  if (!accepted.includes(requested)) {
     throw new Error(`Unsupported EfficientTAM DAVIS fixture: ${requested}.`);
   }
 
@@ -696,8 +698,10 @@ const main = async () => {
     throw new Error("Manual subject proposals require ?subjects=1.");
   }
 
-  if (realSubjects && fixture !== "bmx-trees" && fixture !== "judo" && fixture !== "soapbox") {
-    throw new Error("Original DAVIS real-subject trials support bmx-trees, judo and soapbox.");
+  if (realSubjects && ![
+    "bmx-trees", "judo", "soapbox", "pigs", "gold-fish", "dogs-jump", "bike-packing",
+  ].includes(fixture)) {
+    throw new Error("Original DAVIS real-subject trials require a verified multi-object fixture.");
   }
 
   const correction = requestedCorrection();
