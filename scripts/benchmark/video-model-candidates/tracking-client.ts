@@ -56,7 +56,7 @@ type TrackingFrameResult = {
   }[];
   readonly memorySlots: number;
   readonly corrected: boolean;
-  readonly selectionMethod: "predicted-iou" | "explicit" | "temporal-iou" | "seed-point-largest";
+  readonly selectionMethod: "predicted-iou" | "explicit" | "temporal-iou" | "seed-point-largest" | "seed-area-confidence";
   readonly temporalIoU?: number;
   readonly truthForeground: number;
   readonly proposals: number;
@@ -259,6 +259,8 @@ type NormalizedPoint = { readonly x: number; readonly y: number };
 type SeedSelectionHint = {
   readonly include: NormalizedPoint;
   readonly exclude?: NormalizedPoint;
+  readonly mode: "point-largest" | "area-confidence";
+  readonly areaWeight: number;
 };
 
 const includesSeedPoint = (mask: Uint16Array, point: NormalizedPoint): boolean => {
@@ -338,6 +340,7 @@ const selectMask = async (
         (seedHint.exclude === undefined || !includesSeedPoint(candidate.mask, seedHint.exclude)))
       .map((candidate) => ({
         index: candidate.index,
+        confidence: candidate.predictedIou,
         area: candidate.mask.reduce(
           (sum, value) => sum + Number(value !== 0 && (value & 0x8000) === 0),
           0,
@@ -346,9 +349,17 @@ const selectMask = async (
       .filter((candidate) => candidate.area <= SIDE * SIDE * 0.75);
 
     if (matching.length > 0) {
-      winner = matching.reduce((selected, current) =>
-        current.area > selected.area ? current : selected).index;
-      selectionMethod = "seed-point-largest";
+      winner = matching.reduce((selected, current) => {
+        const rating = (candidate: (typeof matching)[number]) =>
+          seedHint.mode === "point-largest"
+            ? candidate.area
+            : candidate.confidence + seedHint.areaWeight * Math.log1p(candidate.area);
+
+        return rating(current) > rating(selected) ? current : selected;
+      }).index;
+      selectionMethod = seedHint.mode === "point-largest"
+        ? "seed-point-largest"
+        : "seed-area-confidence";
     }
   }
 
@@ -524,14 +535,34 @@ const requestedSubjectProposals = (): readonly [number, number] | undefined => {
   return [first, second];
 };
 
-const requestedSeedSelection = (): "confidence" | "point-largest" => {
+const requestedSeedSelection = (): "confidence" | "point-largest" | "area-confidence" => {
   const raw = new URL(globalThis.location.href).searchParams.get("seedSelection");
 
   if (raw === null || raw === "confidence") return "confidence";
 
-  if (raw === "point-largest") return "point-largest";
+  if (raw === "point-largest" || raw === "area-confidence") return raw;
 
-  throw new Error("Research-only seed selection must be confidence or point-largest.");
+  throw new Error("Research-only seed selection must be confidence, point-largest or area-confidence.");
+};
+
+const requestedSeedAreaWeight = (mode: ReturnType<typeof requestedSeedSelection>): number => {
+  const raw = new URL(globalThis.location.href).searchParams.get("seedAreaWeight");
+
+  if (mode !== "area-confidence") {
+    if (raw !== null) throw new Error("Seed area weight requires area-confidence mode.");
+
+    return 0;
+  }
+
+  if (raw === null) return 0.4;
+
+  const weight = Number(raw);
+
+  if (!Number.isFinite(weight) || weight < 0 || weight > 1 || raw.trim() === "") {
+    throw new Error("Seed area weight must be a finite number between zero and one.");
+  }
+
+  return weight;
 };
 
 const requestedTrackedSelection = (): "confidence" | "temporal" => {
@@ -643,6 +674,7 @@ const main = async () => {
   const excludeOther = requestedExcludeOther();
   const trackedSelection = requestedTrackedSelection();
   const seedSelection = requestedSeedSelection();
+  const seedAreaWeight = requestedSeedAreaWeight(seedSelection);
 
   if (seedSelection !== "confidence" && !realSubjects) {
     throw new Error("Click-supported automatic seed selection requires ?subjects=1.");
@@ -868,7 +900,7 @@ const main = async () => {
                   index === 0 ? chosenSeedProposal :
                     correcting ? correction.proposal : undefined,
                   trackedSelection === "temporal" ? previousMask : undefined,
-                  index === 0 && seedSelection === "point-largest" ? seedHint : undefined,
+                  index === 0 && seedSelection !== "confidence" ? seedHint : undefined,
                 );
 
                 stageMs.maskReadback = performance.now() - maskReadStarted;
@@ -1150,8 +1182,13 @@ const main = async () => {
 
         const firstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
         const secondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
-        const firstHint = { include: firstRegion.seed, exclude: firstExclude };
-        const secondHint = { include: secondRegion.seed, exclude: secondExclude };
+        const hintMode = seedSelection === "area-confidence" ? "area-confidence" : "point-largest";
+        const firstHint: SeedSelectionHint = {
+          include: firstRegion.seed, exclude: firstExclude, mode: hintMode, areaWeight: seedAreaWeight,
+        };
+        const secondHint: SeedSelectionHint = {
+          include: secondRegion.seed, exclude: secondExclude, mode: hintMode, areaWeight: seedAreaWeight,
+        };
         const first = await runPass(firstBank, subjectProposals?.[0], false, firstClick, firstRegion.rgb, firstHint);
         const second = await runPass(secondBank, subjectProposals?.[1], false, secondClick, secondRegion.rgb, secondHint);
         const seedMaskA = first.frameMasks[0];
@@ -1304,6 +1341,7 @@ const main = async () => {
           excludeOther,
           trackedSelection,
           seedSelection,
+          seedAreaWeight,
           subjects: [
             summarize(firstRegion, first, "largest DAVIS instance"),
             summarize(secondRegion, second, "second DAVIS instance"),
