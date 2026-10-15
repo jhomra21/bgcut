@@ -9,7 +9,10 @@ const fixtures = [
   "judo",
   "soapbox",
   "cows",
-] as const;
+  ...(new URL(globalThis.location.href).searchParams.has("holdouts")
+    ? ["pigs", "gold-fish", "dogs-jump", "bike-packing"] as const
+    : []),
+];
 
 const inspect = async (fixture: string) => {
   const response = await fetch(`/quality/${fixture}/00000.png`);
