@@ -1084,11 +1084,11 @@ jobs:
           ROOT="$RUNNER_TEMP/video-indexed-annotations"
           python3 scripts/benchmark/video-model-candidates/prepare-davis-indexed-annotations.py \
             --output "$ROOT/original-masks" --frames 24 \
-            --sequences bmx-trees judo soapbox \
+            --sequences bmx-trees judo soapbox pigs gold-fish dogs-jump bike-packing \
             >"$ROOT/zip-range-tracking-report.json"
-          test "$(find "$ROOT/original-masks/bmx-trees" -name '*.png' | wc -l | tr -d ' ')" = 24
-          test "$(find "$ROOT/original-masks/judo" -name '*.png' | wc -l | tr -d ' ')" = 24
-          test "$(find "$ROOT/original-masks/soapbox" -name '*.png' | wc -l | tr -d ' ')" = 24
+          for clip in bmx-trees judo soapbox pigs gold-fish dogs-jump bike-packing; do
+            test "$(find "$ROOT/original-masks/$clip" -name '*.png' | wc -l | tr -d ' ')" = 24
+          done
 
       - name: Download verified EfficientTAM tracking bundle
         shell: bash
@@ -1147,7 +1147,7 @@ jobs:
           CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           test -x "$CHROME"
 
-          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long soapbox soapbox-temporal soapbox-exclude-temporal bmx-trees-seed-largest judo-seed-largest judo-seed-largest-temporal judo-exclude-seed-largest-temporal soapbox-seed-largest-temporal bmx-trees-seed-weight40-temporal bmx-trees-seed-weight40-temporal-long judo-seed-weight40-temporal judo-exclude-seed-weight40-temporal-long soapbox-seed-weight20-temporal soapbox-seed-weight40-temporal soapbox-seed-weight60-temporal soapbox-exclude-seed-weight40-temporal soapbox-seed-weight40-temporal-long; do
+          for scenario in bmx-trees judo bmx-trees-manual judo-manual bmx-trees-manual-exclude judo-manual-exclude bmx-trees-manual-temporal judo-manual-temporal judo-manual-exclude-temporal bmx-trees-manual-long bmx-trees-manual-temporal-long judo-manual-long judo-manual-temporal-long judo-manual-exclude-long judo-manual-exclude-temporal-long soapbox soapbox-temporal soapbox-exclude-temporal bmx-trees-seed-largest judo-seed-largest judo-seed-largest-temporal judo-exclude-seed-largest-temporal soapbox-seed-largest-temporal bmx-trees-seed-weight40-temporal bmx-trees-seed-weight40-temporal-long judo-seed-weight40-temporal judo-exclude-seed-weight40-temporal-long soapbox-seed-weight20-temporal soapbox-seed-weight40-temporal soapbox-seed-weight60-temporal soapbox-exclude-seed-weight40-temporal soapbox-seed-weight40-temporal-long pigs-temporal pigs-seed-weight40-temporal pigs-exclude-seed-weight40-temporal gold-fish-temporal gold-fish-seed-weight40-temporal gold-fish-exclude-seed-weight40-temporal dogs-jump-temporal dogs-jump-seed-weight40-temporal dogs-jump-exclude-seed-weight40-temporal bike-packing-temporal bike-packing-seed-weight40-temporal bike-packing-exclude-seed-weight40-temporal; do
             rm -f "$ROOT/result.json" "$ROOT/failure.json"
 
             fixture="$scenario"
@@ -1218,6 +1218,10 @@ jobs:
             elif [[ "$scenario" == "soapbox-seed-largest-temporal" ]]; then
               fixture="soapbox"
               proposal_query="&seedSelection=point-largest&trackedSelection=temporal"
+            elif [[ "$scenario" == "pigs-temporal" || "$scenario" == "gold-fish-temporal" ||
+                    "$scenario" == "dogs-jump-temporal" || "$scenario" == "bike-packing-temporal" ]]; then
+              fixture="${scenario%-temporal}"
+              proposal_query="&trackedSelection=temporal"
             elif [[ "$scenario" == *-seed-weight* ]]; then
               fixture="${scenario%%-seed-weight*}"
               weight="${scenario#*-seed-weight}"
