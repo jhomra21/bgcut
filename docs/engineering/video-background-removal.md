@@ -249,11 +249,55 @@ and a longer timeline. It does establish that this specific set of
 prompts and per-frame selections can maintain two separate subjects
 for one second in the isolated five-module EfficientTAM WebGPU run.
 
-These results still depend on manually selected first-frame proposal
-indices, chosen offline with reference annotations. No source mask is
-used for runtime selection. The reference data are research-only, so
-these experiments must not ship their annotations or scoring code as
-application assets.
+### Click-only first-frame mask ranking (October 14)
+
+EfficientTAM's model confidence can rank a tiny fragment above a full
+subject. A research-only seed policy now accepts the simulated user's
+Keep and Exclude click positions and evaluates the decoder's alternatives.
+The first version picked the largest eligible mask. On Judo this recovered
+the first subject's seed IoU from **0.025** to **0.849**, but on Soapbox
+it selected a worse seed (0.291 instead of 0.342).
+
+A second policy scores each eligible mask using
+`predictedIoU + weight × ln(1 + foregroundPixels)`. It rejects masks
+that miss the Keep point, include the Exclude point, or cover over 75%
+of the frame. No DAVIS annotations influence proposal ranking; the
+offline annotations supply simulated click coordinates and measure IoU
+after inference. These experiments are click-based segmentation, **not
+automatic subject discovery**.
+
+The real macOS WebGPU experiments swept weights of **0.20, 0.40 and
+0.60**, all with independent temporal tracking. With weight 0.40:
+
+| Clip / subject | Seed proposal | Seed IoU | Mean tracked IoU, 12 frames |
+| --- | ---: | ---: | ---: |
+| BMX trees / 1 | 0 | 0.787 | 0.831 |
+| BMX trees / 2 | 0 | 0.282 | 0.463 |
+| Judo / 1 | 0 | 0.849 | 0.819 |
+| Judo / 2 | 0 | 0.602 | 0.594 |
+| Soapbox / 1 | 2 | 0.342 | 0.348 |
+| Soapbox / 2 | 0 | 0.508 | 0.532 |
+
+On Soapbox, weight 0.60 switched subject 1 to proposal 0 and reduced
+its mean tracked IoU from 0.348 to **0.275**. Weights 0.20 and 0.40
+selected the same candidates on that clip; 0.40 retained the correct
+full-subject seed on Judo and BMX trees. This weight was chosen with
+knowledge of these clips, so the results are **not out-of-sample
+validation**.
+
+The 24-frame trials with weight 0.40 measured mean tracked IoU of
+**0.741 / 0.443** for BMX trees and **0.364 / 0.574** for Soapbox.
+Judo with simulated Exclude clicks maintained **0.826 / 0.819** across
+24 frames, with 0.0093 mean inter-object overlap. The full 32-scenario
+GPU workflow passed. The research currently covers three clips and
+cannot establish a generally reliable selection rule. Before tuning
+further, additional DAVIS sequences need to be assessed as held-out
+subjects.
+
+Earlier trials used offline-selected first-frame proposal indices.
+The new click-aware trials choose proposals without reference labels.
+All reference data are non-commercial research assets and must not
+ship with the application or public package.
 
 No change is made to the SAM-backed Solid editor.
 
