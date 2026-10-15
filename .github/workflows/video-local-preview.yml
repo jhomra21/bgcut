@@ -992,10 +992,10 @@ jobs:
           mkdir -p "$ROOT"
           python3 scripts/benchmark/video-model-candidates/prepare-davis-indexed-annotations.py \
             --output "$ROOT/original-masks" --frames 1 \
-            --sequences bear camel bmx-trees breakdance dance-twirl judo soapbox cows \
+            --sequences bear camel bmx-trees breakdance dance-twirl judo soapbox cows pigs gold-fish dogs-jump bike-packing \
             > "$ROOT/zip-range-report.json"
           cat "$ROOT/zip-range-report.json"
-          test "$(find "$ROOT/original-masks" -name '00000.png' | wc -l | tr -d ' ')" = 8
+          test "$(find "$ROOT/original-masks" -name '00000.png' | wc -l | tr -d ' ')" = 12
 
       - name: Inspect true DAVIS per-object annotations in Chrome
         shell: bash
@@ -1027,7 +1027,7 @@ jobs:
             --disable-gpu \
             --no-first-run \
             --user-data-dir="$RUNNER_TEMP/video-indexed-annotations-chrome" \
-            http://127.0.0.1:4195/ >"$ROOT/chrome.log" 2>&1 &
+            "http://127.0.0.1:4195/?holdouts=1" >"$ROOT/chrome.log" 2>&1 &
           CHROME_PID=$!
 
           for _ in {1..180}; do
@@ -1036,9 +1036,9 @@ jobs:
               bun -e '
                 const json = await Bun.file(process.argv.at(-1)).json();
                 const fixtures = json.reports.find((r) => r.name === "davis-colour-instances")?.fixtures;
-                if (!Array.isArray(fixtures) || fixtures.length !== 8 ||
+                if (!Array.isArray(fixtures) || fixtures.length !== 12 ||
                     fixtures.some((row) => row.unavailable || row.unassignedForeground < 0)) {
-                  throw Error("Original DAVIS palette inventory must decode all 8 masks.");
+                  throw Error("Original DAVIS palette inventory must decode all 12 masks.");
                 }
                 const multi = fixtures.filter((row) => row.instances.length > 1);
                 if (multi.length < 2) {
@@ -1048,6 +1048,11 @@ jobs:
                   source: "official indexed DAVIS 2017 trainval archive",
                   decoded: fixtures.length,
                   multiObjectFixtures: multi.map((row) => row.fixture),
+                  holdoutCandidates: fixtures.slice(8).map((row) => ({
+                    fixture: row.fixture,
+                    independentObjects: row.instances.length,
+                    subjects: row.instances.map((item) => item.pixels),
+                  })),
                 }));
               ' "$ROOT/result.json"
               mv "$ROOT/result.json" "$ROOT/result-indexed-inventory.json"
