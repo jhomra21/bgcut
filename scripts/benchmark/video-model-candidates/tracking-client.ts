@@ -436,6 +436,7 @@ const frameInput = (frame: VideoFrame) => halfTensor(
 
 const fixtureFromLocation = () => {
   const requested = new URL(globalThis.location.href).searchParams.get("fixture") ?? "bear";
+
   const accepted = [
     "bear", "camel", "car-shadow", "bmx-trees", "judo", "soapbox",
     "pigs", "gold-fish", "dogs-jump", "bike-packing",
