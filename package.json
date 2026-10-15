@@ -45,6 +45,7 @@
     "dev": "bun run brand:prepare && vite",
     "cli": "bun run src/cli/main.ts",
     "model:prepare": "bun run scripts/model/prepare.ts",
+    "video:model:prepare": "bun run scripts/benchmark/video-segmentation/prepare-tracked-decoder.ts",
     "model:webgpu:prepare": "bun run scripts/model/prepare.ts --webgpu-only",
     "model:verify-dist": "bun run scripts/model/verify.ts",
     "build": "bun run brand:prepare && bun run model:prepare && vite build && bun run site:prepare-routes && bun run site:audit && bun run model:verify-dist",

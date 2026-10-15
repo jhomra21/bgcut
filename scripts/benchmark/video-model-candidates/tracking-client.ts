@@ -1,0 +1,1464 @@
+import * as ort from "onnxruntime-web/webgpu";
+
+import { annotatedForeground, annotationInstanceMask, annotationInstances } from "./annotation-instances";
+import { channelsToHalfTokens, floatToHalf, halfToFloat } from "./half";
+import { BoundedFrameMemory } from "./memory-bank";
+
+import { openMediaBunnyVideoSource } from "../video-segmentation/media-source";
+import { binaryMaskIou, davisBoundaryF } from "../video-segmentation/quality-metrics";
+import { configureVideoOrt, frameToNchw } from "../video-segmentation/runtime-common";
+
+const SIDE = 512;
+
+const FEATURE_SIDE = 32;
+
+const TOKENS = FEATURE_SIDE * FEATURE_SIDE;
+
+const CHANNELS = 64;
+
+const POINTER_CHANNELS = 256;
+
+const MAX_MEMORY_FRAMES = 7;
+
+const roles = [
+  "image_encoder",
+  "prompt_encoder",
+  "mask_decoder",
+  "memory_encoder",
+  "memory_attention",
+] as const;
+
+type Role = (typeof roles)[number];
+
+type Memory = {
+  readonly index: number;
+  readonly features: Uint16Array;
+  readonly positions: Uint16Array;
+  readonly pointer: Uint16Array;
+};
+
+type TrackingFrameResult = {
+  readonly index: number;
+  readonly timestamp: number;
+  readonly inferenceMs: number;
+  readonly stageMs: Readonly<Record<string, number>>;
+  readonly seedProposalDiagnostics?: readonly {
+    readonly index: number;
+    readonly predictedIou: number;
+    readonly actualIou: number;
+    readonly foreground: number;
+  }[];
+  readonly proposalDiagnostics?: readonly {
+    readonly index: number;
+    readonly predictedIou: number;
+    readonly actualIou: number;
+    readonly foreground: number;
+  }[];
+  readonly memorySlots: number;
+  readonly corrected: boolean;
+  readonly selectionMethod: "predicted-iou" | "explicit" | "temporal-iou" | "seed-point-largest" | "seed-area-confidence";
+  readonly temporalIoU?: number;
+  readonly truthForeground: number;
+  readonly proposals: number;
+  readonly chosenProposal: number;
+  readonly score: number;
+  readonly foreground: number;
+  readonly iou: number;
+  readonly boundaryF: number;
+};
+
+const halfTensor = (data: Uint16Array, dims: readonly number[]) =>
+  new ort.Tensor("float16", data, [...dims]);
+
+const toHalf = (tensor: ort.Tensor, name: string): ort.Tensor => {
+  if (tensor.type === "float16") return tensor;
+
+  if (tensor.type !== "float32" || !(tensor.data instanceof Float32Array)) {
+    throw new Error(`EfficientTAM ${name} cannot be converted to Float16 from ${tensor.type}.`);
+  }
+
+  // The published prompt encoder exposes float32 embeddings, while the
+  // mask decoder accepts float16. Convert only this model-boundary tensor.
+  return halfTensor(floatToHalf(tensor.data), tensor.dims);
+};
+
+const requireDims = (tensor: ort.Tensor | undefined, name: string, dims: readonly number[]) => {
+  if (tensor === undefined || tensor.dims.length !== dims.length ||
+      tensor.dims.some((value, index) => value !== dims[index])) {
+    throw new Error(`EfficientTAM ${name} has unexpected dimensions: ${tensor?.dims.join(",") ?? "missing"}.`);
+  }
+
+  return tensor;
+};
+
+const dispose = (outputs: Record<string, ort.Tensor>) => {
+  for (const tensor of Object.values(outputs)) tensor.dispose();
+};
+
+const readTemporalPosition = async (): Promise<Uint16Array> => {
+  const response = await fetch("/specialized/efficienttam-ti-maskmem-tpos.npy");
+
+  if (!response.ok) throw new Error(`EfficientTAM temporal embeddings: HTTP ${response.status}.`);
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  if (bytes.length !== 1024 || bytes[0] !== 0x93 ||
+      new TextDecoder().decode(bytes.slice(1, 6)) !== "NUMPY" ||
+      bytes[6] !== 1 || bytes[7] !== 0) {
+    throw new Error("Unexpected EfficientTAM NPY temporal embedding format.");
+  }
+
+  const headerBytes = (bytes[8] ?? 0) | ((bytes[9] ?? 0) << 8);
+  const text = new TextDecoder().decode(bytes.slice(10, 10 + headerBytes));
+
+  if (!text.includes("'<f2'") || !text.includes("(7, 1, 1, 64)")) {
+    throw new Error(`Unexpected temporal embeddings dtype/shape: ${text.trim()}.`);
+  }
+
+  const start = 10 + headerBytes;
+
+  if (bytes.length - start !== MAX_MEMORY_FRAMES * CHANNELS * 2) {
+    throw new Error("Temporal embeddings contain an unexpected number of values.");
+  }
+
+  return new Uint16Array(bytes.buffer.slice(start));
+};
+
+const withTemporalPosition = (
+  position: Uint16Array,
+  encodings: Uint16Array,
+  slot: number,
+) => {
+  const tokens = channelsToHalfTokens(position, CHANNELS, TOKENS);
+  const temporal = new Float32Array(tokens.length);
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const positionHalf = tokens[index] ?? 0;
+    const temporalHalf = encodings[slot * CHANNELS + (index % CHANNELS)] ?? 0;
+    temporal[index] = halfToFloat(positionHalf) + halfToFloat(temporalHalf);
+  }
+
+  return floatToHalf(temporal);
+};
+
+const assembledMemory = (bank: readonly Memory[], frameIndex: number, temporal: Uint16Array) => {
+  const selected = bank.slice(-MAX_MEMORY_FRAMES);
+  const features = new Uint16Array(selected.length * CHANNELS * TOKENS);
+  const positions = new Uint16Array(features.length);
+  const pointers = new Uint16Array(selected.length * POINTER_CHANNELS);
+
+  for (const [index, value] of selected.entries()) {
+    features.set(
+      channelsToHalfTokens(value.features, CHANNELS, TOKENS),
+      index * CHANNELS * TOKENS,
+    );
+
+    // The final temporal slot corresponds to the closest conditioning frame.
+    const slot = Math.max(0, Math.min(
+      MAX_MEMORY_FRAMES - 1,
+      MAX_MEMORY_FRAMES - (frameIndex - value.index),
+    ));
+
+    positions.set(
+      withTemporalPosition(value.positions, temporal, slot),
+      index * CHANNELS * TOKENS,
+    );
+    pointers.set(value.pointer, index * POINTER_CHANNELS);
+  }
+
+  return {
+    features: halfTensor(features, [selected.length * TOKENS, 1, CHANNELS]),
+    positions: halfTensor(positions, [selected.length * TOKENS, 1, CHANNELS]),
+    pointers: halfTensor(pointers, [selected.length * 4, 1, CHANNELS]),
+  };
+};
+
+const promptInputs = (
+  x?: number,
+  y?: number,
+  exclude?: { readonly x: number; readonly y: number },
+) => ({
+  point_coords: new ort.Tensor(
+    "float32",
+    Float32Array.of(
+      x === undefined ? 0 : x * SIDE,
+      y === undefined ? 0 : y * SIDE,
+      exclude === undefined ? 0 : exclude.x * SIDE,
+      exclude === undefined ? 0 : exclude.y * SIDE,
+    ),
+    [1, 2, 2],
+  ),
+  point_labels: new ort.Tensor(
+    "int32",
+    Int32Array.of(x === undefined ? -1 : 1, exclude === undefined ? -1 : 0),
+    [1, 2],
+  ),
+  mask_input: new ort.Tensor("float32", new Float32Array(128 * 128), [1, 1, 128, 128]),
+  has_mask: new ort.Tensor("float32", Float32Array.of(0), [1]),
+});
+
+const readableHalf = async (
+  tensor: ort.Tensor | undefined,
+  name: string,
+): Promise<Uint16Array> => {
+  if (tensor === undefined) {
+    throw new Error(`EfficientTAM ${name} is missing.`);
+  }
+
+  // WebGPU tensors and native Float16Array values are not necessarily
+  // Uint16Array instances. Read and reinterpret their storage explicitly.
+  const data = await tensor.getData();
+
+  if (!ArrayBuffer.isView(data)) {
+    throw new Error(`EfficientTAM ${name} returned an unsupported ${tensor.type} data representation.`);
+  }
+
+  if (tensor.type === "float16" && data.byteLength % 2 === 0) {
+    return new Uint16Array(data.buffer, data.byteOffset, data.byteLength / 2).slice();
+  }
+
+  if (tensor.type === "float32" && data.byteLength % 4 === 0) {
+    // The FP16 bundle may return float32 logits after interpolating masks.
+    return floatToHalf(new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4));
+  }
+
+  throw new Error(
+    `EfficientTAM ${name}: unsupported ${tensor.type} ${data.constructor.name} at ${tensor.location}.`,
+  );
+};
+
+// Research-only previous-mask matching. It uses no DAVIS annotations.
+const temporalMaskIoU = (previous: Uint16Array, candidate: Uint16Array) => {
+  if (previous.length !== SIDE * SIDE || candidate.length !== SIDE * SIDE) {
+    throw new Error("EfficientTAM temporal proposal masks have different dimensions.");
+  }
+
+  let union = 0;
+  let intersection = 0;
+
+  // Sample a 128 x 128 grid to avoid a full mask readback comparison.
+  for (let y = 0; y < SIDE; y += 4) {
+    for (let x = 0; x < SIDE; x += 4) {
+      const offset = y * SIDE + x;
+      const past = previous[offset] ?? 0;
+      const next = candidate[offset] ?? 0;
+      const pastActive = past !== 0 && (past & 0x8000) === 0;
+      const nextActive = next !== 0 && (next & 0x8000) === 0;
+
+      if (pastActive || nextActive) union += 1;
+
+      if (pastActive && nextActive) intersection += 1;
+    }
+  }
+
+  return union === 0 ? 0 : intersection / union;
+};
+
+type NormalizedPoint = { readonly x: number; readonly y: number };
+
+type SeedSelectionHint = {
+  readonly include: NormalizedPoint;
+  readonly exclude?: NormalizedPoint;
+  readonly mode: "point-largest" | "area-confidence";
+  readonly areaWeight: number;
+};
+
+const includesSeedPoint = (mask: Uint16Array, point: NormalizedPoint): boolean => {
+  const x = Math.max(0, Math.min(SIDE - 1, Math.floor(point.x * SIDE)));
+  const y = Math.max(0, Math.min(SIDE - 1, Math.floor(point.y * SIDE)));
+  const value = mask[y * SIDE + x] ?? 0;
+
+  return value !== 0 && (value & 0x8000) === 0;
+};
+
+const selectMask = async (
+  outputs: Record<string, ort.Tensor>,
+  requestedProposal?: number,
+  previousMask?: Uint16Array,
+  seedHint?: SeedSelectionHint,
+) => {
+  const masksTensor = outputs.masks;
+  const iouTensor = outputs.iou_pred;
+  const ptrTensor = outputs.obj_ptrs;
+
+  const masks = await readableHalf(masksTensor, "masks");
+  const scores = await readableHalf(iouTensor, "iou_pred");
+  const pointers = await readableHalf(ptrTensor, "obj_ptrs");
+  const count = scores.length;
+
+  requireDims(masksTensor, "masks", [1, count, SIDE, SIDE]);
+  requireDims(ptrTensor, "obj_ptrs", [1, count, POINTER_CHANNELS]);
+
+  if (count < 1 || count > 4) {
+    throw new Error(`Unexpected EfficientTAM mask proposal count: ${count}.`);
+  }
+
+  let winner = 0;
+
+  for (let index = 1; index < count; index += 1) {
+    if (halfToFloat(scores[index] ?? 0) > halfToFloat(scores[winner] ?? 0)) {
+      winner = index;
+    }
+  }
+
+  const alternatives = Array.from({ length: count }, (_, index) => ({
+    index,
+    predictedIou: halfToFloat(scores[index] ?? 0),
+    mask: masks.slice(index * SIDE * SIDE, (index + 1) * SIDE * SIDE),
+  }));
+
+  let selectionMethod: TrackingFrameResult["selectionMethod"] = "predicted-iou";
+  let temporalIoU: number | undefined;
+
+  if (requestedProposal !== undefined) {
+    if (!Number.isInteger(requestedProposal) ||
+        requestedProposal < 0 || requestedProposal >= count) {
+      throw new Error(`Requested proposal ${requestedProposal} is outside [0, ${count}).`);
+    }
+
+    winner = requestedProposal;
+    selectionMethod = "explicit";
+  } else if (previousMask !== undefined) {
+    const scoresByOverlap = alternatives.map((candidate) =>
+      temporalMaskIoU(previousMask, candidate.mask));
+
+    const bestOverlap = Math.max(...scoresByOverlap);
+
+    // If all proposals are disjoint from the last frame, fall back to
+    // the model's predicted-IoU ranking rather than matching empty masks.
+    if (bestOverlap >= 0.1) {
+      winner = scoresByOverlap.indexOf(bestOverlap);
+      selectionMethod = "temporal-iou";
+    }
+
+    temporalIoU = scoresByOverlap[winner];
+  } else if (seedHint !== undefined) {
+    // Experimental seed policy. No DAVIS labels are consulted.
+    const matching = alternatives
+      .filter((candidate) =>
+        includesSeedPoint(candidate.mask, seedHint.include) &&
+        (seedHint.exclude === undefined || !includesSeedPoint(candidate.mask, seedHint.exclude)))
+      .map((candidate) => ({
+        index: candidate.index,
+        confidence: candidate.predictedIou,
+        area: candidate.mask.reduce(
+          (sum, value) => sum + Number(value !== 0 && (value & 0x8000) === 0),
+          0,
+        ),
+      }))
+      .filter((candidate) => candidate.area <= SIDE * SIDE * 0.75);
+
+    if (matching.length > 0) {
+      winner = matching.reduce((selected, current) => {
+        const rating = (candidate: (typeof matching)[number]) =>
+          seedHint.mode === "point-largest"
+            ? candidate.area
+            : candidate.confidence + seedHint.areaWeight * Math.log1p(candidate.area);
+
+        return rating(current) > rating(selected) ? current : selected;
+      }).index;
+      selectionMethod = seedHint.mode === "point-largest"
+        ? "seed-point-largest"
+        : "seed-area-confidence";
+    }
+  }
+
+  const score = halfToFloat(scores[winner] ?? 0);
+
+  if (!Number.isFinite(score)) {
+    throw new Error("EfficientTAM produced a non-finite mask confidence score.");
+  }
+
+  const mask = masks.slice(winner * SIDE * SIDE, (winner + 1) * SIDE * SIDE);
+  const pointer = pointers.slice(winner * POINTER_CHANNELS, (winner + 1) * POINTER_CHANNELS);
+
+  return { mask, pointer, score, winner, proposals: count, alternatives, selectionMethod, temporalIoU };
+};
+
+type Truth = { readonly mask: Uint8Array; readonly width: number; readonly height: number };
+
+const loadTruth = async (
+  clip: string,
+  index: number,
+  objectColour?: readonly [number, number, number],
+): Promise<Truth> => {
+  const response = await fetch(`/quality/${clip}/${String(index).padStart(5, "0")}.png`);
+
+  if (!response.ok) {
+    throw new Error(`Missing DAVIS truth mask for ${clip} frame ${index}.`);
+  }
+
+  const bitmap = await createImageBitmap(await response.blob());
+
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    if (context === null) throw new Error("Cannot decode DAVIS mask canvas.");
+
+    context.drawImage(bitmap, 0, 0);
+
+    const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+
+    const mask = objectColour === undefined
+      ? annotatedForeground(pixels)
+      : annotationInstanceMask(pixels, objectColour);
+
+    return { mask, width: bitmap.width, height: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
+};
+
+const binaryMask = (prediction: Uint16Array, truth: Truth) => {
+  const mask = new Uint8Array(truth.mask.length);
+
+  for (let y = 0; y < truth.height; y += 1) {
+    const sy = Math.min(SIDE - 1, Math.floor((y + 0.5) * SIDE / truth.height));
+
+    for (let x = 0; x < truth.width; x += 1) {
+      const sx = Math.min(SIDE - 1, Math.floor((x + 0.5) * SIDE / truth.width));
+      const value = prediction[sy * SIDE + sx] ?? 0;
+
+      mask[y * truth.width + x] = value !== 0 && (value & 0x8000) === 0 ? 1 : 0;
+    }
+  }
+
+  return mask;
+};
+
+const frameInput = (frame: VideoFrame) => halfTensor(
+  floatToHalf(
+    frameToNchw(frame, SIDE, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+  ),
+  [1, 3, SIDE, SIDE],
+);
+
+const fixtureFromLocation = () => {
+  const requested = new URL(globalThis.location.href).searchParams.get("fixture") ?? "bear";
+
+  const accepted = [
+    "bear", "camel", "car-shadow", "bmx-trees", "judo", "soapbox",
+    "pigs", "gold-fish", "dogs-jump", "bike-packing",
+  ];
+
+  if (!accepted.includes(requested)) {
+    throw new Error(`Unsupported EfficientTAM DAVIS fixture: ${requested}.`);
+  }
+
+  return requested;
+};
+
+const pointFromTruth = async (fixture: string) => {
+  const truth = await loadTruth(fixture, 0);
+  let totalX = 0;
+  let totalY = 0;
+  let count = 0;
+
+  for (let y = 0; y < truth.height; y += 1) {
+    for (let x = 0; x < truth.width; x += 1) {
+      if (truth.mask[y * truth.width + x] === 0) continue;
+
+      totalX += x;
+      totalY += y;
+      count += 1;
+    }
+  }
+
+  if (count === 0) throw new Error(`DAVIS ${fixture} has no foreground seed pixels.`);
+
+  const centerX = totalX / count;
+  const centerY = totalY / count;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestX = 0;
+  let bestY = 0;
+
+  for (let y = 0; y < truth.height; y += 1) {
+    for (let x = 0; x < truth.width; x += 1) {
+      if (truth.mask[y * truth.width + x] === 0) continue;
+
+      const distance = (x - centerX) ** 2 + (y - centerY) ** 2;
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestX = x;
+        bestY = y;
+      }
+    }
+  }
+
+  return { x: (bestX + 0.5) / truth.width, y: (bestY + 0.5) / truth.height };
+};
+
+const requestedSeedProposal = (): number | undefined => {
+  const raw = new URL(globalThis.location.href).searchParams.get("proposal");
+
+  if (raw === null) return undefined;
+
+  if (!/^(0|[1-9][0-9]*)$/u.test(raw)) {
+    throw new Error("Experimental seed proposal must be a nonnegative integer.");
+  }
+
+  return Number(raw);
+};
+
+const requestedCorrection = (): { readonly index: number; readonly proposal: number } | undefined => {
+  const params = new URL(globalThis.location.href).searchParams;
+  const raw = params.get("correctionAt");
+
+  if (raw === null) return undefined;
+
+  const index = Number(raw);
+  const proposal = Number(params.get("correctionProposal"));
+
+  if (!Number.isInteger(index) || index < 1 || index > 11 ||
+      !Number.isInteger(proposal) || proposal < 0 || proposal > 3 ||
+      params.get("correctionProposal") === null) {
+    throw new Error("EfficientTAM correction must supply frame 1..11 and proposal 0..3.");
+  }
+
+  return { index, proposal };
+};
+
+const requestedSubjectProposals = (): readonly [number, number] | undefined => {
+  const raw = new URL(globalThis.location.href).searchParams.get("subjectProposals");
+
+  if (raw === null) return undefined;
+
+  if (!/^[0-3],[0-3]$/u.test(raw)) {
+    throw new Error("Independent object seed proposals must be a pair of indices 0..3.");
+  }
+
+  const [first, second] = raw.split(",").map(Number);
+
+  if (first === undefined || second === undefined) {
+    throw new Error("Two subject proposals are required.");
+  }
+
+  return [first, second];
+};
+
+const requestedSeedSelection = (): "confidence" | "point-largest" | "area-confidence" => {
+  const raw = new URL(globalThis.location.href).searchParams.get("seedSelection");
+
+  if (raw === null || raw === "confidence") return "confidence";
+
+  if (raw === "point-largest" || raw === "area-confidence") return raw;
+
+  throw new Error("Research-only seed selection must be confidence, point-largest or area-confidence.");
+};
+
+const requestedSeedAreaWeight = (mode: ReturnType<typeof requestedSeedSelection>): number => {
+  const raw = new URL(globalThis.location.href).searchParams.get("seedAreaWeight");
+
+  if (mode !== "area-confidence") {
+    if (raw !== null) throw new Error("Seed area weight requires area-confidence mode.");
+
+    return 0;
+  }
+
+  if (raw === null) return 0.4;
+
+  const weight = Number(raw);
+
+  if (!Number.isFinite(weight) || weight < 0 || weight > 1 || raw.trim() === "") {
+    throw new Error("Seed area weight must be a finite number between zero and one.");
+  }
+
+  return weight;
+};
+
+const requestedTrackedSelection = (): "confidence" | "temporal" => {
+  const raw = new URL(globalThis.location.href).searchParams.get("trackedSelection");
+
+  if (raw === null || raw === "confidence") return "confidence";
+
+  if (raw === "temporal") return "temporal";
+
+  throw new Error("Tracked proposal selection must be confidence or temporal.");
+};
+
+const requestedExcludeOther = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("excludeOther");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") {
+    throw new Error("Research-only cross-subject exclusion accepts only ?excludeOther=1.");
+  }
+
+  return true;
+};
+
+const requestedRealSubjects = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("subjects");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") throw new Error("Independent object quality accepts only ?subjects=1.");
+
+  return true;
+};
+
+const originalSubjectSeeds = async (fixture: string) => {
+  const response = await fetch(`/quality/${fixture}/00000.png`);
+
+  if (!response.ok) {
+    throw new Error(`Cannot read original DAVIS per-object annotations: ${fixture}.`);
+  }
+
+  const bitmap = await createImageBitmap(await response.blob());
+
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    if (context === null) throw new Error("Original DAVIS annotation canvas unavailable.");
+
+    context.drawImage(bitmap, 0, 0);
+
+    const data = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    const regions = annotationInstances(data, bitmap.width, bitmap.height, 256);
+
+    if (regions.length < 2) {
+      throw new Error(`Expected at least two distinct original DAVIS objects in ${fixture}.`);
+    }
+
+    return regions.slice(0, 2).map(({ rgb, seed, pixels }) => ({ rgb, seed, pixels }));
+  } finally {
+    bitmap.close();
+  }
+};
+
+const requestedIndependentTracks = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("dual");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") throw new Error("Independent mask tracks accept only ?dual=1.");
+
+  return true;
+};
+
+const requestedRewind = (): boolean => {
+  const raw = new URL(globalThis.location.href).searchParams.get("rewind");
+
+  if (raw === null) return false;
+
+  if (raw !== "1") throw new Error("Rewind probe accepts only ?rewind=1.");
+
+  return true;
+};
+
+const requestedFrameCount = (): number => {
+  const raw = new URL(globalThis.location.href).searchParams.get("frames");
+
+  if (raw === null) return 8;
+
+  const count = Number(raw);
+
+  if (!Number.isInteger(count) || count < 2 || count > 24) {
+    throw new Error("EfficientTAM quality fixture must request between 2 and 24 frames.");
+  }
+
+  return count;
+};
+
+const main = async () => {
+  configureVideoOrt();
+
+  const fixture = fixtureFromLocation();
+  const seedProposal = requestedSeedProposal();
+  const frameCount = requestedFrameCount();
+  const verifyRewind = requestedRewind();
+  const independentTracks = requestedIndependentTracks();
+  const realSubjects = requestedRealSubjects();
+  const subjectProposals = requestedSubjectProposals();
+  const excludeOther = requestedExcludeOther();
+  const trackedSelection = requestedTrackedSelection();
+  const seedSelection = requestedSeedSelection();
+  const seedAreaWeight = requestedSeedAreaWeight(seedSelection);
+
+  if (seedSelection !== "confidence" && !realSubjects) {
+    throw new Error("Click-supported automatic seed selection requires ?subjects=1.");
+  }
+
+  if (seedSelection !== "confidence" && subjectProposals !== undefined) {
+    throw new Error("Automatic seed selection cannot use explicit proposal indices.");
+  }
+
+  if (trackedSelection !== "confidence" && !realSubjects) {
+    throw new Error("Temporal proposal selection requires ?subjects=1.");
+  }
+
+  if (excludeOther && !realSubjects) {
+    throw new Error("Cross-subject exclusion requires ?subjects=1.");
+  }
+
+  if (subjectProposals !== undefined && !realSubjects) {
+    throw new Error("Manual subject proposals require ?subjects=1.");
+  }
+
+  if (realSubjects && ![
+    "bmx-trees", "judo", "soapbox", "pigs", "gold-fish", "dogs-jump", "bike-packing",
+  ].includes(fixture)) {
+    throw new Error("Original DAVIS real-subject trials require a verified multi-object fixture.");
+  }
+
+  const correction = requestedCorrection();
+
+  if (correction !== undefined && correction.index >= frameCount) {
+    throw new Error("EfficientTAM correction frame falls outside the requested window.");
+  }
+
+  const sessions = new Map<Role, ort.InferenceSession>();
+  const loading = [];
+  const started = performance.now();
+
+  const fileResponse = await fetch(`/quality/${fixture}.mp4`);
+
+  if (!fileResponse.ok) throw new Error(`The DAVIS ${fixture} fixture is unavailable.`);
+
+  const file = new File([await fileResponse.blob()], `${fixture}.mp4`, { type: "video/mp4" });
+  const source = await openMediaBunnyVideoSource(file);
+  const temporal = await readTemporalPosition();
+
+  try {
+    for (const role of roles) {
+      const response = await fetch(`/specialized/efficienttam-ti-${role}.onnx`);
+
+      if (!response.ok) throw new Error(`Missing EfficientTAM ${role}: HTTP ${response.status}.`);
+
+      const model = new Uint8Array(await response.arrayBuffer());
+      const loadStarted = performance.now();
+
+      const session = await ort.InferenceSession.create(model, {
+        executionProviders: [{ name: "webgpu" }],
+        graphOptimizationLevel: "all",
+      });
+
+      sessions.set(role, session);
+      loading.push({
+        role,
+        bytes: model.byteLength,
+        loadMs: performance.now() - loadStarted,
+        inputs: session.inputNames,
+        outputs: session.outputNames,
+      });
+    }
+
+    const get = (role: Role) => {
+      const session = sessions.get(role);
+
+      if (session === undefined) throw new Error(`EfficientTAM ${role} session unavailable.`);
+
+      return session;
+    };
+
+    const point = fixture === "bear"
+      ? { x: 0.4, y: 0.65 }
+      : await pointFromTruth(fixture);
+
+    const clickInputs = promptInputs(point.x, point.y);
+    const trackInputs = promptInputs();
+    const clickEmbedding = await get("prompt_encoder").run(clickInputs);
+    const noPointEmbedding = await get("prompt_encoder").run(trackInputs);
+
+    const times = (await source.frameTimes(
+      source.info.firstTimestamp,
+      source.info.firstTimestamp + Math.min(1, source.info.duration),
+      24,
+    )).slice(0, frameCount);
+
+    if (times.length < 2) throw new Error("EfficientTAM tracking needs at least two DAVIS frames.");
+
+    const bank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+
+    const createPass = (
+      subjectBank = bank,
+      chosenSeedProposal = seedProposal,
+      allowCorrection = true,
+      subjectPrompt = clickEmbedding,
+      objectColour?: readonly [number, number, number],
+      seedHint?: SeedSelectionHint,
+    ) => {
+      if (subjectBank.size !== 0) {
+        throw new Error("EfficientTAM rewind pass inherited stale tracking memory.");
+      }
+
+      const results: TrackingFrameResult[] = [];
+      const frameMasks: Uint8Array[] = [];
+      let previousMask: Uint16Array | undefined;
+
+      const advance = async (
+        index: number,
+        timestamp: number,
+        sharedVision?: Record<string, ort.Tensor>,
+      ) => {
+        const frame = sharedVision === undefined ? await source.frameAt(timestamp) : undefined;
+
+        if (frame === null) throw new Error(`Could not decode EfficientTAM frame ${index}.`);
+
+        const frameStarted = performance.now();
+        const stageMs: Record<string, number> = {};
+
+        try {
+          const input = frame === undefined ? undefined : frameInput(frame.frame);
+
+          stageMs.preprocess = performance.now() - frameStarted;
+
+          try {
+            const visionStarted = performance.now();
+
+            const vision = sharedVision ?? (input === undefined
+              ? undefined
+              : await get("image_encoder").run({ image: input }));
+
+            if (vision === undefined) {
+              throw new Error("A tracked frame requires decoded or shared vision features.");
+            }
+
+            stageMs.visionEncoder = sharedVision === undefined
+              ? performance.now() - visionStarted : 0;
+
+            try {
+              const raw = vision.vision_features;
+              const position = vision.vision_pos_enc;
+
+              requireDims(raw, "vision_features", [1, 256, FEATURE_SIDE, FEATURE_SIDE]);
+              requireDims(position, "vision_pos_enc", [1, 256, FEATURE_SIDE, FEATURE_SIDE]);
+
+              let conditioned: ort.Tensor | undefined;
+              let ownedMemory: ReturnType<typeof assembledMemory> | undefined;
+              const correcting = allowCorrection && correction?.index === index;
+
+              if (correcting) {
+                // A correction removes the old tracking history and starts
+                // fresh from the corrected subject's new first frame.
+                subjectBank.clear();
+                previousMask = undefined;
+              }
+
+              if (subjectBank.size > 0) {
+                ownedMemory = assembledMemory(subjectBank.values(), index, temporal);
+
+                const attentionStarted = performance.now();
+
+                const attended = await get("memory_attention").run({
+                  curr: raw,
+                  curr_pos: position,
+                  spatial_memory: ownedMemory.features,
+                  spatial_memory_pos: ownedMemory.positions,
+                  obj_ptr: ownedMemory.pointers,
+                });
+
+                stageMs.memoryAttention = performance.now() - attentionStarted;
+
+                conditioned = requireDims(
+                  attended.output,
+                  "memory_attention.output",
+                  [1, 256, FEATURE_SIDE, FEATURE_SIDE],
+                );
+              }
+
+              const prompt = subjectBank.size === 0 ? subjectPrompt : noPointEmbedding;
+
+              const sparseSource = requireDims(
+                prompt.sparse_prompt_embeddings,
+                "sparse_prompt_embeddings",
+                [1, 3, 256],
+              );
+
+              const denseSource = requireDims(
+                prompt.dense_prompt_embeddings,
+                "dense_prompt_embeddings",
+                [1, 256, FEATURE_SIDE, FEATURE_SIDE],
+              );
+
+              const sparse = toHalf(sparseSource, "sparse_prompt_embeddings");
+              const dense = toHalf(denseSource, "dense_prompt_embeddings");
+              let decoded: Record<string, ort.Tensor>;
+
+              try {
+                const maskStarted = performance.now();
+
+                decoded = await get("mask_decoder").run({
+                  image_embeddings: conditioned ?? raw,
+                  sparse_prompt_embeddings: sparse,
+                  dense_prompt_embeddings: dense,
+                });
+
+                stageMs.maskDecoder = performance.now() - maskStarted;
+              } finally {
+                if (sparse !== sparseSource) sparse.dispose();
+
+                if (dense !== denseSource) dense.dispose();
+              }
+
+              try {
+                const maskReadStarted = performance.now();
+                // Only an explicit seed or correction selects a proposal.
+                // DAVIS truth is loaded after inference, never for selection.
+
+                const selected = await selectMask(
+                  decoded,
+                  index === 0 ? chosenSeedProposal :
+                    correcting ? correction.proposal : undefined,
+                  trackedSelection === "temporal" ? previousMask : undefined,
+                  index === 0 && seedSelection !== "confidence" ? seedHint : undefined,
+                );
+
+                stageMs.maskReadback = performance.now() - maskReadStarted;
+
+                const maskInput = halfTensor(selected.mask, [1, 1, SIDE, SIDE]);
+                let encoded: Record<string, ort.Tensor>;
+
+                try {
+                  const memoryStarted = performance.now();
+
+                  encoded = await get("memory_encoder").run({
+                    pix_feat: raw,
+                    masks: maskInput,
+                  });
+
+                  stageMs.memoryEncoder = performance.now() - memoryStarted;
+                } finally {
+                  maskInput.dispose();
+                }
+
+                try {
+                  const memoryReadStarted = performance.now();
+
+                  requireDims(encoded.vision_features, "memory.vision_features", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
+                  requireDims(encoded.vision_pos_enc, "memory.vision_pos_enc", [1, CHANNELS, FEATURE_SIDE, FEATURE_SIDE]);
+
+                  subjectBank.push({
+                    index,
+                    features: await readableHalf(encoded.vision_features, "memory.vision_features"),
+                    positions: await readableHalf(encoded.vision_pos_enc, "memory.vision_pos_enc"),
+                    pointer: selected.pointer,
+                  });
+
+                  previousMask = selected.mask;
+
+                  stageMs.memoryReadback = performance.now() - memoryReadStarted;
+                } finally {
+                  dispose(encoded);
+                }
+
+                // DAVIS PNG fetching and mask scoring are outside the inference
+                // interval. They must not inflate the measured model latency.
+                const inferenceMs = performance.now() - frameStarted;
+                const truth = await loadTruth(fixture, index, objectColour);
+                const binary = binaryMask(selected.mask, truth);
+
+                frameMasks.push(binary);
+
+                const foreground = binary.reduce((total, value) => total + value, 0);
+
+                // The ground truth evaluates candidate proposals here, but
+                // never controls which proposal is committed for tracking.
+                const proposalDiagnostics = index === 0 || objectColour !== undefined
+                  ? selected.alternatives.map((alternative) => {
+                      const proposed = binaryMask(alternative.mask, truth);
+
+                      return {
+                        index: alternative.index,
+                        predictedIou: alternative.predictedIou,
+                        actualIou: binaryMaskIou(proposed, truth.mask),
+                        foreground: proposed.reduce((sum, pixel) => sum + pixel, 0),
+                      };
+                    })
+                  : undefined;
+
+                results.push({
+                  index,
+                  timestamp,
+                  inferenceMs,
+                  stageMs,
+                  seedProposalDiagnostics: index === 0 ? proposalDiagnostics : undefined,
+                  proposalDiagnostics,
+                  memorySlots: subjectBank.size,
+                  corrected: correction?.index === index,
+                  selectionMethod: selected.selectionMethod,
+                  temporalIoU: selected.temporalIoU,
+                  truthForeground: truth.mask.reduce((sum, pixel) => sum + pixel, 0),
+                  proposals: selected.proposals,
+                  chosenProposal: selected.winner,
+                  score: selected.score,
+                  foreground,
+                  iou: binaryMaskIou(binary, truth.mask),
+                  boundaryF: davisBoundaryF(binary, truth.mask, truth.width, truth.height),
+                });
+              } finally {
+                dispose(decoded);
+                conditioned?.dispose();
+                ownedMemory?.features.dispose();
+                ownedMemory?.positions.dispose();
+                ownedMemory?.pointers.dispose();
+              }
+            } finally {
+              if (sharedVision === undefined) dispose(vision);
+            }
+          } finally {
+            input?.dispose();
+          }
+        } finally {
+          frame?.close();
+        }
+      };
+
+      return { advance, results, frameMasks };
+    };
+
+    const runPass = async (
+      subjectBank = bank,
+      chosenSeedProposal = seedProposal,
+      allowCorrection = true,
+      subjectPrompt = clickEmbedding,
+      objectColour?: readonly [number, number, number],
+      seedHint?: SeedSelectionHint,
+    ) => {
+      const pass = createPass(
+        subjectBank,
+        chosenSeedProposal,
+        allowCorrection,
+        subjectPrompt,
+        objectColour,
+        seedHint,
+      );
+
+      for (const [index, timestamp] of times.entries()) {
+        await pass.advance(index, timestamp);
+      }
+
+      return { results: pass.results, frameMasks: pass.frameMasks };
+    };
+
+    const initialPass = await runPass();
+    const results = initialPass.results;
+
+    let independent:
+      | {
+          readonly primaryMemoryIndices: readonly number[];
+          readonly alternateMemoryIndices: readonly number[];
+          readonly seedMaskIoU: number;
+          readonly alternateMeanTrackedIoU: number;
+          readonly interleavedMinPrimaryMaskIoU: number;
+          readonly interleavedMinAlternateMaskIoU: number;
+          readonly interleavedPrimaryMemoryIndices: readonly number[];
+          readonly interleavedAlternateMemoryIndices: readonly number[];
+          readonly sharedEncoderRuns: number;
+          readonly sharedEncoderMs: number;
+        }
+      | undefined;
+
+    if (independentTracks) {
+      if (seedProposal !== 0 || fixture !== "car-shadow") {
+        throw new Error("Independent mask tracks require car-shadow proposal 0.");
+      }
+
+      const primaryMemoryIndices = bank.values().map((frame) => frame.index);
+      const alternateBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+      const alternate = await runPass(alternateBank, 1, false);
+      const alternateMemoryIndices = alternateBank.values().map((frame) => frame.index);
+      const seedMask = initialPass.frameMasks[0];
+      const alternateSeedMask = alternate.frameMasks[0];
+
+      if (seedMask === undefined || alternateSeedMask === undefined) {
+        throw new Error("Independent mask tracks are missing seed frame masks.");
+      }
+
+      const seedMaskIoU = binaryMaskIou(seedMask, alternateSeedMask);
+      const alternateTracked = alternate.results.slice(1);
+
+      if (seedMaskIoU >= 0.7 ||
+          bank.values().some((frame, index) => frame.index !== primaryMemoryIndices[index]) ||
+          alternateMemoryIndices.length !== primaryMemoryIndices.length ||
+          alternateMemoryIndices.some((index, position) => index !== primaryMemoryIndices[position])) {
+        throw new Error("Independent mask tracks shared state or selected the same seed mask.");
+      }
+
+      // Repeat both trajectories interleaved, frame by frame, on shared
+      // ONNX sessions. Compare with the independently run references.
+      const interleavedPrimaryBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+      const interleavedAlternateBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+      const primary = createPass(interleavedPrimaryBank, 0, false);
+      const secondary = createPass(interleavedAlternateBank, 1, false);
+      let sharedEncoderRuns = 0;
+      let sharedEncoderMs = 0;
+
+      for (const [index, timestamp] of times.entries()) {
+        const frame = await source.frameAt(timestamp);
+
+        if (frame === null) throw new Error(`Shared video frame ${index} could not be decoded.`);
+
+        try {
+          const input = frameInput(frame.frame);
+
+          try {
+            const started = performance.now();
+            const vision = await get("image_encoder").run({ image: input });
+
+            sharedEncoderRuns += 1;
+            sharedEncoderMs += performance.now() - started;
+
+            try {
+              await primary.advance(index, timestamp, vision);
+              await secondary.advance(index, timestamp, vision);
+            } finally {
+              dispose(vision);
+            }
+          } finally {
+            input.dispose();
+          }
+        } finally {
+          frame.close();
+        }
+      }
+
+      const compare = (actual: readonly Uint8Array[], expected: readonly Uint8Array[]) => {
+        if (actual.length !== expected.length) {
+          throw new Error("Interleaved tracking and the sequential reference have different frame counts.");
+        }
+
+        return actual.map((mask, index) => {
+          const reference = expected[index];
+
+          if (reference === undefined) throw new Error("Missing sequential mask for interleave comparison.");
+
+          return binaryMaskIou(mask, reference);
+        });
+      };
+
+      const primaryParity = compare(primary.frameMasks, initialPass.frameMasks);
+      const alternateParity = compare(secondary.frameMasks, alternate.frameMasks);
+      const interleavedMinPrimaryMaskIoU = Math.min(...primaryParity);
+      const interleavedMinAlternateMaskIoU = Math.min(...alternateParity);
+      const interleavedPrimaryMemoryIndices = interleavedPrimaryBank.values().map((frame) => frame.index);
+      const interleavedAlternateMemoryIndices = interleavedAlternateBank.values().map((frame) => frame.index);
+
+      if (sharedEncoderRuns !== times.length ||
+          interleavedMinPrimaryMaskIoU < 0.995 ||
+          interleavedMinAlternateMaskIoU < 0.995 ||
+          interleavedPrimaryMemoryIndices.some((index, pos) => index !== primaryMemoryIndices[pos]) ||
+          interleavedAlternateMemoryIndices.some((index, pos) => index !== alternateMemoryIndices[pos])) {
+        throw new Error("Interleaved EfficientTAM masks or memory histories differ from sequential runs.");
+      }
+
+      independent = {
+        primaryMemoryIndices,
+        alternateMemoryIndices,
+        seedMaskIoU,
+        interleavedMinPrimaryMaskIoU,
+        interleavedMinAlternateMaskIoU,
+        interleavedPrimaryMemoryIndices,
+        interleavedAlternateMemoryIndices,
+        sharedEncoderRuns,
+        sharedEncoderMs,
+        alternateMeanTrackedIoU:
+          alternateTracked.reduce((total, frame) => total + frame.iou, 0) /
+          alternateTracked.length,
+      };
+    }
+
+    const runRealSubjects = async () => {
+      const regions = await originalSubjectSeeds(fixture);
+      const firstRegion = regions[0];
+      const secondRegion = regions[1];
+
+      if (firstRegion === undefined || secondRegion === undefined) {
+        throw new Error("Two indexed DAVIS object identities are required.");
+      }
+
+      // Offline upper-bound experiment: the other object's DAVIS seed is a
+      // simulated user Exclude click. No annotations select a mask proposal
+      // or modify temporal memory after prompting.
+      const firstExclude = excludeOther ? secondRegion.seed : undefined;
+      const secondExclude = excludeOther ? firstRegion.seed : undefined;
+      const firstInputs = promptInputs(firstRegion.seed.x, firstRegion.seed.y, firstExclude);
+      const secondInputs = promptInputs(secondRegion.seed.x, secondRegion.seed.y, secondExclude);
+      let firstClick: Record<string, ort.Tensor> | undefined;
+      let secondClick: Record<string, ort.Tensor> | undefined;
+
+      try {
+        firstClick = await get("prompt_encoder").run(firstInputs);
+        secondClick = await get("prompt_encoder").run(secondInputs);
+
+        const firstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const secondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const hintMode = seedSelection === "area-confidence" ? "area-confidence" : "point-largest";
+
+        const firstHint: SeedSelectionHint = {
+          include: firstRegion.seed, exclude: firstExclude, mode: hintMode, areaWeight: seedAreaWeight,
+        };
+
+        const secondHint: SeedSelectionHint = {
+          include: secondRegion.seed, exclude: secondExclude, mode: hintMode, areaWeight: seedAreaWeight,
+        };
+
+        const first = await runPass(firstBank, subjectProposals?.[0], false, firstClick, firstRegion.rgb, firstHint);
+        const second = await runPass(secondBank, subjectProposals?.[1], false, secondClick, secondRegion.rgb, secondHint);
+        const seedMaskA = first.frameMasks[0];
+        const seedMaskB = second.frameMasks[0];
+
+        if (seedMaskA === undefined || seedMaskB === undefined) {
+          throw new Error("Indexed multi-object tracking is missing its first masks.");
+        }
+
+        const frameInterSubjectIoUs = first.frameMasks.map((mask, index) => {
+          const other = second.frameMasks[index];
+
+          if (other === undefined) throw new Error("Missing indexed second-object frame mask.");
+
+          return binaryMaskIou(mask, other);
+        });
+
+        const seedMaskIoU = frameInterSubjectIoUs[0];
+
+        if (seedMaskIoU === undefined) throw new Error("Missing indexed subject overlap.");
+
+        const interleavedFirstBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+        const interleavedSecondBank = new BoundedFrameMemory<Memory>(MAX_MEMORY_FRAMES);
+
+        const firstPass = createPass(
+          interleavedFirstBank,
+          subjectProposals?.[0],
+          false,
+          firstClick,
+          firstRegion.rgb,
+          firstHint,
+        );
+
+        const secondPass = createPass(
+          interleavedSecondBank,
+          subjectProposals?.[1],
+          false,
+          secondClick,
+          secondRegion.rgb,
+          secondHint,
+        );
+
+        let sharedEncoderRuns = 0;
+
+        for (const [index, timestamp] of times.entries()) {
+          const frame = await source.frameAt(timestamp);
+
+          if (frame === null) {
+            throw new Error(`Indexed DAVIS ${fixture} frame ${index} was not decoded.`);
+          }
+
+          try {
+            const input = frameInput(frame.frame);
+
+            try {
+              const vision = await get("image_encoder").run({ image: input });
+
+              sharedEncoderRuns += 1;
+
+              try {
+                await firstPass.advance(index, timestamp, vision);
+                await secondPass.advance(index, timestamp, vision);
+              } finally {
+                dispose(vision);
+              }
+            } finally {
+              input.dispose();
+            }
+          } finally {
+            frame.close();
+          }
+        }
+
+        const parity = (actual: readonly Uint8Array[], expected: readonly Uint8Array[]) => {
+          if (actual.length !== expected.length) {
+            throw new Error("Original DAVIS interleaved runs have different frame counts.");
+          }
+
+          return Math.min(...actual.map((mask, index) => {
+            const reference = expected[index];
+
+            if (reference === undefined) throw new Error("Missing original DAVIS reference mask.");
+
+            return binaryMaskIou(mask, reference);
+          }));
+        };
+
+        const firstParity = parity(firstPass.frameMasks, first.frameMasks);
+        const secondParity = parity(secondPass.frameMasks, second.frameMasks);
+
+        if (firstParity < 0.995 || secondParity < 0.995 ||
+            sharedEncoderRuns !== times.length ||
+            interleavedFirstBank.size !== firstBank.size ||
+            interleavedSecondBank.size !== secondBank.size) {
+          throw new Error("Two independently clicked DAVIS objects diverged during shared-vision tracking.");
+        }
+
+        const summarize = (
+          region: typeof firstRegion,
+          run: typeof first,
+          reference: string,
+        ) => {
+          const tracked = run.results.slice(1);
+
+          const frameBestAvailableIoUs = run.results.map((row) => {
+            if (row.proposalDiagnostics === undefined || row.proposalDiagnostics.length === 0) {
+              throw new Error("Indexed frame is missing its proposal-quality diagnostics.");
+            }
+
+            const selected = row.proposalDiagnostics.find((candidate) => candidate.index === row.chosenProposal);
+
+            if (selected === undefined || Math.abs(selected.actualIou - row.iou) > 1e-8) {
+              throw new Error("Indexed tracked mask differs from the recorded selected proposal.");
+            }
+
+            return Math.max(...row.proposalDiagnostics.map((candidate) => candidate.actualIou));
+          });
+
+          const trackedBestAvailableIoUs = frameBestAvailableIoUs.slice(1);
+
+          return {
+            reference,
+            rgb: region.rgb,
+            seed: region.seed,
+            excludedSeed: excludeOther
+              ? region === firstRegion ? secondRegion.seed : firstRegion.seed
+              : undefined,
+            seedPixels: region.pixels,
+            meanTrackedIoU: tracked.reduce((sum, row) => sum + row.iou, 0) / tracked.length,
+            meanTrackedBoundaryF: tracked.reduce((sum, row) => sum + row.boundaryF, 0) / tracked.length,
+            meanTrackedBestAvailableIoU: trackedBestAvailableIoUs.reduce((sum, iou) => sum + iou, 0) /
+              trackedBestAvailableIoUs.length,
+            seedIoU: run.results[0]?.iou,
+            seedProposal: run.results[0]?.chosenProposal,
+            seedAlternatives: run.results[0]?.seedProposalDiagnostics,
+            frameIoUs: run.results.map((row) => row.iou),
+            frameBestAvailableIoUs,
+            frameChosenProposals: run.results.map((row) => row.chosenProposal),
+            frameSelectionMethods: run.results.map((row) => row.selectionMethod),
+            frameTemporalIoUs: run.results.map((row) => row.temporalIoU ?? null),
+            frameProposalDiagnostics: run.results.map((row) => row.proposalDiagnostics),
+            memoryIndices: run.results.map((row) => row.memorySlots),
+          };
+        };
+
+        return {
+          fixture,
+          seedMode: subjectProposals === undefined ? "automatic" : "explicit offline-selected proposals",
+          subjectProposals,
+          excludeOther,
+          trackedSelection,
+          seedSelection,
+          seedAreaWeight,
+          subjects: [
+            summarize(firstRegion, first, "largest DAVIS instance"),
+            summarize(secondRegion, second, "second DAVIS instance"),
+          ],
+          seedMaskIoU,
+          frameInterSubjectIoUs,
+          sharedEncoderRuns,
+          minMaskParity: [firstParity, secondParity],
+          interleavedFrameUpdates: 2 * times.length,
+        };
+      } finally {
+        if (firstClick !== undefined) dispose(firstClick);
+
+        if (secondClick !== undefined) dispose(secondClick);
+
+        for (const input of Object.values(firstInputs)) input.dispose();
+
+        for (const input of Object.values(secondInputs)) input.dispose();
+      }
+    };
+
+    const realObjects = realSubjects ? await runRealSubjects() : undefined;
+
+    let rewind:
+      | { readonly replayedFrames: number; readonly minMaskIou: number; readonly frameMaskIous: readonly number[] }
+      | undefined;
+
+    if (verifyRewind) {
+      const memoryBeforeRewind = bank.size;
+
+      if (memoryBeforeRewind === 0) {
+        throw new Error("Cannot verify EfficientTAM rewind without tracked memory.");
+      }
+
+      bank.clear();
+
+      const replayPass = await runPass();
+
+      if (replayPass.frameMasks.length !== initialPass.frameMasks.length ||
+          replayPass.results.length !== initialPass.results.length) {
+        throw new Error("Rewind replay did not process the original frame window.");
+      }
+
+      const frameMaskIous = initialPass.frameMasks.map((mask, index) => {
+        const replayed = replayPass.frameMasks[index];
+
+        if (replayed === undefined) {
+          throw new Error(`Rewind replay omitted frame ${index}.`);
+        }
+
+        return binaryMaskIou(mask, replayed);
+      });
+
+      const minMaskIou = Math.min(...frameMaskIous);
+
+      if (minMaskIou < 0.995) {
+        throw new Error(`EfficientTAM rewind changed mask outputs; minimum IoU ${minMaskIou}.`);
+      }
+
+      rewind = {
+        replayedFrames: replayPass.results.length,
+        minMaskIou,
+        frameMaskIous,
+      };
+    }
+
+    const tracked = results.slice(1);
+    const trackedMs = tracked.reduce((sum, value) => sum + value.inferenceMs, 0);
+
+    const report = {
+      name: "efficienttam-ti-fp16-temporal-smoke",
+      fixture,
+      seedPoint: point,
+      seedProposal: seedProposal ?? "auto",
+      correction,
+      independent,
+      realObjects,
+      rewind,
+      requestedFrameCount: frameCount,
+      model: "egordm/efficienttam-ti-512@40788ab3",
+      status: "experimental; single-object forward tracking; model comparison only",
+      loading,
+      frames: results,
+      meanTrackedIou: tracked.reduce((sum, value) => sum + value.iou, 0) / tracked.length,
+      meanTrackedBoundaryF: tracked.reduce((sum, value) => sum + value.boundaryF, 0) / tracked.length,
+      trackedFps: 1000 * tracked.length / trackedMs,
+      totalMs: performance.now() - started,
+    };
+
+    const response = await fetch("/result", {
+      method: "POST",
+      body: JSON.stringify({ reports: [report] }),
+    });
+
+    if (!response.ok) throw new Error(`Could not save EfficientTAM tracking results: HTTP ${response.status}.`);
+
+    dispose(clickEmbedding);
+    dispose(noPointEmbedding);
+
+    for (const input of Object.values(clickInputs)) input.dispose();
+
+    for (const input of Object.values(trackInputs)) input.dispose();
+  } finally {
+    source.close();
+    await Promise.all([...sessions.values()].map((session) => session.release().catch(() => undefined)));
+  }
+};
+
+void main().catch((error) => fetch("/failure", {
+  method: "POST",
+  body: JSON.stringify({ message: String(error), stack: error instanceof Error ? error.stack : "" }),
+}));

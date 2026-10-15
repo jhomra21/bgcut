@@ -1,11 +1,14 @@
 import * as ort from "onnxruntime-web/webgpu";
 
+import { createSamGpuTokenTransposer } from "./sam21-gpu-tokens";
+
 import {
   channelsToTokens,
   closeVideoSessions,
   concatenateFloat32,
   configureVideoOrt,
   createVideoSession,
+  createVideoSessionFromUrl,
   fetchVideoModelConstants,
   floatData,
   frameToNchw,
@@ -15,9 +18,11 @@ import {
 
 import type {
   VideoSegmentationAdapter,
+  VideoSegmentationAdapterOptions,
   VideoSegmentationCandidate,
   VideoSegmentationMask,
   VideoSegmentationPrompt,
+  VideoSegmentationSubjectPrompt,
 } from "./types";
 
 const FEATURE_CHANNELS = 256;
@@ -36,16 +41,65 @@ const POINTER_TOKENS =
 
 const RELIABLE_IOU = 0.25;
 
-type SamSessions = {
+const TRACKED_VISION_OUTPUTS = [
+  "feats0",
+  "feats1",
+  "feats2",
+] as const;
+
+const PROMPT_VISION_OUTPUTS = [
+  ...TRACKED_VISION_OUTPUTS,
+  "feats2_no_mem",
+] as const;
+
+const TRACKED_VISION_OUTPUTS_WITH_POSITION = [
+  ...TRACKED_VISION_OUTPUTS,
+  "vision_pos_embed",
+] as const;
+
+const PROMPT_VISION_OUTPUTS_WITH_POSITION = [
+  ...PROMPT_VISION_OUTPUTS,
+  "vision_pos_embed",
+] as const;
+
+const MEMORY_OUTPUTS = [
+  "memory_tokens",
+] as const;
+
+const MEMORY_OUTPUTS_WITH_POSITION = [
+  ...MEMORY_OUTPUTS,
+  "memory_pos",
+] as const;
+
+const TRACKED_STEP_OUTPUTS = [
+  "low_res_mask",
+  "iou",
+  "tracked_object_score_logits",
+  "object_pointer",
+  "memory_memory_tokens",
+] as const;
+
+type SamPromptSessions = {
   readonly visionEncoder:
     ort.InferenceSession;
   readonly maskDecoder:
     ort.InferenceSession;
+};
+
+type SamTrackingSessions = {
   readonly memoryAttention:
     ort.InferenceSession;
   readonly memoryEncoder:
     ort.InferenceSession;
   readonly pointerTpos:
+    ort.InferenceSession;
+  readonly trackedMaskDecoder?:
+    ort.InferenceSession;
+  readonly trackedMemoryEncoder?:
+    ort.InferenceSession;
+  readonly trackedStep?:
+    ort.InferenceSession;
+  readonly trackedVisionEncoder?:
     ort.InferenceSession;
 };
 
@@ -53,10 +107,20 @@ type SamVision = {
   readonly feats0: ort.Tensor;
   readonly feats1: ort.Tensor;
   readonly feats2: ort.Tensor;
-  readonly feats2NoMemory:
+  readonly feats2NoMemory?:
     ort.Tensor;
   readonly position:
-    ort.Tensor;
+    Float32Array;
+};
+
+const disposeVision = (
+  vision:
+    SamVision,
+): void => {
+  vision.feats0.dispose();
+  vision.feats1.dispose();
+  vision.feats2.dispose();
+  vision.feats2NoMemory?.dispose();
 };
 
 type SamDecoded = {
@@ -67,6 +131,17 @@ type SamDecoded = {
   readonly pointer:
     Float32Array;
   readonly objectScore: number;
+};
+
+type SamTrackedStep = {
+  readonly mask:
+    VideoSegmentationMask;
+  readonly pointer:
+    Float32Array;
+  readonly objectScore:
+    number;
+  readonly memoryTokens:
+    Float32Array;
 };
 
 type StoredMemory = {
@@ -106,6 +181,104 @@ const requireTensor = (
   }
 
   return tensor;
+};
+
+const decodedTrackedStep = (
+  outputs:
+    Record<
+      string,
+      ort.Tensor
+    >,
+): SamTrackedStep => {
+  const logits =
+    floatData(
+      requireTensor(
+        outputs,
+        "low_res_mask",
+      ),
+      "SAM 2.1 tracked low_res_mask",
+    ).slice();
+
+  const iou =
+    floatData(
+      requireTensor(
+        outputs,
+        "iou",
+      ),
+      "SAM 2.1 tracked iou",
+    )[0] ??
+    0;
+
+  const objectScore =
+    floatData(
+      requireTensor(
+        outputs,
+        "tracked_object_score_logits",
+      ),
+      "SAM 2.1 tracked object score",
+    )[0] ??
+    0;
+
+  const pointer =
+    floatData(
+      requireTensor(
+        outputs,
+        "object_pointer",
+      ),
+      "SAM 2.1 tracked object pointer",
+    );
+
+  const memoryTokens =
+    floatData(
+      requireTensor(
+        outputs,
+        "memory_memory_tokens",
+      ),
+      "SAM 2.1 tracked memory tokens",
+    ).slice();
+
+  if (
+    pointer.length <
+    POINTER_DIMENSION
+  ) {
+    throw new Error(
+      "SAM 2.1 tracked object pointer is shorter than 256 values.",
+    );
+  }
+
+  const maskSide =
+    Math.sqrt(
+      logits.length,
+    );
+
+  if (
+    !Number.isInteger(
+      maskSide,
+    )
+  ) {
+    throw new Error(
+      "SAM 2.1 tracked low-resolution mask is not square.",
+    );
+  }
+
+  return {
+    mask: {
+      logits,
+      width:
+        maskSide,
+      height:
+        maskSide,
+      iou,
+      objectScore,
+    },
+    pointer:
+      pointer.slice(
+        0,
+        POINTER_DIMENSION,
+      ),
+    objectScore,
+    memoryTokens,
+  };
 };
 
 const decodedMask = (
@@ -494,6 +667,8 @@ export const createSam21Adapter =
     onProgress?: (
       progress: number,
     ) => void,
+    options?:
+      VideoSegmentationAdapterOptions,
   ): Promise<VideoSegmentationAdapter> => {
     configureVideoOrt();
 
@@ -501,6 +676,63 @@ export const createSam21Adapter =
       await fetchVideoModelConstants(
         candidate,
       );
+
+    const timingTotals:
+      Record<
+        string,
+        {
+          calls: number;
+          totalMs: number;
+        }
+      > = {};
+
+    const recordTiming = (
+      stage: string,
+      startedAt: number,
+    ) => {
+      const current =
+        timingTotals[
+          stage
+        ] ?? {
+          calls: 0,
+          totalMs: 0,
+        };
+
+      current.calls +=
+        1;
+
+      current.totalMs +=
+        performance.now() -
+        startedAt;
+
+      timingTotals[
+        stage
+      ] =
+        current;
+    };
+
+    const timingSnapshot =
+      () =>
+        Object.fromEntries(
+          Object.entries(
+            timingTotals,
+          ).map(
+            (
+              [
+                stage,
+                timing,
+              ],
+            ) => [
+              stage,
+              {
+                calls:
+                  timing.calls,
+                totalMs:
+                  timing.totalMs,
+              },
+            ],
+          ),
+        );
 
     const roles =
       [
@@ -511,8 +743,11 @@ export const createSam21Adapter =
         "pointer-tpos",
       ] as const;
 
-    const loaded:
-      ort.InferenceSession[] = [];
+    const loaded =
+      new Map<
+        (typeof roles)[number],
+        ort.InferenceSession
+      >();
 
     const load = async (
       role:
@@ -522,25 +757,29 @@ export const createSam21Adapter =
         await createVideoSession(
           candidate,
           role,
+          role === "vision-encoder" && options?.visionGraphCapture === true,
+          role === "vision-encoder" && options?.visionGpuOutputs === true,
+          role === "vision-encoder" && options?.visionGpuAttention === true,
         );
 
-      loaded.push(
+      loaded.set(
+        role,
         session,
       );
 
       onProgress?.(
-        loaded.length /
+        loaded.size /
           roles.length,
       );
 
       return session;
     };
 
-    let sessions:
-      SamSessions;
+    let promptSessions:
+      SamPromptSessions;
 
     try {
-      sessions = {
+      promptSessions = {
         visionEncoder:
           await load(
             "vision-encoder",
@@ -549,35 +788,202 @@ export const createSam21Adapter =
           await load(
             "mask-decoder",
           ),
-        memoryAttention:
-          await load(
-            "memory-attention",
-          ),
-        memoryEncoder:
-          await load(
-            "memory-encoder",
-          ),
-        pointerTpos:
-          await load(
-            "pointer-tpos",
-          ),
       };
     } catch (error) {
       await closeVideoSessions({
         "vision-encoder":
-          loaded[0],
+          loaded.get(
+            "vision-encoder",
+          ),
         "mask-decoder":
-          loaded[1],
-        "memory-attention":
-          loaded[2],
-        "memory-encoder":
-          loaded[3],
-        "pointer-tpos":
-          loaded[4],
+          loaded.get(
+            "mask-decoder",
+          ),
       });
 
       throw error;
     }
+
+    let trackingSessionsPromise:
+      Promise<SamTrackingSessions> |
+      undefined;
+
+    let trackedMaskDecoder:
+      ort.InferenceSession |
+      undefined;
+
+    let trackedMemoryEncoder:
+      ort.InferenceSession |
+      undefined;
+
+    let trackedStep:
+      ort.InferenceSession |
+      undefined;
+
+    let trackedVisionEncoder:
+      ort.InferenceSession |
+      undefined;
+
+    const loadTrackingSessions =
+      async (): Promise<
+        SamTrackingSessions
+      > => {
+        try {
+          if (options?.trackedVisionUrl !== undefined) {
+            // A requested benchmark must not silently fall back if the
+            // generated graph fails to load.
+            trackedVisionEncoder = await createVideoSessionFromUrl(
+              options.trackedVisionUrl,
+              "SAM 2.1 tracked vision encoder",
+            );
+          }
+
+          const memoryAttention =
+            await load(
+              "memory-attention",
+            );
+
+          const memoryEncoder =
+            await load(
+              "memory-encoder",
+            );
+
+          const pointerTpos =
+            await load(
+              "pointer-tpos",
+            );
+
+          if (
+            options?.trackedMaskDecoderUrl !==
+            undefined
+          ) {
+            try {
+              trackedMaskDecoder =
+                await createVideoSessionFromUrl(
+                  options.trackedMaskDecoderUrl,
+                  "SAM 2.1 tracked mask decoder",
+                );
+            } catch {
+              trackedMaskDecoder =
+                undefined;
+            }
+          }
+
+          if (
+            options?.trackedMemoryEncoderUrl !==
+            undefined
+          ) {
+            try {
+              trackedMemoryEncoder =
+                await createVideoSessionFromUrl(
+                  options.trackedMemoryEncoderUrl,
+                  "SAM 2.1 tracked memory encoder",
+                );
+            } catch {
+              trackedMemoryEncoder =
+                undefined;
+            }
+          }
+
+          if (
+            options?.trackedStepUrl !==
+            undefined
+          ) {
+            try {
+              trackedStep =
+                await createVideoSessionFromUrl(
+                  options.trackedStepUrl,
+                  "SAM 2.1 fused tracked step",
+                );
+            } catch {
+              trackedStep =
+                undefined;
+            }
+          }
+
+          return {
+            memoryAttention,
+            memoryEncoder,
+            pointerTpos,
+            trackedMaskDecoder,
+            trackedMemoryEncoder,
+            trackedStep,
+            trackedVisionEncoder,
+          };
+        } catch (error) {
+          await closeVideoSessions({
+            "memory-attention":
+              loaded.get(
+                "memory-attention",
+              ),
+            "memory-encoder":
+              loaded.get(
+                "memory-encoder",
+              ),
+            "pointer-tpos":
+              loaded.get(
+                "pointer-tpos",
+              ),
+            "tracked-mask-decoder":
+              trackedMaskDecoder,
+            "tracked-memory-encoder":
+              trackedMemoryEncoder,
+          });
+
+          try {
+            await trackedVisionEncoder?.release();
+          } catch {
+            // Experimental cleanup must not hide the load failure.
+          }
+
+          trackedVisionEncoder = undefined;
+
+          try {
+            await trackedStep?.release();
+          } catch {
+            // Experimental session cleanup must not hide the load failure.
+          }
+
+          trackedStep =
+            undefined;
+
+          loaded.delete(
+            "memory-attention",
+          );
+
+          loaded.delete(
+            "memory-encoder",
+          );
+
+          loaded.delete(
+            "pointer-tpos",
+          );
+
+          throw error;
+        }
+      };
+
+    const getTrackingSessions =
+      (): Promise<
+        SamTrackingSessions
+      > => {
+        if (
+          trackingSessionsPromise ===
+          undefined
+        ) {
+          trackingSessionsPromise =
+            loadTrackingSessions().catch(
+              (error) => {
+                trackingSessionsPromise =
+                  undefined;
+
+                throw error;
+              },
+            );
+        }
+
+        return trackingSessionsPromise;
+      };
 
     const featureSide =
       candidate.inputSize /
@@ -593,36 +999,205 @@ export const createSam21Adapter =
       MAX_POINTERS *
         POINTER_TOKENS;
 
+    const createBank =
+      () =>
+        new SamMemoryBank(
+          constants
+            .memory_temporal_positional_encoding,
+          featureTokens,
+        );
+
     const bank =
-      new SamMemoryBank(
-        constants
-          .memory_temporal_positional_encoding,
-        featureTokens,
-      );
+      createBank();
+
+    const subjectBanks =
+      new Map<
+        string,
+        SamMemoryBank
+      >();
+
+    let seedFrame: VideoFrame | undefined;
+    let seedVision: SamVision | undefined;
+
+    let visionPosition:
+      Float32Array |
+      undefined;
+
+    let visionPositionTokens:
+      ort.Tensor |
+      undefined;
+
+    let memoryPosition:
+      Float32Array |
+      undefined;
+
+    let promptPipelineWarm = false;
+
+    // Benchmark control only. Independent macOS runs have not shown a
+    // repeatable speedup, so normal editor inference allocates per frame.
+    const normalizationCanvas =
+      options?.visionCanvasReuse === true
+        ? new OffscreenCanvas(candidate.inputSize, candidate.inputSize)
+        : undefined;
+
+    // The upload probe owns this GPU buffer. ORT does not destroy buffers
+    // supplied through Tensor.fromGpuBuffer, so release it when closing.
+    let visionInputBuffer: GPUBuffer | undefined;
+    let visionInputTensor: ort.Tensor | undefined;
 
     const encode =
       async (
         frame: VideoFrame,
+        includePromptOutput =
+          true,
       ): Promise<SamVision> => {
+        const preprocessStartedAt = performance.now();
+
+        const normalized =
+          frameToNchw(
+            frame,
+            candidate.inputSize,
+            constants.image_mean,
+            constants.image_std,
+            normalizationCanvas,
+          );
+
+        recordTiming("vision-preprocess", preprocessStartedAt);
+
+        const visionInputDimensions = [
+          1,
+          3,
+          candidate.inputSize,
+          candidate.inputSize,
+        ];
+
+        let pixelValues: ort.Tensor;
+
+        if (options?.visionGpuInput === true) {
+          const device = await ort.env.webgpu.device;
+
+          if (device === undefined) {
+            throw new Error("The SAM GPU-input probe requires an active WebGPU device.");
+          }
+
+          const uploadStartedAt = performance.now();
+
+          if (visionInputBuffer === undefined) {
+            const buffer = device.createBuffer({
+              size: normalized.byteLength,
+              usage: GPUBufferUsage.STORAGE |
+                GPUBufferUsage.COPY_DST |
+                GPUBufferUsage.COPY_SRC,
+            });
+
+            visionInputBuffer = buffer;
+            visionInputTensor = ort.Tensor.fromGpuBuffer(
+              buffer,
+              {
+                dataType: "float32",
+                dims: visionInputDimensions,
+              },
+            );
+          }
+
+          device.queue.writeBuffer(
+            visionInputBuffer,
+            0,
+            normalized,
+          );
+
+          pixelValues = visionInputTensor ?? (() => {
+            throw new Error("SAM GPU input tensor was not initialized.");
+          })();
+
+          recordTiming("vision-input-upload", uploadStartedAt);
+        } else {
+          pixelValues = new ort.Tensor("float32", normalized, visionInputDimensions);
+        }
+
+        const runStartedAt =
+          performance.now();
+
+        const needsPosition =
+          visionPosition ===
+          undefined;
+
+        const trackingEncoder =
+          !includePromptOutput && !needsPosition &&
+          options?.trackedVisionUrl !== undefined
+            ? (await getTrackingSessions()).trackedVisionEncoder
+            : undefined;
+
+        if (!includePromptOutput && !needsPosition &&
+            options?.trackedVisionUrl !== undefined &&
+            trackingEncoder === undefined) {
+          throw new Error("Requested SAM tracked vision encoder was not loaded.");
+        }
+
         const outputs =
-          await sessions.visionEncoder.run({
-            pixel_values:
-              new ort.Tensor(
-                "float32",
-                frameToNchw(
-                  frame,
-                  candidate.inputSize,
-                  constants.image_mean,
-                  constants.image_std,
+          await (trackingEncoder ?? promptSessions.visionEncoder).run(
+            {
+              pixel_values:
+                pixelValues,
+            },
+            trackingEncoder !== undefined
+              ? TRACKED_VISION_OUTPUTS
+              : includePromptOutput
+              ? (
+                  needsPosition
+                    ? PROMPT_VISION_OUTPUTS_WITH_POSITION
+                    : PROMPT_VISION_OUTPUTS
+                )
+              : (
+                  needsPosition
+                    ? TRACKED_VISION_OUTPUTS_WITH_POSITION
+                    : TRACKED_VISION_OUTPUTS
                 ),
-                [
-                  1,
-                  3,
-                  candidate.inputSize,
-                  candidate.inputSize,
-                ],
+          );
+
+        recordTiming(
+          trackingEncoder === undefined
+            ? "vision-encoder"
+            : "tracked-vision-encoder",
+          runStartedAt,
+        );
+
+        if (
+          needsPosition
+        ) {
+          visionPosition =
+            floatData(
+              requireTensor(
+                outputs,
+                "vision_pos_embed",
               ),
-          });
+              "SAM 2.1 vision_pos_embed",
+            ).slice();
+        }
+
+        if (
+          visionPosition ===
+          undefined
+        ) {
+          throw new Error(
+            "SAM 2.1 vision position cache was not initialized.",
+          );
+        }
+
+        visionPositionTokens ??=
+          new ort.Tensor(
+            "float32",
+            channelsToTokens(
+              visionPosition,
+              FEATURE_CHANNELS,
+              featureTokens,
+            ),
+            [
+              featureTokens,
+              1,
+              FEATURE_CHANNELS,
+            ],
+          );
 
         return {
           feats0:
@@ -641,16 +1216,52 @@ export const createSam21Adapter =
               "feats2",
             ),
           feats2NoMemory:
-            requireTensor(
-              outputs,
-              "feats2_no_mem",
-            ),
+            outputs[
+              "feats2_no_mem"
+            ],
           position:
-            requireTensor(
-              outputs,
-              "vision_pos_embed",
-            ),
+            visionPosition,
         };
+      };
+
+    const getSeedVision =
+      async (
+        frame:
+          VideoFrame,
+      ): Promise<SamVision> => {
+        if (
+          seedFrame ===
+            frame &&
+          seedVision !==
+            undefined
+        ) {
+          return seedVision;
+        }
+
+        const next =
+          await encode(
+            frame,
+          );
+
+        const previous =
+          seedVision;
+
+        seedFrame =
+          frame;
+
+        seedVision =
+          next;
+
+        if (
+          previous !==
+          undefined
+        ) {
+          disposeVision(
+            previous,
+          );
+        }
+
+        return next;
       };
 
     const decode =
@@ -663,9 +1274,12 @@ export const createSam21Adapter =
           ReturnType<
             typeof pointPromptTensors
           >,
-      ): Promise<SamDecoded> =>
-        decodedMask(
-          await sessions.maskDecoder.run({
+      ): Promise<SamDecoded> => {
+        const runStartedAt =
+          performance.now();
+
+        const outputs =
+          await promptSessions.maskDecoder.run({
             feats0:
               vision.feats0,
             feats1:
@@ -676,8 +1290,74 @@ export const createSam21Adapter =
               prompt.points,
             input_labels:
               prompt.labels,
-          }),
+          });
+
+        recordTiming(
+          "mask-decoder",
+          runStartedAt,
         );
+
+        return decodedMask(
+          outputs,
+        );
+      };
+
+    const decodeTracked =
+      async (
+        vision:
+          SamVision,
+        conditioned:
+          ort.Tensor,
+      ): Promise<SamDecoded> => {
+        const trackingSessions =
+          await getTrackingSessions();
+
+        const trackedDecoder =
+          trackingSessions
+            .trackedMaskDecoder;
+
+        if (
+          trackedDecoder ===
+          undefined
+        ) {
+          return decode(
+            vision,
+            conditioned,
+            pointPromptTensors(
+              [
+                {
+                  x: 0,
+                  y: 0,
+                  label: -1,
+                },
+              ],
+              candidate.inputSize,
+            ),
+          );
+        }
+
+        const runStartedAt =
+          performance.now();
+
+        const outputs =
+          await trackedDecoder.run({
+            feats0:
+              vision.feats0,
+            feats1:
+              vision.feats1,
+            feats2_cond:
+              conditioned,
+          });
+
+        recordTiming(
+          "tracked-mask-decoder",
+          runStartedAt,
+        );
+
+        return decodedMask(
+          outputs,
+        );
+      };
 
     const remember =
       async (
@@ -688,43 +1368,82 @@ export const createSam21Adapter =
         index: number,
         prompted: boolean,
       ): Promise<StoredMemory> => {
+        const trackingSessions =
+          await getTrackingSessions();
+
+        const memoryInputs = {
+          feats2:
+            vision.feats2,
+          high_res_mask:
+            new ort.Tensor(
+              "float32",
+              decoded.highResolution,
+              [
+                1,
+                1,
+                candidate.inputSize,
+                candidate.inputSize,
+              ],
+            ),
+          object_score_logits:
+            new ort.Tensor(
+              "float32",
+              Float32Array.of(
+                decoded.objectScore,
+              ),
+              [
+                1,
+                1,
+              ],
+            ),
+        };
+
+        const runStartedAt =
+          performance.now();
+
+        const needsPosition =
+          memoryPosition ===
+          undefined;
+
+        const trackedEncoder =
+          prompted
+            ? undefined
+            : trackingSessions
+                .trackedMemoryEncoder;
+
         const outputs =
-          await sessions.memoryEncoder.run({
-            feats2:
-              vision.feats2,
-            high_res_mask:
-              new ort.Tensor(
-                "float32",
-                decoded.highResolution,
-                [
-                  1,
-                  1,
-                  candidate.inputSize,
-                  candidate.inputSize,
-                ],
-              ),
-            object_score_logits:
-              new ort.Tensor(
-                "float32",
-                Float32Array.of(
-                  decoded.objectScore,
-                ),
-                [
-                  1,
-                  1,
-                ],
-              ),
-            binarize:
-              new ort.Tensor(
-                "float32",
-                Float32Array.of(
-                  prompted
-                    ? 1
-                    : 0,
-                ),
-                [],
-              ),
-          });
+          trackedEncoder ===
+          undefined
+            ? await trackingSessions.memoryEncoder.run(
+                {
+                  ...memoryInputs,
+                  binarize:
+                    new ort.Tensor(
+                      "float32",
+                      Float32Array.of(
+                        prompted
+                          ? 1
+                          : 0,
+                      ),
+                      [],
+                    ),
+                },
+                needsPosition
+                  ? MEMORY_OUTPUTS_WITH_POSITION
+                  : MEMORY_OUTPUTS,
+              )
+            : await trackedEncoder.run(
+                memoryInputs,
+                MEMORY_OUTPUTS,
+              );
+
+        recordTiming(
+          trackedEncoder ===
+            undefined
+            ? "memory-encoder"
+            : "tracked-memory-encoder",
+          runStartedAt,
+        );
 
         const tokens =
           floatData(
@@ -735,20 +1454,33 @@ export const createSam21Adapter =
             "SAM 2.1 memory_tokens",
           ).slice();
 
-        const positions =
-          floatData(
-            requireTensor(
-              outputs,
-              "memory_pos",
-            ),
-            "SAM 2.1 memory_pos",
-          ).slice();
+        if (
+          needsPosition
+        ) {
+          memoryPosition =
+            floatData(
+              requireTensor(
+                outputs,
+                "memory_pos",
+              ),
+              "SAM 2.1 memory_pos",
+            ).slice();
+        }
+
+        if (
+          memoryPosition ===
+          undefined
+        ) {
+          throw new Error(
+            "SAM 2.1 memory position cache was not initialized.",
+          );
+        }
 
         if (
           tokens.length !==
             featureTokens *
               MEMORY_DIMENSION ||
-          positions.length !==
+          memoryPosition.length !==
             featureTokens *
               MEMORY_DIMENSION
         ) {
@@ -760,21 +1492,18 @@ export const createSam21Adapter =
         return {
           index,
           tokens,
-          positions,
+          positions:
+            memoryPosition,
           pointer:
             decoded.pointer,
         };
       };
 
-    return {
-      candidate,
-
-      async seed(
-        frame,
+    const validatePrompt =
+      (
         prompt:
           VideoSegmentationPrompt,
-        frameIndex,
-      ) {
+      ) => {
         if (
           prompt.proposalIndex !==
             undefined &&
@@ -785,23 +1514,39 @@ export const createSam21Adapter =
             "This SAM 2.1 export returns one seed proposal; only proposal 0 is available.",
           );
         }
+      };
 
-        const vision =
-          await encode(
-            frame,
-          );
+    const seedWithBank =
+      async (
+        vision: SamVision,
+        targetBank:
+          SamMemoryBank,
+        prompt:
+          VideoSegmentationPrompt,
+        frameIndex: number,
+      ): Promise<
+        VideoSegmentationMask
+      > => {
+        validatePrompt(
+          prompt,
+        );
 
         const decoded =
           await decode(
             vision,
-            vision.feats2NoMemory,
+            vision.feats2NoMemory ??
+              (() => {
+                throw new Error(
+                  "SAM 2.1 prompt vision output is missing.",
+                );
+              })(),
             pointPromptTensors(
               prompt.points,
               candidate.inputSize,
             ),
           );
 
-        bank.condition(
+        targetBank.condition(
           await remember(
             vision,
             decoded,
@@ -811,35 +1556,53 @@ export const createSam21Adapter =
         );
 
         return decoded.mask;
-      },
+      };
 
-      async track(
-        frame,
-        frameIndex,
-        totalFrames,
-      ) {
-        const vision =
-          await encode(
-            frame,
-          );
+    let gpuTokenTranspose:
+      ReturnType<typeof createSamGpuTokenTransposer> | undefined;
+
+    const trackWithBank =
+      async (
+        vision: SamVision,
+        targetBank:
+          SamMemoryBank,
+        frameIndex: number,
+        totalFrames: number,
+      ): Promise<
+        VideoSegmentationMask
+      > => {
+        const trackingSessions =
+          await getTrackingSessions();
 
         const assembled =
-          bank.assemble(
+          targetBank.assemble(
             frameIndex,
             totalFrames,
           );
 
+        const pointerInputs = {
+          normalized_diffs:
+            new ort.Tensor(
+              "float32",
+              assembled.normalizedPointerDiffs,
+              [
+                MAX_POINTERS,
+              ],
+            ),
+        };
+
+        let runStartedAt =
+          performance.now();
+
         const pointerOutput =
-          await sessions.pointerTpos.run({
-            normalized_diffs:
-              new ort.Tensor(
-                "float32",
-                assembled.normalizedPointerDiffs,
-                [
-                  MAX_POINTERS,
-                ],
-              ),
-          });
+          await trackingSessions.pointerTpos.run(
+            pointerInputs,
+          );
+
+        recordTiming(
+          "pointer-tpos",
+          runStartedAt,
+        );
 
         const pointerPositions =
           expandPointerPositions(
@@ -868,82 +1631,199 @@ export const createSam21Adapter =
           );
         }
 
+        let gpuAttentionTokens:
+          ReturnType<ReturnType<typeof createSamGpuTokenTransposer>> | undefined;
+
+        let currentVisionFeatures: ort.Tensor;
+
+        if (options?.visionGpuAttention === true) {
+          const gpuStartedAt = performance.now();
+          const device = await ort.env.webgpu.device;
+
+          if (device === undefined) {
+            throw new Error("SAM GPU attention requires an active WebGPU device.");
+          }
+
+          gpuTokenTranspose ??= createSamGpuTokenTransposer(
+            device,
+            featureTokens,
+            FEATURE_CHANNELS,
+          );
+
+          gpuAttentionTokens = gpuTokenTranspose(vision.feats2);
+          currentVisionFeatures = gpuAttentionTokens.tensor;
+          recordTiming("vision-gpu-token-transpose", gpuStartedAt);
+        } else {
+          const cpuStartedAt = performance.now();
+
+          currentVisionFeatures = new ort.Tensor(
+            "float32",
+            channelsToTokens(
+              floatData(
+                vision.feats2,
+                "SAM 2.1 feats2",
+              ),
+              FEATURE_CHANNELS,
+              featureTokens,
+            ),
+            [
+              featureTokens,
+              1,
+              FEATURE_CHANNELS,
+            ],
+          );
+
+          recordTiming("vision-cpu-token-transpose", cpuStartedAt);
+        }
+
+        const attentionInputs = {
+          current_vision_features:
+            currentVisionFeatures,
+          current_vision_position_embeddings:
+            visionPositionTokens ??
+            (() => {
+              throw new Error(
+                "SAM 2.1 tokenized vision position cache was not initialized.",
+              );
+            })(),
+          memory:
+            new ort.Tensor(
+              "float32",
+              assembled.memory,
+              [
+                memoryRows,
+                1,
+                MEMORY_DIMENSION,
+              ],
+            ),
+          memory_pos:
+            new ort.Tensor(
+              "float32",
+              memoryPositions,
+              [
+                memoryRows,
+                1,
+                MEMORY_DIMENSION,
+              ],
+            ),
+        };
+
+        runStartedAt =
+          performance.now();
+
+        // The submitted transpose and ONNX inference execute in order on
+        // the same WebGPU queue. Release the owned token buffer after inference.
         const attention =
-          await sessions.memoryAttention.run({
-            current_vision_features:
-              new ort.Tensor(
-                "float32",
-                channelsToTokens(
-                  floatData(
-                    vision.feats2,
-                    "SAM 2.1 feats2",
-                  ),
-                  FEATURE_CHANNELS,
-                  featureTokens,
-                ),
-                [
-                  featureTokens,
-                  1,
-                  FEATURE_CHANNELS,
-                ],
-              ),
-            current_vision_position_embeddings:
-              new ort.Tensor(
-                "float32",
-                channelsToTokens(
-                  floatData(
-                    vision.position,
-                    "SAM 2.1 vision_pos_embed",
-                  ),
-                  FEATURE_CHANNELS,
-                  featureTokens,
-                ),
-                [
-                  featureTokens,
-                  1,
-                  FEATURE_CHANNELS,
-                ],
-              ),
-            memory:
-              new ort.Tensor(
-                "float32",
-                assembled.memory,
-                [
-                  memoryRows,
-                  1,
-                  MEMORY_DIMENSION,
-                ],
-              ),
-            memory_pos:
-              new ort.Tensor(
-                "float32",
-                memoryPositions,
-                [
-                  memoryRows,
-                  1,
-                  MEMORY_DIMENSION,
-                ],
-              ),
+          await trackingSessions.memoryAttention.run(
+            attentionInputs,
+          ).finally(() => {
+            gpuAttentionTokens?.release();
           });
 
-        const decoded =
-          await decode(
-            vision,
-            requireTensor(
-              attention,
-              "conditioned_feats",
-            ),
-            pointPromptTensors(
-              [
-                {
-                  x: 0,
-                  y: 0,
-                  label: -1,
-                },
-              ],
-              candidate.inputSize,
-            ),
+        recordTiming(
+          "memory-attention",
+          runStartedAt,
+        );
+
+        const conditioned =
+          requireTensor(
+            attention,
+            "conditioned_feats",
           );
+
+        const fusedStep =
+          trackingSessions
+            .trackedStep;
+
+        if (
+          fusedStep !==
+          undefined
+        ) {
+          try {
+            runStartedAt =
+              performance.now();
+
+            const outputs =
+              await fusedStep.run(
+                {
+                  feats0:
+                    vision.feats0,
+                  feats1:
+                    vision.feats1,
+                  feats2_cond:
+                    conditioned,
+                  memory_feats2:
+                    vision.feats2,
+                },
+                TRACKED_STEP_OUTPUTS,
+              );
+
+            recordTiming(
+              "tracked-step",
+              runStartedAt,
+            );
+
+            const tracked =
+              decodedTrackedStep(
+                outputs,
+              );
+
+            if (
+              tracked.objectScore >
+                0 &&
+              (tracked.mask.iou ??
+                0) >=
+                RELIABLE_IOU
+            ) {
+              if (
+                memoryPosition ===
+                undefined
+              ) {
+                throw new Error(
+                  "SAM 2.1 memory position cache was not initialized.",
+                );
+              }
+
+              if (
+                tracked.memoryTokens.length !==
+                featureTokens *
+                  MEMORY_DIMENSION
+              ) {
+                throw new Error(
+                  "SAM 2.1 fused tracked step returned unexpected memory geometry.",
+                );
+              }
+
+              targetBank.push({
+                index:
+                  frameIndex,
+                tokens:
+                  tracked.memoryTokens,
+                positions:
+                  memoryPosition,
+                pointer:
+                  tracked.pointer,
+              });
+            }
+
+            return tracked.mask;
+          } finally {
+            conditioned.dispose();
+          }
+        }
+
+        let decoded:
+          SamDecoded;
+
+        try {
+          decoded =
+            await decodeTracked(
+              vision,
+              conditioned,
+            );
+        } finally {
+          conditioned.dispose();
+        }
 
         if (
           decoded.objectScore >
@@ -952,7 +1832,7 @@ export const createSam21Adapter =
             0) >=
             RELIABLE_IOU
         ) {
-          bank.push(
+          targetBank.push(
             await remember(
               vision,
               decoded,
@@ -963,25 +1843,395 @@ export const createSam21Adapter =
         }
 
         return decoded.mask;
+      };
+
+    return {
+      candidate,
+      timingSnapshot,
+
+      async prepareFrame(
+        frame,
+      ) {
+        const encodeStartedAt =
+          performance.now();
+
+        const currentSeedVision =
+          await getSeedVision(
+            frame,
+          );
+
+        const encodedAt =
+          performance.now();
+
+        let promptWarmMs =
+          0;
+
+        if (
+          !promptPipelineWarm
+        ) {
+          const promptStartedAt =
+            performance.now();
+
+          await decode(
+            currentSeedVision,
+            currentSeedVision.feats2NoMemory ??
+              (() => {
+                throw new Error(
+                  "SAM 2.1 prompt vision output is missing.",
+                );
+              })(),
+            pointPromptTensors(
+              [
+                {
+                  x: 0.5,
+                  y: 0.5,
+                  label: 1,
+                },
+              ],
+              candidate.inputSize,
+            ),
+          );
+
+          promptWarmMs =
+            performance.now() -
+            promptStartedAt;
+
+          // Selection preview only needs vision + prompt decoding. Temporal memory warms during export.
+          promptPipelineWarm =
+            true;
+        }
+
+        return {
+          encodeMs:
+            encodedAt -
+            encodeStartedAt,
+          promptWarmMs,
+        };
+      },
+
+      async prepareTracking() {
+        await getTrackingSessions();
+      },
+
+      async seed(
+        frame,
+        prompt:
+          VideoSegmentationPrompt,
+        frameIndex,
+      ) {
+        const vision =
+          await encode(
+            frame,
+          );
+
+        try {
+          return await seedWithBank(
+            vision,
+            bank,
+            prompt,
+            frameIndex,
+          );
+        } finally {
+          disposeVision(
+            vision,
+          );
+        }
+      },
+
+      async track(
+        frame,
+        frameIndex,
+        totalFrames,
+      ) {
+        const vision =
+          await encode(
+            frame,
+            false,
+          );
+
+        try {
+          return await trackWithBank(
+            vision,
+            bank,
+            frameIndex,
+            totalFrames,
+          );
+        } finally {
+          disposeVision(
+            vision,
+          );
+        }
+      },
+
+      async previewSubjects(
+        frame,
+        subjects:
+          readonly VideoSegmentationSubjectPrompt[],
+      ) {
+        if (
+          subjects.length ===
+          0
+        ) {
+          throw new Error(
+            "SAM 2.1 subject preview requires at least one subject.",
+          );
+        }
+
+        const identifiers =
+          new Set(
+            subjects.map(
+              (subject) =>
+                subject.id,
+            ),
+          );
+
+        if (
+          identifiers.size !==
+          subjects.length
+        ) {
+          throw new Error(
+            "SAM 2.1 subject identifiers must be unique.",
+          );
+        }
+
+        const vision =
+          await getSeedVision(
+            frame,
+          );
+
+        const masks:
+          VideoSegmentationMask[] =
+            [];
+
+        for (
+          const subject of
+          subjects
+        ) {
+          validatePrompt(
+            subject.prompt,
+          );
+
+          const decoded =
+            await decode(
+              vision,
+              vision.feats2NoMemory ??
+                (() => {
+                  throw new Error(
+                    "SAM 2.1 prompt vision output is missing.",
+                  );
+                })(),
+              pointPromptTensors(
+                subject.prompt.points,
+                candidate.inputSize,
+              ),
+            );
+
+          masks.push(
+            decoded.mask,
+          );
+        }
+
+        return masks;
+      },
+
+      async seedSubjects(
+        frame,
+        subjects:
+          readonly VideoSegmentationSubjectPrompt[],
+        frameIndex,
+      ) {
+        if (
+          subjects.length ===
+          0
+        ) {
+          throw new Error(
+            "SAM 2.1 multi-subject tracking requires at least one subject.",
+          );
+        }
+
+        const identifiers =
+          new Set(
+            subjects.map(
+              (subject) =>
+                subject.id,
+            ),
+          );
+
+        if (
+          identifiers.size !==
+          subjects.length
+        ) {
+          throw new Error(
+            "SAM 2.1 subject identifiers must be unique.",
+          );
+        }
+
+        const vision =
+          await getSeedVision(
+            frame,
+          );
+
+        subjectBanks.clear();
+
+        const masks:
+          VideoSegmentationMask[] =
+            [];
+
+        for (
+          const subject of
+          subjects
+        ) {
+          const subjectBank =
+            createBank();
+
+          subjectBanks.set(
+            subject.id,
+            subjectBank,
+          );
+
+          masks.push(
+            await seedWithBank(
+              vision,
+              subjectBank,
+              subject.prompt,
+              frameIndex,
+            ),
+          );
+        }
+
+        return masks;
+      },
+
+      async trackSubjects(
+        frame,
+        frameIndex,
+        totalFrames,
+      ) {
+        if (
+          subjectBanks.size ===
+          0
+        ) {
+          throw new Error(
+            "SAM 2.1 has no seeded subjects to track.",
+          );
+        }
+
+        const vision =
+          await encode(
+            frame,
+            false,
+          );
+
+        const masks:
+          VideoSegmentationMask[] =
+            [];
+
+        try {
+          for (
+            const subjectBank of
+            subjectBanks.values()
+          ) {
+            masks.push(
+              await trackWithBank(
+                vision,
+                subjectBank,
+                frameIndex,
+                totalFrames,
+              ),
+            );
+          }
+
+          return masks;
+        } finally {
+          disposeVision(
+            vision,
+          );
+        }
       },
 
       rewind() {
         bank.rewind();
       },
 
+      rewindSubjects() {
+        for (
+          const subjectBank of
+          subjectBanks.values()
+        ) {
+          subjectBank.rewind();
+        }
+      },
+
       async close() {
+        seedFrame = undefined;
+
+        if (
+          seedVision !==
+          undefined
+        ) {
+          disposeVision(
+            seedVision,
+          );
+
+          seedVision =
+            undefined;
+        }
+
+        subjectBanks.clear();
+
+        visionPositionTokens?.dispose();
+        visionPositionTokens =
+          undefined;
+
+        await trackingSessionsPromise?.catch(
+          () => undefined,
+        );
+
         await closeVideoSessions({
           "vision-encoder":
-            sessions.visionEncoder,
+            loaded.get(
+              "vision-encoder",
+            ),
           "mask-decoder":
-            sessions.maskDecoder,
+            loaded.get(
+              "mask-decoder",
+            ),
           "memory-attention":
-            sessions.memoryAttention,
+            loaded.get(
+              "memory-attention",
+            ),
           "memory-encoder":
-            sessions.memoryEncoder,
+            loaded.get(
+              "memory-encoder",
+            ),
           "pointer-tpos":
-            sessions.pointerTpos,
+            loaded.get(
+              "pointer-tpos",
+            ),
+          "tracked-mask-decoder":
+            trackedMaskDecoder,
+          "tracked-memory-encoder":
+            trackedMemoryEncoder,
         });
+
+        try {
+          await trackedVisionEncoder?.release();
+        } catch {
+          // Closing the specialized vision session is best-effort.
+        }
+
+        trackedVisionEncoder = undefined;
+
+        try {
+          await trackedStep?.release();
+        } catch {
+          // Closing the experimental fused session is best-effort.
+        }
+
+        visionInputTensor = undefined;
+        visionInputBuffer?.destroy();
+        visionInputBuffer = undefined;
       },
     };
+
   };

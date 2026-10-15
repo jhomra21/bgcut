@@ -174,6 +174,11 @@ export const QUALITY_FIXTURES =
 export const QUALITY_FRAME_COUNT =
   12;
 
+// Research-only indexed DAVIS data can cover a full second. Keep the
+// public quality fixture proxy on its existing twelve-frame contract.
+const INDEXED_DAVIS_FRAME_COUNT =
+  24;
+
 export const QUALITY_FRAME_RATE =
   24;
 
@@ -389,10 +394,14 @@ export const proxyQualityFixtureRequest =
         10,
       );
 
+    const frameLimit =
+      options.maskRoot === undefined
+        ? QUALITY_FRAME_COUNT
+        : INDEXED_DAVIS_FRAME_COUNT;
+
     if (
       index < 0 ||
-      index >=
-        QUALITY_FRAME_COUNT ||
+      index >= frameLimit ||
       filename !==
         frameFilename(
           index,

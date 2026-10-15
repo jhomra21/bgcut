@@ -88,7 +88,7 @@ const App = (props: AppProps = {}) => {
         <div class="site-header-shell">
           <LocalAppHeader />
         </div>
-        <HomePage />
+        <HomePage allowVideo={import.meta.env.DEV} />
       </div>
     );
   }

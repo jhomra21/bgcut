@@ -183,10 +183,51 @@ export const fetchVideoModelConstants =
     };
   };
 
+export const createVideoSessionFromUrl =
+  async (
+    url: string,
+    label: string,
+  ): Promise<ort.InferenceSession> => {
+    const response =
+      await fetch(
+        url,
+        {
+          cache:
+            "force-cache",
+        },
+      );
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        `Could not fetch ${label}: HTTP ${response.status}.`,
+      );
+    }
+
+    return ort.InferenceSession.create(
+      new Uint8Array(
+        await response.arrayBuffer(),
+      ),
+      {
+        executionProviders: [
+          {
+            name: "webgpu",
+          },
+        ],
+        graphOptimizationLevel:
+          "all",
+      },
+    );
+  };
+
 export const createVideoSession =
   async (
     candidate: VideoSegmentationCandidate,
     role: VideoModelGraphRole,
+    captureGraph = false,
+    visionGpuOutputs = false,
+    visionGpuAttention = false,
   ): Promise<ort.InferenceSession> => {
     const artifact =
       artifactFor(
@@ -261,7 +302,23 @@ export const createVideoSession =
         ],
         graphOptimizationLevel:
           "all",
+        enableGraphCapture: captureGraph,
       };
+
+    if (role === "vision-encoder" && (visionGpuOutputs || visionGpuAttention)) {
+      // These feature tensors feed only GPU-backed decoder/temporal models.
+      // The attention probe also keeps feats2 on the GPU to transpose its
+      // tokens without a CPU readback. The positional embedding stays on CPU.
+      const locations = {
+        feats0: "gpu-buffer",
+        feats1: "gpu-buffer",
+        feats2_no_mem: "gpu-buffer",
+      } as const;
+
+      sessionOptions.preferredOutputLocation = visionGpuAttention
+        ? { ...locations, feats2: "gpu-buffer" }
+        : locations;
+    }
 
     if (
       externalData.length >
@@ -304,8 +361,10 @@ export const frameToNchw =
     imageSize: number,
     mean: readonly number[],
     std: readonly number[],
+    reusableCanvas?: OffscreenCanvas,
   ): Float32Array => {
     const canvas =
+      reusableCanvas ??
       new OffscreenCanvas(
         imageSize,
         imageSize,
@@ -324,6 +383,12 @@ export const frameToNchw =
       throw new Error(
         "Could not create the video benchmark 2D canvas.",
       );
+    }
+
+    // Only a reused canvas needs clearing. The regular per-frame allocation
+    // path stays unchanged; clearing prevents alpha pixels retaining old frames.
+    if (reusableCanvas !== undefined) {
+      context.clearRect(0, 0, imageSize, imageSize);
     }
 
     context.drawImage(

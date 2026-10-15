@@ -2,6 +2,8 @@ import { Show } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 
 import ComparisonSlider from "../components/ComparisonSlider";
+import { VideoLab } from "../components/VideoLab";
+import { isVideoFile } from "../media-intake";
 
 type ReadyImage = {
   readonly status: "ready";
@@ -46,7 +48,8 @@ const transparentName = (fileName: string): string => {
   return `${baseName || "image"}-transparent.png`;
 };
 
-export const HomePage = (props: { readonly showIntro?: boolean }) => {
+export const HomePage = (props: { readonly showIntro?: boolean; readonly allowVideo?: boolean }) => {
+  const [videoFile, setVideoFile] = createSignal<File>();
   const [imageState, setImageState] = createSignal<ImageState>({ status: "empty" });
   const [resultState, setResultState] = createSignal<ResultState>({ status: "idle" });
   const [copyState, setCopyState] = createSignal<"idle" | "copied" | "error">("idle");
@@ -94,6 +97,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
   };
 
   const reset = () => {
+    setVideoFile(undefined);
     selectionVersion += 1;
     clearResult();
 
@@ -195,6 +199,22 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
       });
   };
 
+  const selectMedia = (file: File) => {
+    if (processing()) {
+      return;
+    }
+
+    reset();
+
+    if (props.allowVideo && isVideoFile(file)) {
+      setVideoFile(file);
+
+      return;
+    }
+
+    selectImage(file);
+  };
+
   const copyResult = (result: ReadyResult) => {
     if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
       setCopyState("error");
@@ -237,7 +257,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
   };
 
   const handleSurfaceClick = (event: MouseEvent) => {
-    if (readyImage() !== undefined || event.target !== event.currentTarget) {
+    if (videoFile() !== undefined || readyImage() !== undefined || event.target !== event.currentTarget) {
       return;
     }
 
@@ -254,7 +274,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
     const file = event.dataTransfer?.files.item(0);
 
     if (file !== null && file !== undefined) {
-      selectImage(file);
+      selectMedia(file);
     }
   };
 
@@ -268,7 +288,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
     const file = input.files?.item(0);
 
     if (file !== null && file !== undefined) {
-      selectImage(file);
+      selectMedia(file);
     }
   };
 
@@ -292,7 +312,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
 
       if (file !== null) {
         event.preventDefault();
-        selectImage(file);
+        selectMedia(file);
 
         return;
       }
@@ -398,7 +418,7 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
       </Show>
 
       <section
-        class={`drop-surface${readyImage() !== undefined ? " has-image" : ""}`}
+        class={`drop-surface${readyImage() !== undefined || videoFile() !== undefined ? " has-image" : ""}`}
         onClick={handleSurfaceClick}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
@@ -410,11 +430,12 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
           id="source-file-input"
           class="file-input"
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/avif"
-          aria-label="Choose image"
+          accept={props.allowVideo ? "image/png,image/jpeg,image/webp,image/avif,video/*,.mp4,.mov,.m4v,.webm,.mkv" : "image/png,image/jpeg,image/webp,image/avif"}
+          aria-label={props.allowVideo ? "Choose image or video" : "Choose image"}
           onChange={handleFileInput}
         />
 
+        <Show keyed when={videoFile()} fallback={<>
         <Show
           keyed
           when={readyImage()}
@@ -426,12 +447,12 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
                     <kbd class="shortcut-key input-shortcut-key" aria-label="Choose image shortcut, Command O">⌘O</kbd>
                   </span>
                 </span>
-                <strong>Click or drag image here</strong>
+                <strong>{props.allowVideo ? "Click or drag image or video here" : "Click or drag image here"}</strong>
                 <span class="drop-trigger-shortcuts" aria-label="Image input shortcuts">
                   <span aria-keyshortcuts="Meta+V Control+V">
                     or paste <kbd class="shortcut-key input-shortcut-key" aria-label="Paste image shortcut, Command V">⌘V</kbd>
                   </span>
-                  <span class="drop-trigger-format">JPEG, PNG, WebP, or AVIF</span>
+                  <span class="drop-trigger-format">{props.allowVideo ? "Images or video · processed on your device" : "JPEG, PNG, WebP, or AVIF"}</span>
                 </span>
               </span>
             </button>
@@ -534,6 +555,9 @@ export const HomePage = (props: { readonly showIntro?: boolean }) => {
               </button>
             </div>
           )}
+        </Show>
+        </>}>
+          {(file) => <VideoLab file={file} onChangeMedia={() => fileInput?.click()} />}
         </Show>
       </section>
 

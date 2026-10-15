@@ -4,6 +4,7 @@ export type VideoModelGraphRole =
   | "vision-encoder"
   | "mask-decoder"
   | "tracked-mask-decoder"
+  | "tracked-memory-encoder"
   | "memory-attention"
   | "memory-encoder"
   | "pointer-tpos";
@@ -58,6 +59,12 @@ export type VideoSegmentationPrompt = {
   readonly proposalIndex?: number;
 };
 
+export type VideoSegmentationSubjectPrompt = {
+  readonly id: string;
+  readonly prompt:
+    VideoSegmentationPrompt;
+};
+
 export type VideoSegmentationMaskAlternative = {
   readonly logits: Float32Array;
   readonly width: number;
@@ -81,8 +88,35 @@ export type VideoSegmentationDiscovery = {
     VideoSegmentationMaskAlternative;
 };
 
+export type VideoFramePreparation = {
+  readonly encodeMs: number;
+  readonly promptWarmMs: number;
+};
+
+export type VideoSegmentationTimingSummary =
+  Readonly<
+    Record<
+      string,
+      {
+        readonly calls:
+          number;
+        readonly totalMs:
+          number;
+      }
+    >
+  >;
+
 export type VideoSegmentationAdapter = {
   readonly candidate: VideoSegmentationCandidate;
+  timingSnapshot?():
+    VideoSegmentationTimingSummary;
+  prepareFrame?(
+    frame: VideoFrame,
+  ): Promise<
+    VideoFramePreparation |
+    void
+  >;
+  prepareTracking?(): Promise<void>;
   seed(
     frame: VideoFrame,
     prompt: VideoSegmentationPrompt,
@@ -100,6 +134,29 @@ export type VideoSegmentationAdapter = {
     frameIndex: number,
     totalFrames: number,
   ): Promise<VideoSegmentationMask>;
+  previewSubjects?(
+    frame: VideoFrame,
+    subjects:
+      readonly VideoSegmentationSubjectPrompt[],
+  ): Promise<
+    readonly VideoSegmentationMask[]
+  >;
+  seedSubjects?(
+    frame: VideoFrame,
+    subjects:
+      readonly VideoSegmentationSubjectPrompt[],
+    frameIndex: number,
+    totalFrames: number,
+  ): Promise<
+    readonly VideoSegmentationMask[]
+  >;
+  trackSubjects?(
+    frame: VideoFrame,
+    frameIndex: number,
+    totalFrames: number,
+  ): Promise<
+    readonly VideoSegmentationMask[]
+  >;
   discover?(
     frame: VideoFrame,
     points:
@@ -108,12 +165,37 @@ export type VideoSegmentationAdapter = {
     readonly VideoSegmentationDiscovery[]
   >;
   rewind(): void;
+  rewindSubjects?(): void;
   close(): Promise<void>;
+};
+
+export type VideoSegmentationAdapterOptions = {
+  /** Benchmark-only: try WebGPU command graph capture on the vision encoder. */
+  readonly visionGraphCapture?: boolean;
+  /** Benchmark-only: compare a reusable normalization canvas with the default. */
+  readonly visionCanvasReuse?: boolean;
+  /** Benchmark-only: upload normalized pixels through an owned WebGPU input buffer. */
+  readonly visionGpuInput?: boolean;
+  /** Benchmark-only: keep decoder-facing SAM vision features on WebGPU. */
+  readonly visionGpuOutputs?: boolean;
+  /** Benchmark-only: transpose SAM memory-attention feature tokens on GPU. */
+  readonly visionGpuAttention?: boolean;
+  readonly trackedMaskDecoderUrl?:
+    string;
+  readonly trackedMemoryEncoderUrl?:
+    string;
+  readonly trackedStepUrl?:
+    string;
+  /** Benchmark-only: pruned SAM vision encoder graph for tracked frames. */
+  readonly trackedVisionUrl?:
+    string;
 };
 
 export type VideoSegmentationAdapterFactory = (
   candidate: VideoSegmentationCandidate,
   onProgress?: (progress: number) => void,
+  options?:
+    VideoSegmentationAdapterOptions,
 ) => Promise<VideoSegmentationAdapter>;
 
 export type DecodedVideoFrame = {
@@ -132,6 +214,7 @@ export type VideoSourceInfo = {
 
 export type VideoFrameSource = {
   readonly info: VideoSourceInfo;
+  frameTimes(start: number, end: number, maxFps: number, signal?: AbortSignal): Promise<readonly number[]>;
   frameAt(timestamp: number): Promise<DecodedVideoFrame | null>;
   framesAt(
     timestamps: readonly number[],
